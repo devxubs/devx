@@ -14,9 +14,10 @@ type Size = "small" | "medium" | "large";
 export type MenuProps = {
   item: MenuItem[];
   size?: Size;
+  onClose?: Function;
 };
 
-const Menu = ({ item, size = "medium" }: MenuProps) => {
+const Menu = ({ item, size = "medium", onClose }: MenuProps) => {
   const sizeStyles = {
     small: {
       minWidth: 120,
@@ -87,7 +88,10 @@ const Menu = ({ item, size = "medium" }: MenuProps) => {
                 },
               }),
             }}
-            onClick={() => onClick?.(label)}
+            onClick={() => {
+              onClick?.(label);
+              onClose?.();
+            }}
           >
             <ListItemIcon
               sx={{

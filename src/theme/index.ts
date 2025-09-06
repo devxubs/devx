@@ -1,6 +1,6 @@
 import { createTheme } from "@mui/material/styles";
 import typography from "./typography";
-import shadows from "./shadow";
+import { lightShadows, darkShadows } from "./shadow";
 import darkPalette from "./darkPalette";
 import lightPalette from "./lightPalette";
 
@@ -34,5 +34,5 @@ export const buildAppTheme = (
     ),
     typography,
     shape: { borderRadius: 12 },
-    shadows,
+    shadows: mode === "light" ? lightShadows : darkShadows,
   });

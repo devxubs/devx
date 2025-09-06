@@ -6,7 +6,7 @@ import {
   responsiveFontSizes,
 } from "@mui/material/styles";
 import palette from "./colors";
-import shadows from "./shadow";
+import { darkShadows } from "./shadow";
 import typography from "./typography";
 
 const darkPalette: PaletteOptions = {

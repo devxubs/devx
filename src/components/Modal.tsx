@@ -17,12 +17,14 @@ export default function CustomModal({
   children,
   sx,
   title,
+  closeIcon = false,
 }: {
   open: boolean;
   onClose: () => void;
   children?: React.ReactNode;
   sx?: SxProps;
   title?: string;
+  closeIcon?: boolean;
 }) {
   return (
     <Modal
@@ -49,17 +51,26 @@ export default function CustomModal({
             ...sx,
           }}
         >
-          <Stack
-            direction="row"
-            justifyContent={title ? "space-between" : "flex-end"}
-            alignItems="center"
-            mb={2}
-          >
-            {title && <Typography variant="h6">{title}</Typography>}
-            <IconButton onClick={onClose}>
-              <Icon icon="eva:close-fill"></Icon>
-            </IconButton>
-          </Stack>
+          {title ||
+            (closeIcon && (
+              <Stack
+                direction="row"
+                justifyContent={title ? "space-between" : "flex-end"}
+                alignItems="center"
+                mb={2}
+              >
+                {title && (
+                  <Typography fontSize={22} fontWeight={600}>
+                    {title}
+                  </Typography>
+                )}
+                {closeIcon && (
+                  <IconButton onClick={onClose}>
+                    <Icon icon="eva:close-fill"></Icon>
+                  </IconButton>
+                )}
+              </Stack>
+            ))}
           {children}
         </Box>
       </Fade>

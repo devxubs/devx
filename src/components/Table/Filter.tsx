@@ -22,11 +22,40 @@ import Select, { SelectChangeEvent } from "@mui/material/Select";
 import Icon from "../Icon";
 import CustomModal from "../Modal";
 import FilterModal from "./FilterModel";
+import dayjs, { Dayjs } from "dayjs";
+import { Type } from ".";
+import CustomAutocomplete from "../Autocomplete";
 
-const Filter = ({ type }: { type: "user" | "order" }) => {
+type FilterOrder = {
+  order_created_at?: Dayjs;
+  courier_submitted_at?: Dayjs;
+  employee: string;
+  status: string;
+  order_source: string;
+  select_product: string;
+  district: string;
+  print_status: string;
+};
+
+const Filter = ({ type }: { type: Type }) => {
   const theme = useTheme();
   const [userRole, setUserRole] = useState<string[]>([]);
+  const [productStock, setProductStock] = useState("");
   const [searchText, setSearchText] = useState("");
+
+  const [filterOrder, setFilterOrder] = useState<FilterOrder>({
+    order_created_at: undefined,
+    courier_submitted_at: undefined,
+    employee: "",
+    status: "",
+    order_source: "",
+    select_product: "",
+    district: "",
+    print_status: "",
+  });
+  const activeFilters = Object.entries(filterOrder).filter(
+    ([, value]) => value !== undefined && value !== "" // only show non-empty values
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -52,23 +81,6 @@ const Filter = ({ type }: { type: "user" | "order" }) => {
         alignItems="center"
         justifyContent={"space-between"}
       >
-        {type === "user" && (
-          <FormControl sx={{ width: "30%" }}>
-            <InputLabel id="demo-simple-select-label">Roll</InputLabel>
-            <Select
-              multiple
-              value={userRole}
-              onChange={handleChange}
-              label="Roll"
-            >
-              {names.map((name) => (
-                <MenuItem key={name} value={name}>
-                  {name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        )}
         <FormControl variant="outlined" sx={{ width: "40%" }}>
           <TextField
             fullWidth
@@ -84,27 +96,78 @@ const Filter = ({ type }: { type: "user" | "order" }) => {
             }}
           />
         </FormControl>
-
-        <Box>
-          <Tooltip title="Filter">
-            <IconButton
-              sx={{ color: "text.secondary" }}
-              onClick={() => setModalOpen(true)}
+        {type === "user" ? (
+          <Stack sx={{ width: "30%" }}>
+            <CustomAutocomplete label="Status" option={names} />
+          </Stack>
+        ) : type === "product" ? (
+          <Stack sx={{ width: "30%" }}>
+            <CustomAutocomplete
+              label="Stock"
+              option={["In stock", "Low stock", "Out of stock"]}
+              value={productStock}
+              onChange={(val: any) => {
+                setProductStock(val);
+              }}
+            />
+          </Stack>
+        ) : (
+          <Box>
+            <Tooltip title="Filter">
+              <IconButton
+                sx={{ color: "text.secondary" }}
+                onClick={() => setModalOpen(true)}
+              >
+                <Icon icon="solar:filters-bold-duotone" />
+              </IconButton>
+            </Tooltip>
+            <CustomModal
+              sx={{ width: { xs: "90%", md: 900 } }}
+              open={modalOpen}
+              onClose={() => setModalOpen(false)}
+              title="Order Filter"
             >
-              <Icon icon="solar:filters-bold-duotone" />
-            </IconButton>
-          </Tooltip>
-          <CustomModal
-            sx={{ width: { xs: "90%", md: 900 } }}
-            open={modalOpen}
-            onClose={() => setModalOpen(false)}
-            title="Filter"
-          >
-            <FilterModal />
-          </CustomModal>
-        </Box>
+              <FilterModal
+                filterValue={filterOrder}
+                onCloseModal={() => setModalOpen(false)}
+                onChange={(f: FilterOrder) => {
+                  setFilterOrder(f);
+                  console.log(f);
+                }}
+              />
+            </CustomModal>
+          </Box>
+        )}
       </Stack>
       <Stack spacing={1} direction="row" alignItems="center">
+        {productStock && (
+          <Stack
+            spacing={1}
+            direction="row"
+            border={1}
+            borderColor={"divider"}
+            borderRadius={0.5}
+            p={1}
+            sx={{ borderStyle: "dashed" }}
+          >
+            <Typography variant="subtitle2">Stock: </Typography>
+            <Chip
+              label={productStock}
+              size="small"
+              onDelete={() => {
+                setProductStock("");
+              }}
+              sx={{
+                borderRadius: 0.5,
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                p: "0px 0px ",
+                bgcolor: alpha(theme.palette.grey[300], 0.1),
+                color: theme.palette.grey[300],
+              }}
+            />
+          </Stack>
+        )}
         {userRole.length > 0 && (
           <Stack
             spacing={1}
@@ -168,7 +231,54 @@ const Filter = ({ type }: { type: "user" | "order" }) => {
             />
           </Stack>
         )}
-        {(userRole.length > 0 || searchText) && (
+        {activeFilters.length > 0 && (
+          <Stack
+            spacing={1}
+            direction="row"
+            border={1}
+            borderColor={"divider"}
+            borderRadius={0.5}
+            flexWrap="wrap"
+            p={1}
+            sx={{ borderStyle: "dashed" }}
+          >
+            <Typography variant="subtitle2">Filters: </Typography>
+
+            {activeFilters.map(([key, value]) => {
+              return (
+                <Box sx={{ py: 0.2 }} key={key}>
+                  <Chip
+                    label={`${key.replace(/_/g, " ").toLocaleUpperCase()}: ${
+                      dayjs.isDayjs(value)
+                        ? (value?.format("MM/DD/YYYY") as any)
+                        : value
+                    }`}
+                    size="small"
+                    onDelete={() =>
+                      setFilterOrder((prev) => ({
+                        ...prev,
+                        [key]: key.includes("at") ? undefined : "", // clear value
+                      }))
+                    }
+                    suppressHydrationWarning
+                    sx={{
+                      borderRadius: 0.5,
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      p: "0px 0px ",
+                      bgcolor: alpha(theme.palette.grey[300], 0.1),
+                      color: theme.palette.grey[300],
+                    }}
+                  />
+                </Box>
+              );
+            })}
+          </Stack>
+        )}
+        {(searchText ||
+          userRole.length > 0 ||
+          activeFilters.length > 0 ||
+          productStock) && (
           <Button
             variant="text"
             color="error"
@@ -176,6 +286,16 @@ const Filter = ({ type }: { type: "user" | "order" }) => {
             onClick={() => {
               setUserRole([]);
               setSearchText("");
+              setFilterOrder({
+                order_created_at: undefined,
+                courier_submitted_at: undefined,
+                employee: "",
+                status: "",
+                order_source: "",
+                select_product: "",
+                district: "",
+                print_status: "",
+              });
             }}
           >
             Clear

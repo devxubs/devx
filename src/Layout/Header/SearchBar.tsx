@@ -11,7 +11,6 @@ import {
   alpha,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import CustomPopover from "@src/components/CustomPopover";
 
 const suggestions = [
   "Apple",

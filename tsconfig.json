@@ -31,7 +31,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "src/theme/lightPalette.ts"
+    "src/theme/lightPalette.ts",
+    "src/Pages/User/imageUploader.txs"
   ],
   "exclude": ["node_modules"]
 }
