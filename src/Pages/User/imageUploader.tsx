@@ -3,7 +3,6 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Box, Typography, Paper, useTheme, alpha } from "@mui/material";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import Icon from "@src/components/Icon";
 
 const UploadPhoto = () => {

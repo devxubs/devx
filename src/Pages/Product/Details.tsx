@@ -1,20 +1,26 @@
 import {
-  AccordionSummary,
-  accordionSummaryClasses,
+  Paper,
   Stack,
   Typography,
-  AccordionDetails,
   TextField,
   Box,
   IconButton,
+  Collapse,
 } from "@mui/material";
-import Accordion from "@mui/material/Accordion";
-import CustomAutocomplete from "@src/components/Autocomplete";
-import React from "react";
+import React, { useState } from "react";
+import { Controller } from "react-hook-form";
 import UploadPhoto from "./imageUploader";
 import Icon from "@src/components/Icon";
+// import RichTextEditor from "@src/components/RichTextEditor";
+import dynamic from "next/dynamic";
+
+const RichTextEditor = dynamic(() => import("@src/components/RichTextEditor"), {
+  ssr: false,
+});
 
 interface DetailsProps {
+  formControl: any;
+  errors: any;
   detailsData: {
     name: string;
     category: string;
@@ -27,122 +33,102 @@ interface DetailsProps {
 }
 
 const Details = ({
+  formControl,
+  errors,
   detailsData,
   handleRemove,
   onDetailsDataChange,
 }: DetailsProps) => {
+  const [expanded, setExpanded] = useState(true);
+
   return (
-    <Accordion
-      sx={{
-        borderRadius: "16px!important",
-        boxShadow: 15,
-      }}
-      defaultExpanded={false}
-    >
-      <AccordionSummary
-        expandIcon={<Icon icon="solar:alt-arrow-right-broken" />}
-        focusRipple={false}
-        sx={{
-          p: 2,
-          "& .MuiAccordionSummary-content": {
-            m: "0px!important",
-          },
-          [`& .${accordionSummaryClasses.expandIconWrapper}.${accordionSummaryClasses.expanded}`]:
-            {
-              transform: "rotate(90deg)",
-            },
-        }}
+    <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
+      {/* Header */}
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        p={3}
+        sx={{ cursor: "pointer" }}
       >
-        <Stack spacing={1} p={2}>
-          <Typography
-            variant="body1"
-            fontSize={18}
-            color="textPrimary"
-            sx={{
-              "&:hover": {
-                cursor: "pointer",
-                textDecoration: "underline",
-              },
-            }}
-          >
+        <Stack spacing={0.5}>
+          <Typography variant="body1" fontSize={18} color="textPrimary">
             Details
           </Typography>
-          <Typography
-            variant="body2"
-            fontSize={13}
-            fontWeight={400}
-            color="textSecondary"
-          >
+          <Typography variant="body2" color="textSecondary">
             Title, Category, short description, image...
           </Typography>
         </Stack>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Stack spacing={3}>
-          <Stack
-            spacing={2}
-            direction={"row"}
-            alignItems={"center"}
-            width={"100%"}
-            mb={2}
-          >
-            <Stack spacing={1.5} flex={1}>
-              <Typography
-                variant="h6"
-                fontSize={"13px!important"}
-                fontWeight={500}
-              >
-                Product Name
-              </Typography>
-              <TextField
-                label="Product Name"
-                variant="outlined"
-                required
-                onChange={(e) => {
-                  onDetailsDataChange("name", e.target.value);
-                }}
-                value={detailsData.name}
-              />
-            </Stack>
-            <Stack spacing={1.5} flex={1}>
-              <Typography
-                variant="h6"
-                fontSize={"13px!important"}
-                fontWeight={500}
-              >
-                Category
-              </Typography>
-              <CustomAutocomplete
-                label="Category"
-                option={["Active", "Inactive"]}
-                onChange={(v: any) => {
-                  onDetailsDataChange("category", v);
-                }}
-              />
-            </Stack>
-          </Stack>
+        <IconButton onClick={() => setExpanded(!expanded)}>
+          <Icon
+            style={{
+              transform: `rotate(${expanded ? 90 : 0}deg)`,
+              transition: "all 0.2s",
+            }}
+            icon={"solar:alt-arrow-right-broken"}
+          />
+        </IconButton>
+      </Stack>
+
+      {/* Animated Content */}
+      <Collapse in={expanded}>
+        <Stack spacing={3} p={2}>
+          {/* Product Name */}
           <Stack spacing={1.5}>
             <Typography
               variant="h6"
               fontSize={"13px!important"}
               fontWeight={500}
             >
-              Sub description
+              Product Name
             </Typography>
-            <TextField
-              label="Sub description"
-              variant="outlined"
-              multiline
-              rows={4}
-              onChange={(e) => {
-                onDetailsDataChange("subDescription", e.target.value);
-              }}
-              value={detailsData.subDescription}
-              sx={{
-                fontSize: 14,
-              }}
+            <Controller
+              name="product_name"
+              control={formControl}
+              defaultValue={""}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  value={field.value ?? ""}
+                  error={!!errors.product_name}
+                  helperText={errors.product_name?.message}
+                  label="Product Name"
+                  variant="outlined"
+                  required
+                />
+              )}
             />
           </Stack>
+
+          {/* Sub Description */}
+          <Stack spacing={1.5}>
+            <Typography
+              variant="h6"
+              fontSize={"13px!important"}
+              fontWeight={500}
+            >
+              Sub Description
+            </Typography>
+            <Controller
+              name="sub_description"
+              control={formControl}
+              defaultValue=""
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  value={field.value ?? ""}
+                  error={!!errors.sub_description}
+                  helperText={errors.sub_description?.message}
+                  label="Sub Description"
+                  variant="outlined"
+                  multiline
+                  rows={4}
+                />
+              )}
+            />
+          </Stack>
+
+          {/* Content / RichText */}
           <Stack spacing={1.5}>
             <Typography
               variant="h6"
@@ -151,21 +137,27 @@ const Details = ({
             >
               Content
             </Typography>
-            <TextField
-              label="Content"
-              variant="outlined"
-              placeholder="Write something about this product"
-              multiline
-              rows={4}
-              onChange={(e) => {
-                onDetailsDataChange("content", e.target.value);
-              }}
-              value={detailsData.content}
-              sx={{
-                fontSize: 14,
-              }}
-            />
+            <Stack>
+              <Controller
+                name="content"
+                control={formControl}
+                defaultValue=""
+                render={({ field }) => (
+                  <RichTextEditor
+                    {...field}
+                    value={field.value ?? ""}
+                    error={!!errors.content}
+                    helperText={errors.content?.message}
+                  />
+                )}
+              />
+              <Typography variant="caption" color="error" ml={1.5}>
+                {errors.content?.message}
+              </Typography>
+            </Stack>
           </Stack>
+
+          {/* Images */}
           <Stack spacing={1.5}>
             <Typography
               variant="h6"
@@ -174,22 +166,28 @@ const Details = ({
             >
               Images
             </Typography>
-            <UploadPhoto
-              onImageUpload={(file) => {
-                onDetailsDataChange("images", file);
-              }}
-            />
-            <Box
-              sx={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 1.5,
-                mt: "24px!important",
-              }}
-            >
-              {detailsData.images.map((src, index) => {
-                const objectUrl = URL.createObjectURL(src);
-
+            <Stack>
+              <Controller
+                name="images"
+                control={formControl}
+                defaultValue={[]}
+                render={({ field }) => (
+                  <UploadPhoto
+                    {...field}
+                    value={field.value ?? []}
+                    error={!!errors.images}
+                    helperText={errors.images?.message}
+                    onImageUpload={(file) => field.onChange(file)}
+                  />
+                )}
+              />
+              <Typography variant="caption" color="error" ml={1.5} mt={0.6}>
+                {errors.images?.message}
+              </Typography>
+            </Stack>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 2 }}>
+              {detailsData.images.map((file, index) => {
+                const objectUrl = URL.createObjectURL(file);
                 return (
                   <Box
                     key={index}
@@ -197,18 +195,17 @@ const Details = ({
                       position: "relative",
                       width: 80,
                       height: 80,
-                      borderRadius: 0.8,
+                      borderRadius: 1,
                       overflow: "hidden",
                     }}
                   >
                     <img
                       src={objectUrl}
-                      alt={objectUrl}
+                      alt={`img-${index}`}
                       style={{
                         width: "100%",
                         height: "100%",
                         objectFit: "cover",
-                        borderRadius: "8px",
                       }}
                     />
                     <IconButton
@@ -218,15 +215,14 @@ const Details = ({
                         position: "absolute",
                         top: 2,
                         right: 2,
-                        backgroundColor: "rgba(0,0,0,0.6)",
+                        bgcolor: "rgba(0,0,0,0.6)",
                         color: "white",
-                        "&:hover": { backgroundColor: "rgba(0,0,0,0.8)" },
+                        "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
                         width: 22,
                         height: 22,
                       }}
                     >
                       <Icon icon="ic:round-close" />
-                      {/* <CloseIcon sx={{ fontSize: 14 }} /> */}
                     </IconButton>
                   </Box>
                 );
@@ -234,8 +230,8 @@ const Details = ({
             </Box>
           </Stack>
         </Stack>
-      </AccordionDetails>
-    </Accordion>
+      </Collapse>
+    </Paper>
   );
 };
 

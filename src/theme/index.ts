@@ -35,4 +35,13 @@ export const buildAppTheme = (
     typography,
     shape: { borderRadius: 12 },
     shadows: mode === "light" ? lightShadows : darkShadows,
+    components: {
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: {
+            borderRadius: "6px",
+          },
+        },
+      },
+    },
   });

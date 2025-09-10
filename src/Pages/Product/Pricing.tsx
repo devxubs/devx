@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Accordion,
   AccordionSummary,
@@ -5,46 +7,36 @@ import {
   Stack,
   Typography,
   AccordionDetails,
+  TextField,
+  Grid,
+  IconButton,
+  Paper,
+  Collapse,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import React from "react";
+import React, { useState } from "react";
 
-const Pricing = () => {
+import { Controller } from "react-hook-form";
+
+interface PricingProps {
+  formControl: any;
+  errors: any;
+}
+
+const Pricing = ({ formControl, errors }: PricingProps) => {
+  const [expanded, setExpanded] = useState(true);
   return (
-    <Accordion
-      sx={{
-        borderRadius: "16px!important",
-        boxShadow: 15,
-      }}
-      defaultExpanded={false}
-    >
-      <AccordionSummary
-        expandIcon={<Icon icon="solar:alt-arrow-right-broken" />}
-        focusRipple={false}
-        sx={{
-          p: 2,
-          "& .MuiAccordionSummary-content": {
-            m: "0px!important",
-          },
-          [`& .${accordionSummaryClasses.expandIconWrapper}.${accordionSummaryClasses.expanded}`]:
-            {
-              transform: "rotate(90deg)",
-            },
-        }}
+    <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        p={3}
+        sx={{ cursor: "pointer" }}
       >
-        <Stack spacing={1} p={2}>
-          <Typography
-            variant="body1"
-            fontSize={18}
-            color="textPrimary"
-            sx={{
-              "&:hover": {
-                cursor: "pointer",
-                textDecoration: "underline",
-              },
-            }}
-          >
-            Properties
+        <Stack spacing={1}>
+          <Typography variant="body1" fontSize={18} color="textPrimary">
+            Price
           </Typography>
           <Typography
             variant="body2"
@@ -52,24 +44,88 @@ const Pricing = () => {
             fontWeight={400}
             color="textSecondary"
           >
-            Title, Category, short description, image...
+            Price related inputs
           </Typography>
         </Stack>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Stack spacing={3}>
-          <Stack
-            spacing={2}
-            direction={"row"}
-            alignItems={"center"}
-            width={"100%"}
-            mb={2}
-          >
-            <Stack spacing={2} flex={1}></Stack>
-          </Stack>
-        </Stack>
-      </AccordionDetails>
-    </Accordion>
+        <IconButton onClick={() => setExpanded(!expanded)}>
+          <Icon
+            style={{
+              transform: `rotate(${expanded ? 90 : 0}deg)`,
+              transition: "all 0.2s",
+            }}
+            icon={"solar:alt-arrow-right-broken"}
+          />
+        </IconButton>
+      </Stack>
+      <Collapse in={expanded}>
+        <Grid container spacing={3} p={2}>
+          {/* Regular Price */}
+          <Grid size={{ xs: 12 }}>
+            <Stack spacing={1.5}>
+              <Typography
+                variant="h6"
+                fontSize={"13px!important"}
+                fontWeight={500}
+              >
+                Regular Price
+              </Typography>
+              <Controller
+                name="regularPrice"
+                control={formControl}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    value={field.value ?? ""}
+                    type="number"
+                    label="Regular Price"
+                    variant="outlined"
+                    error={!!errors.regularPrice}
+                    helperText={errors.regularPrice?.message}
+                    InputProps={{
+                      inputProps: { min: 0 },
+                    }}
+                  />
+                )}
+              />
+            </Stack>
+          </Grid>
+
+          {/* Sale Price */}
+          <Grid size={{ xs: 12 }}>
+            <Stack spacing={1.5}>
+              <Typography
+                variant="h6"
+                fontSize={"13px!important"}
+                fontWeight={500}
+              >
+                Sale Price
+              </Typography>
+              <Controller
+                name="salePrice"
+                control={formControl}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    value={field.value ?? ""}
+                    type="number"
+                    label="Sale Price"
+                    variant="outlined"
+                    error={!!errors.salePrice}
+                    helperText={errors.salePrice?.message}
+                    sx={{
+                      "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button":
+                        {
+                          display: "none",
+                        },
+                    }}
+                  />
+                )}
+              />
+            </Stack>
+          </Grid>
+        </Grid>
+      </Collapse>
+    </Paper>
   );
 };
 

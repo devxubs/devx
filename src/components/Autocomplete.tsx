@@ -2,9 +2,6 @@ import React from "react";
 import {
   Autocomplete,
   TextField,
-  InputAdornment,
-  IconButton,
-  Box,
   Popper,
   autocompleteClasses,
   useTheme,
@@ -12,6 +9,8 @@ import {
 } from "@mui/material";
 
 import { type AutocompleteProps } from "@mui/material/Autocomplete";
+import { type SxProps } from "@mui/material/styles";
+import { ControllerRenderProps } from "react-hook-form";
 
 interface CustomAutocompleteProps
   extends Omit<
@@ -25,6 +24,9 @@ interface CustomAutocompleteProps
   value?: string | string[] | null;
   onChange?: Function;
   multiple?: boolean;
+  error?: boolean;
+  helperText?: string;
+  validField?: any;
 }
 
 // Styled Popper component
@@ -76,26 +78,33 @@ const CustomAutocomplete = ({
   onChange,
   value,
   multiple = false,
+  error,
+  helperText,
+  validField,
   ...rest
 }: CustomAutocompleteProps) => {
   return (
     <Autocomplete
       {...rest}
-      freeSolo={arrow}
-      options={option}
+      freeSolo={!arrow}
+      options={Array.isArray(option) ? option : []}
       PopperComponent={StyledPopper}
+      multiple={multiple}
       value={value}
       onChange={(e, newValue) => {
-        onChange?.(newValue);
+        onChange?.(newValue, e);
       }}
-      multiple={multiple}
+      sx={{ ...rest.sx }}
       renderInput={(params) => (
         <TextField
           {...params}
+          {...validField}
           fullWidth
           variant="outlined"
           placeholder={placeholder}
           label={label}
+          error={error}
+          helperText={helperText}
           sx={{
             "& .MuiOutlinedInput-root": {
               paddingRight: "16px!important",

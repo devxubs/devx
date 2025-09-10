@@ -268,29 +268,34 @@ const Product = () => {
         </Stack>
       </Stack>
       <CustomModal
-        sx={{ width: "100%", height: "100vh", borderRadius: 0 }}
+        sx={{
+          width: "100%",
+          height: "100vh",
+          borderRadius: 0,
+          boxShadow: "none!important",
+        }}
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         // title={mode === "add" ? "Add User" : "Edit User"}
       >
         <Stack
-          maxWidth={650}
-          mx={"auto"}
           sx={{
+            height: "100%",
             overflowY: "auto",
             scrollbarWidth: "none!important",
             "&::-webkit-scrollbar": { display: "none!important" },
           }}
-          height={"100%"}
         >
-          <Modal
-            mode={mode}
-            onClose={() => setIsModalOpen(false)}
-            userData={selectedProduct || {}}
-            onChange={(d) => {
-              setSelectedProduct({ ...selectedProduct, ...d });
-            }}
-          />
+          <Stack maxWidth={650} mx={"auto"} height={"100%"}>
+            <Modal
+              mode={mode}
+              onClose={() => setIsModalOpen(false)}
+              userData={selectedProduct || {}}
+              onChange={(d) => {
+                setSelectedProduct({ ...selectedProduct, ...d });
+              }}
+            />
+          </Stack>
         </Stack>
       </CustomModal>
       <CustomModal

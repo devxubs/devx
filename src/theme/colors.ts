@@ -60,6 +60,21 @@ const palette = {
     800: "#212B36",
     900: "#161C24",
   },
+  action: {
+    active: "#919EAB",
+    hover: "rgba(145 158 171 / 8%)",
+    hoverOpacity: 0.08,
+    selected: "rgba(145 158 171 / 16%)",
+    selectedOpacity: 0.08,
+    disabled: "rgba(145 158 171 / 80%)",
+    disabledBackground: "rgba(145 158 171 / 24%)",
+    disabledOpacity: 0.48,
+    focus: "rgba(145 158 171 / 24%)",
+    focusOpacity: 0.12,
+    activatedOpacity: 0.12,
+    activeChannel: "145 158 171",
+    selectedChannel: 145,
+  },
 };
 
 export default palette;

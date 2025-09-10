@@ -7,11 +7,20 @@ import Icon from "@src/components/Icon";
 import UploadIcon from "@src/SvgIcon/UploadIcon";
 
 interface UploadPhotoProps {
-  // You can add props if needed
   onImageUpload?: (file: File[]) => void;
+  error?: boolean;
+  helperText?: string;
+  value?: string;
+  onChange?: () => void;
 }
 
-const UploadPhoto = ({ onImageUpload }: UploadPhotoProps) => {
+const UploadPhoto = ({
+  onImageUpload,
+  error,
+  helperText,
+  value,
+  onChange,
+}: UploadPhotoProps) => {
   const theme = useTheme();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -35,13 +44,17 @@ const UploadPhoto = ({ onImageUpload }: UploadPhotoProps) => {
       {...getRootProps()}
       sx={{
         border: "1px dashed",
-        borderColor: isDragActive
+        borderColor: error
+          ? "error.main"
+          : isDragActive
           ? alpha(theme.palette.primary.main, 0.7)
           : "divider",
-        borderRadius: 1.6,
+        borderRadius: 1.5,
         textAlign: "center",
         cursor: "pointer",
-        backgroundColor: "background.paper",
+        backgroundColor: error
+          ? alpha(theme.palette.error.main, 0.08)
+          : "background.paper",
         transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
         width: "100%",
         height: 220,
@@ -84,7 +97,17 @@ const UploadPhoto = ({ onImageUpload }: UploadPhotoProps) => {
             Drop or select files
           </Typography>
           <Typography variant="body1" fontSize={13} color={"textSecondary"}>
-            Drag files here, or browse your device.
+            Drag files here, or{" "}
+            <Typography
+              variant="body1"
+              fontSize={13}
+              component={"span"}
+              color="primary"
+              sx={{ textDecoration: "underline" }}
+            >
+              browse
+            </Typography>{" "}
+            your device.
           </Typography>
         </Box>
       </Box>

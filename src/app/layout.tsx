@@ -4,6 +4,7 @@ import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import ThemeProviderClient from "@src/theme/ThemeProviderClient";
 import Layout from "@src/Layout";
+import "./globals.css";
 
 export const metadata = {
   title: "My App",
