@@ -13,6 +13,7 @@ import UploadPhoto from "./imageUploader";
 import Icon from "@src/components/Icon";
 // import RichTextEditor from "@src/components/RichTextEditor";
 import dynamic from "next/dynamic";
+import { TableRow } from "@src/components/Table";
 
 const RichTextEditor = dynamic(() => import("@src/components/RichTextEditor"), {
   ssr: false,
@@ -21,25 +22,13 @@ const RichTextEditor = dynamic(() => import("@src/components/RichTextEditor"), {
 interface DetailsProps {
   formControl: any;
   errors: any;
-  detailsData: {
-    name: string;
-    category: string;
-    subDescription: string;
-    content: string;
-    images: File[];
-  };
-  onDetailsDataChange: (field: string, value: any) => void;
-  handleRemove: (index: number) => void;
+  data: TableRow;
 }
 
-const Details = ({
-  formControl,
-  errors,
-  detailsData,
-  handleRemove,
-  onDetailsDataChange,
-}: DetailsProps) => {
+const Details = ({ formControl, errors, data }: DetailsProps) => {
   const [expanded, setExpanded] = useState(true);
+
+  console.log(data);
 
   return (
     <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -49,7 +38,6 @@ const Details = ({
         justifyContent="space-between"
         alignItems="center"
         p={3}
-        sx={{ cursor: "pointer" }}
       >
         <Stack spacing={0.5}>
           <Typography variant="body1" fontSize={18} color="textPrimary">
@@ -85,7 +73,7 @@ const Details = ({
             <Controller
               name="product_name"
               control={formControl}
-              defaultValue={""}
+              defaultValue={data.product_name || ""}
               render={({ field }) => (
                 <TextField
                   {...field}
@@ -112,7 +100,7 @@ const Details = ({
             <Controller
               name="sub_description"
               control={formControl}
-              defaultValue=""
+              defaultValue={data.sub_description || ""}
               render={({ field }) => (
                 <TextField
                   {...field}
@@ -137,11 +125,11 @@ const Details = ({
             >
               Content
             </Typography>
-            <Stack>
+            <>
               <Controller
                 name="content"
                 control={formControl}
-                defaultValue=""
+                defaultValue={data.content || ""}
                 render={({ field }) => (
                   <RichTextEditor
                     {...field}
@@ -154,7 +142,7 @@ const Details = ({
               <Typography variant="caption" color="error" ml={1.5}>
                 {errors.content?.message}
               </Typography>
-            </Stack>
+            </>
           </Stack>
 
           {/* Images */}
@@ -170,64 +158,18 @@ const Details = ({
               <Controller
                 name="images"
                 control={formControl}
-                defaultValue={[]}
+                defaultValue={data.images || []}
                 render={({ field }) => (
                   <UploadPhoto
                     {...field}
                     value={field.value ?? []}
                     error={!!errors.images}
                     helperText={errors.images?.message}
-                    onImageUpload={(file) => field.onChange(file)}
+                    // onImageUpload={(file) => field.onChange(file)}
                   />
                 )}
               />
-              <Typography variant="caption" color="error" ml={1.5} mt={0.6}>
-                {errors.images?.message}
-              </Typography>
             </Stack>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 2 }}>
-              {detailsData.images.map((file, index) => {
-                const objectUrl = URL.createObjectURL(file);
-                return (
-                  <Box
-                    key={index}
-                    sx={{
-                      position: "relative",
-                      width: 80,
-                      height: 80,
-                      borderRadius: 1,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <img
-                      src={objectUrl}
-                      alt={`img-${index}`}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                    />
-                    <IconButton
-                      size="small"
-                      onClick={() => handleRemove(index)}
-                      sx={{
-                        position: "absolute",
-                        top: 2,
-                        right: 2,
-                        bgcolor: "rgba(0,0,0,0.6)",
-                        color: "white",
-                        "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
-                        width: 22,
-                        height: 22,
-                      }}
-                    >
-                      <Icon icon="ic:round-close" />
-                    </IconButton>
-                  </Box>
-                );
-              })}
-            </Box>
           </Stack>
         </Stack>
       </Collapse>

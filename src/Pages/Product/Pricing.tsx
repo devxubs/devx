@@ -1,12 +1,8 @@
 "use client";
 
 import {
-  Accordion,
-  AccordionSummary,
-  accordionSummaryClasses,
   Stack,
   Typography,
-  AccordionDetails,
   TextField,
   Grid,
   IconButton,
@@ -14,6 +10,7 @@ import {
   Collapse,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
+import { TableRow } from "@src/components/Table";
 import React, { useState } from "react";
 
 import { Controller } from "react-hook-form";
@@ -21,9 +18,10 @@ import { Controller } from "react-hook-form";
 interface PricingProps {
   formControl: any;
   errors: any;
+  data: TableRow;
 }
 
-const Pricing = ({ formControl, errors }: PricingProps) => {
+const Pricing = ({ formControl, errors, data }: PricingProps) => {
   const [expanded, setExpanded] = useState(true);
   return (
     <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -32,7 +30,6 @@ const Pricing = ({ formControl, errors }: PricingProps) => {
         justifyContent="space-between"
         alignItems="center"
         p={3}
-        sx={{ cursor: "pointer" }}
       >
         <Stack spacing={1}>
           <Typography variant="body1" fontSize={18} color="textPrimary">
@@ -72,6 +69,7 @@ const Pricing = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="regularPrice"
                 control={formControl}
+                defaultValue={data.regularPrice || ""}
                 render={({ field }) => (
                   <TextField
                     {...field}
@@ -103,6 +101,7 @@ const Pricing = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="salePrice"
                 control={formControl}
+                defaultValue={data.salePrice || ""}
                 render={({ field }) => (
                   <TextField
                     {...field}

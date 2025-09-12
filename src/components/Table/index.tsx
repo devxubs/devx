@@ -103,7 +103,7 @@ export default function CustomTable({
           scrollbarWidth: "none!important", // Hide scrollbar for Firefox
         }}
       >
-        <Table stickyHeader>
+        <Table>
           <TableHead
             sx={{
               backgroundColor:
@@ -195,7 +195,7 @@ export default function CustomTable({
 
           {/* TableFooter with TablePagination inside TableRow */}
           <TableFooter>
-            <TableRow sx={{ borderBottom: "0px!important", borderTop: 1 }}>
+            <TableRow sx={{ borderBottom: "0px!important" }}>
               {type !== "rank" && (
                 <TablePagination
                   rowsPerPageOptions={[10, 25, 50, { label: "All", value: -1 }]}

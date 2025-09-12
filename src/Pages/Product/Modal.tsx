@@ -14,7 +14,7 @@ import Pricing from "./Pricing";
 interface ModalProps {
   mode: "add" | "edit";
   onClose?: () => void;
-  userData?: TableRow;
+  data?: TableRow;
   onChange?: (data: any) => void;
 }
 
@@ -35,14 +35,14 @@ const productSchema = z
     // PRODUCT PROPERTIES
     product_code: z.string().min(1, "Product code is required!"),
     product_sku: z.string().min(1, "Product SKU is required!"),
-    quantity: z.coerce.number().min(0, "Quantity is required!"), // ✅ coercion
+    quantity: z.coerce.number().min(1, "Quantity is required!"), // ✅ coercion
     category: z.string().min(1, "Choose at least one category!"),
-    product_type: z.array(z.string()).min(1, "Select at least one type!"),
+    product_type: z.string().min(1, "Select at least one type!"),
     color: z.array(z.string()).min(1, "Choose at least one color!"),
     size: z.array(z.string()).min(1, "Choose at least one size!"),
 
     // PRODUCT PRICING
-    regularPrice: z.coerce.number().min(0, "Price is required!"), // ✅ coercion
+    regularPrice: z.coerce.number().min(1, "Price is required!"), // ✅ coercion
     salePrice: z.coerce
       .number()
       .optional()
@@ -57,32 +57,7 @@ const productSchema = z
 
 type PricingValues = z.infer<typeof productSchema>;
 
-const Modal = ({ mode, onClose, userData, onChange }: ModalProps) => {
-  const [detailsData, setDetailsData] = useState({
-    name: "",
-    category: "",
-    subDescription: "",
-    content: "",
-    images: [],
-  });
-
-  const onDetailsDataChange = (field: string, value: any) => {
-    if (Array.isArray(value)) {
-      setDetailsData((prev) => ({
-        ...prev,
-        [field]: [...prev.images, ...value],
-      }));
-      return;
-    }
-    setDetailsData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-  const handleRemove = (index: number) => {
-    // setImages(images.filter((_, i) => i !== index));
-  };
-
+const Modal = ({ mode, onClose, data, onChange }: ModalProps) => {
   // 2. Hook form setup
   const {
     control,
@@ -95,44 +70,40 @@ const Modal = ({ mode, onClose, userData, onChange }: ModalProps) => {
   >({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      product_name: "",
-      sub_description: "",
-      content: "",
-      images: [],
-      product_code: "",
-      product_sku: "",
-      quantity: "",
-      category: "",
-      product_type: [],
-      color: [],
-      size: [],
-      regularPrice: "",
+      product_name: (data?.product_name as any) || "",
+      sub_description: (data?.sub_description as any) || "",
+      content: (data?.content as any) || "",
+      images: (data?.images as any) || [],
+
+      product_code: (data?.product_code as any) || "",
+      product_sku: (data?.product_sku as any) || "",
+      quantity: (data?.quantity as any) || "",
+      category: (data?.category as any) || "",
+      product_type: (data?.product_type as any) || "",
+      color: (data?.color as any) || [],
+      size: (data?.size as any) || [],
+
+      regularPrice: (data?.regularPrice as any) || "",
       salePrice: undefined,
     },
   });
 
   // 3. Submit handler
   const onSubmit: SubmitHandler<PricingValues> = (data) => {
-    console.log("✅ Pricing form data:", data);
+    onChange?.(data);
   };
 
   return (
     <Stack width={"100%"} component="form">
       <Stack spacing={4}>
         <Stack>
-          <Details
-            detailsData={detailsData}
-            onDetailsDataChange={onDetailsDataChange}
-            handleRemove={handleRemove}
-            formControl={control}
-            errors={errors}
-          />
+          <Details data={data || {}} formControl={control} errors={errors} />
         </Stack>
         <Stack>
-          <Properties formControl={control} errors={errors} />
+          <Properties data={data || {}} formControl={control} errors={errors} />
         </Stack>
         <Stack>
-          <Pricing formControl={control} errors={errors} />
+          <Pricing data={data || {}} formControl={control} errors={errors} />
         </Stack>
       </Stack>
 
@@ -153,7 +124,7 @@ const Modal = ({ mode, onClose, userData, onChange }: ModalProps) => {
           type="submit"
           onClick={handleSubmit(onSubmit)}
         >
-          {mode === "edit" ? "Update user" : "Add user"}
+          {mode === "edit" ? "Update product" : "Add product"}
         </Button>
       </Stack>
     </Stack>

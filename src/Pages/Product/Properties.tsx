@@ -16,13 +16,15 @@ import { Controller } from "react-hook-form";
 
 import Icon from "@src/components/Icon";
 import React, { useState } from "react";
+import { TableRow } from "@src/components/Table";
 
 interface PricingProps {
   formControl: any;
   errors: any;
+  data: TableRow;
 }
 
-const Properties = ({ formControl, errors }: PricingProps) => {
+const Properties = ({ formControl, errors, data }: PricingProps) => {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -32,7 +34,6 @@ const Properties = ({ formControl, errors }: PricingProps) => {
         justifyContent="space-between"
         alignItems="center"
         p={3}
-        sx={{ cursor: "pointer" }}
       >
         <Stack spacing={1}>
           <Typography variant="body1" fontSize={18} color="textPrimary">
@@ -71,7 +72,7 @@ const Properties = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="product_code"
                 control={formControl}
-                defaultValue=""
+                defaultValue={data.product_code || ""}
                 render={({ field }) => (
                   <TextField
                     {...field}
@@ -98,7 +99,7 @@ const Properties = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="product_sku"
                 control={formControl}
-                defaultValue=""
+                defaultValue={data.product_sku || ""}
                 render={({ field }) => (
                   <TextField
                     {...field}
@@ -124,6 +125,7 @@ const Properties = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="quantity"
                 control={formControl}
+                defaultValue={data.quantity || ""}
                 render={({ field }) => (
                   <TextField
                     {...field}
@@ -157,7 +159,7 @@ const Properties = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="category"
                 control={formControl}
-                defaultValue={[]}
+                defaultValue={data.category || []}
                 render={({ field }) => (
                   <CustomAutocomplete
                     {...field}
@@ -186,7 +188,7 @@ const Properties = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="product_type"
                 control={formControl}
-                defaultValue={[]}
+                defaultValue={data.product_type || []}
                 render={({ field }) => (
                   <CustomAutocomplete
                     {...field}
@@ -215,7 +217,7 @@ const Properties = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="color"
                 control={formControl}
-                defaultValue={[]}
+                defaultValue={data.color || []}
                 render={({ field }) => (
                   <CustomAutocomplete
                     {...field}
@@ -298,7 +300,7 @@ const Properties = ({ formControl, errors }: PricingProps) => {
               <Controller
                 name="size"
                 control={formControl}
-                defaultValue={[]}
+                defaultValue={data.size || []}
                 render={({ field }) => (
                   <CustomAutocomplete
                     {...field}

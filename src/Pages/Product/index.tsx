@@ -8,7 +8,6 @@ import {
   Box,
   useTheme,
   alpha,
-  Container,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
@@ -23,65 +22,100 @@ import Modal from "./Modal";
 const AllProducts = [
   {
     id: 1,
-    name: "Urban Explorer Sneakers",
-    category: "Accessories",
-    date: "03 Sep 2025",
-    time: "5:59 pm",
-    stock: "out of stock",
-    stockValue: 0,
-    price: 83.74,
-    image: "/images/product-1.webp",
+    product_name: "Elegance Stiletto Heels",
+    sub_description: "Stylish high heels for evening wear",
+    content:
+      "These stiletto heels feature a sleek design, cushioned insole, and durable sole — perfect for parties, events, or formal occasions.",
+    images: [
+      "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp",
+      "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-2.webp",
+    ],
+    product_code: "ESH-2025",
+    product_sku: "SH-0004",
+    quantity: "72",
+    category: "Shoes",
+    product_type: "Heels",
+    color: ["Red", "Black", "Nude"],
+    size: ["36", "37", "38", "39", "40", "41"],
+    regularPrice: "95.21",
+    salePrice: "85.21",
+    date: "31 Aug 2025",
+    time: "2:59 pm",
   },
   {
     id: 2,
-    name: "Classic Leather Loafers",
-    category: "Shoes",
+    product_name: "Classic Leather Handbag",
+    sub_description: "Elegant handbag crafted from premium leather",
+    content:
+      "Designed with spacious compartments and a timeless design, this leather handbag is perfect for daily or formal use.",
+    images: [
+      "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-10.webp",
+      "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-9.webp",
+    ],
+    product_code: "CLH-2025",
+    product_sku: "HB-0005",
+    quantity: "0",
+    category: "Bags",
+    product_type: "Handbag",
+    color: ["Black", "Brown", "Beige"],
+    size: ["Medium"],
+    regularPrice: "149.99",
+    salePrice: "129.99",
     date: "02 Sep 2025",
-    time: "4:59 pm",
-    stock: "72 in stock",
-    stockValue: 72,
-    price: 97.14,
-    image: "/images/product-2.webp",
+    time: "11:45 am",
   },
   {
     id: 3,
-    name: "Mountain Trekking Boots",
-    category: "Apparel",
-    date: "01 Sep 2025",
-    time: "3:59 pm",
-    stock: "10 low stock",
-    stockValue: 10,
-    price: 68.71,
-    image: "/images/product-3.webp",
+    product_name: "Modern Denim Jacket",
+    sub_description: "Casual yet stylish denim jacket",
+    content:
+      "Crafted from durable denim with a modern fit, this jacket provides comfort and a versatile look.",
+    images: ["/images/product-3.webp", "/images/product-3a.webp"],
+    product_code: "MDJ-2025",
+    product_sku: "CJ-0006",
+    quantity: "10",
+    category: "Clothing",
+    product_type: "Jacket",
+    color: ["Blue", "Black", "Light Wash"],
+    size: ["S", "M", "L", "XL"],
+    regularPrice: "79.99",
+    salePrice: "69.50",
+    date: "05 Sep 2025",
+    time: "4:20 pm",
   },
   {
     id: 4,
-    name: "Elegance Stiletto Heels",
-    category: "Shoes",
-    date: "31 Aug 2025",
-    time: "2:59 pm",
-    stock: "72 in stock",
-    stockValue: 72,
-    price: 85.21,
-    image: "/images/product-4.webp",
+    product_name: "Smart Fitness Watch",
+    sub_description: "Track your fitness and stay connected",
+    content:
+      "This smartwatch offers fitness tracking, sleep analysis, and notifications, with long-lasting battery and water resistance.",
+    images: [
+      "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-8.webp",
+      "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-7.webp",
+    ],
+    product_code: "SFW-2025",
+    product_sku: "AC-0007",
+    quantity: "120",
+    category: "Accessories",
+    product_type: "Smartwatch",
+    color: ["Black", "Silver", "Rose Gold"],
+    size: ["One Size"],
+    regularPrice: "229.00",
+    salePrice: "199.00",
+    date: "08 Sep 2025",
+    time: "9:10 am",
   },
 ];
 
-const Stock = ({
-  stockValue,
-  stock,
-}: {
-  stockValue: number;
-  stock: string;
-}) => {
+const Stock = ({ quantity }: { quantity: number }) => {
   const theme = useTheme();
   const color =
-    stockValue === 0 ? "error" : stockValue <= 10 ? "warning" : "primary";
+    quantity === 0 ? "error" : quantity <= 10 ? "warning" : "primary";
   return (
     <Stack spacing={1}>
       <LinearProgress
         variant="determinate"
-        value={stockValue}
+        value={Math.min(quantity, 80)}
         color={color}
         sx={{
           height: 6,
@@ -104,7 +138,11 @@ const Stock = ({
         fontWeight={600}
         color="textSecondary"
       >
-        {stock}
+        {quantity === 0
+          ? "out of stock"
+          : quantity <= 10
+          ? quantity + " low stock"
+          : quantity + " in stock"}
       </Typography>
     </Stack>
   );
@@ -181,12 +219,12 @@ const products: Omit<TableProps, "type"> = {
   body: AllProducts.map((product) => ({
     id: product.id,
     product: [
-      product.name,
+      product.product_name,
       <ProductsView
         key={product.id}
-        name={product.name}
+        name={product.product_name}
         description={product.category}
-        url={product.image}
+        url={product.images[0]}
       />,
     ],
     create_at: [
@@ -194,25 +232,36 @@ const products: Omit<TableProps, "type"> = {
       <CreateAt key={product.id} date={product.date} time={product.time} />,
     ],
     stock: [
-      product.stockValue,
-      <Stock
-        key={product.id}
-        stockValue={product.stockValue}
-        stock={product.stock}
-      />,
+      product.quantity,
+      <Stock key={product.id} quantity={parseInt(product.quantity)} />,
     ],
-    price: `$${product.price}`,
+    price: `$${product.salePrice ? product.salePrice : product.regularPrice}`,
+
+    product_name: product.product_name,
+    sub_description: product.sub_description,
+    content: product.content,
+    images: product.images,
+    product_code: product.product_code,
+    product_sku: product.product_sku,
+    quantity: product.quantity,
+    category: product.category,
+    product_type: product.product_type,
+    color: product.color,
+    size: product.size,
+    regularPrice: product.regularPrice,
+    salePrice: product.salePrice,
   })),
 };
 
 const Product = () => {
-  const [isModalOpen, setIsModalOpen] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState({} as TableRow);
+
   const actionMenu = (row: any) => [
     {
       label: "edit",
       onClick: () => {
-        // setSelectedProduct({ ...row, name: row.name[0] }); // store clicked user
+        setSelectedProduct(row); // store clicked user
         setMode("edit");
         setIsModalOpen(true);
       },
@@ -290,7 +339,7 @@ const Product = () => {
             <Modal
               mode={mode}
               onClose={() => setIsModalOpen(false)}
-              userData={selectedProduct || {}}
+              data={selectedProduct || {}}
               onChange={(d) => {
                 setSelectedProduct({ ...selectedProduct, ...d });
               }}

@@ -9,7 +9,7 @@ import HardBreak from "@tiptap/extension-hard-break";
 
 import { Box, useTheme, Stack, alpha } from "@mui/material";
 import MenuBar from "./MenuBar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface RichTextEditorProps {
   error?: boolean;
@@ -58,7 +58,7 @@ export default function ReachTextEditor({
   return (
     <Stack
       sx={{
-        width: fullScreen ? "100vw" : "auto",
+        width: fullScreen ? "100vw" : "100%",
         height: fullScreen ? "100vh" : "auto",
         position: fullScreen ? "fixed" : "relative",
         top: fullScreen ? 0 : "auto",
@@ -67,12 +67,11 @@ export default function ReachTextEditor({
         right: fullScreen ? 0 : "auto",
         zIndex: fullScreen ? 99999 : "auto",
         maxHeight: fullScreen ? "100vh" : 480,
-        transform: fullScreen ? "scale(1)" : "scale(0.98)", // subtle zoom effect
+        // transform: fullScreen ? "scale(1)" : "scale(0.99)", // subtle zoom effect
         transformOrigin: "center center", // zoom from center
         boxShadow: fullScreen ? "0 4px 40px rgba(0,0,0,0.3)" : "none",
         bgcolor: fullScreen ? "background.paper" : "initial",
-        mt: fullScreen ? "0px!important" : "",
-        p: fullScreen ? 2 : "0",
+        p: fullScreen ? 2 : 0,
       }}
     >
       <Stack
@@ -88,7 +87,7 @@ export default function ReachTextEditor({
           minHeight: 240,
           height: "100%",
           width: "100%",
-          transform: fullScreen ? "scale(1)" : "scale(0.98)", // subtle zoom effect
+          transform: fullScreen ? "scale(1)" : "scale(0.99)", // subtle zoom effect
           transformOrigin: "center center",
         }}
       >
@@ -97,6 +96,7 @@ export default function ReachTextEditor({
           min-height: 200px
         }
         .tiptap{
+          min-height: 200px;
           height: 100%;
           width: 100%;
           outline: none;
