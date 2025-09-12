@@ -1,7 +1,11 @@
-import { Stack } from "@mui/material";
+import CategoriesPage from "@src/Pages/Categories";
 
 const categories = () => {
-  return <Stack>categories</Stack>;
+  return (
+    <div>
+      <CategoriesPage />
+    </div>
+  );
 };
 
 export default categories;

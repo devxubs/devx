@@ -2,14 +2,13 @@
 import React from "react";
 import Scrollbar from "react-browser-scrollbar";
 
-import { Box, Stack } from "@mui/material";
+import { Box, Container, Stack } from "@mui/material";
 import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
 import Header from "./Header";
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  console.log(pathname);
 
   return (
     <Stack
@@ -25,12 +24,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       ) : (
         <>
           <Sidebar />
-          <Stack sx={{ width: "100%", position: "relative", flex: 1 }}>
+          <Stack sx={{ width: "100%", position: "relative", flexGrow: 1 }}>
             <Scrollbar autoHide darkMode thumbSize={6}>
               <Header />
-              <Box p={2} px={3}>
-                {children}
-              </Box>
+              <Container maxWidth="lg">{children}</Container>
             </Scrollbar>
           </Stack>
         </>

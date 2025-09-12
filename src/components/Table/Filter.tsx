@@ -59,11 +59,6 @@ const Filter = ({ type }: { type: Type }) => {
 
   const [modalOpen, setModalOpen] = useState(false);
 
-  const handleChange = (event: SelectChangeEvent<typeof userRole>) => {
-    const value = event.target.value;
-    setUserRole(typeof value === "string" ? value.split(",") : value);
-  };
-
   const names = [
     "CEO",
     "Manager",
@@ -112,31 +107,33 @@ const Filter = ({ type }: { type: Type }) => {
             />
           </Stack>
         ) : (
-          <Box>
-            <Tooltip title="Filter">
-              <IconButton
-                sx={{ color: "text.secondary" }}
-                onClick={() => setModalOpen(true)}
+          type !== "category" && (
+            <Box>
+              <Tooltip title="Filter">
+                <IconButton
+                  sx={{ color: "text.secondary" }}
+                  onClick={() => setModalOpen(true)}
+                >
+                  <Icon icon="solar:filters-bold-duotone" />
+                </IconButton>
+              </Tooltip>
+              <CustomModal
+                sx={{ width: { xs: "90%", md: 900 } }}
+                open={modalOpen}
+                onClose={() => setModalOpen(false)}
+                title="Order Filter"
               >
-                <Icon icon="solar:filters-bold-duotone" />
-              </IconButton>
-            </Tooltip>
-            <CustomModal
-              sx={{ width: { xs: "90%", md: 900 } }}
-              open={modalOpen}
-              onClose={() => setModalOpen(false)}
-              title="Order Filter"
-            >
-              <FilterModal
-                filterValue={filterOrder}
-                onCloseModal={() => setModalOpen(false)}
-                onChange={(f: FilterOrder) => {
-                  setFilterOrder(f);
-                  console.log(f);
-                }}
-              />
-            </CustomModal>
-          </Box>
+                <FilterModal
+                  filterValue={filterOrder}
+                  onCloseModal={() => setModalOpen(false)}
+                  onChange={(f: FilterOrder) => {
+                    setFilterOrder(f);
+                    console.log(f);
+                  }}
+                />
+              </CustomModal>
+            </Box>
+          )
         )}
       </Stack>
       <Stack spacing={1} direction="row" alignItems="center">

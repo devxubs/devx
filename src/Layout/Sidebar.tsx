@@ -107,7 +107,7 @@ const Sidebar = () => {
 
   return (
     <Stack
-      width={layout ? 300 : 90}
+      minWidth={layout ? 300 : 90}
       px={layout ? 1 : 0}
       py={2}
       bgcolor={"background.paper"}

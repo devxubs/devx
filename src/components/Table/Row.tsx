@@ -10,34 +10,39 @@ import {
   Checkbox,
   Palette,
 } from "@mui/material";
-import React, { useState } from "react";
+import React from "react";
 import CustomPopover from "../CustomPopover";
 import { ActionItem, TableRow as TableRowProps, Type } from ".";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import Menu from "../Menu";
+
 interface RowProps {
   head: string[];
-  row: TableRowProps & { allChecked?: boolean };
+  row: TableRowProps;
   type: Type;
+  checked?: boolean; // ✅ comes from parent
   onCheck?: (checked: boolean) => void;
   actionMenu: ActionItem[];
 }
 
-const Row = ({ row, head, onCheck, type, actionMenu }: RowProps) => {
-  const [checked, setChecked] = useState(Boolean(row.allChecked));
+const Row = ({
+  row,
+  head,
+  onCheck,
+  checked = false,
+  type,
+  actionMenu,
+}: RowProps) => {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
 
-  React.useEffect(() => {
-    setChecked(Boolean(row.allChecked));
-  }, [row.allChecked]);
-
   return (
     <TableRow
-      component={"tr"}
+      component="tr"
       sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
     >
       {head.map((column, colIndex) => {
@@ -49,22 +54,31 @@ const Row = ({ row, head, onCheck, type, actionMenu }: RowProps) => {
 
         if (column === "@check") {
           return (
-            <TableCell key={colIndex}>
+            <TableCell
+              key={colIndex}
+              align="left"
+              sx={{
+                p: 0,
+                px: 1,
+                whiteSpace: "nowrap",
+                textOverflow: "ellipsis",
+              }}
+            >
               <Checkbox
-                checked={checked}
-                onChange={(e) => {
-                  setChecked(e.target.checked);
-                  onCheck?.(e.target.checked);
-                }}
+                checked={checked} // ✅ controlled
+                onChange={(e) => onCheck?.(e.target.checked)}
               />
             </TableCell>
           );
         }
 
         if (column === "@action") {
-          // your action buttons (menu) here
           return (
-            <TableCell key={colIndex} align="left">
+            <TableCell
+              key={colIndex}
+              align="right"
+              sx={{ whiteSpace: "nowrap", textOverflow: "ellipsis" }}
+            >
               <IconButton onClick={handleMenuOpen}>
                 <MoreVertIcon fontSize="small" />
               </IconButton>
@@ -79,9 +93,14 @@ const Row = ({ row, head, onCheck, type, actionMenu }: RowProps) => {
             </TableCell>
           );
         }
+
         if (column.toLocaleLowerCase() === chip) {
           return (
-            <TableCell key={colIndex} align="left">
+            <TableCell
+              key={colIndex}
+              align="left"
+              sx={{ whiteSpace: "nowrap", textOverflow: "ellipsis" }}
+            >
               <Chip
                 label={row[chip]}
                 size="small"
@@ -90,7 +109,6 @@ const Row = ({ row, head, onCheck, type, actionMenu }: RowProps) => {
                   borderRadius: 0.5,
                   fontWeight: 700,
                   fontSize: "0.75rem",
-                  p: "0px 0px ",
                   bgcolor: paletteColor?.main
                     ? alpha(paletteColor.main, 0.1)
                     : alpha(theme.palette.primary.main, 0.1),
@@ -102,7 +120,10 @@ const Row = ({ row, head, onCheck, type, actionMenu }: RowProps) => {
         }
 
         return (
-          <TableCell key={colIndex}>
+          <TableCell
+            key={colIndex}
+            sx={{ whiteSpace: "nowrap", textOverflow: "ellipsis" }}
+          >
             {row[
               column.includes(" ")
                 ? column.replaceAll(" ", "_").toLowerCase()

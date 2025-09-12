@@ -29,6 +29,14 @@ type OrderStatus =
   | "Hold"
   | "Cancelled";
 
+const statusColor = {
+  Pending: "warning",
+  Confirmed: "success",
+  Processing: "info",
+  Hold: "default",
+  Cancelled: "error",
+} as const;
+
 export type ActionItem = {
   label: string;
   onClick?: () => void;
@@ -39,7 +47,7 @@ export type TableRow = {
   [key: string]: string | number | React.ReactNode;
 };
 
-export type Type = "order" | "rank" | "user" | "product";
+export type Type = "order" | "rank" | "user" | "product" | "category";
 
 export type TableProps = {
   type: Type;
@@ -48,14 +56,6 @@ export type TableProps = {
   actionMenu?: (row: TableRow) => ActionItem[]; // Optional action menu items
 };
 
-const statusColor = {
-  Pending: "warning",
-  Confirmed: "success",
-  Processing: "info",
-  Hold: "default",
-  Cancelled: "error",
-} as const;
-
 export default function CustomTable({
   type,
   head,
@@ -63,7 +63,6 @@ export default function CustomTable({
   actionMenu,
 }: TableProps) {
   const theme = useTheme();
-  const [allChecked, setAllChecked] = React.useState(false);
   const [checkedRows, setCheckedRows] = React.useState<boolean[]>(() =>
     body.map(() => false)
   );
@@ -77,7 +76,6 @@ export default function CustomTable({
       : body;
 
   const handleAllCheck = (checked: boolean) => {
-    setAllChecked(checked);
     setCheckedRows(body.map(() => checked));
   };
 
@@ -85,8 +83,12 @@ export default function CustomTable({
     const updated = [...checkedRows];
     updated[index] = checked;
     setCheckedRows(updated);
-    setAllChecked(updated.every(Boolean));
   };
+
+  const allChecked = checkedRows.length > 0 && checkedRows.every(Boolean);
+
+  const isIndeterminate =
+    checkedRows.some(Boolean) && !checkedRows.every(Boolean);
 
   return (
     <Stack component={Paper} borderRadius={1} overflow={"hidden"}>
@@ -100,7 +102,11 @@ export default function CustomTable({
         component={Paper}
         sx={{
           maxHeight: 550,
-          scrollbarWidth: "none!important", // Hide scrollbar for Firefox
+          overflowX: "auto", // ✅ horizontal scroll
+          overflowY: "auto", // ✅ vertical scroll
+          "&::-webkit-scrollbar": { display: "none" }, // optional: hide scrollbar in Chrome/Safari
+          scrollbarWidth: "none!important",
+          width: "100%",
         }}
       >
         <Table>
@@ -111,12 +117,15 @@ export default function CustomTable({
             }}
           >
             <TableRow>
-              {allChecked ? (
+              {isIndeterminate || allChecked ? (
                 <TableCell
                   colSpan={10}
                   align="left"
                   sx={{
                     backgroundColor: alpha(theme.palette.primary.main, 0.15),
+                    p: 0,
+                    px: 1,
+                    whiteSpace: "nowrap",
                   }}
                 >
                   <Stack
@@ -127,8 +136,10 @@ export default function CustomTable({
                   >
                     <Checkbox
                       checked={allChecked}
+                      indeterminate={isIndeterminate}
                       onChange={(e) => handleAllCheck(e.target.checked)}
                     />
+
                     <IconButton>
                       <Icon icon="solar:trash-bin-trash-bold" />
                     </IconButton>
@@ -138,18 +149,29 @@ export default function CustomTable({
                 head.map((h, idx) => {
                   if (h === "@check") {
                     return (
-                      <TableCell key={idx} align="left">
+                      <TableCell
+                        key={idx}
+                        align="left"
+                        sx={{ p: 0, px: 1, whiteSpace: "nowrap" }}
+                      >
                         <Checkbox
                           checked={allChecked}
+                          indeterminate={isIndeterminate}
                           onChange={(e) => handleAllCheck(e.target.checked)}
                         />
                       </TableCell>
                     );
                   } else if (h.includes("@")) {
-                    return <TableCell key={idx} />;
+                    return (
+                      <TableCell key={idx} sx={{ whiteSpace: "nowrap" }} />
+                    );
                   }
                   return (
-                    <TableCell key={idx} align="left">
+                    <TableCell
+                      key={idx}
+                      align="left"
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
                       {h}
                     </TableCell>
                   );
@@ -185,6 +207,7 @@ export default function CustomTable({
                     ...row,
                     ...arr,
                   }}
+                  checked={checkedRows[index]}
                   head={head}
                   onCheck={(checked: boolean) => handleRowCheck(index, checked)}
                   actionMenu={actionMenu?.(row) || []}

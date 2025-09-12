@@ -18,6 +18,7 @@ import LinearProgress, {
   linearProgressClasses,
 } from "@mui/material/LinearProgress";
 import Modal from "./Modal";
+import DeleteDialog from "@src/components/DeleteDialog";
 
 const AllProducts = [
   {
@@ -63,6 +64,44 @@ const AllProducts = [
     salePrice: "129.99",
     date: "02 Sep 2025",
     time: "11:45 am",
+  },
+  {
+    id: 3,
+    product_name: "Modern Denim Jacket",
+    sub_description: "Casual yet stylish denim jacket",
+    content:
+      "Crafted from durable denim with a modern fit, this jacket provides comfort and a versatile look.",
+    images: ["/images/product-3.webp", "/images/product-3a.webp"],
+    product_code: "MDJ-2025",
+    product_sku: "CJ-0006",
+    quantity: "10",
+    category: "Clothing",
+    product_type: "Jacket",
+    color: ["Blue", "Black", "Light Wash"],
+    size: ["S", "M", "L", "XL"],
+    regularPrice: "79.99",
+    salePrice: "69.50",
+    date: "05 Sep 2025",
+    time: "4:20 pm",
+  },
+  {
+    id: 3,
+    product_name: "Modern Denim Jacket",
+    sub_description: "Casual yet stylish denim jacket",
+    content:
+      "Crafted from durable denim with a modern fit, this jacket provides comfort and a versatile look.",
+    images: ["/images/product-3.webp", "/images/product-3a.webp"],
+    product_code: "MDJ-2025",
+    product_sku: "CJ-0006",
+    quantity: "10",
+    category: "Clothing",
+    product_type: "Jacket",
+    color: ["Blue", "Black", "Light Wash"],
+    size: ["S", "M", "L", "XL"],
+    regularPrice: "79.99",
+    salePrice: "69.50",
+    date: "05 Sep 2025",
+    time: "4:20 pm",
   },
   {
     id: 3,
@@ -215,7 +254,15 @@ const ProductsView = ({
 };
 
 const products: Omit<TableProps, "type"> = {
-  head: ["@check", "Product", "Create at", "Stock", "price", "@action"],
+  head: [
+    "@check",
+    "Product",
+    // "Product",
+    "Create at",
+    "Stock",
+    "price",
+    "@action",
+  ],
   body: AllProducts.map((product) => ({
     id: product.id,
     product: [
@@ -304,7 +351,7 @@ const Product = () => {
               setIsModalOpen(true);
             }}
           >
-            Add user
+            Add product
           </Button>
         </Stack>
         <Stack>
@@ -347,34 +394,12 @@ const Product = () => {
           </Stack>
         </Stack>
       </CustomModal>
-      <CustomModal
-        // sx={{ width: { xs: "90%", md: 900 } }}
+      <DeleteDialog
         open={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
-        title={"Delete User"}
-      >
-        <Stack>
-          <Typography>
-            Are you sure you want to delete{" "}
-            <strong>{productToDelete?.email || "this user"}</strong>?
-          </Typography>
-          <Stack direction="row" spacing={2} justifyContent="flex-end" mt={3}>
-            <Button
-              onClick={() => setIsDeleteDialogOpen(false)}
-              color="inherit"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleDeleteConfirm}
-              color="error"
-              variant="contained"
-            >
-              Delete
-            </Button>
-          </Stack>
-        </Stack>
-      </CustomModal>
+        title={productToDelete?.product_name}
+        onDelete={handleDeleteConfirm}
+      />
     </Scrollbar>
   );
 };
