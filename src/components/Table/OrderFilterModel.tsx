@@ -17,25 +17,28 @@ import {
   orderSources,
 } from "@src/handler/order_filter";
 import CustomAutocomplete from "../Autocomplete";
-import { Dayjs } from "dayjs";
+import { OrderFilter } from "./Filter";
 
-type FilterOrder = {
-  order_created_at?: Dayjs;
-  courier_submitted_at?: Dayjs;
-  employee: string;
-  status: string;
-  order_source: string;
-  select_product: string;
-  district: string;
-  print_status: string;
-};
+const employeeNames = [
+  "John",
+  "Anthony",
+  "Thomas",
+  "Mark",
+  "Paul",
+  "Andrew",
+  "George",
+  "Charles",
+  "Richard",
+  "Edward",
+  "Steven",
+];
 
-const FilterModal = ({
+const OrderFilterModal = ({
   onChange,
   filterValue,
   onCloseModal,
 }: {
-  filterValue: FilterOrder;
+  filterValue: OrderFilter;
   onChange?: Function;
   onCloseModal: Function;
 }) => {
@@ -50,7 +53,7 @@ const FilterModal = ({
               onChange={(v: any) => {
                 onChange?.({
                   ...filterValue,
-                  order_created_at: v,
+                  order_created_at: v === null ? "" : v,
                 });
               }}
             />
@@ -62,7 +65,10 @@ const FilterModal = ({
             <DatePicker
               value={filterValue.courier_submitted_at}
               onChange={(v: any) => {
-                onChange?.({ ...filterValue, courier_submitted_at: v });
+                onChange?.({
+                  ...filterValue,
+                  courier_submitted_at: v === null ? "" : v,
+                });
               }}
             />
           </Stack>
@@ -70,16 +76,14 @@ const FilterModal = ({
         <Grid size={{ xs: 12, md: 4 }}>
           <Stack spacing={1.5}>
             <Typography variant="body2">Employee</Typography>
-            <FormControl fullWidth>
-              <InputLabel id="demo-simple-select-label">Employee</InputLabel>
-              <Select label="Employee">
-                {["a"].map((name) => (
-                  <MenuItem key={name} value={name}>
-                    {name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <CustomAutocomplete
+              label="Employee"
+              option={employeeNames}
+              value={filterValue.employee}
+              onChange={(v: any) => {
+                onChange?.({ ...filterValue, employee: v === null ? "" : v });
+              }}
+            />
           </Stack>
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
@@ -90,8 +94,7 @@ const FilterModal = ({
               option={orderStatuses}
               value={filterValue.status}
               onChange={(v: any) => {
-                onChange?.({ ...filterValue, status: v });
-                console.log(v);
+                onChange?.({ ...filterValue, status: v === null ? "" : v });
               }}
             />
           </Stack>
@@ -104,20 +107,23 @@ const FilterModal = ({
               option={orderSources}
               value={filterValue.order_source}
               onChange={(v: any) => {
-                onChange?.({ ...filterValue, order_source: v });
+                onChange?.({
+                  ...filterValue,
+                  order_source: v === null ? "" : v,
+                });
               }}
             />
           </Stack>
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <Stack spacing={1.5}>
-            <Typography variant="body2">Select Product</Typography>
+            <Typography variant="body2">Product</Typography>
             <CustomAutocomplete
-              label="Select Product"
+              label="Product"
               option={products}
-              value={filterValue.select_product}
+              value={filterValue.products}
               onChange={(v: any) => {
-                onChange?.({ ...filterValue, select_product: v });
+                onChange?.({ ...filterValue, products: v === null ? "" : v });
               }}
             />
           </Stack>
@@ -130,7 +136,7 @@ const FilterModal = ({
               option={districts}
               value={filterValue.district}
               onChange={(v: any) => {
-                onChange?.({ ...filterValue, district: v });
+                onChange?.({ ...filterValue, district: v === null ? "" : v });
               }}
             />
           </Stack>
@@ -143,7 +149,10 @@ const FilterModal = ({
               option={["All", "Printed", "NOt Printed"]}
               value={filterValue.print_status}
               onChange={(v: any) => {
-                onChange?.({ ...filterValue, print_status: v });
+                onChange?.({
+                  ...filterValue,
+                  print_status: v === null ? "" : v,
+                });
               }}
             />
           </Stack>
@@ -154,16 +163,6 @@ const FilterModal = ({
           size="large"
           color="error"
           onClick={() => {
-            onChange?.({
-              order_created_at: undefined,
-              courier_submitted_at: undefined,
-              employee: "",
-              status: "",
-              order_source: "",
-              select_product: "",
-              district: "",
-              print_status: "",
-            });
             onCloseModal();
           }}
         >
@@ -183,4 +182,4 @@ const FilterModal = ({
   );
 };
 
-export default FilterModal;
+export default OrderFilterModal;

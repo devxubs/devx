@@ -34,6 +34,7 @@ const AllProducts = [
     product_code: "ESH-2025",
     product_sku: "SH-0004",
     quantity: "72",
+    stock_value: "In Stock", // ✅ added
     category: "Shoes",
     product_type: "Heels",
     color: ["Red", "Black", "Nude"],
@@ -56,6 +57,7 @@ const AllProducts = [
     product_code: "CLH-2025",
     product_sku: "HB-0005",
     quantity: "0",
+    stock_value: "Out of Stock", // ✅ added
     category: "Bags",
     product_type: "Handbag",
     color: ["Black", "Brown", "Beige"],
@@ -75,44 +77,7 @@ const AllProducts = [
     product_code: "MDJ-2025",
     product_sku: "CJ-0006",
     quantity: "10",
-    category: "Clothing",
-    product_type: "Jacket",
-    color: ["Blue", "Black", "Light Wash"],
-    size: ["S", "M", "L", "XL"],
-    regularPrice: "79.99",
-    salePrice: "69.50",
-    date: "05 Sep 2025",
-    time: "4:20 pm",
-  },
-  {
-    id: 3,
-    product_name: "Modern Denim Jacket",
-    sub_description: "Casual yet stylish denim jacket",
-    content:
-      "Crafted from durable denim with a modern fit, this jacket provides comfort and a versatile look.",
-    images: ["/images/product-3.webp", "/images/product-3a.webp"],
-    product_code: "MDJ-2025",
-    product_sku: "CJ-0006",
-    quantity: "10",
-    category: "Clothing",
-    product_type: "Jacket",
-    color: ["Blue", "Black", "Light Wash"],
-    size: ["S", "M", "L", "XL"],
-    regularPrice: "79.99",
-    salePrice: "69.50",
-    date: "05 Sep 2025",
-    time: "4:20 pm",
-  },
-  {
-    id: 3,
-    product_name: "Modern Denim Jacket",
-    sub_description: "Casual yet stylish denim jacket",
-    content:
-      "Crafted from durable denim with a modern fit, this jacket provides comfort and a versatile look.",
-    images: ["/images/product-3.webp", "/images/product-3a.webp"],
-    product_code: "MDJ-2025",
-    product_sku: "CJ-0006",
-    quantity: "10",
+    stock_value: "Low Stock", // ✅ added
     category: "Clothing",
     product_type: "Jacket",
     color: ["Blue", "Black", "Light Wash"],
@@ -135,6 +100,7 @@ const AllProducts = [
     product_code: "SFW-2025",
     product_sku: "AC-0007",
     quantity: "120",
+    stock_value: "In Stock", // ✅ added
     category: "Accessories",
     product_type: "Smartwatch",
     color: ["Black", "Silver", "Rose Gold"],
@@ -264,39 +230,21 @@ const products: Omit<TableProps, "type"> = {
     "@action",
   ],
   body: AllProducts.map((product) => ({
+    ...product,
     id: product.id,
-    product: [
-      product.product_name,
+    product: (
       <ProductsView
         key={product.id}
         name={product.product_name}
         description={product.category}
         url={product.images[0]}
-      />,
-    ],
-    create_at: [
-      `${product.date} at ${product.time}`,
-      <CreateAt key={product.id} date={product.date} time={product.time} />,
-    ],
-    stock: [
-      product.quantity,
-      <Stock key={product.id} quantity={parseInt(product.quantity)} />,
-    ],
+      />
+    ),
+    create_at: (
+      <CreateAt key={product.id} date={product.date} time={product.time} />
+    ),
+    stock: <Stock key={product.id} quantity={parseInt(product.quantity)} />,
     price: `$${product.salePrice ? product.salePrice : product.regularPrice}`,
-
-    product_name: product.product_name,
-    sub_description: product.sub_description,
-    content: product.content,
-    images: product.images,
-    product_code: product.product_code,
-    product_sku: product.product_sku,
-    quantity: product.quantity,
-    category: product.category,
-    product_type: product.product_type,
-    color: product.color,
-    size: product.size,
-    regularPrice: product.regularPrice,
-    salePrice: product.salePrice,
   })),
 };
 
@@ -338,7 +286,7 @@ const Product = () => {
   };
   return (
     <Scrollbar autoHide thumbSize={6} darkMode>
-      <Stack spacing={2}>
+      <Stack spacing={2} py={2}>
         {/* Header */}
         <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
           <Button

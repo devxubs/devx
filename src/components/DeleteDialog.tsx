@@ -17,7 +17,7 @@ const DeleteDialog = ({
 }: DeleteDialogProps) => {
   return (
     <CustomModal
-      // sx={{ width: { xs: "90%", md: 900 } }}
+      sx={{ width: { xs: "100%", md: 400 } }}
       open={open}
       onClose={() => onClose()}
       title={"Delete User"}

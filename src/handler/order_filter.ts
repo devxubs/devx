@@ -1,12 +1,13 @@
 const orderStatuses = [
   "Pending", // Order placed but not yet processed
   "Confirmed", // Seller confirmed the order
+  "Cancelled", // Cancelled before shipping
+  "Hold",
+  "Completed", // Successfully completed
+  "Delivered", // Successfully delivered
   "Processing", // Order is being prepared
   "Shipped", // Order handed to courier  ----in courier
   "Out for Delivery", // Courier is delivering
-  "Delivered", // Successfully delivered
-  "Completed", // Successfully completed
-  "Cancelled", // Cancelled before shipping
   "Failed", // Payment/order failed
 ];
 

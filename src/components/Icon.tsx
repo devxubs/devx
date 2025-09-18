@@ -1,17 +1,25 @@
 import React from "react";
 
 import { Icon as Iconify, IconProps } from "@iconify/react";
+import { Palette, useTheme } from "@mui/material";
 
 const Icon = ({
   icon,
   size = "medium",
   style,
+  color,
   ...rest
 }: {
   icon: string;
   size?: "small" | "medium" | "large" | string;
+  color?: "primary" | "secondary" | "info" | "success" | "warning" | "error";
   style?: any;
 }) => {
+  const theme = useTheme();
+  const colorKey = color as keyof Palette;
+  const paletteColor: any = theme.palette[colorKey] ?? {
+    main: color || "",
+  };
   return (
     <Iconify
       icon={icon}
@@ -33,6 +41,7 @@ const Icon = ({
           ? 28
           : size
       }
+      color={paletteColor.main}
       style={style}
       {...(rest as Omit<IconProps, "icon">)}
     />

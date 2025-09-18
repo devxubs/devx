@@ -8,7 +8,7 @@ import Icon from "./Icon";
 const CustomCalendarIcon = () => <Icon icon="solar:calendar-bold-duotone" />;
 
 type Props = {
-  onChange?: Function;
+  onChange?: (value: Dayjs | null) => void;
   value?: Dayjs | null;
 };
 
@@ -16,13 +16,9 @@ export default function DatePicker({ onChange, value }: Props) {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <MuiDatePicker
-        value={value}
-        onChange={(newValue) => {
-          onChange?.(newValue);
-        }}
-        slots={{
-          openPickerIcon: CustomCalendarIcon,
-        }}
+        value={value || null}
+        onChange={(newValue) => onChange?.(newValue)}
+        slots={{ openPickerIcon: CustomCalendarIcon }}
         slotProps={{
           textField: {
             variant: "outlined",
@@ -30,12 +26,7 @@ export default function DatePicker({ onChange, value }: Props) {
             fullWidth: true,
           },
           popper: {
-            modifiers: [
-              {
-                name: "offset",
-                options: { offset: [0, 8] },
-              },
-            ],
+            modifiers: [{ name: "offset", options: { offset: [0, 8] } }],
           },
         }}
       />

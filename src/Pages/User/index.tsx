@@ -12,10 +12,8 @@ import {
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { TableProps, TableRow } from "@src/components/Table";
-import Link from "next/link";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
-import jwt from "jsonwebtoken";
 import CustomModal from "@src/components/Modal";
 import Modal from "./Modal";
 
@@ -53,44 +51,40 @@ const UserProfile = ({
   );
 };
 
+const allUser = [
+  {
+    name: "Jubayer Ahmed",
+    phone_number: "01325584606",
+    email: "devxub@gmail.com",
+    role: "Manager",
+  },
+  {
+    name: "Najrul Ahmed",
+    phone_number: "01818388585",
+    email: "najrul787@gmail.com",
+    role: "CEO",
+  },
+];
+
 const users: Omit<TableProps, "type"> = {
   head: ["@check", "Name", "Phone Number", "Role", "@action"],
-  body: [
-    {
-      name: [
-        "Jubayer Ahmed",
-        <UserProfile name="Jubayer Ahmed" email="devxub@gmail.com" url="" />,
-      ],
-      phone_number: "01325584606",
-      email: "devxub@gmail.com",
-      role: "Manager",
-    },
-    {
-      name: [
-        "Najrul Ahmed",
-        <UserProfile name="Najrul Ahmed" email="najrul787@gmail.com" url="" />,
-      ],
-      phone_number: "01818388585",
-      email: "najrul787@gmail.com",
-      role: "CEO",
-    },
-  ],
+  body: allUser.map((u) => ({
+    ...u,
+    full_name: u.name,
+    name: <UserProfile name={u.name} email={u.email} />,
+    phone_number: u.phone_number,
+    role: u.role,
+  })),
 };
 
 const Users = () => {
-  // const filtered = users.body.filter((row) => {
-  //   const valuesToSearch = [row.name, row.rank];
-  //   return valuesToSearch.some((val: any) =>
-  //     val.toLowerCase().includes("".toLowerCase())
-  //   );
-  // });
   const [modalOpen, setModalOpen] = useState(false);
   const [editableUser, setEditableUser] = useState({} as TableRow);
   const actionMenu = (row: any) => [
     {
       label: "edit",
       onClick: () => {
-        setEditableUser({ ...row, name: row.name[0] }); // store clicked user
+        setEditableUser({ ...row, name: row.full_name }); // store clicked user
         setMode("edit");
         setModalOpen(true);
       },
@@ -99,7 +93,6 @@ const Users = () => {
       label: "delete",
       color: "error",
       onClick: () => {
-        // setDeleteConform(true);
         setUserToDelete(row);
         setDeleteOpen(true);
       },
@@ -121,7 +114,7 @@ const Users = () => {
 
   return (
     <Scrollbar autoHide thumbSize={6} darkMode>
-      <Stack spacing={2}>
+      <Stack spacing={2} py={2}>
         {/* Header */}
         <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
           <Button

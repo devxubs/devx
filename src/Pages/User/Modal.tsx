@@ -84,7 +84,7 @@ const Modal = ({ mode, onClose, userData, onChange }: ModalProps) => {
             <Stack spacing={1.5}>
               <Typography variant="body2">Role</Typography>
               <CustomAutocomplete
-                label="Status"
+                label="Role"
                 option={["Active", "Inactive"]}
                 onChange={(v: any) => {
                   console.log(v);

@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import React, { useState } from "react";
 import {
   alpha,
   Checkbox,
@@ -18,24 +18,10 @@ import {
   IconButton,
 } from "@mui/material";
 import Row from "./Row";
-import Filter from "./Filter";
+import Filter, { FilterData } from "./Filter";
 import Icon from "../Icon";
-import Scrollbar from "react-browser-scrollbar";
-
-type OrderStatus =
-  | "Pending"
-  | "Confirmed"
-  | "Processing"
-  | "Hold"
-  | "Cancelled";
-
-const statusColor = {
-  Pending: "warning",
-  Confirmed: "success",
-  Processing: "info",
-  Hold: "default",
-  Cancelled: "error",
-} as const;
+import OrderTab from "./OrderTab";
+import { orderStatuses } from "@src/handler/order_filter";
 
 export type ActionItem = {
   label: string;
@@ -63,38 +49,190 @@ export default function CustomTable({
   actionMenu,
 }: TableProps) {
   const theme = useTheme();
-  const [checkedRows, setCheckedRows] = React.useState<boolean[]>(() =>
+  const [checkedRows, setCheckedRows] = useState<boolean[]>(() =>
     body.map(() => false)
   );
+  const [openRowId, setOpenRowId] = useState<string | number | null>(null);
+  const [filterData, setFilterData] = useState<FilterData>({
+    userRole: "",
+    productStock: "",
+    searchText: "",
+    orderData: {
+      order_created_at: undefined,
+      courier_submitted_at: undefined,
+      employee: "",
+      status: "",
+      order_source: "",
+      products: "",
+      district: "",
+      print_status: "",
+    },
+  });
 
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const filterRow = React.useMemo(() => {
+    return body.filter((row: any) => {
+      const { userRole, productStock, orderData } = filterData;
+      console.log(productStock);
+
+      // --- Search text filter
+      if (
+        filterData.searchText &&
+        !Object.values(row).some((val) =>
+          String(val)
+            .toLowerCase()
+            .includes(filterData.searchText.toLowerCase())
+        )
+      ) {
+        return false;
+      }
+
+      // --- User role
+      if (userRole && userRole !== row.role) return false;
+
+      // --- Product stock
+      if (
+        productStock &&
+        productStock.toLowerCase() !== row.stock_value.toLowerCase()
+      )
+        return false;
+
+      // --- Status filter
+      if (orderData.status && row.status !== orderData.status) return false;
+
+      // --- Employee filter (maps to customer name)
+      if (orderData.employee && row.employee.name !== orderData.employee) {
+        return false;
+      }
+
+      // --- Order Source filter
+      if (
+        orderData.order_source &&
+        row.orderSource !== orderData.order_source
+      ) {
+        return false;
+      }
+
+      // --- Product filter (by name or code)
+      if (
+        orderData.products &&
+        !row.products.some(
+          (prod: any) =>
+            prod.name
+              .toLowerCase()
+              .includes(orderData.products?.toLowerCase()) ||
+            prod.code.toLowerCase().includes(orderData.products?.toLowerCase())
+        )
+      ) {
+        return false;
+      }
+
+      // --- District filter (maps to address)
+      if (
+        orderData.district &&
+        !row.customer.address
+          ?.toLowerCase()
+          .includes(orderData.district.toLowerCase())
+      ) {
+        return false;
+      }
+
+      // --- Print status filter (maps to note here)
+      if (
+        orderData.print_status &&
+        row.print_status !== orderData.print_status
+      ) {
+        return false;
+      }
+
+      // --- Order created date filter
+      if (orderData.order_created_at) {
+        const orderDate = new Date(row.timestamps.orderPlaced);
+        const filterDate = new Date(orderData.order_created_at as any);
+
+        // Compare only the date part (ignore time)
+        const orderDay = orderDate.setHours(0, 0, 0, 0);
+        const filterDay = filterDate.setHours(0, 0, 0, 0);
+
+        if (orderDay !== filterDay) return false;
+      }
+
+      // --- Courier submitted date filter
+      if (orderData.courier_submitted_at && row.timestamps.deliveryTime) {
+        const courierDate = new Date(row.timestamps.deliveryTime);
+        const filterDate = new Date(orderData.courier_submitted_at as any);
+
+        // Compare only the date part (ignore time)
+        const courierDay = courierDate.setHours(0, 0, 0, 0);
+        const filterDay = filterDate.setHours(0, 0, 0, 0);
+
+        if (courierDay !== filterDay) return false;
+      }
+      return true;
+    });
+  }, [filterData, body]);
+
+  const allChecked = checkedRows.length > 0 && checkedRows.every(Boolean);
+  const isIndeterminate =
+    checkedRows.some(Boolean) && !checkedRows.every(Boolean);
+
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const paginatedRows =
     rowsPerPage > 0
-      ? body.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-      : body;
+      ? (filterRow || []).slice(
+          page * rowsPerPage,
+          page * rowsPerPage + rowsPerPage
+        )
+      : filterRow;
 
   const handleAllCheck = (checked: boolean) => {
-    setCheckedRows(body.map(() => checked));
+    setCheckedRows(filterRow.map(() => checked));
   };
-
   const handleRowCheck = (index: number, checked: boolean) => {
     const updated = [...checkedRows];
     updated[index] = checked;
     setCheckedRows(updated);
   };
 
-  const allChecked = checkedRows.length > 0 && checkedRows.every(Boolean);
-
-  const isIndeterminate =
-    checkedRows.some(Boolean) && !checkedRows.every(Boolean);
-
   return (
-    <Stack component={Paper} borderRadius={1} overflow={"hidden"}>
+    <Stack
+      component={Paper}
+      borderRadius={1}
+      overflow={"hidden"}
+      sx={{
+        backgroundColor: theme.palette.background.paper + "!important",
+      }}
+    >
+      {type === "order" && (
+        <Stack>
+          <OrderTab
+            value={
+              orderStatuses.lastIndexOf(filterData.orderData.status || "") ===
+              -1
+                ? 0
+                : orderStatuses.lastIndexOf(filterData.orderData.status || "") +
+                  1
+            }
+            onChange={(s) => {
+              setFilterData((prev) => ({
+                ...prev,
+                orderData: {
+                  ...prev.orderData,
+                  status: s === "All" ? "" : s,
+                },
+              }));
+            }}
+          />
+        </Stack>
+      )}
       {type !== "rank" && (
-        <Stack py={2} px={3}>
-          <Filter type={type} />
+        <Stack pt={2} px={3}>
+          <Filter
+            type={type}
+            onFilterChange={(d) => setFilterData(d)}
+            filterData={filterData}
+          />
         </Stack>
       )}
 
@@ -102,18 +240,20 @@ export default function CustomTable({
         component={Paper}
         sx={{
           maxHeight: 550,
-          overflowX: "auto", // ✅ horizontal scroll
-          overflowY: "auto", // ✅ vertical scroll
-          "&::-webkit-scrollbar": { display: "none" }, // optional: hide scrollbar in Chrome/Safari
-          scrollbarWidth: "none!important",
+          overflow: "auto", // single source of truth for scrolling
+          "&::-webkit-scrollbar": { display: "none" },
+          scrollbarWidth: "none",
           width: "100%",
+          backgroundColor: theme.palette.background.paper + "!important",
+          borderRadius: type === "rank" ? 1 : 0,
         }}
       >
-        <Table>
+        <Table stickyHeader>
           <TableHead
             sx={{
-              backgroundColor:
-                alpha(theme.palette.grey[400], 0.1) + "!important",
+              "& th": {
+                backgroundColor: theme.palette.grey[700] + "!important",
+              },
             }}
           >
             <TableRow>
@@ -122,8 +262,8 @@ export default function CustomTable({
                   colSpan={10}
                   align="left"
                   sx={{
-                    backgroundColor: alpha(theme.palette.primary.main, 0.15),
-                    p: 0,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.09),
+                    p: 1,
                     px: 1,
                     whiteSpace: "nowrap",
                   }}
@@ -140,9 +280,16 @@ export default function CustomTable({
                       onChange={(e) => handleAllCheck(e.target.checked)}
                     />
 
-                    <IconButton>
-                      <Icon icon="solar:trash-bin-trash-bold" />
-                    </IconButton>
+                    <Stack direction={"row"} spacing={1}>
+                      {type === "order" && (
+                        <IconButton>
+                          <Icon icon="solar:printer-minimalistic-bold" />
+                        </IconButton>
+                      )}
+                      <IconButton color="error">
+                        <Icon icon="solar:trash-bin-trash-bold" />
+                      </IconButton>
+                    </Stack>
                   </Stack>
                 </TableCell>
               ) : (
@@ -152,7 +299,7 @@ export default function CustomTable({
                       <TableCell
                         key={idx}
                         align="left"
-                        sx={{ p: 0, px: 1, whiteSpace: "nowrap" }}
+                        sx={{ p: 1, whiteSpace: "nowrap", width: "0px" }}
                       >
                         <Checkbox
                           checked={allChecked}
@@ -163,14 +310,17 @@ export default function CustomTable({
                     );
                   } else if (h.includes("@")) {
                     return (
-                      <TableCell key={idx} sx={{ whiteSpace: "nowrap" }} />
+                      <TableCell
+                        key={idx}
+                        sx={{ p: 1, whiteSpace: "nowrap" }}
+                      />
                     );
                   }
                   return (
                     <TableCell
                       key={idx}
                       align="left"
-                      sx={{ whiteSpace: "nowrap" }}
+                      sx={{ p: type === "rank" ? 2 : 1, whiteSpace: "nowrap" }}
                     >
                       {h}
                     </TableCell>
@@ -182,12 +332,14 @@ export default function CustomTable({
 
           <TableBody
             sx={{
+              width: "100%",
+              overflow: "scroll",
               "&::-webkit-scrollbar": {
                 display: "none", // Hide scrollbar for WebKit browsers
               },
             }}
           >
-            {paginatedRows.map((row, index) => {
+            {(paginatedRows || []).map((row: any, index) => {
               let arr: Record<string, any> = {};
 
               for (const key in row) {
@@ -202,11 +354,14 @@ export default function CustomTable({
               return (
                 <Row
                   key={index}
+                  isOpen={openRowId === (row.id ?? index)} // controlled open state
+                  onToggle={() =>
+                    setOpenRowId(
+                      openRowId === (row.id ?? index) ? null : row.id ?? index
+                    )
+                  }
                   type={type}
-                  row={{
-                    ...row,
-                    ...arr,
-                  }}
+                  row={row}
                   checked={checkedRows[index]}
                   head={head}
                   onCheck={(checked: boolean) => handleRowCheck(index, checked)}
@@ -222,7 +377,7 @@ export default function CustomTable({
               {type !== "rank" && (
                 <TablePagination
                   rowsPerPageOptions={[10, 25, 50, { label: "All", value: -1 }]}
-                  count={body.length}
+                  count={filterRow.length}
                   rowsPerPage={rowsPerPage}
                   page={page}
                   onPageChange={(e, newPage) => setPage(newPage)}

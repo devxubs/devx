@@ -10,6 +10,7 @@ import {
   Tooltip,
   Typography,
   Grid,
+  useTheme,
 } from "@mui/material";
 import CustomBox from "@src/components/CustomBox";
 import AntSwitch from "@src/components/CustomSwitch";
@@ -29,6 +30,8 @@ interface SettingsProps {
 
 const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const theme = useTheme();
+  const isSmUp = theme.breakpoints.up("sm");
 
   const globalState = useGlobalState();
   const layout = globalState.get("layoutFull");

@@ -90,7 +90,7 @@ const CustomAutocomplete = ({
       options={Array.isArray(option) ? option : []}
       PopperComponent={StyledPopper}
       multiple={multiple}
-      value={value}
+      value={value ?? null}
       onChange={(e, newValue) => {
         onChange?.(newValue, e);
       }}

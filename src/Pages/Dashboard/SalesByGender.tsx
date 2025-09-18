@@ -1,16 +1,20 @@
 "use client";
 
 import React from "react";
-import ReactApexChart from "react-apexcharts";
-import { Box, Card, Typography, Stack, useTheme } from "@mui/material";
+import dynamic from "next/dynamic";
+
+import { Box, Typography, Stack, useTheme } from "@mui/material";
 import { ApexOptions } from "apexcharts";
 import CustomCard from "@src/components/CustomCard";
 
+const ReactApexChart = dynamic(() => import("react-apexcharts"), {
+  ssr: false,
+});
+
 const GenderSalesChart = () => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
 
-  const series = [35, 45, 20]; // Mens, Womens, Kids
+  const series = [35, 45, 20];
 
   const options: ApexOptions = {
     chart: {

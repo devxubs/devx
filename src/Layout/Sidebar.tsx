@@ -126,7 +126,7 @@ const Sidebar = () => {
           position: "absolute",
           top: 24,
           right: -13,
-          zIndex: 2,
+          zIndex: 18,
           transition: "transform 0.3s ease",
           transform: !layout ? "rotate(0deg)" : "rotate(180deg)",
           p: 0.4,
