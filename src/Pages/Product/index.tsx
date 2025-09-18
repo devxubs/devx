@@ -18,7 +18,7 @@ import LinearProgress, {
   linearProgressClasses,
 } from "@mui/material/LinearProgress";
 import Modal from "./Modal";
-import DeleteDialog from "@src/components/DeleteDialog";
+import DeleteDialog from "@src/components/AlertDialog";
 
 const AllProducts = [
   {

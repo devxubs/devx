@@ -69,6 +69,9 @@ const OrderTab = ({ value = 0, onChange }: OrderTabProps) => {
           children: <span className="MuiTabs-indicatorSpan" />,
         }}
         sx={{
+          "& .MuiTabs-scroller": {
+            scrollbarWidth: "none!important",
+          },
           "& .MuiTabs-indicator": {
             display: "flex",
             justifyContent: "center",
@@ -78,6 +81,9 @@ const OrderTab = ({ value = 0, onChange }: OrderTabProps) => {
             maxWidth: 40,
             width: "100%",
             backgroundColor: theme.palette.common.white,
+            ...theme.applyStyles("light", {
+              backgroundColor: theme.palette.common.black,
+            }),
           },
         }}
       >
@@ -86,21 +92,28 @@ const OrderTab = ({ value = 0, onChange }: OrderTabProps) => {
           const statusVal = statusColor[statusKey] || "default";
           const paletteKey = statusVal === "default" ? "primary" : statusVal;
 
-          const color =
-            statusKey === "All" || statusKey === "Hold"
-              ? theme.palette.common.white
-              : theme.palette[paletteKey]?.main || theme.palette.primary.main;
-
           const isAll = statusKey === "All";
           const isHold = statusKey === "Hold";
+
+          const color =
+            isAll || isHold
+              ? theme.palette.mode === "light"
+                ? theme.palette.common.black
+                : theme.palette.common.white
+              : theme.palette[paletteKey]?.main || theme.palette.primary.main;
+
           const isActive = val === i;
           const isHoldActive = isHold && isActive;
 
           const bgColor = isAll || isActive ? color : alpha(color, 0.1);
           const textColor = isAll
-            ? theme.palette.common.black
+            ? theme.palette.mode === "dark"
+              ? theme.palette.common.black
+              : theme.palette.common.white
             : isHoldActive
-            ? theme.palette.common.black // 👈 active hold → white text
+            ? theme.palette.mode === "dark"
+              ? theme.palette.common.black
+              : theme.palette.common.white
             : isHold
             ? theme.palette.text.secondary // 👈 inactive hold → secondary text
             : isActive
@@ -136,6 +149,9 @@ const OrderTab = ({ value = 0, onChange }: OrderTabProps) => {
                 minHeight: 50,
                 "&.Mui-selected": {
                   color: theme.palette.common.white,
+                  ...theme.applyStyles("light", {
+                    color: theme.palette.common.black,
+                  }),
                 },
               }}
             />

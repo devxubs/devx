@@ -2,15 +2,15 @@
 
 import { Stack, Button, Typography } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomModal from "@src/components/Modal";
-import CustomTable, { TableRow } from "@src/components/Table";
+import CustomTable from "@src/components/Table";
 import React, { useState } from "react";
-import DeleteDialog from "@src/components/DeleteDialog";
 import { orders } from "./data";
 import User from "./User";
 import CreateAt from "./CreateAt";
 import { OrderType } from "./type";
 import NoteModal from "./NoteModal";
+import Link from "next/link";
+import AlertDialog from "@src/components/AlertDialog";
 
 const statusColor: Record<
   string,
@@ -121,14 +121,15 @@ const Order = () => {
       <Stack spacing={2} py={2}>
         {/* Header */}
         <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Icon icon="solar:user-plus-bold-duotone" />}
-            onClick={() => {}}
-          >
-            Create order
-          </Button>
+          <Link href={"/order/create"}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Icon icon="solar:user-plus-bold-duotone" />}
+            >
+              Create order
+            </Button>
+          </Link>
         </Stack>
         <Stack width={"100%"} overflow={"hidden"}>
           <CustomTable
@@ -139,11 +140,12 @@ const Order = () => {
           />
         </Stack>
       </Stack>
-      <DeleteDialog
+      <AlertDialog
+        type="delete"
         open={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         title={productToDelete?.product_name}
-        onDelete={handleDeleteConfirm}
+        onConfirm={handleDeleteConfirm}
       />
     </>
   );

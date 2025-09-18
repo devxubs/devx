@@ -13,6 +13,7 @@ import {
   Button,
   IconButton,
   Tooltip,
+  useMediaQuery,
 } from "@mui/material";
 import React from "react";
 import Icon from "../Icon";
@@ -21,6 +22,7 @@ import OrderFilterModal from "./OrderFilterModel";
 import dayjs, { Dayjs } from "dayjs";
 import { Type } from ".";
 import CustomAutocomplete from "../Autocomplete";
+import Scrollbar from "react-browser-scrollbar";
 
 export type OrderFilter = {
   order_created_at?: Dayjs;
@@ -53,6 +55,7 @@ const Filter: React.FC<FilterProps> = ({
 }) => {
   const theme = useTheme();
   const [modalOpen, setModalOpen] = React.useState(false);
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const names = [
     "CEO",
@@ -75,10 +78,11 @@ const Filter: React.FC<FilterProps> = ({
         alignItems="center"
         justifyContent="space-between"
       >
-        <FormControl variant="outlined" sx={{ width: "40%" }}>
+        <FormControl variant="outlined" sx={{ flex: !isMobile ? 0.4 : 1 }}>
           <TextField
             fullWidth
             placeholder="Search"
+            size={isMobile ? "small" : "medium"}
             value={filterData.searchText}
             onChange={(e) =>
               onFilterChange?.({ ...filterData, searchText: e.target.value })
@@ -131,27 +135,38 @@ const Filter: React.FC<FilterProps> = ({
             </Tooltip>
 
             <CustomModal
-              sx={{ width: { xs: "90%", md: 900 } }}
+              sx={{
+                width: { xs: "100%", md: 900 },
+                height: { xs: "100vh", md: "auto" },
+                borderRadius: { xs: 0, md: 2 },
+              }}
               open={modalOpen}
               onClose={() => setModalOpen(false)}
               title="Order Filter"
             >
-              <OrderFilterModal
-                filterValue={{
-                  ...filterData.orderData,
-                  status: filterData.orderData.status,
-                }}
-                onCloseModal={() => setModalOpen(false)}
-                onChange={(f: OrderFilter) =>
-                  onFilterChange?.({
-                    ...filterData,
-                    orderData: {
-                      ...f,
-                      status: f.status !== null ? f.status : "",
-                    },
-                  })
-                }
-              />
+              <Scrollbar
+                autoHide
+                darkMode
+                thumbSize={6}
+                style={{ height: "100%" }}
+              >
+                <OrderFilterModal
+                  filterValue={{
+                    ...filterData.orderData,
+                    status: filterData.orderData.status,
+                  }}
+                  onCloseModal={() => setModalOpen(false)}
+                  onChange={(f: OrderFilter) =>
+                    onFilterChange?.({
+                      ...filterData,
+                      orderData: {
+                        ...f,
+                        status: f.status !== null ? f.status : "",
+                      },
+                    })
+                  }
+                />
+              </Scrollbar>
             </CustomModal>
           </Box>
         )}

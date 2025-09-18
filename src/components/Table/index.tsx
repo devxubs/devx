@@ -197,7 +197,6 @@ export default function CustomTable({
 
   return (
     <Stack
-      component={Paper}
       borderRadius={1}
       overflow={"hidden"}
       sx={{
@@ -244,7 +243,6 @@ export default function CustomTable({
           "&::-webkit-scrollbar": { display: "none" },
           scrollbarWidth: "none",
           width: "100%",
-          backgroundColor: theme.palette.background.paper + "!important",
           borderRadius: type === "rank" ? 1 : 0,
         }}
       >
@@ -252,7 +250,11 @@ export default function CustomTable({
           <TableHead
             sx={{
               "& th": {
-                backgroundColor: theme.palette.grey[700] + "!important",
+                backgroundColor:
+                  alpha(theme.palette.grey[700], 0.1) + "!important",
+                ...theme.applyStyles("dark", {
+                  backgroundColor: theme.palette.grey[700],
+                }),
               },
             }}
           >
@@ -262,7 +264,7 @@ export default function CustomTable({
                   colSpan={10}
                   align="left"
                   sx={{
-                    backgroundColor: alpha(theme.palette.primary.main, 0.09),
+                    // backgroundColor: alpha(theme.palette.primary.main, 0.09),
                     p: 1,
                     px: 1,
                     whiteSpace: "nowrap",

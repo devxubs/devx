@@ -256,6 +256,10 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                       );
                     }}
                     sx={{
+                      backgroundColor:
+                        color === "primary"
+                          ? alpha(theme.palette.primary.main, 0.1)
+                          : "transparent",
                       p: 2,
                     }}
                   >
@@ -278,6 +282,10 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                       );
                     }}
                     sx={{
+                      backgroundColor:
+                        color === "secondary"
+                          ? alpha(theme.palette.primary.main, 0.1)
+                          : "transparent",
                       p: 2,
                     }}
                   >
@@ -300,6 +308,10 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                       );
                     }}
                     sx={{
+                      backgroundColor:
+                        color === "info"
+                          ? alpha(theme.palette.info.main, 0.1)
+                          : "transparent",
                       p: 2,
                     }}
                   >
@@ -322,6 +334,10 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                       );
                     }}
                     sx={{
+                      backgroundColor:
+                        color === "error"
+                          ? alpha(theme.palette.error.main, 0.1)
+                          : "transparent",
                       p: 2,
                     }}
                   >
@@ -344,6 +360,10 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                       );
                     }}
                     sx={{
+                      backgroundColor:
+                        color === "warning"
+                          ? alpha(theme.palette.warning.main, 0.1)
+                          : "transparent",
                       p: 2,
                     }}
                   >
@@ -366,6 +386,10 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                       );
                     }}
                     sx={{
+                      backgroundColor:
+                        color === "success"
+                          ? alpha(theme.palette.success.main, 0.1)
+                          : "transparent",
                       p: 2,
                     }}
                   >

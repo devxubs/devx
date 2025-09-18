@@ -7,7 +7,7 @@ import { Controller, useForm, SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import DeleteDialog from "@src/components/DeleteDialog";
+import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { TableProps } from "@src/components/Table";
@@ -142,7 +142,7 @@ const Categories = () => {
 
         {/* Modal */}
         <CustomModal
-          sx={{ width: 500, borderRadius: 1 }}
+          sx={{ width: { xs: "90%", sm: 500 }, borderRadius: 1 }}
           open={isModalOpen}
           onClose={closeModal}
         >
@@ -183,11 +183,12 @@ const Categories = () => {
         </CustomModal>
 
         {/* Delete Dialog */}
-        <DeleteDialog
+        <AlertDialog
+          type="delete"
           open={isDeleteDialogOpen}
           onClose={() => setIsDeleteDialogOpen(false)}
-          title={`Delete category "${selectedCategory?.name}"?`}
-          onDelete={handleDelete}
+          title={`Are you sure want to delete "${selectedCategory?.name}"?`}
+          onConfirm={handleDelete}
         />
       </Stack>
     </Scrollbar>

@@ -12,7 +12,6 @@ const CustomBox = ({ children, sx, ...rest }: CustomBoxProps) => {
     <Box
       sx={{
         ...sx,
-        position: "relative", // ✅ Required for arrow positioning
         overflow: "visible",
         backdropFilter: "blur(20px)",
         backgroundColor: alpha(theme.palette.background.default, 0.9),

@@ -1,12 +1,19 @@
 "use client";
-import { Box, Stack, IconButton } from "@mui/material";
+import React, { useEffect } from "react";
+import {
+  Box,
+  Stack,
+  IconButton,
+  useTheme,
+  useMediaQuery,
+  Drawer,
+} from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomList from "@src/components/List";
 import useGlobalState from "@src/handler/globalState";
 import Logo from "@src/SvgIcon/logo";
 import LogoNameIcon from "@src/SvgIcon/logoName";
-import React, { useState } from "react";
-import Scrollbar from "react-browser-scrollbar";
+import CustomBox from "@src/components/CustomBox";
 
 const items = [
   {
@@ -29,7 +36,7 @@ const items = [
   },
   {
     headingId: "management",
-    icon: "solar:clipboard-list-bold-duotone", // Assuming this icon for Categories
+    icon: "solar:clipboard-list-bold-duotone",
     label: "Categories",
     url: "/categories",
   },
@@ -47,13 +54,13 @@ const items = [
   },
   {
     headingId: "management",
-    icon: "solar:palette-bold-duotone", // Assuming this icon for Attributes
+    icon: "solar:palette-bold-duotone",
     label: "Attributes",
     url: "/attributes",
   },
   {
     headingId: "management",
-    icon: "solar:users-group-two-rounded-bold-duotone", // Assuming this icon for Suppliers
+    icon: "solar:users-group-two-rounded-bold-duotone",
     label: "Suppliers",
     url: "/suppliers",
   },
@@ -103,91 +110,116 @@ const items = [
 
 const Sidebar = () => {
   const globalState = useGlobalState();
+  const theme = useTheme();
+  const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
+
   const layout = globalState.get("layoutFull");
 
-  return (
+  const sidebarWidth = layout ? 300 : 90;
+
+  const SidebarContent = (
     <Stack
-      minWidth={layout ? 300 : 90}
+      component={isSmDown ? CustomBox : "div"}
+      width={layout ? 300 : 90}
       px={layout ? 1 : 0}
       py={2}
-      bgcolor={"background.paper"}
-      position="relative"
-      sx={{
-        transition: "width 0.3s ease, padding 0.3s ease",
-        // overflow: "hidden",
-      }}
+      bgcolor="background.paper"
+      height="100%"
     >
-      <IconButton
-        size="small"
-        sx={{
-          bgcolor: (theme) => theme.palette.background.default + "!important",
-          border: 1,
-          borderColor: "divider",
-          position: "absolute",
-          top: 24,
-          right: -13,
-          zIndex: 18,
-          transition: "transform 0.3s ease",
-          transform: !layout ? "rotate(0deg)" : "rotate(180deg)",
-          p: 0.4,
-        }}
-        onClick={() => {
-          globalState.set("layoutFull", !layout);
-          const cd = JSON.parse(localStorage.getItem("customize") as any);
-          localStorage.setItem(
-            "customize",
-            JSON.stringify({ ...cd, layoutFull: !layout })
-          );
-        }}
-      >
-        <Icon
-          icon={"eva:arrow-ios-back-fill"}
-          style={{ width: 18, height: 18 }}
-        />
-      </IconButton>
-      {/* logo */}
+      {/* Toggle button */}
+      {!isSmDown ? (
+        <IconButton
+          size="small"
+          sx={{
+            bgcolor: (t) => `${t.palette.background.default}!important`,
+            border: 1,
+            borderColor: "divider",
+            position: "absolute",
+            top: 24,
+            right: -13,
+            zIndex: 18,
+            transition: "transform 0.3s ease",
+            transform: !layout ? "rotate(0deg)" : "rotate(180deg)",
+            p: 0.4,
+          }}
+          onClick={() => {
+            globalState.set("layoutFull", !layout);
+            const cd = JSON.parse(localStorage.getItem("customize") || "{}");
+            localStorage.setItem(
+              "customize",
+              JSON.stringify({ ...cd, layoutFull: !layout })
+            );
+          }}
+        >
+          <Icon
+            icon="eva:arrow-ios-back-fill"
+            style={{ width: 18, height: 18 }}
+          />
+        </IconButton>
+      ) : (
+        <IconButton
+          onClick={() => globalState.set("layoutFull", false)}
+          sx={{
+            position: "absolute",
+            top: 24,
+            right: 13,
+            zIndex: 18,
+          }}
+        >
+          <Icon icon="carbon:close" />
+        </IconButton>
+      )}
+
+      {/* Logo */}
       <Stack height={60} py={1}>
-        {layout ? (
-          <Box
-            width={"100%"}
-            height={"100%"}
-            sx={{ opacity: 1, transition: "opacity 0.3s" }}
-          >
-            <LogoNameIcon />
-          </Box>
-        ) : (
-          <Box
-            width={"100%"}
-            height={"100%"}
-            sx={{ opacity: 1, transition: "opacity 0.3s" }}
-          >
-            <Logo />
-          </Box>
-        )}
+        {layout ? <LogoNameIcon /> : <Logo />}
       </Stack>
+
+      {/* Menu */}
       <Stack
         flex={1}
-        height={"calc(100vh - 80px)"}
+        height="calc(100% - 80px)"
         overflow="auto"
         sx={{
-          scrollbarWidth: "none!important", // Firefox
-          "&::-webkit-scrollbar": {
-            display: "none", // Chrome, Safari, Edge
-          },
+          scrollbarWidth: "none!important",
         }}
       >
-        {layout ? (
-          <Scrollbar autoHide thumbSize={6} darkMode>
-            <Box pb={2} sx={{ transition: "padding 0.3s ease" }}>
-              <CustomList fullMenu={true} items={items} />
-            </Box>
-          </Scrollbar>
-        ) : (
-          <Box py={2} px={1} sx={{ transition: "padding 0.3s ease" }}>
-            <CustomList fullMenu={false} items={items} />
-          </Box>
-        )}
+        <Box
+          pb={2}
+          px={layout ? 0 : 1}
+          sx={{ transition: "padding 0.3s ease" }}
+        >
+          <CustomList fullMenu={layout} items={items} />
+        </Box>
       </Stack>
+    </Stack>
+  );
+
+  return isSmDown ? (
+    // 🔹 Mobile view → Drawer
+    <Drawer
+      open={layout}
+      onClose={() => globalState.set("layoutFull", false)}
+      ModalProps={{ keepMounted: true }}
+      sx={{
+        "& .MuiDrawer-paper": {
+          width: "100%",
+          maxWidth: 300,
+          bgcolor: "background.paper",
+          px: 0,
+        },
+      }}
+    >
+      {SidebarContent}
+    </Drawer>
+  ) : (
+    // 🔹 Desktop view → Persistent sidebar
+    <Stack
+      width={sidebarWidth}
+      position="relative"
+      sx={{ transition: "width 0.3s ease, padding 0.3s ease" }}
+    >
+      {SidebarContent}
     </Stack>
   );
 };
