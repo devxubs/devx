@@ -1,20 +1,15 @@
-import CreateAt from "./CreateAt";
 import { OrderType } from "./type";
-import User from "./User";
 
 export const orders: OrderType[] = [
   {
     orderId: "#6012",
     status: "Pending",
-    date: "13 Sep 2025",
-    time: "2:00 pm",
     note: "Ava Thompson",
     orderSource: "Mobile App",
     employee: { id: "EMP001", name: "John Doe" },
     customer: {
       name: "Ava Thompson",
       email: "ava.thompson@example.com",
-      ip: "192.168.0.12",
       address: "123 Main Street, Austin, TX 78701",
       phone: "512-555-0192",
     },
@@ -56,15 +51,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6013",
     status: "Processing",
-    date: "13 Sep 2025",
-    time: "3:30 pm",
     note: "Liam Carter",
     orderSource: "Phone Call",
     employee: { id: "EMP002", name: "Alice Smith" },
     customer: {
       name: "Liam Carter",
       email: "liam.carter@example.com",
-      ip: "10.0.0.5",
       address: "456 Oak Drive, Seattle, WA 98101",
       phone: "206-555-0147",
     },
@@ -115,15 +107,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6014",
     status: "Confirmed",
-    date: "12 Sep 2025",
-    time: "11:00 am",
     note: "Sophia Kim",
     orderSource: "Messenger",
     employee: { id: "EMP003", name: "Michael Lee" },
     customer: {
       name: "Sophia Kim",
       email: "sophia.kim@example.com",
-      ip: "172.16.0.8",
       address: "789 Pine St, Denver, CO 80203",
       phone: "303-555-0173",
     },
@@ -165,15 +154,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6015",
     status: "Hold",
-    date: "12 Sep 2025",
-    time: "2:15 pm",
     note: "Noah Wilson",
     orderSource: "WhatsApp",
     employee: { id: "EMP004", name: "Sophia Brown" },
     customer: {
       name: "Noah Wilson",
       email: "noah.wilson@example.com",
-      ip: "192.168.1.4",
       address: "321 Maple Ave, Chicago, IL 60601",
       phone: "312-555-0132",
     },
@@ -224,15 +210,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6016",
     status: "Cancelled",
-    date: "11 Sep 2025",
-    time: "4:45 pm",
     note: "Olivia Martinez",
     orderSource: "Website",
     employee: { id: "EMP005", name: "David Miller" },
     customer: {
       name: "Olivia Martinez",
       email: "olivia.martinez@example.com",
-      ip: "192.168.1.20",
       address: "101 Lakeview Blvd, Miami, FL 33101",
       phone: "305-555-0199",
     },
@@ -274,15 +257,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6017",
     status: "Processing",
-    date: "14 Sep 2025",
-    time: "9:30 am",
     note: "Ethan Brown",
     orderSource: "Messenger",
     employee: { id: "EMP006", name: "Emma Wilson" },
     customer: {
       name: "Ethan Brown",
       email: "ethan.brown@example.com",
-      ip: "172.16.0.11",
       address: "555 Elm St, San Francisco, CA 94102",
       phone: "415-555-0178",
     },
@@ -333,15 +313,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6018",
     status: "Delivered",
-    date: "12 Sep 2025",
-    time: "5:30 pm",
     note: "Emma Davis",
     orderSource: "WhatsApp",
     employee: { id: "EMP007", name: "Oliver Taylor" },
     customer: {
       name: "Emma Davis",
       email: "emma.davis@example.com",
-      ip: "10.0.0.9",
       address: "202 Birch Rd, Dallas, TX 75201",
       phone: "214-555-0164",
     },
@@ -383,15 +360,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6019",
     status: "Pending",
-    date: "15 Sep 2025",
-    time: "10:15 am",
     note: "James Lee",
     orderSource: "Phone Call",
     employee: { id: "EMP008", name: "Ava Martinez" },
     customer: {
       name: "James Lee",
       email: "james.lee@example.com",
-      ip: "192.168.1.30",
       address: "404 Cedar St, Boston, MA 02108",
       phone: "617-555-0185",
     },
@@ -431,15 +405,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6020",
     status: "Hold",
-    date: "14 Sep 2025",
-    time: "7:45 pm",
     note: "Isabella Johnson",
     orderSource: "Mobile App",
     employee: { id: "EMP009", name: "Liam Thompson" },
     customer: {
       name: "Isabella Johnson",
       email: "isabella.johnson@example.com",
-      ip: "172.16.0.22",
       address: "606 Spruce Ln, Portland, OR 97201",
       phone: "503-555-0142",
     },
@@ -481,15 +452,12 @@ export const orders: OrderType[] = [
   {
     orderId: "#6021",
     status: "Confirmed",
-    date: "13 Sep 2025",
-    time: "6:00 pm",
     note: "William Scott",
     orderSource: "Website",
     employee: { id: "EMP010", name: "Sophia Davis" },
     customer: {
       name: "William Scott",
       email: "william.scott@example.com",
-      ip: "10.1.1.15",
       address: "707 Aspen Ct, Phoenix, AZ 85001",
       phone: "602-555-0176",
     },

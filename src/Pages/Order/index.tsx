@@ -30,6 +30,10 @@ const statusColor: Record<
 } as const;
 
 const cOrder = (orders as OrderType[]).map((o, i) => {
+  const d = new Date(o.timestamps.orderPlaced);
+  const dateOnly = d.toLocaleDateString();
+  const timeOnly = d.toLocaleTimeString();
+
   return {
     ...o,
     products: o.products,
@@ -42,7 +46,7 @@ const cOrder = (orders as OrderType[]).map((o, i) => {
         number={o.customer.phone}
       />
     ),
-    date: <CreateAt date={o.date} time={o.time} />,
+    date: <CreateAt date={dateOnly} time={timeOnly} />,
     address: (
       <Typography
         variant="body2"
@@ -121,7 +125,7 @@ const Order = () => {
       <Stack spacing={2} py={2}>
         {/* Header */}
         <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
-          <Link href={"/order/create"}>
+          <Link href={"/order/publish"}>
             <Button
               variant="contained"
               color="primary"

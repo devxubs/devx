@@ -1,21 +1,13 @@
 "use client";
 
-import {
-  Stack,
-  Button,
-  Avatar,
-  Typography,
-  Dialog,
-  DialogTitle,
-  DialogActions,
-  DialogContent,
-} from "@mui/material";
+import { Stack, Button, Avatar, Typography } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { TableProps, TableRow } from "@src/components/Table";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import CustomModal from "@src/components/Modal";
 import Modal from "./Modal";
+import AlertDialog from "@src/components/AlertDialog";
 
 const UserProfile = ({
   name,
@@ -154,31 +146,16 @@ const Users = () => {
           }}
         />
       </CustomModal>
-      <CustomModal
+      <AlertDialog
         // sx={{ width: { xs: "90%", md: 900 } }}
+        type="delete"
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        title={"Delete User"}
-      >
-        <Stack>
-          <Typography>
-            Are you sure you want to delete{" "}
-            <strong>{userToDelete?.email || "this user"}</strong>?
-          </Typography>
-          <Stack direction="row" spacing={2} justifyContent="flex-end" mt={3}>
-            <Button onClick={() => setDeleteOpen(false)} color="inherit">
-              Cancel
-            </Button>
-            <Button
-              onClick={handleDeleteConfirm}
-              color="error"
-              variant="contained"
-            >
-              Delete
-            </Button>
-          </Stack>
-        </Stack>
-      </CustomModal>
+        title={
+          "Are you sure you want to delete" + userToDelete?.email || "this user"
+        }
+        onConfirm={handleDeleteConfirm}
+      />
     </Scrollbar>
   );
 };

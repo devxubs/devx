@@ -11,7 +11,6 @@ export type Customer = {
   id?: string;
   name: string;
   email: string;
-  ip: string;
   address: string;
   phone: string;
 };
@@ -88,8 +87,6 @@ export type OrderSource =
 export type OrderType = {
   orderId: string;
   status: OrderStatus;
-  date: string;
-  time: string;
   note: string;
   employee: Employee;
   orderSource: OrderSource;

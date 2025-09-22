@@ -52,24 +52,24 @@ const items = [
     label: "Customers",
     url: "/customers",
   },
-  {
-    headingId: "management",
-    icon: "solar:palette-bold-duotone",
-    label: "Attributes",
-    url: "/attributes",
-  },
-  {
-    headingId: "management",
-    icon: "solar:users-group-two-rounded-bold-duotone",
-    label: "Suppliers",
-    url: "/suppliers",
-  },
-  {
-    headingId: "management",
-    icon: "solar:inbox-archive-bold-duotone",
-    label: "Inventory",
-    url: "/inventory",
-  },
+  // {
+  //   headingId: "management",
+  //   icon: "solar:palette-bold-duotone",
+  //   label: "Attributes",
+  //   url: "/attributes",
+  // },
+  // {
+  //   headingId: "management",
+  //   icon: "solar:users-group-two-rounded-bold-duotone",
+  //   label: "Suppliers",
+  //   url: "/suppliers",
+  // },
+  // {
+  //   headingId: "management",
+  //   icon: "solar:inbox-archive-bold-duotone",
+  //   label: "Inventory",
+  //   url: "/inventory",
+  // },
   {
     headingId: "management",
     icon: "solar:pie-chart-2-bold-duotone",

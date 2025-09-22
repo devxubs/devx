@@ -18,7 +18,7 @@ import LinearProgress, {
   linearProgressClasses,
 } from "@mui/material/LinearProgress";
 import Modal from "./Modal";
-import DeleteDialog from "@src/components/AlertDialog";
+import AlertDialog from "@src/components/AlertDialog";
 
 const AllProducts = [
   {
@@ -342,11 +342,12 @@ const Product = () => {
           </Stack>
         </Stack>
       </CustomModal>
-      <DeleteDialog
+      <AlertDialog
+        type="delete"
         open={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         title={productToDelete?.product_name}
-        onDelete={handleDeleteConfirm}
+        onConfirm={handleDeleteConfirm}
       />
     </Scrollbar>
   );

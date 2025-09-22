@@ -1,7 +1,8 @@
+import Publish from "@src/Pages/Order/Publish";
 import React from "react";
 
 const Create = () => {
-  return <div>Create</div>;
+  return <Publish />;
 };
 
 export default Create;
