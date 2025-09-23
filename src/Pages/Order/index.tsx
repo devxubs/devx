@@ -30,14 +30,14 @@ const statusColor: Record<
 } as const;
 
 const cOrder = (orders as OrderType[]).map((o, i) => {
-  const d = new Date(o.timestamps.orderPlaced);
+  const d = new Date(o.createdAt);
   const dateOnly = d.toLocaleDateString();
   const timeOnly = d.toLocaleTimeString();
 
   return {
     ...o,
     products: o.products,
-    note: <NoteModal note={o.note} />,
+    note: <NoteModal note={o.orderNote || ""} />,
     order: o.orderId,
     customer: (
       <User

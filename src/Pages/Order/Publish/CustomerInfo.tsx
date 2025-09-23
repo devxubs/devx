@@ -13,7 +13,7 @@ import React, { useState } from "react";
 import Icon from "@src/components/Icon";
 
 const CustomerInfo = () => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -82,8 +82,15 @@ const CustomerInfo = () => {
                 </Typography>
                 <TextField
                   fullWidth
-                  placeholder="Phone Number"
-                  label="Phone Number"
+                  placeholder="Number"
+                  label="Number"
+                  type="number"
+                  sx={{
+                    "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button":
+                      {
+                        display: "none",
+                      },
+                  }}
                 />
               </Stack>
             </Grid>
@@ -94,7 +101,15 @@ const CustomerInfo = () => {
                   fontSize={"13px!important"}
                   fontWeight={500}
                 >
-                  Address
+                  Billing Address{" "}
+                  <Typography
+                    component={"span"}
+                    variant="body2"
+                    fontSize={12}
+                    color="textSecondary"
+                  >
+                    (Street, City, State)
+                  </Typography>
                 </Typography>
                 <TextField fullWidth placeholder="Address" label="Address" />
               </Stack>

@@ -1,100 +1,82 @@
-export type OrderStatus =
-  | "Pending"
-  | "Confirmed"
-  | "Processing"
-  | "Hold"
-  | "Cancelled"
-  | "Delivered"
-  | "Returned";
-
-export type Customer = {
-  id?: string;
-  name: string;
-  email: string;
-  address: string;
-  phone: string;
-};
-
-export type Delivery = {
-  shipBy: string; // courier
-  speedy: string; // shipping speed
-  trackingNo: string; // tracking number
-  estimatedDate?: string; // ISO date string
-};
-
-export type Payment = {
-  method:
-    | "COD"
-    | "Credit Card"
-    | "Bank Transfer"
-    | "Wallet"
-    | "Card"
-    | "Cash on Delivery";
-  status?: "Unpaid" | "Paid" | "Refunded";
-  cardMasked?: string;
-  cardType?: string;
-  transactionId?: string;
-  amount?: number;
-  currency?: string;
-};
-
-export type Product = {
-  id?: string;
-  name: string;
-  code: string;
-  images: string[];
-  quantity: number;
-  price: number;
-  total?: number; // computed: quantity * price
-};
-
-export type Pricing = {
-  subtotal: number;
-  shipping: number;
-  discount: number;
-  taxes: number;
-  total: number;
-};
-
-export type OrderHistory = {
-  status: OrderStatus;
-  date: string; // ISO date
-  time: string; // HH:mm
-  note?: string;
-  updatedBy?: string;
-};
-
-export type OrderTimestamps = {
-  orderPlaced: string; // ISO date
-  paymentTime?: string; // ISO date
-  deliveryTime?: string; // ISO date
-  completionTime?: string; // ISO date
-  cancelledAt?: string;
-};
-export type Employee = {
-  id: string;
-  name: string;
-};
-export type OrderSource =
-  | "Website"
-  | "Mobile App"
-  | "WhatsApp"
-  | "Phone Call"
-  | "Messenger"
-  | "Instagram"
-  | "FaceBook";
-
-export type OrderType = {
+export interface OrderType {
   orderId: string;
-  status: OrderStatus;
-  note: string;
-  employee: Employee;
-  orderSource: OrderSource;
-  customer: Customer;
-  delivery: Delivery;
-  payment: Payment;
-  products: Product[];
-  pricing: Pricing;
-  // history: OrderHistory[];
-  timestamps: OrderTimestamps;
-};
+  invoiceNo?: string; // optional invoice number
+  status:
+    | "Pending"
+    | "Processing"
+    | "Confirmed"
+    | "Hold"
+    | "Cancelled"
+    | "Delivered"
+    | "Completed";
+  orderNote?: string; // general instructions
+  orderSource: string; // e.g. Website, App, Phone
+  createdAt: string; // ISO date string
+  updatedAt?: string; // ISO date string
+
+  employee: {
+    id: string;
+    name: string;
+  };
+
+  customer: {
+    id?: string;
+    name: string;
+    email: string;
+    address: string;
+    phone: string;
+  };
+
+  delivery: {
+    address: string;
+    shipBy: string; // FedEx, UPS, DHL, etc.
+    method: string; // Express, Standard, Priority, etc.
+    trackingNo?: string;
+    estimatedDelivery?: string; // ISO date string
+    deliveredAt?: string; // ISO date string
+  };
+
+  payment: {
+    method:
+      | "Cash on Delivery"
+      | "Card"
+      | "Bank Transfer"
+      | "Wallet"
+      | "Credit Card";
+    status: "Pending" | "Paid" | "Failed" | "Refunded";
+    transactionId?: string;
+    details?: {
+      cardMasked?: string;
+      cardType?: string;
+    };
+  };
+
+  products: {
+    id?: string;
+    name: string;
+    code: string;
+    quantity: number;
+    price: number;
+    images: string[];
+  }[];
+
+  pricing: {
+    currency: string; // e.g., "USD"
+    subtotal: number;
+    shipping: number;
+    discount: number; // always positive
+    taxes: number;
+    total: number;
+    advancePayment?: number;
+    dueAmount?: number;
+    couponCode?: string;
+  };
+
+  statusHistory?: {
+    status: string;
+    timestamp: string; // ISO date
+  }[];
+
+  cancellationReason?: string;
+  returnStatus?: "Requested" | "Approved" | "Rejected" | "Completed";
+}
