@@ -9,11 +9,37 @@ import {
    Collapse,
    Grid,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Icon from "@src/components/Icon";
+import { OrderType } from "../type";
+import { Controller } from "react-hook-form";
+import CustomAutocomplete from "@src/components/Autocomplete";
+import { paymentMethod } from "../data";
 
-const Pricing = () => {
+interface DetailsProps {
+   control: any;
+   errors: any;
+   data: OrderType["pricing"];
+   setValue: Function;
+   watch: any;
+}
+
+const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
    const [expanded, setExpanded] = useState(true);
+
+   const subtotal = Number(watch("pricing.subtotal") ?? 0);
+   const shipping = Number(watch("pricing.shipping") ?? 0);
+   const discount = Number(watch("pricing.discount") ?? 0);
+   const advance = Number(watch("pricing.advancePayment") ?? 0);
+   const delivery = Number(watch("pricing.deliveryCharge") ?? 0);
+
+   useEffect(() => {
+      const total = Math.max(subtotal + shipping + delivery - discount, 0);
+      const due = Math.max(total - advance, 0);
+
+      setValue("pricing.total", total);
+      setValue("pricing.dueAmount", due);
+   }, [subtotal, shipping, delivery, discount, advance, setValue]);
 
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -55,15 +81,63 @@ const Pricing = () => {
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
+                           Payment method
+                        </Typography>
+                        <Controller
+                           name="pricing.paymentMethod"
+                           control={control}
+                           defaultValue={
+                              data?.paymentMethod ?? "Cash on Delivery"
+                           }
+                           render={({ field }) => (
+                              <CustomAutocomplete
+                                 {...field}
+                                 value={field.value || []} // ✅ always controlled
+                                 onChange={(val: any, e: any) =>
+                                    field.onChange(val)
+                                 }
+                                 error={!!errors.paymentMethod}
+                                 helperText={errors.paymentMethod?.message}
+                                 arrow
+                                 option={paymentMethod}
+                                 placeholder="Payment method"
+                                 label="Payment method"
+                                 getOptionLabel={(option) => option.toString()}
+                              />
+                           )}
+                        />
+                     </Stack>
+                  </Grid>
+
+                  {/* Subtotal */}
+                  <Grid size={{ xs: 12, md: 6 }}>
+                     <Stack spacing={1.5}>
+                        <Typography
+                           variant="h6"
+                           fontSize={"13px!important"}
+                           fontWeight={500}
+                        >
                            Subtotal
                         </Typography>
-                        <TextField
-                           fullWidth
-                           placeholder="Subtotal"
-                           label="Subtotal"
+                        <Controller
+                           name="pricing.subtotal"
+                           control={control}
+                           defaultValue={data?.subtotal ?? 0}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 type="number"
+                                 fullWidth
+                                 label="Subtotal"
+                                 error={!!errors?.subtotal}
+                                 helperText={errors?.subtotal?.message}
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>
+
+                  {/* Delivery Charge */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
                         <Typography
@@ -71,39 +145,63 @@ const Pricing = () => {
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
-                           Shipping Cost
-                        </Typography>
-                        <TextField
-                           fullWidth
-                           placeholder="Shipping Cost"
-                           label="Shipping Cost"
-                        />
-                     </Stack>
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
-                           Discount{" "}
+                           Delivery Charge{" "}
                            <Typography
                               component={"span"}
                               variant="body2"
                               fontSize={12}
                               color="textSecondary"
                            >
-                              (manual entry or coupon code)
+                              (Leave 0 for free)
                            </Typography>
                         </Typography>
-                        <TextField
-                           fullWidth
-                           placeholder="Discount"
-                           label="Discount"
+                        <Controller
+                           name="pricing.deliveryCharge"
+                           control={control}
+                           defaultValue={data?.deliveryCharge ?? 0} // free by default
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 type="number"
+                                 fullWidth
+                                 label="Delivery Charge"
+                                 error={!!errors?.deliveryCharge}
+                                 helperText={errors?.deliveryCharge?.message}
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>
+
+                  {/* Discount */}
+                  <Grid size={{ xs: 12, md: 6 }}>
+                     <Stack spacing={1.5}>
+                        <Typography
+                           variant="h6"
+                           fontSize={"13px!important"}
+                           fontWeight={500}
+                        >
+                           Discount
+                        </Typography>
+                        <Controller
+                           name="pricing.discount"
+                           control={control}
+                           defaultValue={data?.discount ?? 0}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 type="number"
+                                 fullWidth
+                                 label="Discount"
+                                 error={!!errors?.discount}
+                                 helperText={errors?.discount?.message}
+                              />
+                           )}
+                        />
+                     </Stack>
+                  </Grid>
+
+                  {/* Total (read-only) */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
                         <Typography
@@ -113,13 +211,26 @@ const Pricing = () => {
                         >
                            Total Amount
                         </Typography>
-                        <TextField
-                           fullWidth
-                           placeholder="Total Amount"
-                           label="Total Amount"
+                        <Controller
+                           name="pricing.total"
+                           control={control}
+                           defaultValue={0}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 type="number"
+                                 fullWidth
+                                 label="Total Amount"
+                                 InputProps={{ readOnly: true }}
+                                 error={!!errors?.total}
+                                 helperText={errors?.total?.message}
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>
+
+                  {/* Advance Payment */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
                         <Typography
@@ -127,44 +238,51 @@ const Pricing = () => {
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
-                           Advance Payment{" "}
-                           <Typography
-                              component={"span"}
-                              variant="body2"
-                              fontSize={12}
-                              color="textSecondary"
-                           >
-                              (if applicable)
-                           </Typography>
+                           Advance Payment
                         </Typography>
-                        <TextField
-                           fullWidth
-                           placeholder="Advance Payment"
-                           label="Advance Payment"
+                        <Controller
+                           name="pricing.advancePayment"
+                           control={control}
+                           defaultValue={data?.advancePayment ?? 0}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 type="number"
+                                 fullWidth
+                                 label="Advance Payment"
+                                 error={!!errors?.advancePayment}
+                                 helperText={errors?.advancePayment?.message}
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
+
+                  {/* Due (read-only) */}
+                  <Grid size={{ xs: 12 }}>
                      <Stack spacing={1.5}>
                         <Typography
                            variant="h6"
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
-                           Due Amount{" "}
-                           <Typography
-                              component={"span"}
-                              variant="body2"
-                              fontSize={12}
-                              color="textSecondary"
-                           >
-                              (auto-calculated)
-                           </Typography>
+                           Due Amount
                         </Typography>
-                        <TextField
-                           fullWidth
-                           placeholder="Due Amount"
-                           label="Due Amount"
+                        <Controller
+                           name="pricing.dueAmount"
+                           control={control}
+                           defaultValue={0}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 type="number"
+                                 fullWidth
+                                 label="Due Amount"
+                                 InputProps={{ readOnly: true }}
+                                 error={!!errors?.dueAmount}
+                                 helperText={errors?.dueAmount?.message}
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>

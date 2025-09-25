@@ -9,44 +9,31 @@ import {
    Collapse,
    useTheme,
    alpha,
+   Table,
+   TableBody,
+   TableCell,
+   TableContainer,
+   TableHead,
+   TableRow,
 } from "@mui/material";
 import React, { useState } from "react";
 import Icon from "@src/components/Icon";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import { productsData } from "@src/Pages/Product";
+import { Controller } from "react-hook-form";
+import { OrderType } from "../type";
 
-const ProductDetails = () => {
+interface DetailsProps {
+   control: any;
+   errors: any;
+   data: OrderType["products"];
+}
+
+const ProductDetails = ({ control, errors, data }: DetailsProps) => {
    const theme = useTheme();
    const [expanded, setExpanded] = useState(true);
-   const [products, setProducts] = useState<any[]>([]);
-   const [selected, setSelected] = useState<string[]>([]);
 
    const products_name = productsData.map((p) => p.product_name);
-
-   // Handle quantity or price change
-   const handleProductChange = (
-      index: number,
-      field: "quantity" | "price",
-      value: number
-   ) => {
-      const newProducts = [...products];
-      newProducts[index][field] = value;
-      setProducts(newProducts);
-   };
-
-   // Handle product removal
-   const handleRemoveProduct = (index: number) => {
-      const newProducts = [...products];
-      newProducts.splice(index, 1);
-      setProducts(newProducts);
-      setSelected(newProducts.map((p) => p.name));
-   };
 
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -81,179 +68,209 @@ const ProductDetails = () => {
             <Stack spacing={3} p={2} pt={0}>
                {/* Autocomplete */}
                <Stack>
-                  <CustomAutocomplete
-                     option={products_name}
-                     size="small"
-                     placeholder="Search product..."
-                     label="Search"
-                     value={selected}
-                     multiple
-                     onChange={(d: string[]) => {
-                        setSelected(d);
+                  <Controller
+                     name="products"
+                     control={control}
+                     defaultValue={data || []}
+                     render={({ field }) => {
+                        const allProducts = field.value || [];
 
-                        const newProducts = d
-                           .map((name) => {
-                              const p = productsData.find(
-                                 (prod) => prod.product_name === name
-                              );
-                              if (p) {
-                                 return {
-                                    name: p.product_name,
-                                    image: p.images[0],
-                                    quantity: 1,
-                                    price: parseFloat(p.salePrice),
-                                 };
-                              }
-                              return null;
-                           })
-                           .filter(Boolean); // remove nulls
+                        return (
+                           <>
+                              <CustomAutocomplete
+                                 value={
+                                    allProducts.map((p: any) => p.name) || []
+                                 } // always array
+                                 onChange={(val: string[]) => {
+                                    const newProducts = val.map((name) => {
+                                       const existing = allProducts.find(
+                                          (p: any) => p.product_name === name
+                                       );
+                                       if (existing) return existing;
 
-                        setProducts(newProducts);
+                                       const found = productsData.find(
+                                          (p) => p.product_name === name
+                                       );
+                                       return found
+                                          ? {
+                                               name: found.product_name,
+                                               quantity: 1,
+                                               price: found.salePrice ?? 0,
+                                               image: found.images[0],
+                                            }
+                                          : null;
+                                    });
+                                    field.onChange(newProducts.filter(Boolean)); // remove nulls
+                                 }}
+                                 error={!!errors.products}
+                                 helperText={errors.products?.message}
+                                 arrow
+                                 option={products_name}
+                                 size="small"
+                                 placeholder="Search product..."
+                                 label="Search"
+                                 multiple
+                                 getOptionLabel={(option) =>
+                                    option?.toString() || ""
+                                 }
+                              />
+
+                              {errors.products && (
+                                 <Typography
+                                    color="error"
+                                    variant="caption"
+                                    sx={{ mt: 0.5 }}
+                                 >
+                                    {errors.products.message}
+                                 </Typography>
+                              )}
+                           </>
+                        );
                      }}
                   />
                </Stack>
-               {/* Product Table */}
 
-               {!products.length ? (
-                  <Stack
-                     alignItems="center"
-                     justifyContent="center"
-                     p={3}
-                     sx={{ color: theme.palette.text.secondary }}
-                  >
-                     <Typography>No item added</Typography>
-                  </Stack>
-               ) : (
-                  <TableContainer
-                     component={Paper}
-                     sx={{
-                        maxHeight: 300, // set the height you want
-                        overflowY: "auto",
-                        scrollbarWidth: "none!important", // Firefox
-                        "&::-webkit-scrollbar": {
-                           display: "none!important", // Chrome, Safari, Edge
-                        },
-                     }}
-                  >
-                     <Table stickyHeader sx={{ minWidth: 650 }}>
-                        <TableHead
-                           sx={{
-                              "& th": {
-                                 backgroundColor:
-                                    alpha(theme.palette.grey[700], 0.1) +
-                                    "!important",
-                                 ...theme.applyStyles("dark", {
-                                    backgroundColor: theme.palette.grey[700],
-                                 }),
+               {/* Product Table */}
+               <Controller
+                  name="products"
+                  control={control}
+                  render={({ field }) => {
+                     const allProducts = field.value || [];
+
+                     if (!allProducts.length) {
+                        return (
+                           <Stack
+                              alignItems="center"
+                              justifyContent="center"
+                              p={3}
+                              sx={{ color: theme.palette.text.secondary }}
+                           >
+                              <Typography>No item added</Typography>
+                           </Stack>
+                        );
+                     }
+
+                     return (
+                        <TableContainer
+                           component={Paper}
+                           sx={[
+                              {
+                                 maxHeight: 300,
+                                 overflowY: "auto",
+                                 scrollbarWidth: "none!important",
+                                 backgroundColor: alpha(
+                                    theme.palette.grey[400],
+                                    0.1
+                                 ),
+                                 "&::-webkit-scrollbar": { display: "none" },
                               },
-                           }}
+                              theme.applyStyles("dark", {
+                                 backgroundColor: alpha(
+                                    theme.palette.background.default,
+                                    0.1
+                                 ),
+                              }),
+                           ]}
                         >
-                           <TableRow>
-                              <TableCell>Name</TableCell>
-                              <TableCell align="left">Quantity</TableCell>
-                              <TableCell align="left">Price</TableCell>
-                              <TableCell align="left">Subtotal</TableCell>
-                              <TableCell align="left"></TableCell>
-                           </TableRow>
-                        </TableHead>
-                        <TableBody
-                           sx={{
-                              "& tr": {
-                                 backgroundColor:
-                                    alpha(theme.palette.grey[400], 0.1) +
-                                    "!important",
-                                 ...theme.applyStyles("dark", {
-                                    backgroundColor: theme.palette.grey[800],
-                                 }),
-                              },
-                           }}
-                        >
-                           {products.map((row, idx) => (
-                              <TableRow
-                                 key={idx}
+                           <Table stickyHeader sx={{ minWidth: 650 }}>
+                              <TableHead
                                  sx={{
-                                    "&:last-child td, &:last-child th": {
-                                       border: 0,
+                                    "& th": {
+                                       backgroundColor: theme.palette.grey[300],
+                                       ...theme.applyStyles("dark", {
+                                          backgroundColor:
+                                             theme.palette.grey[800], // dark mode
+                                       }),
                                     },
                                  }}
                               >
-                                 <TableCell component="th" scope="row">
-                                    {row.name}
-                                 </TableCell>
-                                 <TableCell align="left">
-                                    <TextField
-                                       variant="outlined"
-                                       type="number"
-                                       value={row.quantity}
-                                       size="small"
-                                       onChange={(e) =>
-                                          handleProductChange(
-                                             idx,
-                                             "quantity",
-                                             parseInt(e.target.value, 10) || 0
-                                          )
-                                       }
-                                       sx={{
-                                          width: 50,
-                                          "& .MuiOutlinedInput-root": {
-                                             padding: "2px 8px",
-                                             borderRadius: 0.5,
-                                             fontSize: 14,
-                                          },
-                                          "& .MuiOutlinedInput-input": {
-                                             padding: "4px 0",
-                                          },
-                                       }}
-                                       InputProps={{
-                                          sx: { fontSize: 14, padding: 0 },
-                                       }}
-                                    />
-                                 </TableCell>
-                                 <TableCell align="left">
-                                    <TextField
-                                       variant="outlined"
-                                       type="number"
-                                       value={row.price}
-                                       size="small"
-                                       onChange={(e) =>
-                                          handleProductChange(
-                                             idx,
-                                             "price",
-                                             parseFloat(e.target.value) || 0
-                                          )
-                                       }
-                                       sx={{
-                                          width: 80,
-                                          "& .MuiOutlinedInput-root": {
-                                             padding: "2px 8px",
-                                             borderRadius: 0.5,
-                                             fontSize: 14,
-                                          },
-                                          "& .MuiOutlinedInput-input": {
-                                             padding: "4px 0",
-                                          },
-                                       }}
-                                       InputProps={{
-                                          sx: { fontSize: 14, padding: 0 },
-                                       }}
-                                    />
-                                 </TableCell>
-                                 <TableCell align="left">
-                                    {(row.price * row.quantity).toFixed(2)}
-                                 </TableCell>
-                                 <TableCell align="left">
-                                    <IconButton
-                                       onClick={() => handleRemoveProduct(idx)}
-                                    >
-                                       <Icon icon="carbon:close" />
-                                    </IconButton>
-                                 </TableCell>
-                              </TableRow>
-                           ))}
-                        </TableBody>
-                     </Table>
-                  </TableContainer>
-               )}
+                                 <TableRow>
+                                    <TableCell>Name</TableCell>
+                                    <TableCell align="left">Quantity</TableCell>
+                                    <TableCell align="left">Price</TableCell>
+                                    <TableCell align="left">Subtotal</TableCell>
+                                    <TableCell align="left"></TableCell>
+                                 </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                 {allProducts.map((row: any, idx: number) => (
+                                    <TableRow key={idx}>
+                                       <TableCell>{row.name}</TableCell>
+                                       <TableCell align="left">
+                                          <TextField
+                                             type="number"
+                                             size="small"
+                                             value={row.quantity}
+                                             onChange={(e) => {
+                                                const newQuantity =
+                                                   parseInt(
+                                                      e.target.value,
+                                                      10
+                                                   ) || 1;
+                                                const updated = [
+                                                   ...allProducts,
+                                                ];
+                                                updated[idx] = {
+                                                   ...updated[idx],
+                                                   quantity: newQuantity,
+                                                };
+                                                field.onChange(updated);
+                                             }}
+                                             sx={{ width: 70 }}
+                                          />
+                                       </TableCell>
+                                       <TableCell align="left">
+                                          <TextField
+                                             type="number"
+                                             size="small"
+                                             value={row.price}
+                                             onChange={(e) => {
+                                                const newPrice =
+                                                   e.target.value === ""
+                                                      ? 0
+                                                      : parseFloat(
+                                                           e.target.value
+                                                        );
+                                                const updated = [
+                                                   ...allProducts,
+                                                ];
+                                                updated[idx] = {
+                                                   ...updated[idx],
+                                                   price: newPrice,
+                                                };
+                                                field.onChange(updated);
+                                             }}
+                                             sx={{ width: 80 }}
+                                          />
+                                       </TableCell>
+                                       <TableCell align="left">
+                                          {(
+                                             Number(row.price) *
+                                             Number(row.quantity)
+                                          ).toFixed(2)}
+                                       </TableCell>
+                                       <TableCell align="left">
+                                          <IconButton
+                                             onClick={() => {
+                                                const updated =
+                                                   allProducts.filter(
+                                                      (_: any, i: number) =>
+                                                         i !== idx
+                                                   );
+                                                field.onChange(updated);
+                                             }}
+                                          >
+                                             <Icon icon="carbon:close" />
+                                          </IconButton>
+                                       </TableCell>
+                                    </TableRow>
+                                 ))}
+                              </TableBody>
+                           </Table>
+                        </TableContainer>
+                     );
+                  }}
+               />
             </Stack>
          </Collapse>
       </Paper>

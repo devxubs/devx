@@ -13,8 +13,16 @@ import React, { useState } from "react";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import { orderSources, orderStatuses } from "@src/handler/order_filter";
+import { OrderType } from "../type";
+import { Controller } from "react-hook-form";
 
-const OrderInfo = () => {
+interface DetailsProps {
+   control: any;
+   errors: any;
+   data: OrderType;
+}
+
+const OrderInfo = ({ control, errors, data }: DetailsProps) => {
    const [expanded, setExpanded] = useState(true);
 
    return (
@@ -110,10 +118,26 @@ const OrderInfo = () => {
                         >
                            Order Source
                         </Typography>
-                        <CustomAutocomplete
-                           option={orderSources}
-                           placeholder="Source"
-                           label="Source"
+                        <Controller
+                           name="orderSource"
+                           control={control}
+                           defaultValue={data.orderSource || []}
+                           render={({ field }) => (
+                              <CustomAutocomplete
+                                 {...field}
+                                 value={field.value || []} // ✅ always controlled
+                                 onChange={(val: any, e: any) =>
+                                    field.onChange(val)
+                                 }
+                                 error={!!errors.orderSource}
+                                 helperText={errors.orderSource?.message}
+                                 arrow
+                                 option={orderSources}
+                                 placeholder="Source"
+                                 label="Source"
+                                 getOptionLabel={(option) => option.toString()}
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>
@@ -126,10 +150,26 @@ const OrderInfo = () => {
                         >
                            Order Status
                         </Typography>
-                        <CustomAutocomplete
-                           option={orderStatuses}
-                           placeholder="Status"
-                           label="Status"
+                        <Controller
+                           name="status"
+                           control={control}
+                           defaultValue={data.status || []}
+                           render={({ field }) => (
+                              <CustomAutocomplete
+                                 {...field}
+                                 value={field.value || []} // ✅ always controlled
+                                 onChange={(val: any, e: any) =>
+                                    field.onChange(val)
+                                 }
+                                 error={!!errors.status}
+                                 helperText={errors.status?.message}
+                                 arrow
+                                 option={orderStatuses}
+                                 placeholder="Status"
+                                 label="Status"
+                                 getOptionLabel={(option) => option.toString()}
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>
@@ -142,12 +182,20 @@ const OrderInfo = () => {
                         >
                            Order Note
                         </Typography>
-                        <TextField
-                           fullWidth
-                           multiline
-                           rows={4}
-                           placeholder="Note"
-                           label="Note"
+                        <Controller
+                           name="orderNote"
+                           control={control}
+                           defaultValue={data?.orderNote ?? ""}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 fullWidth
+                                 multiline
+                                 rows={4}
+                                 placeholder="Note"
+                                 label="Note"
+                              />
+                           )}
                         />
                      </Stack>
                   </Grid>

@@ -1,108 +1,12 @@
 import { OrderType } from "./type";
 
-// // 🧑‍💻 1. Customer Information
-
-// Customer Name
-
-// Email Address
-
-// Phone Number
-
-// Billing Address (Street, City, State, ZIP, Country)
-
-// Shipping Address (checkbox: “Same as billing”)
-
-// // 📦 2. Products / Items
-
-// Add Product(s) (search by name or code)
-
-// For each product:
-
-// Product Name / SKU
-
-// Quantity
-
-// Price per unit
-
-// Subtotal (auto-calculated)
-
-// ** 🚚 3. Delivery Details
-
-// Shipping Method (Standard, Express, Overnight, etc.)
-
-// Courier / Ship By (FedEx, UPS, DHL, USPS, etc.)
-
-// Tracking Number (optional, filled later)
-
-// Estimated Delivery Date
-
-// Delivery Instructions (e.g., “Leave at reception”)
-
-// ** 💳 4. Payment Information
-
-// Payment Method (Cash on Delivery, Card, Bank Transfer, Wallet, etc.)
-
-// Payment Status (Pending, Paid, Failed, Refunded)
-
-// Transaction ID (if available)
-
-// If Card → optional details:
-
-// Masked Card Number (**** **** **** 1234)
-
-// Card Type (Visa, Mastercard, Amex)
-
-// ** 🧾 5. Pricing & Discounts
-
-// Subtotal (auto-calculated)
-
-// Shipping Cost
-
-// Discount (manual entry or coupon code)
-
-// Tax / VAT
-
-// Total Amount
-
-// Advance Payment (if applicable)
-
-// Due Amount (auto-calculated)
-
-// ** 📋 6. Order Details
-
-// Order ID (auto-generated)
-
-// Invoice No.
-
-// Order Source (Website, App, Phone, WhatsApp, Messenger)
-
-// Order Status (Pending, Processing, Confirmed, Delivered, Cancelled, etc.)
-
-// Order Note (special instructions)
-
-// ** 📜 7. Extra (Optional but Useful)
-
-// Status History (timestamps of each stage)
-
-// Cancellation Reason (if status = Cancelled)
-
-// Return Status (Requested, Approved, Completed)
-
-//?? ⚡ On the form UI, you can present these as collapsible sections or tabs:
-
-// Customer
-
-// Products
-
-// Delivery
-
-// Payment
-
-// Pricing
-
-// Order Info
-
-// Give it as it is given here.
+export const paymentMethod = [
+   "Cash on Delivery",
+   "Card",
+   "Bank Transfer",
+   "Wallet",
+   "Credit Card",
+];
 
 export const orders: OrderType[] = [
    {
@@ -123,22 +27,6 @@ export const orders: OrderType[] = [
          phone: "512-555-0192",
       },
 
-      delivery: {
-         address: "123 Main Street, Austin, TX 78701",
-         shipBy: "FedEx",
-         method: "Express",
-         trackingNo: "TRK1928374651",
-         estimatedDelivery: "2025-09-13T10:00:00Z",
-         deliveredAt: "2025-09-13T10:00:00Z",
-      },
-
-      payment: {
-         method: "Card",
-         status: "Paid",
-         transactionId: "TXN19283",
-         details: { cardMasked: "**** **** **** 4123", cardType: "Visa" },
-      },
-
       products: [
          {
             id: "PRD001",
@@ -146,18 +34,16 @@ export const orders: OrderType[] = [
             code: "PRD001",
             quantity: 2,
             price: 25.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-1.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 51.98,
-         shipping: 0,
+         deliveryCharge: 0,
          discount: 5,
-         taxes: 4.16,
          total: 51.14,
       },
    },
@@ -179,18 +65,6 @@ export const orders: OrderType[] = [
          phone: "206-555-0147",
       },
 
-      delivery: {
-         address: "456 Oak Drive, Seattle, WA 98101",
-         shipBy: "UPS",
-         method: "Standard",
-         trackingNo: "TRK8753091276",
-      },
-
-      payment: {
-         method: "Cash on Delivery",
-         status: "Pending",
-      },
-
       products: [
          {
             id: "PRD002",
@@ -198,9 +72,8 @@ export const orders: OrderType[] = [
             code: "PRD002",
             quantity: 1,
             price: 59.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-2.webp",
-            ],
          },
          {
             id: "PRD003",
@@ -208,18 +81,16 @@ export const orders: OrderType[] = [
             code: "PRD003",
             quantity: 1,
             price: 34.95,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-3.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 94.94,
-         shipping: 5,
+         deliveryCharge: 5,
          discount: 0,
-         taxes: 7.59,
          total: 107.53,
       },
    },
@@ -241,19 +112,6 @@ export const orders: OrderType[] = [
          phone: "303-555-0173",
       },
 
-      delivery: {
-         address: "789 Pine St, Denver, CO 80203",
-         shipBy: "DHL",
-         method: "Standard",
-         trackingNo: "TRK0001234567",
-      },
-
-      payment: {
-         method: "Card",
-         status: "Paid",
-         details: { cardMasked: "**** **** **** 5678", cardType: "Mastercard" },
-      },
-
       products: [
          {
             id: "PRD007",
@@ -261,18 +119,16 @@ export const orders: OrderType[] = [
             code: "PRD007",
             quantity: 1,
             price: 22.75,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-2.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 22.75,
-         shipping: 0,
+         deliveryCharge: 0,
          discount: 5,
-         taxes: 1.79,
          total: 19.54,
       },
    },
@@ -294,19 +150,6 @@ export const orders: OrderType[] = [
          phone: "312-555-0132",
       },
 
-      delivery: {
-         address: "321 Maple Ave, Chicago, IL 60601",
-         shipBy: "USPS",
-         method: "Priority",
-         trackingNo: "TRK8765432109",
-      },
-
-      payment: {
-         method: "Card",
-         status: "Paid",
-         details: { cardMasked: "**** **** **** 8765", cardType: "Amex" },
-      },
-
       products: [
          {
             id: "PRD005",
@@ -314,9 +157,8 @@ export const orders: OrderType[] = [
             code: "PRD005",
             quantity: 1,
             price: 79.49,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-3.webp",
-            ],
          },
          {
             id: "PRD009",
@@ -324,18 +166,16 @@ export const orders: OrderType[] = [
             code: "PRD009",
             quantity: 1,
             price: 39.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-1.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 119.48,
-         shipping: 0,
+         deliveryCharge: 0,
          discount: 10,
-         taxes: 9.56,
          total: 119.04,
       },
    },
@@ -357,19 +197,6 @@ export const orders: OrderType[] = [
          phone: "305-555-0199",
       },
 
-      delivery: {
-         address: "101 Lakeview Blvd, Miami, FL 33101",
-         shipBy: "UPS",
-         method: "Express",
-         trackingNo: "TRK9081726354",
-      },
-
-      payment: {
-         method: "Card",
-         status: "Refunded",
-         details: { cardMasked: "**** **** **** 9999", cardType: "Visa" },
-      },
-
       products: [
          {
             id: "PRD010",
@@ -377,18 +204,16 @@ export const orders: OrderType[] = [
             code: "PRD010",
             quantity: 1,
             price: 49.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-2.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 49.99,
-         shipping: 0,
+         deliveryCharge: 0,
          discount: 0,
-         taxes: 3.99,
          total: 53.98,
       },
 
@@ -412,18 +237,6 @@ export const orders: OrderType[] = [
          phone: "415-555-0178",
       },
 
-      delivery: {
-         address: "555 Elm St, San Francisco, CA 94102",
-         shipBy: "DHL",
-         method: "Express",
-         trackingNo: "TRK5647382910",
-      },
-
-      payment: {
-         method: "Bank Transfer",
-         status: "Paid",
-      },
-
       products: [
          {
             id: "PRD011",
@@ -431,9 +244,8 @@ export const orders: OrderType[] = [
             code: "PRD011",
             quantity: 1,
             price: 129.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-1.webp",
-            ],
          },
          {
             id: "PRD012",
@@ -441,18 +253,16 @@ export const orders: OrderType[] = [
             code: "PRD012",
             quantity: 1,
             price: 45.5,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-3.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 175.49,
-         shipping: 10,
+         deliveryCharge: 10,
          discount: 15,
-         taxes: 12.84,
          total: 183.33,
       },
    },
@@ -474,19 +284,6 @@ export const orders: OrderType[] = [
          phone: "214-555-0164",
       },
 
-      delivery: {
-         address: "202 Birch Rd, Dallas, TX 75201",
-         shipBy: "FedEx",
-         method: "Overnight",
-         trackingNo: "TRK5432109876",
-         deliveredAt: "2025-09-12T09:00:00Z",
-      },
-
-      payment: {
-         method: "Wallet",
-         status: "Paid",
-      },
-
       products: [
          {
             id: "PRD013",
@@ -494,18 +291,16 @@ export const orders: OrderType[] = [
             code: "PRD013",
             quantity: 1,
             price: 199.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-2.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 199.99,
-         shipping: 0,
+         deliveryCharge: 0,
          discount: 20,
-         taxes: 14.4,
          total: 194.39,
       },
    },
@@ -514,7 +309,7 @@ export const orders: OrderType[] = [
       orderId: "#6019",
       invoiceNo: "INV-6019",
       status: "Pending",
-      orderNote: "Confirm stock before shipping",
+      orderNote: "Confirm stock before deliveryCharge",
       orderSource: "Phone Call",
       createdAt: "2025-09-15T10:00:00Z",
 
@@ -527,18 +322,6 @@ export const orders: OrderType[] = [
          phone: "617-555-0185",
       },
 
-      delivery: {
-         address: "404 Cedar St, Boston, MA 02108",
-         shipBy: "USPS",
-         method: "Priority",
-         trackingNo: "TRK2345678910",
-      },
-
-      payment: {
-         method: "Cash on Delivery",
-         status: "Pending",
-      },
-
       products: [
          {
             id: "PRD014",
@@ -546,18 +329,16 @@ export const orders: OrderType[] = [
             code: "PRD014",
             quantity: 1,
             price: 89.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-1.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 89.99,
-         shipping: 0,
+         deliveryCharge: 0,
          discount: 0,
-         taxes: 6.75,
          total: 96.74,
       },
    },
@@ -579,19 +360,6 @@ export const orders: OrderType[] = [
          phone: "503-555-0142",
       },
 
-      delivery: {
-         address: "606 Spruce Ln, Portland, OR 97201",
-         shipBy: "DHL",
-         method: "Economy",
-         trackingNo: "TRK9081726355",
-      },
-
-      payment: {
-         method: "Card",
-         status: "Paid",
-         details: { cardMasked: "**** **** **** 4444", cardType: "Visa" },
-      },
-
       products: [
          {
             id: "PRD015",
@@ -599,18 +367,16 @@ export const orders: OrderType[] = [
             code: "PRD015",
             quantity: 1,
             price: 249.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-2.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 249.99,
-         shipping: 20,
+         deliveryCharge: 20,
          discount: 30,
-         taxes: 18.9,
          total: 258.89,
       },
    },
@@ -632,19 +398,6 @@ export const orders: OrderType[] = [
          phone: "602-555-0176",
       },
 
-      delivery: {
-         address: "707 Aspen Ct, Phoenix, AZ 85001",
-         shipBy: "FedEx",
-         method: "Standard",
-         trackingNo: "TRK1122334455",
-      },
-
-      payment: {
-         method: "Credit Card",
-         status: "Paid",
-         details: { cardMasked: "**** **** **** 2222", cardType: "Mastercard" },
-      },
-
       products: [
          {
             id: "PRD016",
@@ -652,9 +405,8 @@ export const orders: OrderType[] = [
             code: "PRD016",
             quantity: 1,
             price: 109.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-3.webp",
-            ],
          },
          {
             id: "PRD017",
@@ -662,18 +414,16 @@ export const orders: OrderType[] = [
             code: "PRD017",
             quantity: 1,
             price: 19.99,
-            images: [
+            images:
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/m-product/product-1.webp",
-            ],
          },
       ],
 
       pricing: {
-         currency: "USD",
+         paymentMethod: "Cash on Delivery",
          subtotal: 129.98,
-         shipping: 0,
+         deliveryCharge: 0,
          discount: 10,
-         taxes: 9.59,
          total: 129.57,
       },
    },
