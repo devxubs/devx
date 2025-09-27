@@ -27,6 +27,7 @@ const Publish = () => {
    const theme = useTheme();
    const [order, setOrder] = useState<OrderType>({} as OrderType);
    const [loading, setLoading] = useState(false);
+   const [isEditMode, setIsEditMode] = useState(false);
    const router = useRouter();
    const params = useSearchParams();
    const id = params?.get("id");
@@ -90,7 +91,10 @@ const Publish = () => {
                })), // ✅ now type-safe
                pricing: editData.pricing,
             });
+            setIsEditMode(true);
          }
+      } else {
+         setIsEditMode(false);
       }
    }, []);
 
@@ -183,6 +187,8 @@ const Publish = () => {
                      color="inherit"
                      onClick={() => {
                         reset();
+                        setIsEditMode(false);
+
                         router.push("/order");
                      }}
                   >
@@ -207,7 +213,7 @@ const Publish = () => {
                            : theme.palette.primary.contrastText,
                      }}
                   >
-                     Add Order
+                     {isEditMode ? "Update Order" : "Place Order"}
                      {loading && (
                         <CircularProgress
                            size={24}

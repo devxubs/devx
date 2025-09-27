@@ -33,7 +33,13 @@ export type TableRow = {
    [key: string]: string | number | React.ReactNode;
 };
 
-export type Type = "order" | "rank" | "user" | "product" | "category";
+export type Type =
+   | "order"
+   | "rank"
+   | "user"
+   | "product"
+   | "category"
+   | "default";
 
 export type TableProps = {
    type: Type;
@@ -243,8 +249,8 @@ export default function CustomTable({
             sx={{
                maxHeight: 550,
                overflow: "auto", // single source of truth for scrolling
-               "&::-webkit-scrollbar": { display: "none" },
-               scrollbarWidth: "none",
+               "&::-webkit-scrollbar": { display: "none!important" },
+               scrollbarWidth: "none!important",
                width: "100%",
                borderRadius: type === "rank" ? 1 : 0,
             }}

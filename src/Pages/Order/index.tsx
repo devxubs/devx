@@ -39,7 +39,22 @@ const cOrder = (orders as OrderType[]).map((o, i) => {
       ...o,
       products: o.products,
       note: <NoteModal note={o.orderNote || ""} />,
-      order: o.orderId,
+      order: (
+         <Link
+            href={`/order/${encodeURIComponent(o.orderId)}`}
+            style={{ textDecoration: "none" }}
+         >
+            <Typography
+               color="textPrimary"
+               sx={{
+                  cursor: "pointer",
+                  "&:hover": { textDecoration: "underline" },
+               }}
+            >
+               {o.orderId}
+            </Typography>
+         </Link>
+      ),
       customer: (
          <User
             name={o.customer.name}
@@ -70,7 +85,7 @@ const cOrder = (orders as OrderType[]).map((o, i) => {
    };
 });
 
-const OrderItem = {
+export const OrderItem = {
    head: [
       "@check",
       "Note",
@@ -98,8 +113,6 @@ const Order = () => {
          label: "edit",
          icon: <Icon icon="solar:pen-bold" size="small" />,
          onClick: () => {
-            console.log(row);
-
             router.push(`/order/publish?id=${encodeURIComponent(row.orderId)}`);
          },
       },

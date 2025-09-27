@@ -219,16 +219,8 @@ const ProductsView = ({
    );
 };
 
-const products: Omit<TableProps, "type"> = {
-   head: [
-      "@check",
-      "Product",
-      // "Product",
-      "Create at",
-      "Stock",
-      "price",
-      "@action",
-   ],
+export const products: Omit<TableProps, "type"> = {
+   head: ["@check", "Product", "Create at", "Stock", "price", "@action"],
    body: productsData.map((product) => ({
       ...product,
       id: product.id,
