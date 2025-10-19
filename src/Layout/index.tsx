@@ -112,7 +112,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                         position={"absolute"}
                         top={0}
                         left={0}
-                        zIndex={10}
+                        zIndex={999}
                         sx={{
                            backdropFilter: "blur(4px)",
                            backgroundColor: alpha(

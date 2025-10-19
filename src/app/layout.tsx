@@ -7,26 +7,26 @@ import Layout from "@src/Layout";
 import "./globals.css";
 
 export const metadata = {
-  title: "My App",
-  description: "A working dark/light theme setup",
+   title: "My App",
+   description: "A working dark/light theme setup",
 };
 
 export default function RootLayout({
-  children,
+   children,
 }: {
-  children: React.ReactNode;
+   children: React.ReactNode;
 }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <head></head>
-      <body suppressHydrationWarning>
-        <InitColorSchemeScript attribute="class" />
-        <AppRouterCacheProvider options={{ enableCssLayer: true }}>
-          <ThemeProviderClient>
-            <Layout>{children}</Layout>
-          </ThemeProviderClient>
-        </AppRouterCacheProvider>
-      </body>
-    </html>
-  );
+   return (
+      <html lang="en" suppressHydrationWarning>
+         <head></head>
+         <body suppressHydrationWarning>
+            <InitColorSchemeScript attribute="class" />
+            <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+               <ThemeProviderClient>
+                  <Layout>{children}</Layout>
+               </ThemeProviderClient>
+            </AppRouterCacheProvider>
+         </body>
+      </html>
+   );
 }

@@ -14,6 +14,7 @@ import useGlobalState from "@src/handler/globalState";
 import Logo from "@src/SvgIcon/logo";
 import LogoNameIcon from "@src/SvgIcon/logoName";
 import CustomBox from "@src/components/CustomBox";
+import ChatIcon from "@src/SvgIcon/ChatIcon";
 
 const items = [
    {
@@ -52,24 +53,42 @@ const items = [
       label: "Customers",
       url: "/customers",
    },
-   // {
-   //   headingId: "management",
-   //   icon: "solar:palette-bold-duotone",
-   //   label: "Attributes",
-   //   url: "/attributes",
-   // },
-   // {
-   //   headingId: "management",
-   //   icon: "solar:users-group-two-rounded-bold-duotone",
-   //   label: "Suppliers",
-   //   url: "/suppliers",
-   // },
-   // {
-   //   headingId: "management",
-   //   icon: "solar:inbox-archive-bold-duotone",
-   //   label: "Inventory",
-   //   url: "/inventory",
-   // },
+   {
+      headingId: "management",
+      icon: "solar:palette-bold-duotone",
+      label: "Quote",
+      url: "/quote",
+   },
+   {
+      headingId: "management",
+      icon: "solar:users-group-two-rounded-bold-duotone",
+      label: "Suppliers",
+      url: "/suppliers",
+   },
+   {
+      headingId: "management",
+      icon: "solar:inbox-archive-bold-duotone",
+      label: "Purchase",
+      url: "/purchase",
+   },
+   {
+      headingId: "management",
+      icon: "solar:inbox-archive-bold-duotone",
+      label: "Expenses",
+      url: "/expenses",
+   },
+   {
+      headingId: "management",
+      icon: "solar:inbox-archive-bold-duotone",
+      label: "Assets",
+      url: "/assets",
+   },
+   {
+      headingId: "management",
+      icon: <ChatIcon />,
+      label: "Chat",
+      url: "/chat",
+   },
    {
       headingId: "management",
       icon: "solar:pie-chart-2-bold-duotone",
@@ -112,17 +131,25 @@ const Sidebar = () => {
    const globalState = useGlobalState();
    const theme = useTheme();
    const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
+   const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
 
+   useEffect(() => {
+      if (isMdDown) {
+         globalState.set("layoutFull", false);
+      } else {
+         globalState.set("layoutFull", true);
+      }
+   }, [isMdDown]);
    const layout = globalState.get("layoutFull");
 
-   const sidebarWidth = layout ? 300 : 90;
+   const sidebarWidth = layout ? 270 : 90;
 
    const SidebarContent = (
       <Stack
          component={isSmDown ? CustomBox : "div"}
-         width={layout ? 300 : 90}
+         width={layout ? 270 : 90}
          px={layout ? 1 : 0}
-         py={2}
+         py={1}
          bgcolor="background.paper"
          height="100%"
       >
@@ -173,7 +200,7 @@ const Sidebar = () => {
          )}
 
          {/* Logo */}
-         <Stack height={60} py={1}>
+         <Stack height={50} pb={1}>
             {layout ? <LogoNameIcon /> : <Logo />}
          </Stack>
 
@@ -191,7 +218,17 @@ const Sidebar = () => {
                px={layout ? 0 : 1}
                sx={{ transition: "padding 0.3s ease" }}
             >
-               <CustomList fullMenu={layout} items={items} />
+               <CustomList
+                  fullMenu={layout}
+                  items={items.map((i) => ({
+                     ...i,
+                     onItemClick: () => {
+                        if (isSmDown) {
+                           globalState.set("layoutFull", false);
+                        }
+                     },
+                  }))}
+               />
             </Box>
          </Stack>
       </Stack>

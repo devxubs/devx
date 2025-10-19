@@ -75,6 +75,7 @@ const Users = () => {
    const actionMenu = (row: any) => [
       {
          label: "edit",
+         icon: <Icon icon="solar:pen-bold" size="small" />,
          onClick: () => {
             setEditableUser({ ...row, name: row.full_name }); // store clicked user
             setMode("edit");
@@ -84,6 +85,13 @@ const Users = () => {
       {
          label: "delete",
          color: "error",
+         icon: (
+            <Icon
+               icon="solar:trash-bin-trash-bold"
+               size="small"
+               color="error"
+            />
+         ),
          onClick: () => {
             setUserToDelete(row);
             setDeleteOpen(true);

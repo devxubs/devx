@@ -252,10 +252,18 @@ const Product = () => {
             setMode("edit");
             setIsModalOpen(true);
          },
+         icon: <Icon icon="solar:pen-bold" size="small" />,
       },
       {
          label: "delete",
          color: "error",
+         icon: (
+            <Icon
+               icon="solar:trash-bin-trash-bold"
+               size="small"
+               color="error"
+            />
+         ),
          onClick: () => {
             // setDeleteConform(true);
             setProductToDelete(row);

@@ -259,6 +259,8 @@ export default function CustomTable({
                <TableHead
                   sx={{
                      "& th": {
+                        py: 1,
+                        px: { xs: 1, md: 1 },
                         backgroundColor:
                            alpha(theme.palette.grey[700], 0.1) + "!important",
                         ...theme.applyStyles("dark", {
@@ -274,8 +276,6 @@ export default function CustomTable({
                            align="left"
                            sx={{
                               // backgroundColor: alpha(theme.palette.primary.main, 0.09),
-                              p: 1,
-                              px: 1,
                               whiteSpace: "nowrap",
                            }}
                         >
@@ -313,7 +313,6 @@ export default function CustomTable({
                                     key={idx}
                                     align="left"
                                     sx={{
-                                       p: 1,
                                        whiteSpace: "nowrap",
                                        width: "0px",
                                     }}
@@ -324,6 +323,7 @@ export default function CustomTable({
                                        onChange={(e) =>
                                           handleAllCheck(e.target.checked)
                                        }
+                                       // sx={{ px: { xs: 1, md: 0.2 }, py: 0 }}
                                     />
                                  </TableCell>
                               );
@@ -331,7 +331,7 @@ export default function CustomTable({
                               return (
                                  <TableCell
                                     key={idx}
-                                    sx={{ p: 1, whiteSpace: "nowrap" }}
+                                    sx={{ whiteSpace: "nowrap" }}
                                  />
                               );
                            }

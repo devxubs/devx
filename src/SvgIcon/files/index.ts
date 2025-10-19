@@ -1,0 +1,12 @@
+export { default as AudioIcon } from "./AudioIcon";
+export { default as PdfIcon } from "./PdfIcon";
+export { default as PsdIcon } from "./PsdIcon";
+export { default as WordIcon } from "./WordIcon";
+export { default as ExcelIcon } from "./ExcelIcon";
+export { default as ZipIcon } from "./ZipIcon";
+export { default as AiIcon } from "./AiIcon";
+export { default as PowerPointIcon } from "./PowerPointIcon";
+export { default as ImageIcon } from "./ImageIcon";
+export { default as VideoIcon } from "./VideoIcon";
+export { default as FolderIcon } from "./FolderIcon";
+export { default as UnknownIcon } from "./UnknownIcon";

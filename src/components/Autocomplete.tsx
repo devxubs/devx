@@ -9,8 +9,6 @@ import {
 } from "@mui/material";
 
 import { type AutocompleteProps } from "@mui/material/Autocomplete";
-import { type SxProps } from "@mui/material/styles";
-import { ControllerRenderProps } from "react-hook-form";
 
 interface CustomAutocompleteProps
    extends Omit<
@@ -20,7 +18,7 @@ interface CustomAutocompleteProps
    placeholder?: string;
    arrow?: boolean;
    label?: string;
-   option: string[];
+   option: any[];
    value?: string | string[] | null;
    onChange?: (d: any, e: Event | Element) => void;
    multiple?: boolean;
@@ -86,15 +84,15 @@ const CustomAutocomplete = ({
    return (
       <Autocomplete
          {...rest}
-         freeSolo={!arrow}
-         options={Array.isArray(option) ? option : []}
          PopperComponent={StyledPopper}
+         sx={{ ...rest.sx, p: 0 }}
          multiple={multiple}
-         value={value ?? null}
-         onChange={(e, newValue) => {
-            onChange?.(newValue, e as any);
+         freeSolo={!arrow}
+         options={Array.isArray(option) ? option : []} // ✅ safe guard
+         value={multiple ? value ?? (multiple ? [] : null) : value ?? null} // ✅ safe value
+         onChange={(event, newValue) => {
+            onChange?.(newValue, event as any);
          }}
-         sx={{ ...rest.sx }}
          renderInput={(params) => (
             <TextField
                {...params}
@@ -106,9 +104,27 @@ const CustomAutocomplete = ({
                error={error}
                helperText={helperText}
                sx={{
-                  "& .MuiOutlinedInput-root": {
-                     paddingRight: "16px!important",
-                  },
+                  "& .MuiOutlinedInput-root":
+                     multiple && value?.length
+                        ? {}
+                        : {
+                             paddingTop:
+                                rest.size === "small"
+                                   ? "9px !important"
+                                   : "16px !important",
+                             paddingBottom:
+                                rest.size === "small"
+                                   ? "9px !important"
+                                   : "16px !important",
+                             paddingLeft:
+                                rest.size === "small"
+                                   ? "8px!important"
+                                   : "10px !important",
+                             paddingRight:
+                                rest.size === "small"
+                                   ? "10px !important"
+                                   : "16px !important",
+                          },
                }}
             />
          )}
