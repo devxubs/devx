@@ -148,89 +148,86 @@ const Publish = () => {
    };
 
    return (
-      <Stack>
-         <Container maxWidth="md">
-            <form onSubmit={handleSubmit(onSubmit)}>
-               <Stack spacing={3}>
-                  <CustomerDetails
-                     control={control}
-                     errors={errors.customer || {}}
-                     data={customerData as any}
-                  />
-                  <ProductDetails
-                     control={control}
-                     errors={errors}
-                     data={productsData as any}
-                  />
-                  <OrderInfo
-                     control={control}
-                     errors={errors}
-                     data={orderInfoData as any}
-                  />
-                  <Pricing
-                     control={control}
-                     errors={errors.pricing || {}}
-                     setValue={setValue}
-                     watch={watch}
-                     data={pricingData as any}
-                  />
-               </Stack>
-               <Stack
-                  spacing={2}
-                  direction="row"
-                  justifyContent="flex-end"
-                  width="100%"
-                  mt={2}
+      <Stack width={"100%"} maxWidth={650} mx={"auto"} height={"100%"}>
+         <form onSubmit={handleSubmit(onSubmit)}>
+            <Stack spacing={3}>
+               <CustomerDetails
+                  control={control}
+                  errors={errors.customer || {}}
+                  data={customerData as any}
+               />
+               <ProductDetails
+                  control={control}
+                  errors={errors}
+                  data={productsData as any}
+               />
+               <OrderInfo
+                  control={control}
+                  errors={errors}
+                  data={orderInfoData as any}
+               />
+               <Pricing
+                  control={control}
+                  errors={errors.pricing || {}}
+                  setValue={setValue}
+                  watch={watch}
+                  data={pricingData as any}
+               />
+            </Stack>
+            <Stack
+               spacing={2}
+               direction="row"
+               justifyContent="flex-end"
+               width="100%"
+               mt={2}
+            >
+               <Button
+                  variant="text"
+                  color="inherit"
+                  onClick={() => {
+                     reset();
+                     setIsEditMode(false);
+
+                     router.push("/order");
+                  }}
                >
-                  <Button
-                     variant="text"
-                     color="inherit"
-                     onClick={() => {
-                        reset();
-                        setIsEditMode(false);
+                  Cancel
+               </Button>
 
-                        router.push("/order");
-                     }}
-                  >
-                     Cancel
-                  </Button>
-
-                  <Button
-                     variant="contained"
-                     color="primary"
-                     type="submit"
-                     disabled={loading}
-                     sx={{
-                        position: "relative",
-                        overflow: "hidden",
-                        backgroundColor: loading
-                           ? alpha(theme.palette.primary.main, 0.5) +
-                             "!important"
-                           : theme.palette.primary.main + "!important",
-                        color: loading
-                           ? alpha(theme.palette.primary.contrastText, 0.7) +
-                             "!important"
-                           : theme.palette.primary.contrastText,
-                     }}
-                  >
-                     {isEditMode ? "Update Order" : "Place Order"}
-                     {loading && (
-                        <CircularProgress
-                           size={24}
-                           sx={{
-                              color: theme.palette.primary.contrastText,
-                              position: "absolute",
-                              top: "50%",
-                              left: "50%",
-                              marginTop: "-12px",
-                              marginLeft: "-12px",
-                           }}
-                        />
-                     )}
-                  </Button>
-               </Stack>
-            </form>
-         </Container>
+               <Button
+                  variant="contained"
+                  color="primary"
+                  type="submit"
+                  disabled={loading}
+                  sx={{
+                     position: "relative",
+                     overflow: "hidden",
+                     backgroundColor: loading
+                        ? alpha(theme.palette.primary.main, 0.5) + "!important"
+                        : theme.palette.primary.main + "!important",
+                     color: loading
+                        ? alpha(theme.palette.primary.contrastText, 0.7) +
+                          "!important"
+                        : theme.palette.primary.contrastText,
+                  }}
+               >
+                  {isEditMode ? "Update Order" : "Place Order"}
+                  {loading && (
+                     <CircularProgress
+                        size={24}
+                        sx={{
+                           color: theme.palette.primary.contrastText,
+                           position: "absolute",
+                           top: "50%",
+                           left: "50%",
+                           marginTop: "-12px",
+                           marginLeft: "-12px",
+                        }}
+                     />
+                  )}
+               </Button>
+            </Stack>
+         </form>
       </Stack>
    );
 };

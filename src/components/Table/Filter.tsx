@@ -322,7 +322,11 @@ const Filter: React.FC<FilterProps> = ({
                   variant="text"
                   color="error"
                   startIcon={
-                     <Icon size="small" icon="solar:trash-bin-trash-bold" />
+                     <Icon
+                        size="small"
+                        icon="solar:trash-bin-trash-bold"
+                        color="error"
+                     />
                   }
                   onClick={() =>
                      onFilterChange?.({

@@ -103,7 +103,7 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                <Stack
                   direction="row"
                   alignItems="center"
-                  spacing={0.5}
+                  spacing={isSmDown ? 0 : 0.5}
                   sx={{
                      flexShrink: 0,
                      transition: "all 0.3s ease",
@@ -112,7 +112,11 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                      overflow: "hidden",
                   }}
                >
-                  <IconButton size="small" {...imageUpload.getRootProps()}>
+                  <IconButton
+                     size="small"
+                     {...imageUpload.getRootProps()}
+                     disabled={!user.id}
+                  >
                      <input {...imageUpload.getInputProps()} />
                      <Icon
                         size="small"
@@ -121,7 +125,11 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                      />
                   </IconButton>
 
-                  <IconButton size="small" {...attachmentUpload.getRootProps()}>
+                  <IconButton
+                     size="small"
+                     {...attachmentUpload.getRootProps()}
+                     disabled={!user.id}
+                  >
                      <input {...attachmentUpload.getInputProps()} />
                      <Icon
                         size="small"
@@ -136,6 +144,7 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                         state.set("isRecording", true);
                         state.set("showRecord", true);
                      }}
+                     disabled={!user.id}
                   >
                      <Icon
                         size="small"
@@ -158,12 +167,23 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
             >
                <Box
                   ref={ref}
-                  contentEditable
+                  contentEditable={!!user.id}
                   suppressContentEditableWarning
                   onInput={handleInput}
                   onKeyDown={handleKeyDown}
-                  onFocus={() => setFullField(true)}
-                  onBlur={() => setFullField(false)}
+                  onFocus={(e) => {
+                     setFullField(true);
+                     e.target.innerHTML = messageHTML;
+                  }}
+                  onBlur={(e) => {
+                     setFullField(false);
+                     e.target.innerHTML =
+                        messageHTML.length >= 7
+                           ? isSmDown
+                              ? messageHTML.slice(0, 7) + "..."
+                              : messageHTML.slice(0, 30) + "..."
+                           : messageHTML;
+                  }}
                   sx={{
                      flex: 1,
                      minHeight: 40,
@@ -188,17 +208,20 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                         content: isSmDown ? '"Message"' : '"Type a message..."',
                         color: theme.palette.text.disabled,
                      },
-                     "&:focus": {
-                        backgroundColor: theme.palette.background.paper,
-                        border: `1px solid ${alpha(
-                           theme.palette.primary.main,
-                           0.5
-                        )}`,
-                        boxShadow: `0 0 0 2px ${alpha(
-                           theme.palette.primary.main,
-                           0.15
-                        )}`,
-                     },
+                     "&:focus": !user.id
+                        ? {}
+                        : {
+                             backgroundColor: theme.palette.background.paper,
+                             border: `1px solid ${alpha(
+                                theme.palette.primary.main,
+                                0.5
+                             )}`,
+                             boxShadow: `0 0 0 2px ${alpha(
+                                theme.palette.primary.main,
+                                0.15
+                             )}`,
+                             borderRadius: 1,
+                          },
                   }}
                />
             </motion.div>
@@ -212,6 +235,7 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                         ? setEmojiAnchor(null)
                         : setEmojiAnchor(e.currentTarget)
                   }
+                  disabled={!user.id}
                >
                   <Icon
                      size="small"
@@ -219,7 +243,7 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                      style={{ color: theme.palette.text.secondary }}
                   />
                </IconButton>
-               <IconButton size="small">
+               <IconButton size="small" disabled={!user.id}>
                   <SendIcon />
                </IconButton>
             </Stack>

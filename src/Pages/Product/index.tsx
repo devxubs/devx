@@ -10,15 +10,14 @@ import {
    alpha,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomModal from "@src/components/Modal";
-import CustomTable, { TableProps, TableRow } from "@src/components/Table";
+import CustomTable, { TableProps } from "@src/components/Table";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import LinearProgress, {
    linearProgressClasses,
 } from "@mui/material/LinearProgress";
-import Modal from "./Modal";
 import AlertDialog from "@src/components/AlertDialog";
+import { useRouter } from "next/navigation";
 
 export const productsData = [
    {
@@ -241,17 +240,10 @@ export const products: Omit<TableProps, "type"> = {
 };
 
 const Product = () => {
-   const [isModalOpen, setIsModalOpen] = useState(false);
-   const [selectedProduct, setSelectedProduct] = useState({} as TableRow);
-
    const actionMenu = (row: any) => [
       {
          label: "edit",
-         onClick: () => {
-            setSelectedProduct(row); // store clicked user
-            setMode("edit");
-            setIsModalOpen(true);
-         },
+         onClick: () => router.push(`/product/publish?id=${row.id}`),
          icon: <Icon icon="solar:pen-bold" size="small" />,
       },
       {
@@ -272,9 +264,8 @@ const Product = () => {
       },
    ];
 
-   const [mode, setMode] = useState<"add" | "edit">("edit");
-
-   // Delete dialog states
+   const theme = useTheme();
+   const router = useRouter();
    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
    const [productToDelete, setProductToDelete] = useState<any>(null);
 
@@ -292,12 +283,15 @@ const Product = () => {
                <Button
                   variant="contained"
                   color="primary"
-                  startIcon={<Icon icon="solar:user-plus-bold-duotone" />}
-                  onClick={() => {
-                     setMode("add");
-                     setSelectedProduct({});
-                     setIsModalOpen(true);
-                  }}
+                  startIcon={
+                     <Icon
+                        icon="mingcute:add-line"
+                        style={{
+                           color: theme.palette.text.primary,
+                        }}
+                     />
+                  }
+                  onClick={() => router.push("/product/publish")}
                >
                   Add product
                </Button>
@@ -311,37 +305,6 @@ const Product = () => {
                />
             </Stack>
          </Stack>
-         <CustomModal
-            sx={{
-               width: "100%",
-               height: "100vh",
-               borderRadius: 0,
-               boxShadow: "none!important",
-            }}
-            open={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            // title={mode === "add" ? "Add User" : "Edit User"}
-         >
-            <Stack
-               sx={{
-                  height: "100%",
-                  overflowY: "auto",
-                  scrollbarWidth: "none!important",
-                  "&::-webkit-scrollbar": { display: "none!important" },
-               }}
-            >
-               <Stack maxWidth={650} mx={"auto"} height={"100%"}>
-                  <Modal
-                     mode={mode}
-                     onClose={() => setIsModalOpen(false)}
-                     data={selectedProduct || {}}
-                     onChange={(d) => {
-                        setSelectedProduct({ ...selectedProduct, ...d });
-                     }}
-                  />
-               </Stack>
-            </Stack>
-         </CustomModal>
          <AlertDialog
             type="delete"
             open={isDeleteDialogOpen}

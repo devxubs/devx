@@ -43,6 +43,12 @@ const items = [
    },
    {
       headingId: "management",
+      icon: "solar:bill-list-bold-duotone",
+      label: "Unit",
+      url: "/unit",
+   },
+   {
+      headingId: "management",
       icon: "solar:cart-plus-bold-duotone",
       label: "Order",
       url: "/order",
@@ -67,19 +73,19 @@ const items = [
    },
    {
       headingId: "management",
-      icon: "solar:inbox-archive-bold-duotone",
+      icon: "solar:cart-large-2-bold-duotone",
       label: "Purchase",
       url: "/purchase",
    },
    {
       headingId: "management",
-      icon: "solar:inbox-archive-bold-duotone",
+      icon: "solar:explicit-bold-duotone",
       label: "Expenses",
       url: "/expenses",
    },
    {
       headingId: "management",
-      icon: "solar:inbox-archive-bold-duotone",
+      icon: "solar:cassette-2-bold-duotone",
       label: "Assets",
       url: "/assets",
    },

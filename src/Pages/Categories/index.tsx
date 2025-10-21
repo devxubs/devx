@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Button, TextField, Typography } from "@mui/material";
+import { Stack, Button, TextField, Typography, useTheme } from "@mui/material";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import { Controller, useForm, SubmitHandler } from "react-hook-form";
@@ -24,6 +24,7 @@ type CategoryType = {
 type FormValues = z.infer<typeof productSchema>;
 
 const Categories = () => {
+   const theme = useTheme();
    const [categories, setCategories] = useState<CategoryType[]>([
       { id: 1, name: "Smart Fitness Watch" },
       { id: 2, name: "Smart Fitness Watch" },
@@ -134,7 +135,14 @@ const Categories = () => {
                <Button
                   variant="contained"
                   color="primary"
-                  startIcon={<Icon icon="solar:user-plus-bold-duotone" />}
+                  startIcon={
+                     <Icon
+                        icon="mingcute:add-line"
+                        style={{
+                           color: theme.palette.text.primary,
+                        }}
+                     />
+                  }
                   onClick={() => openModal()}
                >
                   Add Category

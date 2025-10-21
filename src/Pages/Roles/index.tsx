@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Stack } from "@mui/material";
+import { Button, Stack, useTheme } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomTable, { TableProps } from "@src/components/Table";
@@ -42,6 +42,7 @@ const rolesData: Omit<TableProps, "type"> = {
 };
 
 const Roles = () => {
+   const theme = useTheme();
    const [deleteDialog, setDeleteDialog] = useState(false);
    const [roleToDelete, setRoleToDelete] = useState<any>(null);
    const router = useRouter();
@@ -78,7 +79,14 @@ const Roles = () => {
                <Button
                   variant="contained"
                   color="primary"
-                  startIcon={<Icon icon="mingcute:add-line" />}
+                  startIcon={
+                     <Icon
+                        icon="mingcute:add-line"
+                        style={{
+                           color: theme.palette.text.primary,
+                        }}
+                     />
+                  }
                   onClick={() => {
                      router.push("/roles/publish");
                   }}

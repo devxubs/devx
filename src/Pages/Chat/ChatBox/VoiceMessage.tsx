@@ -17,7 +17,7 @@ interface VoiceMessageProps {
 }
 
 const formatTime = (seconds: number) => {
-   if (!seconds || isNaN(seconds)) return "00:00";
+   if (!seconds || isNaN(seconds)) return "0:0";
    const m = Math.floor(seconds / 60);
    const s = Math.floor(seconds % 60);
    return `${m}:${s < 10 ? "0" + s : s}`;
@@ -151,9 +151,9 @@ const VoiceMessage = ({ url, name }: VoiceMessageProps) => {
 
          {/* 🎚️ Slider + Time */}
          <Box sx={{ flex: 1, mx: 1 }}>
-            <Typography variant="body2" noWrap sx={{ mb: 0.5 }}>
+            {/* <Typography variant="body2" noWrap sx={{ mb: 0.5 }}>
                {name}
-            </Typography>
+            </Typography> */}
             <Stack direction="row" alignItems="center" spacing={1}>
                <Typography variant="caption">
                   {formatTime(currentTime)}
@@ -167,8 +167,8 @@ const VoiceMessage = ({ url, name }: VoiceMessageProps) => {
                   onChangeCommitted={handleSliderCommitted}
                   sx={{
                      flex: 1,
-                     height: 6,
-                     "& .MuiSlider-thumb": { width: 10, height: 10 },
+                     height: 10,
+                     "& .MuiSlider-thumb": { width: 15, height: 15 },
                      "& .MuiSlider-rail": { opacity: 0.3 },
                      "& .MuiSlider-track": { border: "none" },
                   }}

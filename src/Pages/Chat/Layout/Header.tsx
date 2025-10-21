@@ -30,6 +30,8 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
    const theme = useTheme();
    const [openModal, setOpenModal] = useState(false);
 
+   console.log(!user);
+
    return (
       <Stack
          direction={"row"}
@@ -85,10 +87,10 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
                   fontWeight={600}
                   color="textPrimary"
                >
-                  {user ? user.name : "Select a user to chat"}
+                  {user && !user.id ? "Select a user to chat" : user.name}
                </Typography>
                <Typography variant="body2" fontSize={12} color="textSecondary">
-                  {user
+                  {user && user.id
                      ? user.isOnline
                         ? "Online"
                         : getLastActiveTime(user.id)
@@ -101,7 +103,7 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
             </Stack>
          </Stack>
 
-         {user && (
+         {user && user.id && (
             <Stack spacing={1} direction="row" alignItems="center">
                <IconButton size="small" onClick={() => onClose?.(!open)}>
                   <SidebarRightIcon
@@ -115,7 +117,10 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
                   onClose={() => setOpenModal(false)}
                   title="Mute this chat?"
                   sx={{
-                     width: 350,
+                     width: {
+                        xs: 300,
+                        sm: 350,
+                     },
                   }}
                >
                   <RadioGroup

@@ -64,7 +64,7 @@ const Modal = ({ users, open, onClose }: ModalProps) => {
                   placeholder="Group name"
                   label="Group name"
                   sx={{
-                     mt: { xs: 2, sm: 1 },
+                     mt: 2,
                      mb: !selected.length ? 2 : 0,
                   }}
                />

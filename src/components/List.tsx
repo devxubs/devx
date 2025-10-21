@@ -80,7 +80,6 @@ export default function CustomList({ items, fullMenu }: CustomListProps) {
                      )}
                      <ListItemButton
                         onClick={() => handleToggle(item, hasChildren)}
-                        // selected={item.selected}
                         sx={{
                            borderRadius: 0.5,
                            mx: fullMenu ? 1 : 0,
@@ -115,7 +114,7 @@ export default function CustomList({ items, fullMenu }: CustomListProps) {
                      >
                         <Stack
                            direction={fullMenu ? "row" : "column"}
-                           alignItems={fullMenu ? "" : "center"}
+                           alignItems={fullMenu ? "center" : "center"}
                            sx={{
                               color: item.selected
                                  ? "primary.main"
@@ -133,7 +132,12 @@ export default function CustomList({ items, fullMenu }: CustomListProps) {
                                  }}
                               >
                                  {typeof item.icon === "string" ? (
-                                    <Icon icon={item.icon} />
+                                    <Icon
+                                       icon={item.icon}
+                                       color={
+                                          item.selected ? "primary" : "default"
+                                       }
+                                    />
                                  ) : (
                                     item.icon
                                  )}

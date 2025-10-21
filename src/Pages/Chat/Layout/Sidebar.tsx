@@ -22,7 +22,7 @@ import Icon from "@src/components/Icon";
 import { useRouter, useSearchParams } from "next/navigation";
 import { messages, User, users } from "../handler/chatData";
 import { toRelativeTime } from "../handler/handler";
-import Modal from "../UserModal";
+import Modal from "../GroupModal";
 
 interface SidebarProps {
    chatList: any[];

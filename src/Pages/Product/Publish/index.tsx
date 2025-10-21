@@ -1,15 +1,17 @@
+"use client";
 import { Stack, Button } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { useForm, SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { TableRow } from "@src/components/Table";
-import Icon from "@src/components/Icon";
-import Details from "./Details";
-import Properties from "./Properties";
-import Pricing from "./Pricing";
+import Details from "../Details";
+import Properties from "../Properties";
+import Pricing from "../Pricing";
+import { useRouter, useSearchParams } from "next/navigation";
+import { productsData } from "..";
 
 interface ModalProps {
    mode: "add" | "edit";
@@ -35,11 +37,11 @@ const productSchema = z
       // PRODUCT PROPERTIES
       product_code: z.string().min(1, "Product code is required!"),
       product_sku: z.string().min(1, "Product SKU is required!"),
-      quantity: z.coerce.number().min(1, "Quantity is required!"), // ✅ coercion
+      quantity: z.coerce.number(),
       category: z.string().min(1, "Choose at least one category!"),
       product_type: z.string().min(1, "Select at least one type!"),
-      color: z.array(z.string()).min(1, "Choose at least one color!"),
-      size: z.array(z.string()).min(1, "Choose at least one size!"),
+      unit: z.array(z.string()),
+      color: z.array(z.string()),
 
       // PRODUCT PRICING
       regularPrice: z.coerce.number().min(1, "Price is required!"), // ✅ coercion
@@ -57,12 +59,18 @@ const productSchema = z
 
 type PricingValues = z.infer<typeof productSchema>;
 
-const Modal = ({ mode, onClose, data, onChange }: ModalProps) => {
+const Publish = () => {
+   const [data, setData] = useState({} as TableRow);
+   const router = useRouter();
+   const params = useSearchParams();
+   const id = params?.get("id");
+
    // 2. Hook form setup
    const {
       control,
       handleSubmit,
       formState: { errors },
+      reset,
    } = useForm<
       z.input<typeof productSchema>,
       any,
@@ -81,20 +89,34 @@ const Modal = ({ mode, onClose, data, onChange }: ModalProps) => {
          category: (data?.category as any) || "",
          product_type: (data?.product_type as any) || "",
          color: (data?.color as any) || [],
-         size: (data?.size as any) || [],
+         unit: (data?.unit as any) || [],
 
          regularPrice: (data?.regularPrice as any) || "",
          salePrice: undefined,
       },
    });
 
+   useEffect(() => {
+      if (id) {
+         const findProduct = productsData.find((p) => p.id === Number(id));
+         setData(findProduct as TableRow);
+         reset(findProduct);
+      }
+   }, [id]);
+
    // 3. Submit handler
    const onSubmit: SubmitHandler<PricingValues> = (data) => {
-      onChange?.(data);
+      setData(data);
    };
 
    return (
-      <Stack width={"100%"} component="form">
+      <Stack
+         width={"100%"}
+         maxWidth={650}
+         mx={"auto"}
+         height={"100%"}
+         component="form"
+      >
          <Stack spacing={4}>
             <Stack>
                <Details
@@ -126,7 +148,11 @@ const Modal = ({ mode, onClose, data, onChange }: ModalProps) => {
             width={"100%"}
             mt={2}
          >
-            <Button variant="text" color="inherit" onClick={onClose}>
+            <Button
+               variant="text"
+               color="inherit"
+               onClick={() => router.push("/product")}
+            >
                Cancel
             </Button>
 
@@ -136,11 +162,11 @@ const Modal = ({ mode, onClose, data, onChange }: ModalProps) => {
                type="submit"
                onClick={handleSubmit(onSubmit)}
             >
-               {mode === "edit" ? "Update product" : "Add product"}
+               {id ? "Update product" : "Add product"}
             </Button>
          </Stack>
       </Stack>
    );
 };
 
-export default Modal;
+export default Publish;

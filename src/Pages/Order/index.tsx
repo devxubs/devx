@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Button, Typography } from "@mui/material";
+import { Stack, Button, Typography, useTheme } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable from "@src/components/Table";
 import React, { useState } from "react";
@@ -102,6 +102,7 @@ export const OrderItem = {
 
 const Order = () => {
    const router = useRouter();
+   const theme = useTheme();
 
    const actionMenu = (row: any) => [
       {
@@ -153,7 +154,14 @@ const Order = () => {
                   <Button
                      variant="contained"
                      color="primary"
-                     startIcon={<Icon icon="solar:user-plus-bold-duotone" />}
+                     startIcon={
+                        <Icon
+                           icon="mingcute:add-line"
+                           style={{
+                              color: theme.palette.text.primary,
+                           }}
+                        />
+                     }
                   >
                      Create order
                   </Button>

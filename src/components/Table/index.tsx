@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { ReactNode, useState } from "react";
 import {
    alpha,
    Checkbox,
@@ -247,7 +247,7 @@ export default function CustomTable({
          <TableContainer
             component={Paper}
             sx={{
-               maxHeight: 550,
+               maxHeight: 500,
                overflow: "auto", // single source of truth for scrolling
                "&::-webkit-scrollbar": { display: "none!important" },
                scrollbarWidth: "none!important",
@@ -323,7 +323,6 @@ export default function CustomTable({
                                        onChange={(e) =>
                                           handleAllCheck(e.target.checked)
                                        }
-                                       // sx={{ px: { xs: 1, md: 0.2 }, py: 0 }}
                                     />
                                  </TableCell>
                               );
@@ -338,7 +337,7 @@ export default function CustomTable({
                            return (
                               <TableCell
                                  key={idx}
-                                 align="left"
+                                 align={"left"}
                                  sx={{
                                     p: type === "rank" ? 2 : 1,
                                     whiteSpace: "nowrap",

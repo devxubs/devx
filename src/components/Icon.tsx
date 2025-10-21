@@ -1,4 +1,4 @@
-import React from "react";
+import React, { CSSProperties } from "react";
 
 import { Icon as Iconify, IconProps } from "@iconify/react";
 import { Palette, useTheme } from "@mui/material";
@@ -20,7 +20,7 @@ const Icon = ({
       | "warning"
       | "error"
       | "default";
-   style?: any;
+   style?: CSSProperties;
 }) => {
    const theme = useTheme();
    const colorKey = color as keyof Palette;
@@ -48,12 +48,13 @@ const Icon = ({
                ? 28
                : size
          }
-         color={
-            color === "default"
-               ? theme.palette.text.secondary
-               : paletteColor.main
-         }
-         style={style}
+         style={{
+            color:
+               color === "default"
+                  ? theme.palette.text.secondary
+                  : paletteColor.main,
+            ...style,
+         }}
          {...(rest as Omit<IconProps, "icon">)}
       />
    );

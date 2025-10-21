@@ -67,6 +67,7 @@ const VoiceRecorder = () => {
    const handleStop = () => {
       mediaRecorderRef.current?.stop();
       state.set("isRecording", false);
+      setProgress(0);
    };
 
    const handlePlayPause = () => {
