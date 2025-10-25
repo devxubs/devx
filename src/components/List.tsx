@@ -1,6 +1,6 @@
 "use client";
 
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useLayoutEffect, useRef, useState } from "react";
 import {
    List,
    ListItemButton,
@@ -13,7 +13,7 @@ import {
    Stack,
 } from "@mui/material";
 import Icon from "@src/components/Icon"; // Must support Iconify string
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 interface Heading {
    title: string;

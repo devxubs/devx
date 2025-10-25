@@ -41,9 +41,10 @@ export type Type =
    | "category"
    | "default";
 
+export type Head = "@check" | "@action" | string;
 export type TableProps = {
    type: Type;
-   head: string[]; // Dynamic headers, e.g., ["Seller", "Call", "@ID"]
+   head: Head[]; // Dynamic headers, e.g., ["Seller", "Call", "@ID"]
    body: TableRow[]; // Must match the keys in head
    actionMenu?: (row: TableRow) => ActionItem[]; // Optional action menu items
 };
@@ -300,7 +301,10 @@ export default function CustomTable({
                                     </IconButton>
                                  )}
                                  <IconButton color="error">
-                                    <Icon icon="solar:trash-bin-trash-bold" />
+                                    <Icon
+                                       icon="solar:trash-bin-trash-bold"
+                                       color="error"
+                                    />
                                  </IconButton>
                               </Stack>
                            </Stack>

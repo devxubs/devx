@@ -59,12 +59,12 @@ const items = [
       label: "Customers",
       url: "/customers",
    },
-   {
-      headingId: "management",
-      icon: "solar:palette-bold-duotone",
-      label: "Quote",
-      url: "/quote",
-   },
+   // {
+   //    headingId: "management",
+   //    icon: "solar:palette-bold-duotone",
+   //    label: "Quote",
+   //    url: "/quote",
+   // },
    {
       headingId: "management",
       icon: "solar:users-group-two-rounded-bold-duotone",
@@ -81,7 +81,7 @@ const items = [
       headingId: "management",
       icon: "solar:explicit-bold-duotone",
       label: "Expenses",
-      url: "/expenses",
+      url: "/expense",
    },
    {
       headingId: "management",

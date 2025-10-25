@@ -7,18 +7,11 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { TableRow } from "@src/components/Table";
-import Details from "../Details";
-import Properties from "../Properties";
-import Pricing from "../Pricing";
+import Details from "./Details";
+import Properties from "./Properties";
+import Pricing from "./Pricing";
 import { useRouter, useSearchParams } from "next/navigation";
 import { productsData } from "..";
-
-interface ModalProps {
-   mode: "add" | "edit";
-   onClose?: () => void;
-   data?: TableRow;
-   onChange?: (data: any) => void;
-}
 
 const productSchema = z
    .object({
@@ -37,6 +30,7 @@ const productSchema = z
       // PRODUCT PROPERTIES
       product_code: z.string().min(1, "Product code is required!"),
       product_sku: z.string().min(1, "Product SKU is required!"),
+      low_stock_alert: z.string(),
       quantity: z.coerce.number(),
       category: z.string().min(1, "Choose at least one category!"),
       product_type: z.string().min(1, "Select at least one type!"),

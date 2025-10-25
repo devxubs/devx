@@ -57,7 +57,7 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
          </Stack>
          <Collapse in={expanded}>
             <Grid container spacing={3} p={2}>
-               <Grid size={{ xs: 12 }} spacing={2}>
+               <Grid size={{ xs: 12, md: 6 }} spacing={2}>
                   <Stack spacing={1.5}>
                      <Typography
                         variant="h6"
@@ -117,6 +117,31 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                         fontSize={"13px!important"}
                         fontWeight={500}
                      >
+                        Low stock alert
+                     </Typography>
+                     <Controller
+                        name="low_stock_alert"
+                        control={formControl}
+                        defaultValue={data.low_stock_alert || ""}
+                        render={({ field }) => (
+                           <TextField
+                              {...field}
+                              error={!!errors.low_stock_alert}
+                              helperText={errors.low_stock_alert?.message}
+                              label="Low stock alert"
+                              variant="outlined"
+                           />
+                        )}
+                     />
+                  </Stack>
+               </Grid>
+               <Grid size={{ xs: 12, md: 6 }} spacing={2}>
+                  <Stack spacing={1.5}>
+                     <Typography
+                        variant="h6"
+                        fontSize={"13px!important"}
+                        fontWeight={500}
+                     >
                         Quantity
                      </Typography>
                      <Controller
@@ -132,7 +157,6 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                               label="Quantity"
                               variant="outlined"
                               type="number"
-                              required
                               sx={{
                                  "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button":
                                     {

@@ -36,10 +36,10 @@ const OrderInfo = ({ control, errors, data }: DetailsProps) => {
          >
             <Stack spacing={0.5}>
                <Typography variant="body1" fontSize={18} color="textPrimary">
-                  Order Information
+                  Information
                </Typography>
                <Typography variant="body2" color="textSecondary">
-                  details, order source, status, and special notes
+                  Details, Order source, Status, and Special notes
                </Typography>
             </Stack>
             <IconButton onClick={() => setExpanded(!expanded)}>
