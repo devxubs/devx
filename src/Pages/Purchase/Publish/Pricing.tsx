@@ -12,11 +12,9 @@ import {
 import React, { useEffect, useState } from "react";
 import Icon from "@src/components/Icon";
 import { Controller } from "react-hook-form";
-import CustomAutocomplete from "@src/components/Autocomplete";
-import { paymentMethod } from "@src/Pages/Order/data";
 import { PurchaseTypes } from "..";
 
-interface DetailsProps {
+interface PricingProps {
    control: any;
    errors: any;
    data: PurchaseTypes;
@@ -24,22 +22,39 @@ interface DetailsProps {
    watch: any;
 }
 
-const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
+const Pricing = ({ control, errors, data, setValue, watch }: PricingProps) => {
    const [expanded, setExpanded] = useState(true);
 
-   const subtotal = Number(watch("subtotal") ?? 0);
-   const shipping = Number(watch("shipping") ?? 0);
-   const discount = Number(watch("discount") ?? 0);
-   const advance = Number(watch("advancePayment") ?? 0);
-   const delivery = Number(watch("deliveryCharge") ?? 0);
-
+   // ✅ Auto Calculation Effect
    useEffect(() => {
-      const total = Math.max(subtotal + shipping + delivery - discount, 0);
-      const due = Math.max(total - advance, 0);
+      const product = watch("product");
+      const productAmount = Number(watch("product_amount")) || 0;
+      const discount = Number(watch("discount")) || 0;
+      const advance = Number(watch("advance")) || 0;
+      const othersCost = Number(watch("others_cost")) || 0;
+      const pay = Number(watch("pay"));
 
-      setValue("total", total);
-      setValue("dueAmount", due);
-   }, [subtotal, shipping, delivery, discount, advance, setValue]);
+      const total = productAmount - discount + othersCost;
+      const due = productAmount - (discount + advance) - pay;
+
+      const pa = product
+         .map((p: any, i: number) => p.price * p.quantity)
+         .reduce(
+            (accumulator: any, currentValue: any) => accumulator + currentValue,
+            0
+         );
+
+      setValue("product_amount", parseInt(pa) || 0);
+      setValue("total", total >= 0 ? total : 0);
+      // setValue("pay", pay >= 0 ? pay : 0);
+      setValue("due", due >= 0 ? due : 0);
+   }, [
+      watch("product"),
+      watch("product_amount"),
+      watch("discount"),
+      watch("advance"),
+      watch("others_cost"),
+   ]);
 
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -55,8 +70,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                   Pricing & Discounts
                </Typography>
                <Typography variant="body2" color="textSecondary">
-                  Affordable rates with exclusive discounts on bulk and seasonal
-                  orders.
+                  Automated purchase pricing and balance calculations.
                </Typography>
             </Stack>
             <IconButton onClick={() => setExpanded(!expanded)}>
@@ -74,30 +88,34 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
          <Collapse in={expanded}>
             <Stack spacing={3} p={2} pt={0}>
                <Grid container spacing={2}>
+                  {/* Product Amount */}
                   <Grid size={{ xs: 12, md: 6 }}>
-                     {/* Product Amount */}
                      <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
-                           Product Amount
+                        <Typography fontSize={13} fontWeight={500}>
+                           Product Amount.{" "}
+                           <Typography
+                              component={"span"}
+                              variant="body2"
+                              fontSize={12}
+                              color="textSecondary"
+                           >
+                              (Auto-generated)
+                           </Typography>
                         </Typography>
                         <Controller
                            name="product_amount"
                            control={control}
-                           defaultValue={
-                              data?.product_amount ?? "Cash on Delivery"
-                           }
+                           defaultValue={data?.product_amount ?? 0}
                            render={({ field }) => (
                               <TextField
                                  {...field}
                                  type="number"
                                  fullWidth
-                                 label="Subtotal"
-                                 error={!!errors?.subtotal}
-                                 helperText={errors?.subtotal?.message}
+                                 inputProps={{ min: 0 }}
+                                 label="Amount"
+                                 error={!!errors?.product_amount}
+                                 helperText={errors?.product_amount?.message}
+                                 disabled
                               />
                            )}
                         />
@@ -107,11 +125,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                   {/* Discount */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
+                        <Typography fontSize={13} fontWeight={500}>
                            Discount
                         </Typography>
                         <Controller
@@ -122,6 +136,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                               <TextField
                                  {...field}
                                  type="number"
+                                 inputProps={{ min: 0 }}
                                  fullWidth
                                  label="Discount"
                                  error={!!errors?.discount}
@@ -132,42 +147,10 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                      </Stack>
                   </Grid>
 
-                  {/* Total Amount */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
-                           Total Amount
-                        </Typography>
-                        <Controller
-                           name="supplier_total"
-                           control={control}
-                           defaultValue={data?.supplier_total ?? 0}
-                           render={({ field }) => (
-                              <TextField
-                                 {...field}
-                                 type="number"
-                                 fullWidth
-                                 label="Total"
-                                 error={!!errors?.supplier_total}
-                                 helperText={errors?.supplier_total?.message}
-                              />
-                           )}
-                        />
-                     </Stack>
-                  </Grid>
-
                   {/* Pay Amount */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
+                        <Typography fontSize={13} fontWeight={500}>
                            Pay Amount
                         </Typography>
                         <Controller
@@ -179,38 +162,10 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                                  {...field}
                                  type="number"
                                  fullWidth
+                                 inputProps={{ min: 0 }}
                                  label="Pay"
-                                 InputProps={{ readOnly: true }}
                                  error={!!errors?.pay}
                                  helperText={errors?.pay?.message}
-                              />
-                           )}
-                        />
-                     </Stack>
-                  </Grid>
-
-                  {/* Due Amount */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
-                           Due Amount
-                        </Typography>
-                        <Controller
-                           name="Due"
-                           control={control}
-                           defaultValue={data?.due ?? 0}
-                           render={({ field }) => (
-                              <TextField
-                                 {...field}
-                                 type="number"
-                                 fullWidth
-                                 label="Due"
-                                 error={!!errors?.due}
-                                 helperText={errors?.due?.message}
                               />
                            )}
                         />
@@ -220,11 +175,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                   {/* Advance Payment */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
+                        <Typography fontSize={13} fontWeight={500}>
                            Advance Payment
                         </Typography>
                         <Controller
@@ -235,6 +186,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                               <TextField
                                  {...field}
                                  type="number"
+                                 inputProps={{ min: 0 }}
                                  fullWidth
                                  label="Advance"
                                  error={!!errors?.advance}
@@ -248,15 +200,19 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                   {/* Total Due */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
-                           Total Due
+                        <Typography fontSize={13} fontWeight={500}>
+                           Total Due.{" "}
+                           <Typography
+                              component={"span"}
+                              variant="body2"
+                              fontSize={12}
+                              color="textSecondary"
+                           >
+                              (Auto-generated)
+                           </Typography>
                         </Typography>
                         <Controller
-                           name="total_due"
+                           name="due"
                            control={control}
                            defaultValue={0}
                            render={({ field }) => (
@@ -264,36 +220,35 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                                  {...field}
                                  type="number"
                                  fullWidth
+                                 inputProps={{ min: 0 }}
                                  label="Total Due"
                                  InputProps={{ readOnly: true }}
-                                 error={!!errors?.total_due}
-                                 helperText={errors?.total_due?.message}
+                                 error={!!errors?.due}
+                                 helperText={errors?.due?.message}
+                                 disabled
                               />
                            )}
                         />
                      </Stack>
                   </Grid>
 
-                  {/* Others cost */}
+                  {/* Others Cost */}
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
-                           Others cost
+                        <Typography fontSize={13} fontWeight={500}>
+                           Others Cost
                         </Typography>
                         <Controller
                            name="others_cost"
                            control={control}
-                           defaultValue={data?.others_cost ?? 0} // free by default
+                           defaultValue={data?.others_cost ?? 0}
                            render={({ field }) => (
                               <TextField
                                  {...field}
                                  type="number"
+                                 inputProps={{ min: 0 }}
                                  fullWidth
-                                 label="Others cost"
+                                 label="Others Cost"
                                  error={!!errors?.others_cost}
                                  helperText={errors?.others_cost?.message}
                               />
@@ -305,25 +260,31 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                   {/* Grand Total */}
                   <Grid size={{ xs: 12 }}>
                      <Stack spacing={1.5}>
-                        <Typography
-                           variant="h6"
-                           fontSize={"13px!important"}
-                           fontWeight={500}
-                        >
-                           Grand Total
+                        <Typography fontSize={13} fontWeight={500}>
+                           Grand Total.{" "}
+                           <Typography
+                              component={"span"}
+                              variant="body2"
+                              fontSize={12}
+                              color="textSecondary"
+                           >
+                              (Auto-generated)
+                           </Typography>
                         </Typography>
                         <Controller
                            name="total"
                            control={control}
-                           defaultValue={data?.total ?? 0} // free by default
+                           defaultValue={data?.total ?? 0}
                            render={({ field }) => (
                               <TextField
                                  {...field}
                                  type="number"
                                  fullWidth
                                  label="Total"
+                                 InputProps={{ readOnly: true }}
                                  error={!!errors?.total}
                                  helperText={errors?.total?.message}
+                                 disabled
                               />
                            )}
                         />

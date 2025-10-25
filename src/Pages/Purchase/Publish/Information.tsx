@@ -91,7 +91,8 @@ const Information = ({ control, errors, data }: DetailsProps) => {
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
-                           Invoice No.{" "}
+                           Invoice No
+                           {/* .{" "}
                            <Typography
                               component={"span"}
                               variant="body2"
@@ -99,7 +100,7 @@ const Information = ({ control, errors, data }: DetailsProps) => {
                               color="textSecondary"
                            >
                               (Auto-generated)
-                           </Typography>
+                           </Typography> */}
                         </Typography>
                         <Controller
                            name="invoice"

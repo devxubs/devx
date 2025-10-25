@@ -28,7 +28,6 @@ const AttachmentUploader = ({
    onChange,
 }: AttachmentUploaderProps) => {
    const theme = useTheme();
-   console.log(error);
 
    const [attachment, setAttachment] = useState<File[]>(value || []);
 

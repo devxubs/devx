@@ -1,11 +1,21 @@
 "use client";
 
-import { Button, Stack, useTheme, IconButton } from "@mui/material";
+import {
+   Button,
+   Stack,
+   useTheme,
+   IconButton,
+   Tooltip,
+   Typography,
+   TextField,
+} from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
+import CustomModal from "@src/components/Modal";
 import CustomTable, { TableProps } from "@src/components/Table";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+
 export type PurchaseTypes = {
    id: number;
    date: string; // YYYY-MM-DD
@@ -17,12 +27,12 @@ export type PurchaseTypes = {
       code: string;
       quantity: number;
       price: number;
+      sub_total: number;
       images: string;
    };
    product_amount: number;
    others_cost?: number;
    discount?: number;
-   supplier_total: number;
    total: number;
    pay: number;
    advance: number;
@@ -44,14 +54,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Rice",
          code: "RICE-001",
-         quantity: 100,
+         quantity: 1,
          price: 50,
+         sub_total: 1 * 50,
          images: "",
       },
       product_amount: 5000,
       others_cost: 100,
       discount: 200,
-      supplier_total: 4900,
       total: 4900,
       pay: 3000,
       advance: 1000,
@@ -80,14 +90,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Sugar",
          code: "SUGAR-001",
-         quantity: 200,
+         quantity: 1,
          price: 16,
+         sub_total: 1 * 16,
          images: "",
       },
       product_amount: 3200,
       others_cost: 50,
       discount: 0,
-      supplier_total: 3250,
       total: 3250,
       pay: 2000,
       advance: 1000,
@@ -110,14 +120,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Flour",
          code: "FLOUR-001",
-         quantity: 50,
+         quantity: 1,
          price: 50,
+         sub_total: 1 * 50,
          images: "",
       },
       product_amount: 2500,
       others_cost: 0,
       discount: 100,
-      supplier_total: 2400,
       total: 2400,
       pay: 1500,
       advance: 500,
@@ -146,14 +156,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Oil",
          code: "OIL-001",
-         quantity: 30,
+         quantity: 1,
          price: 50,
+         sub_total: 1 * 50,
          images: "",
       },
       product_amount: 1500,
       others_cost: 50,
       discount: 50,
-      supplier_total: 1500,
       total: 1500,
       pay: 1000,
       advance: 300,
@@ -176,14 +186,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Salt",
          code: "SALT-001",
-         quantity: 80,
+         quantity: 1,
          price: 10,
+         sub_total: 1 * 10,
          images: "",
       },
       product_amount: 800,
       others_cost: 20,
       discount: 0,
-      supplier_total: 820,
       total: 820,
       pay: 500,
       advance: 200,
@@ -206,14 +216,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Tea",
          code: "TEA-001",
-         quantity: 400,
+         quantity: 1,
          price: 10,
+         sub_total: 1 * 10,
          images: "",
       },
       product_amount: 4000,
       others_cost: 100,
       discount: 200,
-      supplier_total: 3900,
       total: 3900,
       pay: 2000,
       advance: 1500,
@@ -236,14 +246,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Coffee",
          code: "COFFEE-001",
-         quantity: 50,
+         quantity: 1,
          price: 10,
+         sub_total: 1 * 10,
          images: "",
       },
       product_amount: 500,
       others_cost: 990,
       discount: 100,
-      supplier_total: 1390,
       total: 1390,
       pay: 1000,
       advance: 300,
@@ -272,14 +282,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Milk",
          code: "MILK-001",
-         quantity: 60,
+         quantity: 1,
          price: 20,
+         sub_total: 1 * 20,
          images: "",
       },
       product_amount: 1200,
       others_cost: 50,
       discount: 100,
-      supplier_total: 1150,
       total: 1150,
       pay: 800,
       advance: 200,
@@ -302,14 +312,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Eggs",
          code: "EGGS-001",
-         quantity: 90,
+         quantity: 1,
          price: 10,
+         sub_total: 1 * 10,
          images: "",
       },
       product_amount: 900,
       others_cost: 30,
       discount: 50,
-      supplier_total: 880,
       total: 880,
       pay: 600,
       advance: 200,
@@ -332,14 +342,14 @@ const purchaseData: PurchaseTypes[] = [
       product: {
          name: "Butter",
          code: "BUTTER-001",
-         quantity: 70,
+         quantity: 1,
          price: 20,
+         sub_total: 1 * 20,
          images: "",
       },
       product_amount: 1400,
       others_cost: 30,
       discount: 50,
-      supplier_total: 1380,
       total: 1380,
       pay: 1000,
       advance: 200,
@@ -367,6 +377,7 @@ const Purchase = () => {
    const router = useRouter();
    const [purchase, setPurchase] = useState<PurchaseTypes>({} as PurchaseTypes);
    const [openDelete, setOpenDelete] = useState(false);
+   const [openNote, setOpenNote] = useState<string | null>("");
 
    const tableData: Omit<TableProps, "type"> = {
       head: [
@@ -387,9 +398,21 @@ const Purchase = () => {
          ...pd,
          product: pd.product.name,
          note: (
-            <IconButton size="small">
-               <Icon icon="solar:notes-bold-duotone" size="small" />
-            </IconButton>
+            <Tooltip
+               title={
+                  pd.note?.length === 20
+                     ? pd.note.slice(0, 20) + "..."
+                     : pd.note
+               }
+               disableInteractive
+            >
+               <IconButton
+                  size="small"
+                  onClick={() => setOpenNote(pd.note || null)}
+               >
+                  <Icon icon="solar:notes-bold-duotone" size="small" />
+               </IconButton>
+            </Tooltip>
          ),
          // Convert attachments array into a renderable ReactNode (string)
          attachments: pd.attachments
@@ -458,6 +481,53 @@ const Purchase = () => {
             body={tableData.body}
             actionMenu={(row) => actionMenu(row as any)}
          />
+
+         <CustomModal
+            open={typeof openNote === "string"}
+            onClose={function (): void {
+               setOpenNote(null);
+            }}
+            title="Note"
+            sx={{
+               width: 300,
+            }}
+         >
+            <TextField
+               label="Note"
+               fullWidth
+               multiline
+               minRows={2}
+               maxRows={3}
+               value={openNote || ""}
+               onChange={(e) => setOpenNote(e.target.value || "")}
+            />
+            <Stack
+               spacing={2}
+               direction="row"
+               justifyContent="flex-end"
+               width="100%"
+               mt={2}
+            >
+               <Button
+                  variant="text"
+                  color="inherit"
+                  onClick={() => setOpenNote(null)}
+               >
+                  Cancel
+               </Button>
+
+               <Button
+                  variant="contained"
+                  color="primary"
+                  sx={{
+                     position: "relative",
+                     overflow: "hidden",
+                  }}
+               >
+                  Submit
+               </Button>
+            </Stack>
+         </CustomModal>
 
          <AlertDialog
             open={openDelete}
