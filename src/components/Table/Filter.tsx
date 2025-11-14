@@ -2,7 +2,6 @@
 
 import {
    Stack,
-   Box,
    Chip,
    FormControl,
    InputAdornment,
@@ -11,18 +10,12 @@ import {
    alpha,
    useTheme,
    Button,
-   IconButton,
-   Tooltip,
    useMediaQuery,
 } from "@mui/material";
 import React from "react";
 import Icon from "../Icon";
-import CustomModal from "../Modal";
-import OrderFilterModal from "./OrderFilterModel";
 import dayjs, { Dayjs } from "dayjs";
 import { Type } from ".";
-import CustomAutocomplete from "../Autocomplete";
-import Scrollbar from "react-browser-scrollbar";
 
 export type OrderFilter = {
    order_created_at?: Dayjs;
@@ -40,31 +33,30 @@ export type FilterData = {
    productStock: string;
    searchText: string;
    orderData: OrderFilter;
+   reportData?: {
+      report_type?: string;
+      start_date?: Dayjs;
+      end_date?: Dayjs;
+   };
 };
 
 type FilterProps = {
    type: Type;
    onFilterChange?: (data: FilterData) => void;
    filterData: FilterData; // required now
+   customFilter?: (
+      data: FilterData,
+      onChange: (data: FilterData) => void
+   ) => React.ReactNode;
 };
 
 const Filter: React.FC<FilterProps> = ({
-   type,
    filterData,
    onFilterChange,
+   customFilter,
 }) => {
    const theme = useTheme();
-   const [modalOpen, setModalOpen] = React.useState(false);
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-   const names = [
-      "CEO",
-      "Manager",
-      "Repeat Sales Exicutive",
-      "Team Leader",
-      "Courier Exicutive",
-      "Reseller",
-   ];
 
    const activeFilters = Object.entries(filterData.orderData).filter(
       ([, value]) => value !== undefined && value !== ""
@@ -100,79 +92,10 @@ const Filter: React.FC<FilterProps> = ({
                />
             </FormControl>
 
-            {type === "user" && (
-               <Stack sx={{ width: "30%" }}>
-                  <CustomAutocomplete
-                     label="Role"
-                     option={names}
-                     value={filterData.userRole || ""} // controlled
-                     onChange={(v: string) =>
-                        onFilterChange?.({ ...filterData, userRole: v || "" })
-                     }
-                  />
-               </Stack>
-            )}
-
-            {type === "product" && (
-               <Stack sx={{ width: "30%" }}>
-                  <CustomAutocomplete
-                     label="Stock"
-                     option={["In stock", "Low stock", "Out of stock"]}
-                     value={filterData.productStock || ""}
-                     onChange={(val: string) =>
-                        onFilterChange?.({ ...filterData, productStock: val })
-                     }
-                  />
-               </Stack>
-            )}
-
-            {type === "order" && (
-               <Box>
-                  <Tooltip title="Filter">
-                     <IconButton
-                        sx={{ color: "text.secondary" }}
-                        onClick={() => setModalOpen(true)}
-                     >
-                        <Icon icon="solar:filters-bold-duotone" />
-                     </IconButton>
-                  </Tooltip>
-
-                  <CustomModal
-                     sx={{
-                        width: { xs: "100%", md: 900 },
-                        height: { xs: "100vh", md: "auto" },
-                        borderRadius: { xs: 0, md: 2 },
-                     }}
-                     open={modalOpen}
-                     onClose={() => setModalOpen(false)}
-                     title="Order Filter"
-                  >
-                     <Scrollbar
-                        autoHide
-                        darkMode
-                        thumbSize={6}
-                        style={{ height: "100%" }}
-                     >
-                        <OrderFilterModal
-                           filterValue={{
-                              ...filterData.orderData,
-                              status: filterData.orderData.status,
-                           }}
-                           onCloseModal={() => setModalOpen(false)}
-                           onChange={(f: OrderFilter) =>
-                              onFilterChange?.({
-                                 ...filterData,
-                                 orderData: {
-                                    ...f,
-                                    status: f.status !== null ? f.status : "",
-                                 },
-                              })
-                           }
-                        />
-                     </Scrollbar>
-                  </CustomModal>
-               </Box>
-            )}
+            {customFilter &&
+               customFilter(filterData, (data: FilterData) =>
+                  onFilterChange?.(data)
+               )}
          </Stack>
 
          <Stack

@@ -89,7 +89,7 @@ const Header = () => {
             >
                {!isSmDown ? (
                   <Typography variant="h4" textTransform="capitalize" noWrap>
-                     {pathname?.slice(1).split("/")[0] || "Dashboard"}
+                     {pathname?.slice(1).split("/")[1] || "Dashboard"}
                   </Typography>
                ) : (
                   <IconButton

@@ -21,115 +21,115 @@ const items = [
       heading: { title: "MANAGEMENT", id: "management" },
       icon: "solar:widget-5-bold-duotone",
       label: "Dashboard",
-      url: "/dashboard",
+      url: "/admin/dashboard",
    },
    {
       headingId: "management",
       icon: "solar:users-group-rounded-bold-duotone",
       label: "User",
-      url: "/user",
+      url: "/admin/user",
    },
    {
       headingId: "management",
       icon: "solar:hanger-2-bold-duotone",
       label: "Product",
-      url: "/product",
+      url: "/admin/product",
    },
    {
       headingId: "management",
       icon: "solar:clipboard-list-bold-duotone",
       label: "Categories",
-      url: "/categories",
+      url: "/admin/categories",
    },
    {
       headingId: "management",
       icon: "solar:bill-list-bold-duotone",
       label: "Unit",
-      url: "/unit",
+      url: "/admin/unit",
    },
    {
       headingId: "management",
       icon: "solar:cart-plus-bold-duotone",
       label: "Order",
-      url: "/order",
+      url: "/admin/order",
    },
    {
       headingId: "management",
       icon: "solar:users-group-rounded-bold-duotone",
       label: "Customers",
-      url: "/customers",
+      url: "/admin/customers",
    },
    // {
    //    headingId: "management",
    //    icon: "solar:palette-bold-duotone",
    //    label: "Quote",
-   //    url: "/quote",
+   //    url: "/admin/quote",
    // },
    {
       headingId: "management",
       icon: "solar:users-group-two-rounded-bold-duotone",
       label: "Suppliers",
-      url: "/suppliers",
+      url: "/admin/suppliers",
    },
    {
       headingId: "management",
       icon: "solar:cart-large-2-bold-duotone",
       label: "Purchase",
-      url: "/purchase",
+      url: "/admin/purchase",
    },
    {
       headingId: "management",
       icon: "solar:explicit-bold-duotone",
       label: "Expenses",
-      url: "/expense",
+      url: "/admin/expense",
    },
    {
       headingId: "management",
       icon: "solar:cassette-2-bold-duotone",
       label: "Assets",
-      url: "/assets",
+      url: "/admin/assets",
    },
    {
       headingId: "management",
       icon: <ChatIcon />,
       label: "Chat",
-      url: "/chat",
+      url: "/admin/chat",
    },
    {
       headingId: "management",
       icon: "solar:pie-chart-2-bold-duotone",
       label: "Reports",
-      url: "/reports",
+      url: "/admin/reports",
    },
    {
       headingId: "management",
       icon: "solar:trash-bin-trash-bold-duotone",
       label: "Bin",
-      url: "/bin",
+      url: "/admin/bin",
    },
    {
       heading: { title: "ACCOUNT", id: "account" },
       icon: "solar:settings-bold-duotone",
       label: "Setting",
-      url: "/settings",
+      url: "/admin/settings",
    },
    {
       headingId: "account",
       icon: "solar:lock-keyhole-bold-duotone",
       label: "Roles",
-      url: "/roles",
+      url: "/admin/roles",
    },
    {
       headingId: "account",
       icon: "solar:shield-user-bold-duotone",
       label: "Admin",
-      url: "/admin",
+      url: "/admin/admin",
    },
    {
       headingId: "account",
       icon: "solar:wallet-money-bold-duotone",
       label: "Billing",
-      url: "/billing",
+      url: "/admin/billing",
    },
 ];
 
@@ -153,7 +153,7 @@ const Sidebar = () => {
    const SidebarContent = (
       <Stack
          component={isSmDown ? CustomBox : "div"}
-         width={layout ? 270 : 90}
+         width={sidebarWidth}
          px={layout ? 1 : 0}
          py={1}
          bgcolor="background.paper"
@@ -196,7 +196,7 @@ const Sidebar = () => {
                onClick={() => globalState.set("layoutFull", false)}
                sx={{
                   position: "absolute",
-                  top: 24,
+                  top: 14,
                   right: 13,
                   zIndex: 18,
                }}
@@ -247,9 +247,9 @@ const Sidebar = () => {
          onClose={() => globalState.set("layoutFull", false)}
          ModalProps={{ keepMounted: true }}
          sx={{
+            zIndex: layout ? 1300 : 1,
             "& .MuiDrawer-paper": {
-               width: "100%",
-               maxWidth: 300,
+               maxWidth: 270,
                bgcolor: "background.paper",
                px: 0,
             },

@@ -1,21 +1,29 @@
-import { Card, Typography } from "@mui/material";
+import { Card, Stack, Typography } from "@mui/material";
 import React, { ReactNode } from "react";
 
 const CustomCard = ({
-  children,
-  title,
+   children,
+   title,
 }: {
-  children: ReactNode;
-  title: string;
+   children: ReactNode;
+   title?: string;
 }) => {
-  return (
-    <Card sx={{ p: 3, boxShadow: 20, height: "100%" }}>
-      <Typography variant="subtitle1" mb={2}>
-        {title}
-      </Typography>
-      {children}
-    </Card>
-  );
+   return (
+      <Stack
+         sx={{
+            p: 3,
+            boxShadow: 20,
+            height: "100%",
+            borderRadius: 1.5,
+            bgcolor: "background.paper",
+         }}
+      >
+         <Typography variant="subtitle1" mb={2}>
+            {title}
+         </Typography>
+         {children}
+      </Stack>
+   );
 };
 
 export default CustomCard;

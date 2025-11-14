@@ -47,6 +47,10 @@ export type TableProps = {
    head: Head[]; // Dynamic headers, e.g., ["Seller", "Call", "@ID"]
    body: TableRow[]; // Must match the keys in head
    actionMenu?: (row: TableRow) => ActionItem[]; // Optional action menu items
+   filter?: (
+      data: FilterData,
+      onChange: (data: FilterData) => void
+   ) => React.ReactNode;
 };
 
 export default function CustomTable({
@@ -54,6 +58,7 @@ export default function CustomTable({
    head,
    body,
    actionMenu,
+   filter,
 }: TableProps) {
    const theme = useTheme();
    const [checkedRows, setCheckedRows] = useState<boolean[]>(() =>
@@ -98,7 +103,7 @@ export default function CustomTable({
          // --- Product stock
          if (
             productStock &&
-            productStock.toLowerCase() !== row.stock_value.toLowerCase()
+            productStock.toLowerCase() !== row.stock_value?.toLowerCase()
          )
             return false;
 
@@ -106,7 +111,7 @@ export default function CustomTable({
          if (orderData.status && row.status !== orderData.status) return false;
 
          // --- Employee filter (maps to customer name)
-         if (orderData.employee && row.employee.name !== orderData.employee) {
+         if (orderData.employee && row.employee?.name !== orderData.employee) {
             return false;
          }
 
@@ -121,13 +126,13 @@ export default function CustomTable({
          // --- Product filter (by name or code)
          if (
             orderData.products &&
-            !row.products.some(
+            !row.products?.some(
                (prod: any) =>
                   prod.name
-                     .toLowerCase()
+                     ?.toLowerCase()
                      .includes(orderData.products?.toLowerCase()) ||
                   prod.code
-                     .toLowerCase()
+                     ?.toLowerCase()
                      .includes(orderData.products?.toLowerCase())
             )
          ) {
@@ -137,7 +142,7 @@ export default function CustomTable({
          // --- District filter (maps to address)
          if (
             orderData.district &&
-            !row.customer.address
+            !row.customer?.address
                ?.toLowerCase()
                .includes(orderData.district.toLowerCase())
          ) {
@@ -154,7 +159,9 @@ export default function CustomTable({
 
          // --- Order created date filter
          if (orderData.order_created_at) {
-            const orderDate = new Date(row.timestamps.orderPlaced);
+            const orderDate = new Date(
+               row.timestamps?.orderPlaced ?? row.createdAt
+            );
             const filterDate = new Date(orderData.order_created_at as any);
 
             // Compare only the date part (ignore time)
@@ -165,16 +172,16 @@ export default function CustomTable({
          }
 
          // --- Courier submitted date filter
-         if (orderData.courier_submitted_at && row.timestamps.deliveryTime) {
-            const courierDate = new Date(row.timestamps.deliveryTime);
+         if (orderData.courier_submitted_at) {
+            const courierDate = new Date(row.timestamps?.deliveryTime ?? 0);
             const filterDate = new Date(orderData.courier_submitted_at as any);
 
-            // Compare only the date part (ignore time)
             const courierDay = courierDate.setHours(0, 0, 0, 0);
             const filterDay = filterDate.setHours(0, 0, 0, 0);
 
             if (courierDay !== filterDay) return false;
          }
+
          return true;
       });
    }, [filterData, body]);
@@ -241,6 +248,7 @@ export default function CustomTable({
                   type={type}
                   onFilterChange={(d) => setFilterData(d)}
                   filterData={filterData}
+                  customFilter={filter}
                />
             </Stack>
          )}
