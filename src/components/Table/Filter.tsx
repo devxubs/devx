@@ -14,12 +14,12 @@ import {
 } from "@mui/material";
 import React from "react";
 import Icon from "../Icon";
-import dayjs, { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { Type } from ".";
 
 export type OrderFilter = {
-   order_created_at?: Dayjs;
-   courier_submitted_at?: Dayjs;
+   order_created_at?: [Date | null, Date | null];
+   courier_submitted_at?: [Date | null, Date | null];
    employee?: string;
    status?: string;
    order_source?: string;
@@ -34,16 +34,26 @@ export type FilterData = {
    searchText: string;
    orderData: OrderFilter;
    reportData?: {
-      report_type?: string;
-      start_date?: Dayjs;
-      end_date?: Dayjs;
+      report_type:
+         | "default"
+         | "sales"
+         | "couriers"
+         | "purchases"
+         | "inventory"
+         | "customers"
+         | "expenses"
+         | "suppliers"
+         | "employees"
+         | "products";
+      date?: [Date | null, Date | null];
+      product?: null | string;
    };
 };
 
 type FilterProps = {
    type: Type;
    onFilterChange?: (data: FilterData) => void;
-   filterData: FilterData; // required now
+   filterData: FilterData;
    customFilter?: (
       data: FilterData,
       onChange: (data: FilterData) => void
@@ -58,18 +68,34 @@ const Filter: React.FC<FilterProps> = ({
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-   const activeFilters = Object.entries(filterData.orderData).filter(
-      ([, value]) => value !== undefined && value !== ""
+   // -----------------------------------------------------
+   // ✅ Extract ACTIVE orderData filters only
+   // -----------------------------------------------------
+   const activeOrderFilters = Object.entries(filterData.orderData || {}).filter(
+      ([_, value]) => {
+         if (!value) return false;
+
+         if (Array.isArray(value)) {
+            const [start, end] = value;
+            return Boolean(start && end);
+         }
+
+         return value !== "";
+      }
    );
+
+   const reportData = Object.entries(filterData.reportData || {});
 
    return (
       <Stack spacing={2} mb={2}>
+         {/* ================= TOP SEARCH + CUSTOM FILTER ================ */}
          <Stack
             spacing={2}
             direction="row"
             alignItems="center"
             justifyContent="space-between"
          >
+            {/* Search Box */}
             <FormControl variant="outlined" sx={{ flex: !isMobile ? 0.4 : 1 }}>
                <TextField
                   fullWidth
@@ -93,127 +119,130 @@ const Filter: React.FC<FilterProps> = ({
             </FormControl>
 
             {customFilter &&
-               customFilter(filterData, (data: FilterData) =>
-                  onFilterChange?.(data)
-               )}
+               customFilter(filterData, (updated) => onFilterChange?.(updated))}
          </Stack>
 
+         {/* ================= ACTIVE FILTER CHIPS ================= */}
          <Stack
             spacing={1}
             direction="row"
             alignItems="flex-start"
             flexWrap="wrap"
          >
+            {/* Search Text */}
             {filterData.searchText && (
-               <Stack
-                  spacing={1}
-                  direction="row"
-                  alignItems="center"
-                  border={1}
-                  borderColor="divider"
-                  borderRadius={0.5}
-                  p={1}
-                  sx={{ borderStyle: "dashed" }}
-               >
-                  <Typography variant="subtitle2">Keyword: </Typography>
+               <FilterChipWrapper title="Keyword">
                   <Chip
                      label={filterData.searchText}
                      size="small"
                      onDelete={() =>
                         onFilterChange?.({ ...filterData, searchText: "" })
                      }
-                     sx={{
-                        borderRadius: 0.5,
-                        fontWeight: 700,
-                        fontSize: "0.75rem",
-                        bgcolor: alpha(theme.palette.grey[300], 0.1),
-                        color: theme.palette.grey[300],
-                     }}
+                     sx={chipStyle(theme)}
                   />
-               </Stack>
+               </FilterChipWrapper>
             )}
 
+            {/* Product Stock */}
             {filterData.productStock && (
-               <Stack
-                  spacing={1}
-                  direction="row"
-                  alignItems="center"
-                  border={1}
-                  borderColor="divider"
-                  borderRadius={0.5}
-                  p={1}
-                  sx={{ borderStyle: "dashed" }}
-               >
-                  <Typography variant="subtitle2">Stock: </Typography>
+               <FilterChipWrapper title="Stock">
                   <Chip
                      label={filterData.productStock}
                      size="small"
                      onDelete={() =>
                         onFilterChange?.({ ...filterData, productStock: "" })
                      }
-                     sx={{
-                        borderRadius: 0.5,
-                        fontWeight: 700,
-                        fontSize: "0.75rem",
-                        bgcolor: alpha(theme.palette.grey[300], 0.1),
-                        color: theme.palette.grey[300],
-                     }}
+                     sx={chipStyle(theme)}
                   />
-               </Stack>
+               </FilterChipWrapper>
             )}
 
+            {/* User Role */}
             {filterData.userRole && (
-               <Stack
-                  spacing={1}
-                  direction="row"
-                  alignItems="center"
-                  border={1}
-                  borderColor="divider"
-                  borderRadius={0.5}
-                  p={1}
-                  sx={{ borderStyle: "dashed" }}
-               >
-                  <Typography variant="subtitle2">Role: </Typography>
+               <FilterChipWrapper title="Role">
                   <Chip
                      label={filterData.userRole}
                      size="small"
                      onDelete={() =>
                         onFilterChange?.({ ...filterData, userRole: "" })
                      }
-                     sx={{
-                        borderRadius: 0.5,
-                        fontWeight: 700,
-                        fontSize: "0.75rem",
-                        bgcolor: alpha(theme.palette.grey[300], 0.1),
-                        color: theme.palette.grey[300],
-                     }}
+                     sx={chipStyle(theme)}
                   />
-               </Stack>
+               </FilterChipWrapper>
             )}
 
-            {activeFilters.map(([key, value]) => (
-               <Stack
-                  key={key}
-                  spacing={1}
-                  direction="row"
-                  alignItems="center"
-                  border={1}
-                  borderColor="divider"
-                  borderRadius={0.5}
-                  p={1}
-                  sx={{ borderStyle: "dashed" }}
-               >
-                  <Typography variant="subtitle2">
-                     {key
-                        .split("_")
-                        .map((k) => k.charAt(0).toUpperCase() + k.slice(1))
-                        .join(" ")}
-                     :
-                  </Typography>
+            {/* Reports */}
+            {filterData.reportData && (
+               <>
+                  {reportData.map(([key], idx) => {
+                     const value =
+                        filterData.reportData?.[
+                           key as keyof typeof filterData.reportData
+                        ];
+
+                     if (
+                        key === "report_type" ||
+                        value == null || // null or undefined
+                        (Array.isArray(value) && (!value[0] || !value[1]))
+                     ) {
+                        return null;
+                     }
+
+                     const label =
+                        key === "date" &&
+                        Array.isArray(value) &&
+                        value[0] !== null &&
+                        value[1] !== null
+                           ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
+                                value[1]
+                             ).format("YYYY-MM-DD")}`
+                           : String(value ?? "");
+
+                     return (
+                        filterData.reportData && (
+                           <FilterChipWrapper
+                              key={idx}
+                              title={
+                                 !filterData.reportData.report_type ||
+                                 filterData.reportData.report_type === "default"
+                                    ? key
+                                    : `${filterData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
+                              }
+                           >
+                              <Chip
+                                 label={label}
+                                 size="small"
+                                 onDelete={() =>
+                                    onFilterChange?.({
+                                       ...filterData,
+                                       reportData: {
+                                          ...filterData.reportData,
+                                          [key]:
+                                             key === "date"
+                                                ? [null, null]
+                                                : undefined,
+                                          report_type: "default",
+                                       },
+                                    })
+                                 }
+                                 sx={chipStyle(theme)}
+                              />
+                           </FilterChipWrapper>
+                        )
+                     );
+                  })}
+               </>
+            )}
+
+            {/* ================= Dynamic OrderData Filters ================ */}
+            {activeOrderFilters.map(([key, value]) => (
+               <FilterChipWrapper key={key} title={formatLabel(key)}>
                   <Chip
                      label={
-                        dayjs.isDayjs(value)
-                           ? (value as Dayjs).format("MM/DD/YYYY")
+                        Array.isArray(value) && value[0] && value[1]
+                           ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
+                                value[1]
+                             ).format("YYYY-MM-DD")}`
                            : String(value)
                      }
                      size="small"
@@ -222,25 +251,20 @@ const Filter: React.FC<FilterProps> = ({
                            ...filterData,
                            orderData: {
                               ...filterData.orderData,
-                              [key]: key.includes("at") ? undefined : "",
+                              [key]: Array.isArray(value) ? undefined : "",
                            },
                         })
                      }
-                     sx={{
-                        borderRadius: 0.5,
-                        fontWeight: 700,
-                        fontSize: "0.75rem",
-                        bgcolor: alpha(theme.palette.grey[300], 0.1),
-                        color: theme.palette.grey[300],
-                     }}
+                     sx={chipStyle(theme)}
                   />
-               </Stack>
+               </FilterChipWrapper>
             ))}
 
+            {/* ================= CLEAR ALL BUTTON ================ */}
             {(filterData.searchText ||
+               filterData.productStock ||
                filterData.userRole ||
-               activeFilters.length > 0 ||
-               filterData.productStock) && (
+               activeOrderFilters.length > 0) && (
                <Button
                   variant="text"
                   color="error"
@@ -269,3 +293,45 @@ const Filter: React.FC<FilterProps> = ({
 };
 
 export default Filter;
+
+// ======================================================================
+// SMALL UTILITY COMPONENTS
+// ======================================================================
+
+const FilterChipWrapper = ({
+   title,
+   children,
+}: {
+   title: string;
+   children: React.ReactNode;
+}) => (
+   <Stack
+      spacing={1}
+      direction="row"
+      alignItems="center"
+      border={1}
+      borderColor="divider"
+      borderRadius={0.5}
+      p={1}
+      my={1}
+      sx={{ borderStyle: "dashed" }}
+   >
+      <Typography variant="subtitle2">{title.toUpperCase()}: </Typography>
+      {children}
+   </Stack>
+);
+
+const chipStyle = (theme: any) => ({
+   borderRadius: 0.5,
+   fontWeight: 700,
+   fontSize: "0.75rem",
+   bgcolor: alpha(theme.palette.grey[300], 0.1),
+   color: theme.palette.grey[300],
+});
+
+// Convert snake_case → Normal Label
+const formatLabel = (str: string) =>
+   str
+      .split("_")
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(" ");

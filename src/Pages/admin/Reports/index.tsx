@@ -5,13 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect } from "react";
 import Sales from "./Sales";
 import Courier from "./Courier";
+import Customer from "./Customer";
 
 const tabs = [
    "All",
    "Sales",
    "Courier",
-   "Purchase",
-   "Inventory",
    "Customers",
    "Expenses",
    "Suppliers",
@@ -64,6 +63,7 @@ const Report = () => {
                sx={{
                   backgroundColor: theme.palette.background.paper,
                   borderRadius: 1,
+                  width: "100%",
                   "& .MuiTabs-scroller": {
                      scrollbarWidth: "none!important",
                   },
@@ -98,6 +98,7 @@ const Report = () => {
                         marginRight: theme.spacing(1),
                         color: theme.palette.text.secondary,
                         minHeight: 50,
+                        width: "11.7%",
                         "&.Mui-selected": {
                            color: theme.palette.common.white,
                            ...theme.applyStyles("light", {
@@ -108,7 +109,7 @@ const Report = () => {
                   />
                ))}
             </Tabs>
-            <Button
+            {/* <Button
                variant="contained"
                color="primary"
                startIcon={
@@ -119,7 +120,7 @@ const Report = () => {
                }
             >
                Filter
-            </Button>
+            </Button> */}
          </Stack>
 
          <Stack spacing={2}>
@@ -128,6 +129,8 @@ const Report = () => {
                <Sales />
             ) : tabs[val] === "Courier" ? (
                <Courier />
+            ) : tabs[val] === "Customers" ? (
+               <Customer />
             ) : (
                <div>{tabs[val]} Report Content</div>
             )}

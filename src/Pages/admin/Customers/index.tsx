@@ -3,8 +3,7 @@
 import { Stack, Typography } from "@mui/material";
 import CustomTable from "@src/components/Table";
 import React from "react";
-import { OrderItem } from "../Order";
-import User from "../Order/User";
+import Customer from "../../../components/CustomerInfo";
 import { orders } from "../Order/data";
 import { OrderType } from "../Order/type";
 
@@ -20,7 +19,7 @@ const cOrder = (orders as OrderType[]).map((o, i) => {
       ...o,
       id: o.customer.id,
       customer: (
-         <User
+         <Customer
             name={o.customer.name}
             email={o.customer.email}
             number={o.customer.phone}

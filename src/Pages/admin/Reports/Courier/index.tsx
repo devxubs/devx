@@ -153,19 +153,16 @@ const Courier = () => {
                   body={tableData.body}
                   filter={(data, onChange) => (
                      <DateRange
-                        value={[
-                           data.reportData?.start_date ?? null,
-                           data.reportData?.end_date ?? null,
-                        ]}
-                        onChange={(v: [Dayjs | null, Dayjs | null]) =>
+                        title="Filter by Courier Submitted Date"
+                        onChange={(v: [Date | null, Date | null]) => {
                            onChange({
                               ...data,
                               reportData: {
-                                 start_date: v[0] ?? undefined,
-                                 end_date: v[1] ?? undefined,
+                                 date: v,
+                                 report_type: "couriers",
                               },
-                           })
-                        }
+                           });
+                        }}
                      />
                   )}
                />

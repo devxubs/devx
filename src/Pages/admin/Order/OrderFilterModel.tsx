@@ -71,7 +71,6 @@ const OrderFilterModal = ({
                   <Typography variant="body2">Courier Submitted At</Typography>
                   <DateRange
                      size={isMobile ? "small" : "medium"}
-                     // size={inputSize}
                      value={filterValue.courier_submitted_at}
                      onChange={(v: any) =>
                         onChange?.({

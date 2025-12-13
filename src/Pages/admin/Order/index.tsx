@@ -13,7 +13,7 @@ import Icon from "@src/components/Icon";
 import CustomTable from "@src/components/Table";
 import React, { useState } from "react";
 import { orders } from "./data";
-import User from "./User";
+import User from "../../../components/CustomerInfo";
 import CreateAt from "./CreateAt";
 import { OrderType } from "./type";
 import NoteModal from "./NoteModal";

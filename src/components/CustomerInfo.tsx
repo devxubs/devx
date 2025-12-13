@@ -2,7 +2,7 @@ import { Stack, Avatar, Typography, Tooltip, Button } from "@mui/material";
 import Icon from "@src/components/Icon";
 import { useState } from "react";
 
-const User = ({
+const CustomerInfo = ({
    name,
    email,
    number,
@@ -69,4 +69,4 @@ const User = ({
    );
 };
 
-export default User;
+export default CustomerInfo;

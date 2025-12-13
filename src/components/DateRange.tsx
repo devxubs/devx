@@ -25,19 +25,21 @@ type Props = {
    onChange?: (value: [Date | null, Date | null]) => void;
    value?: [Date | null, Date | null];
    size?: "small" | "medium";
+   title?: string;
 };
 
 export default function DateRangePickerCustom({
    onChange,
    value,
-   size = "medium",
+   size,
+   title,
 }: Props) {
    const theme = useTheme();
 
    const [range, setRange] = React.useState<Range[]>([
       {
          startDate: new Date(),
-         endDate: addDays(new Date(), 7),
+         endDate: addDays(new Date(), 1),
          key: "selection",
       },
    ]);
@@ -55,11 +57,6 @@ export default function DateRangePickerCustom({
 
       setRange([newRange]);
       onChange?.([newRange.startDate || null, newRange.endDate || null]);
-
-      // Automatically close popover when both dates are selected
-      // if (newRange.startDate && newRange.endDate) {
-      //    setTimeout(() => setAnchorEl(null), 150);
-      // }
    };
 
    const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -140,9 +137,10 @@ export default function DateRangePickerCustom({
          <TextField
             size={size}
             variant="outlined"
-            label="Select date range"
+            label={title || "Select date range"}
             value={start && end ? `${start} - ${end}` : ""}
             onClick={handleOpen}
+            fullWidth
             InputProps={{
                readOnly: true,
                endAdornment: (
@@ -152,7 +150,6 @@ export default function DateRangePickerCustom({
                ),
             }}
             sx={{
-               width: size === "small" ? 200 : 300,
                cursor: "pointer",
             }}
          />
@@ -173,7 +170,6 @@ export default function DateRangePickerCustom({
                      },
                   "& .rdrDefinedRangesWrapper": {
                      borderColor: theme.palette.divider + "!important",
-                     border: "0px!important",
                      height: "100%!important",
                   },
                   "& .rdrStaticRange": {
@@ -186,7 +182,7 @@ export default function DateRangePickerCustom({
                      color: theme.palette.primary.main + "!important",
                   },
                   "& .rdrStaticRangeLabel": {
-                     backgroundColor: "transparent!important",
+                     backgroundColor: "transparent !important",
                   },
                   "& .rdrStaticRangeLabel:hover": {
                      backgroundColor:
@@ -310,6 +306,37 @@ export default function DateRangePickerCustom({
                         setCalendarKey((prev) => prev + 1);
                      }}
                   />
+               </Stack>
+               <Stack
+                  spacing={1}
+                  direction={"row"}
+                  alignItems={"center"}
+                  justifyContent={"flex-end"}
+                  sx={{ p: 1, borderTop: `1px solid ${theme.palette.divider}` }}
+               >
+                  <Button
+                     size="small"
+                     color="primary"
+                     onClick={() => {
+                        setRange([
+                           {
+                              startDate: new Date(),
+                              endDate: addDays(new Date(), 1),
+                              key: "selection",
+                           },
+                        ]);
+                        onChange?.([new Date(), addDays(new Date(), 7)]);
+                     }}
+                  >
+                     Reset
+                  </Button>
+                  <Button
+                     size="small"
+                     variant="contained"
+                     onClick={() => setAnchorEl(null)}
+                  >
+                     Apply
+                  </Button>
                </Stack>
             </Box>
          </CustomPopover>
