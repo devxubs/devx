@@ -6,6 +6,7 @@ import React, { useEffect } from "react";
 import Sales from "./Sales";
 import Courier from "./Courier";
 import Customer from "./Customer";
+import Expenses from "./Expenses";
 
 const tabs = [
    "All",
@@ -131,6 +132,8 @@ const Report = () => {
                <Courier />
             ) : tabs[val] === "Customers" ? (
                <Customer />
+            ) : tabs[val] === "Expenses" ? (
+               <Expenses />
             ) : (
                <div>{tabs[val]} Report Content</div>
             )}

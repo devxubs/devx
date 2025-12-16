@@ -114,6 +114,7 @@ const Customer = () => {
       head: [
          "ID",
          "Customer",
+         "Last Order At",
          "Total Orders",
          "Completed Orders",
          "Failed Orders",
@@ -125,6 +126,7 @@ const Customer = () => {
          customer: (
             <CustomerInfo name={item.customerName} number={item.phone} />
          ),
+         last_order_at: item.lastOrderAt,
          total_orders: item.totalOrders,
          completed_orders: item.completedOrders,
          failed_orders: item.failedOrders,

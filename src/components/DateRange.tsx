@@ -38,8 +38,8 @@ export default function DateRangePickerCustom({
 
    const [range, setRange] = React.useState<Range[]>([
       {
-         startDate: new Date(),
-         endDate: addDays(new Date(), 1),
+         startDate: value?.[0] ?? new Date(),
+         endDate: value?.[1] ?? new Date(),
          key: "selection",
       },
    ]);
@@ -54,7 +54,6 @@ export default function DateRangePickerCustom({
 
    const handleChange = (item: any) => {
       const newRange = item.selection;
-
       setRange([newRange]);
       onChange?.([newRange.startDate || null, newRange.endDate || null]);
    };
@@ -79,6 +78,34 @@ export default function DateRangePickerCustom({
       { length: 16 },
       (_, i) => new Date().getFullYear() - 15 + i
    );
+
+   useEffect(() => {
+      if (!value) {
+         setRange([
+            { startDate: new Date(), endDate: new Date(), key: "selection" },
+         ]);
+         setCurrentMonth(new Date());
+         setCalendarKey((prev) => prev + 1);
+      }
+   }, [value]);
+
+   // 🔥 USE value PROP (parent → internal sync)
+   useEffect(() => {
+      if (!value) return;
+
+      setRange([
+         {
+            startDate: value[0] ?? undefined,
+            endDate: value[1] ?? undefined,
+            key: "selection",
+         },
+      ]);
+
+      if (value[0]) {
+         setCurrentMonth(value[0]);
+         setCalendarKey((prev) => prev + 1);
+      }
+   }, [value]);
 
    useEffect(() => {
       // 1. Do your DOM queries or calculations
