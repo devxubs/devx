@@ -2,11 +2,6 @@
 import { Grid, Stack } from "@mui/material";
 import React from "react";
 import AnalyticsCard from "./AnalyticsCard";
-import CustomTable from "@src/components/Table";
-import Balance from "../../Dashboard/Balance";
-import SalesByGender from "../../Dashboard/SalesByGender";
-import SalesOverview from "../../Dashboard/SalesOverview";
-import YearlySalesChart from "../../Dashboard/YearlySalesChart";
 
 const analyticsItem = [
    {

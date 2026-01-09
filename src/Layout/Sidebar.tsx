@@ -121,12 +121,6 @@ const items = [
    },
    {
       headingId: "account",
-      icon: "solar:shield-user-bold-duotone",
-      label: "Admin",
-      url: "/admin/admin",
-   },
-   {
-      headingId: "account",
       icon: "solar:wallet-money-bold-duotone",
       label: "Billing",
       url: "/admin/billing",

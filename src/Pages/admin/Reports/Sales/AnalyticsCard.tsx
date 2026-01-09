@@ -3,7 +3,6 @@
 import React from "react";
 import { Stack, Typography, Box, useTheme } from "@mui/material";
 import dynamic from "next/dynamic";
-import useGlobalState from "@src/handler/globalState";
 import moment from "moment";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
@@ -23,7 +22,6 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    isPositive,
    data,
 }) => {
-   const colorState = useGlobalState.get("color");
    const theme = useTheme();
 
    // ✅ Tooltip style

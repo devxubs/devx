@@ -7,6 +7,7 @@ import Sales from "./Sales";
 import Courier from "./Courier";
 import Customer from "./Customer";
 import Expenses from "./Expenses";
+import Purchases from "./Purchases";
 
 const tabs = [
    "All",
@@ -14,6 +15,7 @@ const tabs = [
    "Courier",
    "Customers",
    "Expenses",
+   "Purchases",
    "Suppliers",
    "Employees",
    "Products",
@@ -74,8 +76,6 @@ const Report = () => {
                      backgroundColor: "transparent",
                   },
                   "& .MuiTabs-indicatorSpan": {
-                     maxWidth: 40,
-                     width: "100%",
                      height: 4,
                      backgroundColor: theme.palette.common.white,
                      ...theme.applyStyles("light", {
@@ -134,6 +134,8 @@ const Report = () => {
                <Customer />
             ) : tabs[val] === "Expenses" ? (
                <Expenses />
+            ) : tabs[val] === "Purchases" ? (
+               <Purchases />
             ) : (
                <div>{tabs[val]} Report Content</div>
             )}

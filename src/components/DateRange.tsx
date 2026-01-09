@@ -26,6 +26,7 @@ type Props = {
    value?: [Date | null, Date | null];
    size?: "small" | "medium";
    title?: string;
+   type?: "single" | "range" | "month-year";
 };
 
 export default function DateRangePickerCustom({
@@ -33,6 +34,7 @@ export default function DateRangePickerCustom({
    value,
    size,
    title,
+   type = "range",
 }: Props) {
    const theme = useTheme();
 
@@ -52,45 +54,26 @@ export default function DateRangePickerCustom({
    const [currentMonth, setCurrentMonth] = React.useState(new Date());
    const [calendarKey, setCalendarKey] = React.useState(0);
 
-   const handleChange = (item: any) => {
-      const newRange = item.selection;
-      setRange([newRange]);
-      onChange?.([newRange.startDate || null, newRange.endDate || null]);
-   };
-
-   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
-      setAnchorEl(event.currentTarget);
-   };
-   const handleClose = () => setAnchorEl(null);
-
-   const start = range[0]?.startDate
-      ? format(range[0].startDate!, "dd MMM yyyy")
-      : "";
-   const end = range[0]?.endDate
-      ? format(range[0].endDate!, "dd MMM yyyy")
-      : "";
-
-   // 🔢 Month & Year lists
-   const months = Array.from({ length: 12 }, (_, i) =>
-      new Date(0, i).toLocaleString("default", { month: "long" })
-   );
-   const years = Array.from(
-      { length: 16 },
-      (_, i) => new Date().getFullYear() - 15 + i
+   // Lists
+   const months = React.useMemo(
+      () =>
+         Array.from({ length: 12 }, (_, i) =>
+            new Date(0, i).toLocaleString("default", { month: "long" })
+         ),
+      []
    );
 
-   useEffect(() => {
-      if (!value) {
-         setRange([
-            { startDate: new Date(), endDate: new Date(), key: "selection" },
-         ]);
-         setCurrentMonth(new Date());
-         setCalendarKey((prev) => prev + 1);
-      }
-   }, [value]);
+   const years = React.useMemo(
+      () =>
+         Array.from(
+            { length: 15 },
+            (_, i) => new Date().getFullYear() - 14 + i
+         ),
+      []
+   );
 
-   // 🔥 USE value PROP (parent → internal sync)
-   useEffect(() => {
+   // Sync value
+   React.useEffect(() => {
       if (!value) return;
 
       setRange([
@@ -101,73 +84,93 @@ export default function DateRangePickerCustom({
          },
       ]);
 
-      if (value[0]) {
-         setCurrentMonth(value[0]);
-         setCalendarKey((prev) => prev + 1);
-      }
+      value[0] && (setCurrentMonth(value[0]), setCalendarKey((k) => k + 1));
    }, [value]);
 
-   useEffect(() => {
-      // 1. Do your DOM queries or calculations
-      const shown = document.querySelector(".rdrMonths .rdrMonthName");
-      if (!shown) return;
+   // Display value
+   const displayValue = React.useMemo(() => {
+      const s = range[0]?.startDate;
+      const e = range[0]?.endDate;
+      if (!s) return "";
 
-      const txt = shown.textContent;
-      if (!txt) return;
+      if (type === "single") return format(s, "dd MMM yyyy");
+      if (type === "month-year") return format(s, "MMMM yyyy");
 
-      const [monthName, year] = txt.split(" ");
+      return e
+         ? `${format(s, "dd MMM yyyy")} - ${format(e, "dd MMM yyyy")}`
+         : "";
+   }, [range, type]);
 
-      const monthIndex = months.findIndex(
-         (m) => m.toLowerCase() === monthName.toLowerCase()
-      );
+   // Calendar change
+   const handleChange = (item: any) => {
+      const sel = item.selection;
 
-      if (monthIndex < 0) return;
-
-      const newDate = new Date(currentMonth);
-      newDate.setMonth(monthIndex);
-      newDate.setFullYear(Number(year));
-
-      // 2. Prevent infinite loop by checking if state is already correct
-      if (
-         currentMonth.getMonth() === newDate.getMonth() &&
-         currentMonth.getFullYear() === newDate.getFullYear()
-      ) {
-         return; // IMPORTANT: prevents infinite loop
+      if (type === "single") {
+         const d = sel.startDate || null;
+         setRange([
+            {
+               startDate: d ?? undefined,
+               endDate: d ?? undefined,
+               key: "selection",
+            },
+         ]);
+         return onChange?.([d, d]);
       }
 
-      // 3. Now we update state safely
-      setCurrentMonth(newDate);
-   }, [calendarKey]); // 🔥 Only runs when calendarKey changes
+      setRange([sel]);
+      onChange?.([sel.startDate || null, sel.endDate || null]);
+   };
 
-   // 🗓️ Handlers
-   const handleMonthChange = (monthIndex: number) => {
-      const updated = new Date(currentMonth);
-      updated.setMonth(monthIndex);
-      setCurrentMonth(updated);
+   // Month only
+   const handleMonthOnly = (m: number) => {
+      setCurrentMonth((prev) => {
+         const d = new Date(prev);
+         d.setMonth(m);
+         return d;
+      });
 
-      setCalendarKey((prev) => prev + 1);
+      const y =
+         range[0]?.startDate?.getFullYear() ?? currentMonth.getFullYear();
+
+      const start = new Date(y, m, 1);
+      const end = new Date(y, m + 1, 0);
+
+      setRange([{ startDate: start, endDate: end, key: "selection" }]);
+      onChange?.([start, end]);
+
       setMonthAnchor(null);
    };
 
-   const handleYearChange = (year: number) => {
-      const updated = new Date(currentMonth);
-      updated.setFullYear(year);
-      setCurrentMonth(updated);
+   // Year only
+   const handleYearOnly = (y: number) => {
+      setCurrentMonth(new Date(y, 0, 1));
 
-      setCalendarKey((prev) => prev + 1);
+      const start = new Date(y, 0, 1);
+      const end = new Date(y, 11, 31);
+
+      setRange([{ startDate: start, endDate: end, key: "selection" }]);
+      onChange?.([start, end]);
+
       setYearAnchor(null);
+   };
+
+   // Reset
+   const handleReset = () => {
+      const t = new Date();
+      const next = type === "range" ? addDays(t, 7) : t;
+
+      setRange([{ startDate: t, endDate: next, key: "selection" }]);
+      onChange?.([t, next]);
    };
 
    return (
       <Stack direction="column" spacing={1} alignItems="flex-start">
-         {/* TextField trigger */}
+         {/* INPUT (UNCHANGED DESIGN) */}
          <TextField
             size={size}
-            variant="outlined"
-            label={title || "Select date range"}
-            value={start && end ? `${start} - ${end}` : ""}
-            onClick={handleOpen}
-            fullWidth
+            label={title || "Select"}
+            value={displayValue}
+            onClick={(e) => setAnchorEl(e.currentTarget)}
             InputProps={{
                readOnly: true,
                endAdornment: (
@@ -176,13 +179,13 @@ export default function DateRangePickerCustom({
                   </InputAdornment>
                ),
             }}
-            sx={{
-               cursor: "pointer",
-            }}
          />
-
          {/* Popover */}
-         <CustomPopover anchorEl={anchorEl} onClose={handleClose} sx={{ p: 0 }}>
+         <CustomPopover
+            anchorEl={anchorEl}
+            onClose={() => setAnchorEl(null)}
+            sx={{ p: 0 }}
+         >
             <Box
                sx={{
                   borderRadius: 1,
@@ -265,96 +268,137 @@ export default function DateRangePickerCustom({
                      },
                }}
             >
-               {/* 🧭 Month & Year selector */}
+               {type !== "month-year" && (
+                  <Stack
+                     direction="row"
+                     justifyContent="space-between"
+                     px={1.5}
+                     py={1}
+                     borderBottom={`1px solid ${theme.palette.divider}`}
+                  >
+                     <Button
+                        size="small"
+                        onClick={(e) => setMonthAnchor(e.currentTarget)}
+                     >
+                        {months[currentMonth.getMonth()]}
+                     </Button>
+                     <Button
+                        size="small"
+                        onClick={(e) => setYearAnchor(e.currentTarget)}
+                     >
+                        {currentMonth.getFullYear()}
+                     </Button>
+                  </Stack>
+               )}
+
+               <Stack direction="row">
+                  {type === "range" && (
+                     <DefinedRange ranges={range} onChange={handleChange} />
+                  )}
+
+                  {(type === "single" || type === "range") && (
+                     <DateRange
+                        key={calendarKey}
+                        ranges={range}
+                        onChange={handleChange}
+                        moveRangeOnFirstSelection={type === "range"}
+                        dragSelectionEnabled={type === "range"}
+                        focusedRange={type === "single" ? [0, 0] : [0, 1]}
+                        showMonthAndYearPickers={false}
+                        months={1}
+                        showDateDisplay={false}
+                        shownDate={currentMonth}
+                        rangeColors={[theme.palette.primary.main]}
+                     />
+                  )}
+                  {type === "month-year" && (
+                     <Stack direction="column" p={2} spacing={2}>
+                        <Typography variant="h6">
+                           Select Month and Year
+                        </Typography>
+                        <Stack direction={"row"}>
+                           <Box
+                              sx={{
+                                 p: 1,
+                                 display: "grid",
+                                 gridTemplateColumns: "repeat(3, 1fr)",
+                                 gap: 1,
+                              }}
+                           >
+                              {months.map((m, i) => (
+                                 <Button
+                                    key={m}
+                                    size="small"
+                                    onClick={() => handleMonthOnly(i)}
+                                    color={
+                                       currentMonth.getMonth() === i
+                                          ? "primary"
+                                          : "inherit"
+                                    }
+                                    variant={
+                                       currentMonth.getMonth() === i
+                                          ? "contained"
+                                          : "text"
+                                    }
+                                    sx={{
+                                       fontWeight:
+                                          currentMonth.getMonth() === i
+                                             ? 600
+                                             : 400,
+                                    }}
+                                 >
+                                    {m}
+                                 </Button>
+                              ))}
+                           </Box>
+                           <Box
+                              sx={{
+                                 p: 1,
+                                 display: "grid",
+                                 gridTemplateColumns: "repeat(3, 1fr)",
+                                 gap: 1,
+                              }}
+                           >
+                              {years.map((y, i) => (
+                                 <Button
+                                    key={y}
+                                    size="small"
+                                    onClick={() => handleYearOnly(y)}
+                                    color={
+                                       currentMonth.getFullYear() === y
+                                          ? "primary"
+                                          : "inherit"
+                                    }
+                                    variant={
+                                       currentMonth.getFullYear() === y
+                                          ? "contained"
+                                          : "text"
+                                    }
+                                    sx={{
+                                       fontWeight:
+                                          currentMonth.getFullYear() === y
+                                             ? 600
+                                             : 400,
+                                    }}
+                                 >
+                                    {y}
+                                 </Button>
+                              ))}
+                           </Box>
+                        </Stack>
+                     </Stack>
+                  )}
+               </Stack>
+
+               {/* FOOTER */}
                <Stack
                   direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  sx={{
-                     px: 1.5,
-                     py: 1,
-                     borderBottom: `1px solid ${theme.palette.divider}`,
-                  }}
-               >
-                  {/* Month button */}
-                  <Button
-                     size="small"
-                     onClick={(e) => setMonthAnchor(e.currentTarget)}
-                  >
-                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {months[currentMonth.getMonth()]}
-                     </Typography>
-                     <Icon
-                        icon="solar:alt-arrow-down-bold-duotone"
-                        color="primary"
-                     />
-                  </Button>
-
-                  {/* Year button */}
-                  <Button
-                     size="small"
-                     onClick={(e) => setYearAnchor(e.currentTarget)}
-                  >
-                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {currentMonth.getFullYear()}
-                     </Typography>
-                     <Icon
-                        icon="solar:alt-arrow-down-bold-duotone"
-                        color="primary"
-                     />
-                  </Button>
-               </Stack>
-               <Stack
-                  direction={"row"}
-                  alignItems={"center"}
-                  sx={{
-                     backgroundColor:
-                        alpha(theme.palette.background.paper, 0.6) +
-                        "!important",
-                  }}
-               >
-                  <DefinedRange ranges={range} onChange={handleChange} />
-                  <DateRange
-                     key={calendarKey}
-                     ranges={range}
-                     onChange={handleChange}
-                     moveRangeOnFirstSelection={false}
-                     editableDateInputs
-                     showMonthAndYearPickers={false}
-                     direction="horizontal"
-                     rangeColors={[theme.palette.primary.main]}
-                     months={1}
-                     showDateDisplay={false}
-                     weekdayDisplayFormat="EEE"
-                     shownDate={currentMonth}
-                     onShownDateChange={(date) => {
-                        const updated = new Date(date);
-                        setCurrentMonth(updated);
-                        setCalendarKey((prev) => prev + 1);
-                     }}
-                  />
-               </Stack>
-               <Stack
+                  justifyContent="flex-end"
                   spacing={1}
-                  direction={"row"}
-                  alignItems={"center"}
-                  justifyContent={"flex-end"}
-                  sx={{ p: 1, borderTop: `1px solid ${theme.palette.divider}` }}
+                  p={1}
+                  borderTop={`1px solid ${theme.palette.divider}`}
                >
-                  <Button
-                     size="small"
-                     color="primary"
-                     onClick={() => {
-                        setRange([
-                           {
-                              startDate: new Date(),
-                              endDate: addDays(new Date(), 1),
-                              key: "selection",
-                           },
-                        ]);
-                        onChange?.([new Date(), addDays(new Date(), 7)]);
-                     }}
-                  >
+                  <Button size="small" onClick={handleReset}>
                      Reset
                   </Button>
                   <Button
@@ -368,61 +412,47 @@ export default function DateRangePickerCustom({
             </Box>
          </CustomPopover>
 
-         {/* Month popover */}
-         <CustomPopover
-            anchorEl={monthAnchor}
-            onClose={() => setMonthAnchor(null)}
-         >
-            <Box sx={{ minWidth: 150, p: 0.5 }}>
-               {months.map((month, idx) => (
+         {/* MONTH UI */}
+         <>
+            {/* MONTH POPOVER (for single / range only) */}
+            <CustomPopover
+               anchorEl={monthAnchor}
+               onClose={() => setMonthAnchor(null)}
+            >
+               {months.map((m, i) => (
                   <MenuItem
-                     key={month}
-                     onClick={() => handleMonthChange(idx)}
-                     sx={{
-                        borderRadius: 1,
-                        fontWeight: idx === currentMonth.getMonth() ? 600 : 400,
-                        bgcolor:
-                           idx === currentMonth.getMonth()
-                              ? alpha(theme.palette.primary.main, 0.1)
-                              : "transparent",
-                        "&:hover": {
-                           bgcolor: alpha(theme.palette.primary.main, 0.15),
-                        },
-                     }}
+                     key={m}
+                     onClick={() =>
+                        setCurrentMonth(
+                           new Date(currentMonth.getFullYear(), i, 1)
+                        )
+                     }
                   >
-                     {month}
+                     {m}
                   </MenuItem>
                ))}
-            </Box>
-         </CustomPopover>
+            </CustomPopover>
+         </>
 
-         {/* Year popover */}
+         {/* YEAR POPOVER (SAME DESIGN) */}
          <CustomPopover
             anchorEl={yearAnchor}
             onClose={() => setYearAnchor(null)}
          >
-            <Box sx={{ minWidth: 100, p: 0.5 }}>
-               {years.map((year) => (
-                  <MenuItem
-                     key={year}
-                     onClick={() => handleYearChange(year)}
-                     sx={{
-                        borderRadius: 1,
-                        fontWeight:
-                           year === currentMonth.getFullYear() ? 600 : 400,
-                        bgcolor:
-                           year === currentMonth.getFullYear()
-                              ? alpha(theme.palette.primary.main, 0.1)
-                              : "transparent",
-                        "&:hover": {
-                           bgcolor: alpha(theme.palette.primary.main, 0.15),
-                        },
-                     }}
-                  >
-                     {year}
-                  </MenuItem>
-               ))}
-            </Box>
+            {years.map((y) => (
+               <MenuItem
+                  key={y}
+                  onClick={() =>
+                     type === "month-year"
+                        ? handleYearOnly(y)
+                        : setCurrentMonth(
+                             new Date(y, currentMonth.getMonth(), 1)
+                          )
+                  }
+               >
+                  {y}
+               </MenuItem>
+            ))}
          </CustomPopover>
       </Stack>
    );
