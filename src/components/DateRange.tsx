@@ -146,7 +146,7 @@ export default function DateRangePickerCustom({
       setCurrentMonth(new Date(y, 0, 1));
 
       const start = new Date(y, 0, 1);
-      const end = new Date(y, 11, 31);
+      const end = new Date(y, 0, 31);
 
       setRange([{ startDate: start, endDate: end, key: "selection" }]);
       onChange?.([start, end]);
@@ -156,11 +156,17 @@ export default function DateRangePickerCustom({
 
    // Reset
    const handleReset = () => {
-      const t = new Date();
-      const next = type === "range" ? addDays(t, 7) : t;
+      const newD = new Date();
+      const start = new Date(newD.getFullYear(), 0, 1);
+      const end = new Date(newD.getFullYear(), 0, 31);
+      const next = type === "range" ? addDays(newD, 7) : end;
 
-      setRange([{ startDate: t, endDate: next, key: "selection" }]);
-      onChange?.([t, next]);
+      setCurrentMonth(new Date(newD.getFullYear(), 0, 1));
+
+      setRange([{ startDate: start, endDate: next, key: "selection" }]);
+      onChange?.([start, next]);
+
+      console.log(range);
    };
 
    return (
@@ -301,9 +307,9 @@ export default function DateRangePickerCustom({
                         key={calendarKey}
                         ranges={range}
                         onChange={handleChange}
-                        moveRangeOnFirstSelection={type === "range"}
-                        dragSelectionEnabled={type === "range"}
-                        focusedRange={type === "single" ? [0, 0] : [0, 1]}
+                        moveRangeOnFirstSelection={false}
+                        preventSnapRefocus
+                        dragSelectionEnabled={true}
                         showMonthAndYearPickers={false}
                         months={1}
                         showDateDisplay={false}
@@ -422,11 +428,12 @@ export default function DateRangePickerCustom({
                {months.map((m, i) => (
                   <MenuItem
                      key={m}
-                     onClick={() =>
+                     onClick={() => {
+                        handleMonthOnly(i);
                         setCurrentMonth(
                            new Date(currentMonth.getFullYear(), i, 1)
-                        )
-                     }
+                        );
+                     }}
                   >
                      {m}
                   </MenuItem>
@@ -442,13 +449,10 @@ export default function DateRangePickerCustom({
             {years.map((y) => (
                <MenuItem
                   key={y}
-                  onClick={() =>
-                     type === "month-year"
-                        ? handleYearOnly(y)
-                        : setCurrentMonth(
-                             new Date(y, currentMonth.getMonth(), 1)
-                          )
-                  }
+                  onClick={() => {
+                     handleYearOnly(y);
+                     setCurrentMonth(new Date(y, currentMonth.getMonth(), 1));
+                  }}
                >
                   {y}
                </MenuItem>

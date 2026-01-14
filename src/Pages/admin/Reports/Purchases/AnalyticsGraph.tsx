@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Stack, Typography, Box, useTheme } from "@mui/material";
 import dynamic from "next/dynamic";
 import moment from "moment";
 import DateRangePickerCustom from "@src/components/DateRange";
+import CustomCard from "@src/components/CustomCard";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
    ssr: false,
@@ -19,7 +20,7 @@ interface AnalyticsDataItem {
 
 type AnalyticsType = "category" | "day" | "week" | "month";
 
-interface AnalyticsCardProps {
+interface AnalyticsGraphProps {
    title: string;
    isPositive: boolean;
    data: AnalyticsDataItem[];
@@ -44,21 +45,34 @@ const groupInto4Weeks = (
    ];
 
    data.forEach((item) => {
-      if (!(item.x instanceof Date)) return;
+      const date = new Date(item.x);
+      if (isNaN(date.getTime())) return;
 
-      if (item.x.getFullYear() !== year || item.x.getMonth() !== m) return;
+      if (date.getFullYear() !== year || date.getMonth() !== m) return;
 
-      const d = item.x.getDate();
+      const d = date.getDate();
       const index = d <= 7 ? 0 : d <= 14 ? 1 : d <= 21 ? 2 : 3;
+
       weeks[index].y += item.y;
    });
 
    return weeks;
 };
 
+/* ---------------- GET LAST DAY OF CURRENT MONTH ---------------- */
+
+function getLastDayOfCurrentMonth() {
+   const today = new Date();
+   const currentYear = today.getFullYear();
+   const currentMonth = today.getMonth();
+   const firstDayOfNextMonth = new Date(currentYear, currentMonth + 1, 1);
+   firstDayOfNextMonth.setDate(0);
+   return firstDayOfNextMonth;
+}
+
 /* ---------------- COMPONENT ---------------- */
 
-const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
+const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
    title,
    isPositive,
    data,
@@ -68,28 +82,64 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    const theme = useTheme();
 
    /* -------- DATE RANGE -------- */
+   const startOfToday = new Date();
+   startOfToday.setHours(0, 0, 0, 0);
+
+   const endOfToday = new Date();
+   endOfToday.setHours(23, 59, 59, 999);
+
    const [dateRange, setDateRange] = React.useState<[Date | null, Date | null]>(
-      [null, null]
+      [startOfToday, endOfToday]
    );
+
+   useEffect(() => {
+      const now = new Date();
+
+      if (type === "category") {
+         setDateRange([null, null]);
+      }
+      if (type === "week") {
+         setDateRange([null, null]);
+      }
+      if (type === "month") {
+         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+         setDateRange([firstDay, lastDay]);
+      }
+      if (type === "day") {
+         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+         const lastDay = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            getLastDayOfCurrentMonth().getDate()
+         );
+
+         setDateRange([firstDay, lastDay]);
+      }
+   }, []);
 
    /* -------- FILTERED DATA -------- */
    const filteredData = React.useMemo(() => {
       if (type === "category") return data;
 
+      const [start, end] = dateRange;
+
+      // WEEK VIEW (4 weeks in selected month)
       if (type === "week") {
          const baseMonth =
-            dateRange[0] ??
-            (data[0]?.x instanceof Date ? data[0].x : new Date());
+            start ?? new Date(data.find((d) => d.x)?.x ?? new Date());
 
          return groupInto4Weeks(data, baseMonth);
       }
 
-      const [start, end] = dateRange;
+      // DAY / MONTH FILTER
       if (!start || !end) return data;
 
       return data.filter((item) => {
-         if (!(item.x instanceof Date)) return false;
-         return item.x >= start && item.x <= end;
+         const date = new Date(item.x);
+         if (isNaN(date.getTime())) return false;
+
+         return date >= start && date <= end;
       });
    }, [data, dateRange, type]);
 
@@ -116,7 +166,6 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    const chartOptions: any = {
       chart: {
          type: "area",
-         height: 150,
          toolbar: { show: false },
          zoom: { enabled: false },
          animations: { enabled: true, easing: "easeinout", speed: 700 },
@@ -124,7 +173,7 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
       dataLabels: { enabled: false },
       stroke: {
          curve: "smooth",
-         width: 2.5,
+         width: 2,
          colors: [
             isPositive ? theme.palette.success.main : theme.palette.error.main,
          ],
@@ -172,10 +221,12 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
          shared: true,
          intersect: false,
          theme: theme.palette.mode,
-         x: { formatter: tooltipXFormatter },
          y: {
-            formatter: (val: number) => `${val.toLocaleString()}৳`,
-            title: { formatter: () => "Amount:" },
+            formatter: (val: number) =>
+               `${val.toLocaleString()}${type !== "category" ? "৳" : ""}`,
+            title: {
+               formatter: () => (type !== "category" ? "Amount: " : "Value: "),
+            },
          },
       },
       legend: { show: false },
@@ -183,20 +234,16 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
 
    /* -------- RENDER -------- */
    return (
-      <Stack
-         sx={{
-            bgcolor: "background.paper",
-            p: 3,
-            px: 1,
-            overflow: "hidden",
-            boxShadow: 20,
-            borderRadius: 1.5,
-         }}
-      >
+      <CustomCard sx={{ p: 1, pb: 2 }}>
          <Stack spacing={1}>
             {/* HEADER */}
-            <Stack direction="row" px={2}>
-               <Stack flex={0.6}>
+            <Stack
+               direction="row"
+               px={2}
+               justifyContent="space-between"
+               // alignItems="center"
+            >
+               <Stack>
                   <Typography variant="h5" fontWeight={700}>
                      {title}
                   </Typography>
@@ -210,12 +257,21 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                   </Typography>
                </Stack>
 
-               <Stack flex={0.4}>
+               <Stack>
                   {filter && type !== "category" && (
                      <DateRangePickerCustom
                         size="small"
-                        type="month-year"
+                        type={
+                           type === "week"
+                              ? "range"
+                              : type === "day"
+                              ? "range"
+                              : type === "month"
+                              ? "month-year"
+                              : "range"
+                        }
                         title="Select Month"
+                        value={dateRange}
                         onChange={setDateRange}
                      />
                   )}
@@ -223,17 +279,17 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
             </Stack>
 
             {/* CHART */}
-            <Box sx={{ height: 150, width: "100%" }}>
+            <Box sx={{ height: 280, width: "100%" }}>
                <ReactApexChart
                   type="area"
-                  height={150}
+                  height={280}
                   series={[{ name: "Value", data: filteredData }]}
                   options={chartOptions}
                />
             </Box>
          </Stack>
-      </Stack>
+      </CustomCard>
    );
 };
 
-export default AnalyticsCard;
+export default AnalyticsGraph;

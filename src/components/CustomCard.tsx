@@ -1,13 +1,13 @@
-import { Card, Stack, Typography } from "@mui/material";
+import { Card, Stack, SxProps, Typography } from "@mui/material";
 import React, { ReactNode } from "react";
 
-const CustomCard = ({
-   children,
-   title,
-}: {
+interface CustomCardProps {
    children: ReactNode;
    title?: string;
-}) => {
+   sx?: SxProps;
+}
+
+const CustomCard = ({ children, title, sx }: CustomCardProps) => {
    return (
       <Stack
          sx={{
@@ -16,6 +16,7 @@ const CustomCard = ({
             height: "100%",
             borderRadius: 1.5,
             bgcolor: "background.paper",
+            ...sx,
          }}
       >
          <Typography variant="subtitle1" mb={2}>

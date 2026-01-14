@@ -116,7 +116,7 @@ const WeeklySalesChart = () => {
          </Stack>
 
          {/* Chart */}
-         <Box height={260}>
+         <Box>
             <ReactApexChart
                options={options}
                series={series}
