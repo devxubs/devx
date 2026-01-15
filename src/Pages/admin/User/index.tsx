@@ -10,7 +10,7 @@ import Modal from "./Modal";
 import AlertDialog from "@src/components/AlertDialog";
 import CustomAutocomplete from "@src/components/Autocomplete";
 
-const UserProfile = ({
+export const UserProfile = ({
    name,
    email,
    url,

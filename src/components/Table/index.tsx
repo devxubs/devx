@@ -1,6 +1,6 @@
 "use client";
 
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useEffect, useState } from "react";
 import {
    alpha,
    Checkbox,
@@ -53,6 +53,88 @@ export type TableProps = {
    ) => React.ReactNode;
 };
 
+const inDateRange = (
+   date?: Date | string,
+   range?: [Date | null, Date | null]
+) => {
+   if (!date || !range) return true;
+
+   const [start, end] = range;
+   if (!start || !end) return true;
+
+   const d = new Date(date);
+   d.setHours(0, 0, 0, 0);
+
+   const s = new Date(start);
+   s.setHours(0, 0, 0, 0);
+
+   const e = new Date(end);
+   e.setHours(23, 59, 59, 999);
+
+   return d >= s && d <= e;
+};
+const isEmpty = (value: any) => {
+   if (value == null) return true;
+   if (typeof value === "string") return value.trim() === "";
+   if (Array.isArray(value)) return value.every((v) => v == null || v === "");
+   return false;
+};
+
+const includesText = (value: any, search?: string) =>
+   !search ||
+   String(value ?? "")
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+const sameDay = (a?: Date | string, b?: Date | string) => {
+   if (!a || !b) return true;
+   const d1 = new Date(a);
+   const d2 = new Date(b);
+   return d1.setHours(0, 0, 0, 0) === d2.setHours(0, 0, 0, 0);
+};
+const filterRules = {
+   /* ---------- ROOT ---------- */
+   userRole: (row: any, value: string) => row.role === value,
+
+   productStock: (row: any, value: string) =>
+      row.stock_value?.toLowerCase() === value.toLowerCase(),
+
+   searchText: (row: any, value: string) =>
+      Object.values(row).some((v) => includesText(v, value)),
+
+   /* ---------- ORDER ---------- */
+   employee: (row: any, value: string) => row.employee?.name === value,
+
+   status: (row: any, value: string) => row.status === value,
+
+   order_source: (row: any, value: string) => row.orderSource === value,
+
+   products: (row: any, value: string) =>
+      row.products?.some(
+         (p: any) => includesText(p.name, value) || includesText(p.code, value)
+      ),
+
+   district: (row: any, value: string) =>
+      includesText(row.customer?.address, value),
+
+   print_status: (row: any, value: string) => row.print_status === value,
+
+   order_created_at: (row: any, value) =>
+      inDateRange(row.timestamps?.orderPlaced ?? row.createdAt, value),
+
+   courier_submitted_at: (row: any, value) =>
+      inDateRange(row.timestamps?.deliveryTime, value),
+
+   /* ---------- REPORT (✅ REQUIRED) ---------- */
+   report_date: (row: any, value: [Date | null, Date | null]) =>
+      inDateRange(row.createdAt, value),
+
+   report_product: (row: any, value: string) =>
+      row.products?.some(
+         (p: any) => includesText(p.name, value) || includesText(p.code, value)
+      ),
+} satisfies Record<string, (row: any, value: any) => boolean>;
+
 export default function CustomTable({
    type,
    head,
@@ -79,112 +161,49 @@ export default function CustomTable({
          district: "",
          print_status: "",
       },
+      reportData: {
+         date: undefined,
+         product: null,
+         report_type: "default",
+      },
    });
 
+   const normalizedReportData = filterData.reportData
+      ? {
+           report_date: filterData.reportData.date,
+           report_product: filterData.reportData.product,
+        }
+      : {};
+
    const filterRow = React.useMemo(() => {
-      return body.filter((row: any) => {
-         const { userRole, productStock, orderData } = filterData;
+      const { userRole, productStock, searchText, orderData } = filterData;
 
-         // --- Search text filter
-         if (
-            filterData.searchText &&
-            !Object.values(row).some((val) =>
-               String(val)
-                  .toLowerCase()
-                  .includes(filterData.searchText.toLowerCase())
-            )
-         ) {
-            return false;
-         }
+      const activeFilters = {
+         userRole,
+         productStock,
+         searchText,
+         ...orderData,
+         ...normalizedReportData,
+      };
 
-         // --- User role
-         if (userRole && userRole !== row.role) return false;
-
-         // --- Product stock
-         if (
-            productStock &&
-            productStock.toLowerCase() !== row.stock_value?.toLowerCase()
-         )
-            return false;
-
-         // --- Status filter
-         if (orderData.status && row.status !== orderData.status) return false;
-
-         // --- Employee filter (maps to customer name)
-         if (orderData.employee && row.employee?.name !== orderData.employee) {
-            return false;
-         }
-
-         // --- Order Source filter
-         if (
-            orderData.order_source &&
-            row.orderSource !== orderData.order_source
-         ) {
-            return false;
-         }
-
-         // --- Product filter (by name or code)
-         if (
-            orderData.products &&
-            !row.products?.some(
-               (prod: any) =>
-                  prod.name
-                     ?.toLowerCase()
-                     .includes(orderData.products?.toLowerCase()) ||
-                  prod.code
-                     ?.toLowerCase()
-                     .includes(orderData.products?.toLowerCase())
-            )
-         ) {
-            return false;
-         }
-
-         // --- District filter (maps to address)
-         if (
-            orderData.district &&
-            !row.customer?.address
-               ?.toLowerCase()
-               .includes(orderData.district.toLowerCase())
-         ) {
-            return false;
-         }
-
-         // --- Print status filter (maps to note here)
-         if (
-            orderData.print_status &&
-            row.print_status !== orderData.print_status
-         ) {
-            return false;
-         }
-
-         // --- Order created date filter
-         if (orderData.order_created_at) {
-            const orderDate = new Date(
-               row.timestamps?.orderPlaced ?? row.createdAt
+      return body.filter((row: any) =>
+         Object.entries(activeFilters).every(([key, value]) => {
+            if (isEmpty(value)) return true;
+            return (
+               filterRules[key as keyof typeof filterRules]?.(row, value) ??
+               true
             );
-            const filterDate = new Date(orderData.order_created_at as any);
+         })
+      );
+   }, [body, filterData, normalizedReportData]);
 
-            // Compare only the date part (ignore time)
-            const orderDay = orderDate.setHours(0, 0, 0, 0);
-            const filterDay = filterDate.setHours(0, 0, 0, 0);
-
-            if (orderDay !== filterDay) return false;
-         }
-
-         // --- Courier submitted date filter
-         if (orderData.courier_submitted_at) {
-            const courierDate = new Date(row.timestamps?.deliveryTime ?? 0);
-            const filterDate = new Date(orderData.courier_submitted_at as any);
-
-            const courierDay = courierDate.setHours(0, 0, 0, 0);
-            const filterDay = filterDate.setHours(0, 0, 0, 0);
-
-            if (courierDay !== filterDay) return false;
-         }
-
-         return true;
-      });
-   }, [filterData, body]);
+   useEffect(() => {
+      setCheckedRows((prev) =>
+         prev.length === filterRow.length
+            ? prev
+            : Array(filterRow.length).fill(false)
+      );
+   }, [filterRow.length]);
 
    const allChecked = checkedRows.length > 0 && checkedRows.every(Boolean);
    const isIndeterminate =

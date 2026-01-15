@@ -8,6 +8,7 @@ import Courier from "./Courier";
 import Customer from "./Customer";
 import Expenses from "./Expenses";
 import Purchases from "./Purchases";
+import Employees from "./Employees";
 
 const tabs = [
    "All",
@@ -16,7 +17,7 @@ const tabs = [
    "Customers",
    "Expenses",
    "Purchases",
-   "Suppliers",
+   // "Suppliers",
    "Employees",
    "Products",
 ];
@@ -136,6 +137,8 @@ const Report = () => {
                <Expenses />
             ) : tabs[val] === "Purchases" ? (
                <Purchases />
+            ) : tabs[val] === "Employees" ? (
+               <Employees />
             ) : (
                <div>{tabs[val]} Report Content</div>
             )}
