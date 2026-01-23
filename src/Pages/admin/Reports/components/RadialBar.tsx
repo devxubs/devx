@@ -20,18 +20,10 @@ interface Data {
 interface RadialBarProps {
    title?: string;
    value?: string;
-   percentage?: string;
-   isPositive?: boolean;
    data: Data[];
 }
 
-const RadialBar = ({
-   data,
-   isPositive,
-   percentage,
-   title,
-   value,
-}: RadialBarProps) => {
+const RadialBar = ({ data, title, value }: RadialBarProps) => {
    const theme = useTheme();
 
    const options: ApexOptions = {

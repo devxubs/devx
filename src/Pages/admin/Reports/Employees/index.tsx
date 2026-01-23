@@ -1,61 +1,123 @@
-import { Stack, Grid } from "@mui/material";
+import { Stack, Grid, Avatar, Typography } from "@mui/material";
 import React from "react";
 import AnalyticsCard from "../components/AnalyticsCard";
-import AnalyticsGraph from "../Purchases/AnalyticsGraph";
+import AnalyticsGraph from "../components/AnalyticsGraph";
 import RadialBar from "../components/RadialBar";
-import CustomTable from "@src/components/Table";
+import CustomTable, { TableProps } from "@src/components/Table";
 import { UserProfile } from "../../User";
+import { SellerProFile } from "../../Dashboard";
+import RankFilter from "./RankFilter";
+import Activity from "./ActivityFilter";
 
-const user = [
+const rankData = [
    {
-      employee_id: "E001",
       name: "John Doe",
-      role: "Sales Manager",
-      phone_number: "01325584606",
-      email: "john.doe@example.com",
-      hire_date: "2020-03-15",
-      salary: "$75,000",
+      calls: 1500,
+      conforms: 1200,
+      cancels: 300,
+      rank: "Top 1",
    },
    {
-      employee_id: "E002",
       name: "Jane Smith",
-      role: "HR Specialist",
-      phone_number: "01818388585",
-      email: "jane.smith@example.com",
-      hire_date: "2019-07-22",
-      salary: "$65,000",
+      calls: 1300,
+      conforms: 1000,
+      cancels: 300,
+      rank: "Top 2",
    },
    {
-      employee_id: "E003",
       name: "Mike Johnson",
-      role: "Software Developer",
-      phone_number: "01711223344",
-      email: "mike.johnson@example.com",
-      hire_date: "2021-11-05",
-      salary: "$85,000",
+      calls: 1100,
+      conforms: 900,
+      cancels: 200,
+      rank: "Top 3",
    },
 ];
 
-const Employees = () => {
-   const employeeTableData = {
-      head: [
-         "Employee ID",
-         "Name",
-         "Role",
-         "Phone Number",
-         "Hire Date",
-         "Salary",
-      ],
-      body: user.map((u) => ({
-         employee_id: u.employee_id,
-         name: <UserProfile name={u.name} email={u.email} />,
-         role: u.role,
-         hire_date: u.hire_date,
-         phone_number: u.phone_number,
-         salary: u.salary,
-      })),
-   };
+const rankSalesman = {
+   head: ["Seller", "Call", "Conform", "Cancel", "Rank", "@action"],
+   body: rankData.map((data, index) => ({
+      seller: (
+         <SellerProFile
+            name={data.name}
+            url={
+               "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-" +
+               (index + 1) +
+               ".webp"
+            }
+         />
+      ),
+      name: data.name,
+      call: data.calls,
+      conform: data.conforms,
+      cancel: data.cancels,
+      rank: data.rank,
+      chip: "rank",
+      color: index === 0 ? "primary" : index === 1 ? "secondary" : "success",
+   })),
+};
 
+const employeeActivity = {
+   head: [
+      "Employee",
+      "Date",
+      "Active Time",
+      "Inactive Time",
+      "Activity",
+      "Status",
+   ],
+   body: [
+      {
+         employee: (
+            <SellerProFile
+               name="John Doe"
+               url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-1.webp"
+            />
+         ),
+         name: "John Doe",
+         date: "2023-09-15",
+         active_time: "09:00 AM",
+         inactive_time: "05:00 PM",
+         activity: "Active",
+         status: "Online",
+         chip: "status",
+         color: "success",
+      },
+      {
+         employee: (
+            <SellerProFile
+               name="Jane Smith"
+               url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-2.webp"
+            />
+         ),
+         name: "Jane Smith",
+         date: "2023-09-15",
+         active_time: "08:30 AM",
+         inactive_time: "04:30 PM",
+         activity: "Active",
+         status: "Online",
+         chip: "status",
+         color: "success",
+      },
+      {
+         employee: (
+            <SellerProFile
+               name="Mike Johnson"
+               url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-3.webp"
+            />
+         ),
+         name: "Mike Johnson",
+         date: "2023-09-15",
+         active_time: "10:00 AM",
+         inactive_time: "06:00 PM",
+         activity: "Inactive",
+         status: "Offline",
+         chip: "status",
+         color: "error",
+      },
+   ],
+};
+
+const Employees = () => {
    return (
       <Stack spacing={3}>
          <Grid container spacing={2}>
@@ -79,11 +141,10 @@ const Employees = () => {
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
-                  title={"Total Purchases"}
+                  title={"Total Salary"}
                   isPositive={true}
                   data={[10, 30, 40, 40, 30, 10, 20]}
                   value={"190"}
-                  percentage={"70%"}
                />
             </Grid>
             <Grid size={{ xs: 12, md: 8 }}>
@@ -115,15 +176,17 @@ const Employees = () => {
             <Grid size={{ xs: 12, md: 12 }}>
                <CustomTable
                   type={"default"}
-                  head={employeeTableData.head}
-                  body={employeeTableData.body}
+                  head={rankSalesman.head}
+                  body={rankSalesman.body}
+                  filter={RankFilter}
                />
             </Grid>
             <Grid size={{ xs: 12, md: 12 }}>
                <CustomTable
                   type={"default"}
-                  head={employeeTableData.head}
-                  body={employeeTableData.body}
+                  head={employeeActivity.head}
+                  body={employeeActivity.body}
+                  filter={Activity}
                />
             </Grid>
          </Grid>

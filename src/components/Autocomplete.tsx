@@ -10,15 +10,14 @@ import {
 
 import { type AutocompleteProps } from "@mui/material/Autocomplete";
 
-interface CustomAutocompleteProps
-   extends Omit<
-      AutocompleteProps<any, boolean, boolean, boolean>,
-      "renderInput" | "options" | "value" | "onChange" | "multiple"
-   > {
+interface CustomAutocompleteProps extends Omit<
+   AutocompleteProps<any, boolean, boolean, boolean>,
+   "renderInput" | "options" | "value" | "onChange" | "multiple"
+> {
    placeholder?: string;
    arrow?: boolean;
    label?: string;
-   option: any[];
+   options: any[];
    value?: string | string[] | null;
    onChange?: (d: any, e: Event | Element) => void;
    multiple?: boolean;
@@ -69,7 +68,7 @@ const StyledPopper = (props: any) => {
 };
 
 const CustomAutocomplete = ({
-   option,
+   options,
    placeholder,
    label,
    arrow = false,
@@ -88,8 +87,8 @@ const CustomAutocomplete = ({
          sx={{ ...rest.sx, p: 0 }}
          multiple={multiple}
          freeSolo={!arrow}
-         options={Array.isArray(option) ? option : []} // ✅ safe guard
-         value={multiple ? value ?? (multiple ? [] : null) : value ?? null} // ✅ safe value
+         options={Array.isArray(options) ? options : []} // ✅ safe guard
+         value={multiple ? (value ?? []) : (value ?? null)} // ✅ safe value
          onChange={(event, newValue) => {
             onChange?.(newValue, event as any);
          }}

@@ -1,6 +1,6 @@
 import { Stack, Grid } from "@mui/material";
 import React from "react";
-import AnalyticsGraph from "./AnalyticsGraph";
+import AnalyticsGraph from "../components/AnalyticsGraph";
 import AnalyticsCard from "../components/AnalyticsCard";
 import CustomTable from "@src/components/Table";
 import DateRangePickerCustom from "@src/components/DateRange";

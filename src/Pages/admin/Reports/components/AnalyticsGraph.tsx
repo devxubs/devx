@@ -26,13 +26,14 @@ interface AnalyticsGraphProps {
    data: AnalyticsDataItem[];
    type?: AnalyticsType;
    filter?: boolean;
+   currency?: string;
 }
 
 /* ---------------- WEEK GROUPING ---------------- */
 
 const groupInto4Weeks = (
    data: AnalyticsDataItem[],
-   month: Date
+   month: Date,
 ): AnalyticsDataItem[] => {
    const year = month.getFullYear();
    const m = month.getMonth();
@@ -78,6 +79,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
    data,
    type = "day",
    filter = true,
+   currency = "",
 }) => {
    const theme = useTheme();
 
@@ -89,7 +91,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
    endOfToday.setHours(23, 59, 59, 999);
 
    const [dateRange, setDateRange] = React.useState<[Date | null, Date | null]>(
-      [startOfToday, endOfToday]
+      [startOfToday, endOfToday],
    );
 
    useEffect(() => {
@@ -111,7 +113,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
          const lastDay = new Date(
             now.getFullYear(),
             now.getMonth(),
-            getLastDayOfCurrentMonth().getDate()
+            getLastDayOfCurrentMonth().getDate(),
          );
 
          setDateRange([firstDay, lastDay]);
@@ -146,7 +148,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
    /* -------- TOTAL -------- */
    const totalValue = React.useMemo(
       () => filteredData.reduce((sum, item) => sum + item.y, 0),
-      [filteredData]
+      [filteredData],
    );
 
    /* -------- FORMATTERS -------- */
@@ -222,10 +224,10 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
          intersect: false,
          theme: theme.palette.mode,
          y: {
-            formatter: (val: number) =>
-               `${val.toLocaleString()}${type !== "category" ? "৳" : ""}`,
+            formatter: (val: number) => `${val.toLocaleString()}${currency}`,
             title: {
-               formatter: () => (type !== "category" ? "Amount: " : "Value: "),
+               formatter: () =>
+                  currency.length !== 0 ? "Amount: " : "Value: ",
             },
          },
       },
@@ -253,7 +255,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
                      color={isPositive ? "success.main" : "error.main"}
                   >
                      {totalValue.toLocaleString()}
-                     {type !== "category" && "৳"}
+                     {currency && currency}
                   </Typography>
                </Stack>
 
@@ -265,10 +267,10 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
                            type === "week"
                               ? "range"
                               : type === "day"
-                              ? "range"
-                              : type === "month"
-                              ? "month-year"
-                              : "range"
+                                ? "range"
+                                : type === "month"
+                                  ? "month-year"
+                                  : "range"
                         }
                         title="Select Month"
                         value={dateRange}

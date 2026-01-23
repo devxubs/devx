@@ -9,6 +9,7 @@ import Customer from "./Customer";
 import Expenses from "./Expenses";
 import Purchases from "./Purchases";
 import Employees from "./Employees";
+import Products from "./Products";
 
 const tabs = [
    "All",
@@ -32,7 +33,7 @@ const Report = () => {
       const tab = params?.get("tab");
       if (tab) {
          const tabIndex = tabs.findIndex(
-            (t) => t.toLowerCase() === tab.toLowerCase()
+            (t) => t.toLowerCase() === tab.toLowerCase(),
          );
          if (tabIndex !== -1) {
             setVal(tabIndex);
@@ -139,8 +140,10 @@ const Report = () => {
                <Purchases />
             ) : tabs[val] === "Employees" ? (
                <Employees />
+            ) : tabs[val] === "Products" ? (
+               <Products />
             ) : (
-               <div>{tabs[val]} Report Content</div>
+               <div>All Reports</div>
             )}
          </Stack>
       </Stack>

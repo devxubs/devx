@@ -34,7 +34,7 @@ const analyticsItem = [
    },
 ];
 
-const SellerProFile = ({ name, url }: { name: string; url: string }) => (
+export const SellerProFile = ({ name, url }: { name: string; url: string }) => (
    <Stack spacing={1} direction="row" alignItems="center">
       <Avatar src={url} />
       <Typography variant="body1">{name}</Typography>

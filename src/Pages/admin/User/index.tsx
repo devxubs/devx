@@ -46,21 +46,62 @@ export const UserProfile = ({
 
 const allUser = [
    {
+      employee_id: "E001",
       name: "Jubayer Ahmed",
       phone_number: "01325584606",
       email: "devxub@gmail.com",
       role: "Manager",
+      salary: "$80,000",
+      hire_date: "2021-05-10",
    },
    {
+      employee_id: "E002",
       name: "Najrul Ahmed",
       phone_number: "01818388585",
       email: "najrul787@gmail.com",
       role: "CEO",
+      salary: "$120,000",
+      hire_date: "2019-03-22",
+   },
+   {
+      employee_id: "E001",
+      name: "John Doe",
+      role: "Sales Manager",
+      phone_number: "01325584606",
+      email: "john.doe@example.com",
+      hire_date: "2020-03-15",
+      salary: "$75,000",
+   },
+   {
+      employee_id: "E002",
+      name: "Jane Smith",
+      role: "HR Specialist",
+      phone_number: "01818388585",
+      email: "jane.smith@example.com",
+      hire_date: "2019-07-22",
+      salary: "$65,000",
+   },
+   {
+      employee_id: "E003",
+      name: "Mike Johnson",
+      role: "Software Developer",
+      phone_number: "01711223344",
+      email: "mike.johnson@example.com",
+      hire_date: "2021-11-05",
+      salary: "$85,000",
    },
 ];
 
 export const users: Omit<TableProps, "type"> = {
-   head: ["@check", "Name", "Phone Number", "Role", "@action"],
+   head: [
+      "@check",
+      "Name",
+      "Phone Number",
+      "Role",
+      "Hire Date",
+      "Salary",
+      "@action",
+   ],
    body: allUser.map((u) => ({
       ...u,
       full_name: u.name,
@@ -82,6 +123,7 @@ const Users = () => {
             setEditableUser({ ...row, name: row.full_name }); // store clicked user
             setMode("edit");
             setModalOpen(true);
+            console.log(row);
          },
       },
       {
@@ -159,7 +201,7 @@ const Users = () => {
                         <Stack sx={{ width: "30%" }}>
                            <CustomAutocomplete
                               label="Role"
-                              option={names}
+                              options={names}
                               value={data.userRole || ""} // controlled
                               onChange={(v: string) =>
                                  onChange?.({

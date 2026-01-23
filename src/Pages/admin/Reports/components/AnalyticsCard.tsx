@@ -12,7 +12,7 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 interface AnalyticsCardProps {
    title: string;
    value: number | string;
-   percentage: string;
+   percentage?: string;
    isPositive: boolean;
    data: number[]; // Should have 7 values (Mon → Sun)
 }
@@ -20,7 +20,7 @@ interface AnalyticsCardProps {
 const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    title,
    value,
-   percentage,
+   percentage = 0,
    isPositive,
    data,
 }) => {
@@ -63,10 +63,10 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
          isPositive && colorState !== "success"
             ? [theme.palette.success.main]
             : isPositive && colorState === "success"
-            ? [theme.palette.primary.main]
-            : colorState === "error"
-            ? [theme.palette.primary.main]
-            : [theme.palette.error.main],
+              ? [theme.palette.primary.main]
+              : colorState === "error"
+                ? [theme.palette.primary.main]
+                : [theme.palette.error.main],
 
       tooltip: {
          enabled: false,
@@ -100,6 +100,9 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                <Typography
                   variant="caption"
                   color={isPositive ? "success.main" : "error.main"}
+                  sx={{
+                     visibility: !percentage ? "hidden" : "visible",
+                  }}
                >
                   {percentage}
                </Typography>
