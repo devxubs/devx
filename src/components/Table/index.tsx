@@ -49,13 +49,13 @@ export type TableProps = {
    actionMenu?: (row: TableRow) => ActionItem[]; // Optional action menu items
    filter?: (
       data: FilterData,
-      onChange: (data: FilterData) => void
+      onChange: (data: FilterData) => void,
    ) => React.ReactNode;
 };
 
 const inDateRange = (
    date?: Date | string,
-   range?: [Date | null, Date | null]
+   range?: [Date | null, Date | null],
 ) => {
    if (!date || !range) return true;
 
@@ -111,7 +111,7 @@ const filterRules = {
 
    products: (row: any, value: string) =>
       row.products?.some(
-         (p: any) => includesText(p.name, value) || includesText(p.code, value)
+         (p: any) => includesText(p.name, value) || includesText(p.code, value),
       ),
 
    district: (row: any, value: string) =>
@@ -131,7 +131,7 @@ const filterRules = {
 
    report_product: (row: any, value: string) =>
       row.products?.some(
-         (p: any) => includesText(p.name, value) || includesText(p.code, value)
+         (p: any) => includesText(p.name, value) || includesText(p.code, value),
       ),
 } satisfies Record<string, (row: any, value: any) => boolean>;
 
@@ -144,7 +144,7 @@ export default function CustomTable({
 }: TableProps) {
    const theme = useTheme();
    const [checkedRows, setCheckedRows] = useState<boolean[]>(() =>
-      body.map(() => false)
+      body.map(() => false),
    );
    const [openRowId, setOpenRowId] = useState<string | number | null>(null);
    const [filterData, setFilterData] = useState<FilterData>({
@@ -193,7 +193,7 @@ export default function CustomTable({
                filterRules[key as keyof typeof filterRules]?.(row, value) ??
                true
             );
-         })
+         }),
       );
    }, [body, filterData, normalizedReportData]);
 
@@ -201,7 +201,7 @@ export default function CustomTable({
       setCheckedRows((prev) =>
          prev.length === filterRow.length
             ? prev
-            : Array(filterRow.length).fill(false)
+            : Array(filterRow.length).fill(false),
       );
    }, [filterRow.length]);
 
@@ -216,7 +216,7 @@ export default function CustomTable({
       rowsPerPage > 0
          ? (filterRow || []).slice(
               page * rowsPerPage,
-              page * rowsPerPage + rowsPerPage
+              page * rowsPerPage + rowsPerPage,
            )
          : filterRow;
 
@@ -242,11 +242,11 @@ export default function CustomTable({
                <OrderTab
                   value={
                      orderStatuses.lastIndexOf(
-                        filterData.orderData.status || ""
+                        filterData.orderData.status || "",
                      ) === -1
                         ? 0
                         : orderStatuses.lastIndexOf(
-                             filterData.orderData.status || ""
+                             filterData.orderData.status || "",
                           ) + 1
                   }
                   onChange={(s) => {
@@ -400,7 +400,7 @@ export default function CustomTable({
                               setOpenRowId(
                                  openRowId === (row.id ?? index)
                                     ? null
-                                    : row.id ?? index
+                                    : (row.id ?? index),
                               )
                            }
                            type={type}

@@ -146,8 +146,8 @@ const Stock = ({ quantity }: { quantity: number }) => {
             {quantity === 0
                ? "out of stock"
                : quantity <= 10
-               ? quantity + " low stock"
-               : quantity + " in stock"}
+                 ? quantity + " low stock"
+                 : quantity + " in stock"}
          </Typography>
       </Stack>
    );
@@ -308,7 +308,7 @@ const Product = () => {
                         <Stack sx={{ width: "30%" }}>
                            <CustomAutocomplete
                               label="Stock"
-                              option={["In stock", "Low stock", "Out of stock"]}
+                              options={["In stock", "Low stock", "Out of stock"]}
                               value={data.productStock || ""}
                               onChange={(val: string) =>
                                  onChange?.({

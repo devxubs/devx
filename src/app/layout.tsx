@@ -39,9 +39,7 @@ export default async function RootLayout({
          <body suppressHydrationWarning className={Public_Sans_font.className}>
             <InitColorSchemeScript attribute="class" />
             <AppRouterCacheProvider options={{ enableCssLayer: true }}>
-               <ThemeProviderClient>
-                  <Layout>{children}</Layout>
-               </ThemeProviderClient>
+               <ThemeProviderClient>{children}</ThemeProviderClient>
             </AppRouterCacheProvider>
          </body>
       </html>
