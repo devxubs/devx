@@ -4,16 +4,16 @@ import {
    Stack,
    Avatar,
    Typography,
-   Box,
    IconButton,
    alpha,
    useTheme,
 } from "@mui/material";
 import {
    DataGrid,
-   GridRowsProp,
+   GridCallbackDetails,
    GridColDef,
    GridRenderCellParams,
+   GridRowSelectionModel,
 } from "@mui/x-data-grid";
 import { useEffect, useState } from "react";
 
@@ -105,8 +105,8 @@ export const columns: GridColDef[] = [
    {
       field: "name",
       headerName: "Name",
-      flex: 1.6,
-      minWidth: 260,
+      flex: 1,
+      // minWidth: 260,
       sortable: false,
       renderCell: (params: GridRenderCellParams) => (
          <UserProfile name={params.row.name} email={params.row.email} />
@@ -116,31 +116,31 @@ export const columns: GridColDef[] = [
       field: "phone",
       headerName: "Phone Number",
       flex: 1,
-      minWidth: 160,
+      // minWidth: 160,
+      description: "true",
    },
    {
       field: "role",
       headerName: "Role",
       flex: 1,
-      minWidth: 160,
+      // minWidth: 160,
    },
    {
       field: "hireDate",
       headerName: "Hire Date",
       flex: 1,
-      minWidth: 140,
+      // minWidth: 140,
    },
    {
       field: "salary",
       headerName: "Salary",
       flex: 1,
-      minWidth: 120,
+      // minWidth: 120,
       valueFormatter: (value: number) => `$${value.toLocaleString()}`,
    },
    {
       field: "actions",
       headerName: "",
-      width: 50,
       sortable: false,
       filterable: false,
       renderCell: () => (
@@ -166,28 +166,64 @@ export default function DataTable() {
          <DataGrid
             rows={rows}
             columns={columns}
-            checkboxSelection
-            disableRowSelectionOnClick
             density="comfortable"
-            autoHeight
+            showToolbar
+            checkboxSelection
+            disableColumnSorting
+            disableColumnMenu
+            disableColumnResize
+            disableColumnFilter
+            disableRowSelectionOnClick
+            // disableAutosize/
+            disableVirtualization
+            slotProps={{
+               loadingOverlay: {
+                  variant: "skeleton",
+                  noRowsVariant: "skeleton",
+                  // noRowsOverlay: "", // you can customize no rows overlay here
+               },
+            }}
+            // isRowSelectable={(p) => {
+            //    console.log(p);
+            //    return true;
+            // }}
+            onRowSelectionModelChange={(
+               { ids }: GridRowSelectionModel,
+               details: GridCallbackDetails,
+            ) => {
+               const selectedIDs = new Set(ids);
+               const selectedRows = rows.filter((row) =>
+                  selectedIDs.has(row.id),
+               );
+               console.log(selectedRows);
+            }}
             sx={{
                border: "none",
 
+               "& .MuiDataGrid-toolbar": {
+                  border: "none!important",
+               },
+
+               "& .MuiDataGrid-scrollbar > div": {
+                  display: "none",
+                  // backgroundColor: "transparent",
+               },
                "& .MuiDataGrid-columnHeaders > div": {
                   height: "auto!important",
                   p: 1,
+                  pl: 0,
                   backgroundColor:
                      alpha(theme.palette.grey[700], 0.1) + "!important",
                   ...theme.applyStyles("dark", {
-                     backgroundColor: theme.palette.grey[700],
+                     backgroundColor: alpha(theme.palette.grey[700], 0.6),
                   }),
                },
-               "& .MuiDataGrid-columnHeader": {
-                  backgroundColor:
-                     alpha(theme.palette.grey[700], 0.1) + "!important",
-                  ...theme.applyStyles("dark", {
-                     backgroundColor: theme.palette.grey[700],
-                  }),
+               "& .MuiDataGrid-columnHeader, & .MuiDataGrid-scrollbarFiller": {
+                  backgroundColor: "transparent!important",
+                  border: "none!important",
+               },
+               "& .MuiDataGrid-columnHeader > .MuiDataGrid-columnSeparator": {
+                  display: "none",
                },
 
                "& .MuiDataGrid-columnHeader:focus": {
@@ -201,19 +237,60 @@ export default function DataTable() {
                "& .MuiDataGrid-columnHeaderTitleContainer:focus": {
                   outline: "none",
                },
-               // "& .MuiDataGrid-columnHeaders": {
-               //    backgroundColor: "rgba(255,255,255,0.04)",
-               //    fontWeight: 600,
-               // },
                "& .MuiDataGrid-row": {
                   borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  transition: "all 0.2s ease-in-out",
                },
+               "& .MuiDataGrid-row:hover": {
+                  backgroundColor:
+                     alpha(theme.palette.grey[700], 0.1) + "!important",
+                  ...theme.applyStyles("dark", {
+                     backgroundColor: alpha(theme.palette.grey[700], 0.3),
+                  }),
+               },
+               "& .MuiDataGrid-row.Mui-selected": {
+                  backgroundColor:
+                     alpha(theme.palette.primary.dark, 0.03) + "!important",
+                  ...theme.applyStyles("dark", {
+                     backgroundColor:
+                        alpha(theme.palette.primary.dark, 0.03) + "!important",
+                  }),
+               },
+
                "& .MuiDataGrid-cell": {
                   outline: "none !important",
                   border: 0,
+               },
+
+               // FOOTER STYLES
+               "& .MuiDataGrid-footerContainer": {
+                  borderTop: "none!important",
                },
             }}
          />
       </div>
    );
 }
+
+const FilterChipWrapper = ({
+   title,
+   children,
+}: {
+   title: string;
+   children: React.ReactNode;
+}) => (
+   <Stack
+      spacing={1}
+      direction="row"
+      alignItems="center"
+      border={1}
+      borderColor="divider"
+      borderRadius={0.5}
+      p={1}
+      my={1}
+      sx={{ borderStyle: "dashed" }}
+   >
+      <Typography variant="subtitle2">{title.toUpperCase()}: </Typography>
+      {children}
+   </Stack>
+);
