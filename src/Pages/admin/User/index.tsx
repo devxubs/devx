@@ -2,7 +2,11 @@
 
 import { Stack, Button, Avatar, Typography, useTheme } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomTable, { TableProps, TableRow } from "@src/components/Table";
+import CustomTable, {
+   ColumnConfig,
+   TableProps,
+   TableRow,
+} from "@src/components/Table";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import CustomModal from "@src/components/Modal";
@@ -20,7 +24,7 @@ export const UserProfile = ({
    url?: string;
 }) => {
    return (
-      <Stack spacing={1} direction="row" alignItems="center">
+      <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
          <Avatar src={url} />
          <Stack>
             <Typography
@@ -44,72 +48,85 @@ export const UserProfile = ({
    );
 };
 
-const allUser = [
+const rows = [
    {
-      employee_id: "E001",
+      id: "E001",
       name: "Jubayer Ahmed",
-      phone_number: "01325584606",
+      phoneNumber: "01325584606",
       email: "devxub@gmail.com",
       role: "Manager",
       salary: "$80,000",
-      hire_date: "2021-05-10",
+      hireDate: "2021-05-10",
    },
    {
-      employee_id: "E002",
+      id: "E002",
       name: "Najrul Ahmed",
-      phone_number: "01818388585",
+      phoneNumber: "01818388585",
       email: "najrul787@gmail.com",
       role: "CEO",
       salary: "$120,000",
-      hire_date: "2019-03-22",
+      hireDate: "2019-03-22",
    },
    {
-      employee_id: "E001",
+      id: "E003",
       name: "John Doe",
       role: "Sales Manager",
-      phone_number: "01325584606",
+      phoneNumber: "01325584606",
       email: "john.doe@example.com",
-      hire_date: "2020-03-15",
+      hireDate: "2020-03-15",
       salary: "$75,000",
    },
    {
-      employee_id: "E002",
+      id: "E004",
       name: "Jane Smith",
       role: "HR Specialist",
-      phone_number: "01818388585",
+      phoneNumber: "01818388585",
       email: "jane.smith@example.com",
-      hire_date: "2019-07-22",
+      hireDate: "2019-07-22",
       salary: "$65,000",
    },
    {
-      employee_id: "E003",
+      id: "E005",
       name: "Mike Johnson",
       role: "Software Developer",
-      phone_number: "01711223344",
+      phoneNumber: "01711223344",
       email: "mike.johnson@example.com",
-      hire_date: "2021-11-05",
+      hireDate: "2021-11-05",
       salary: "$85,000",
    },
 ];
 
-export const users: Omit<TableProps, "type"> = {
-   head: [
-      "@check",
-      "Name",
-      "Phone Number",
-      "Role",
-      "Hire Date",
-      "Salary",
-      "@action",
-   ],
-   body: allUser.map((u) => ({
-      ...u,
-      full_name: u.name,
-      name: <UserProfile name={u.name} email={u.email} />,
-      phone_number: u.phone_number,
-      role: u.role,
-   })),
-};
+const columns: ColumnConfig[] = [
+   { field: "id", headerName: "ID" },
+   {
+      field: "name",
+      headerName: "Name",
+      flex: 1,
+      renderCell: (params) => (
+         <UserProfile name={params.row.name} email={params.row.email} />
+      ),
+   },
+   { field: "phoneNumber", headerName: "Phone" },
+   { field: "role", headerName: "Role" },
+   { field: "hireDate", headerName: "Hire Date" },
+   { field: "salary", headerName: "Salary" },
+
+   {
+      field: "@actions",
+      headerName: "",
+      menu: [
+         { label: "Edit", onClick: () => {} },
+         { label: "Delete", color: "error", onClick: () => {} },
+      ],
+   },
+];
+// const body = allUser.map((u) => ({
+//    ...u,
+//    full_name: u.name,
+//    name: <UserProfile name={u.name} email={u.email} />,
+//    phoneNumber: u.phoneNumber,
+//    role: u.role,
+// }));
 
 const Users = () => {
    const theme = useTheme();
@@ -192,27 +209,27 @@ const Users = () => {
             </Stack>
             <Stack>
                <CustomTable
-                  type={"user"}
-                  head={users.head}
-                  body={users.body}
-                  actionMenu={(row) => actionMenu(row)}
-                  filter={(data, onChange) => {
-                     return (
-                        <Stack sx={{ width: "30%" }}>
-                           <CustomAutocomplete
-                              label="Role"
-                              options={names}
-                              value={data.userRole || ""} // controlled
-                              onChange={(v: string) =>
-                                 onChange?.({
-                                    ...data,
-                                    userRole: v || "",
-                                 })
-                              }
-                           />
-                        </Stack>
-                     );
-                  }}
+                  rows={rows}
+                  columns={columns}
+                  checkBox={true}
+                  // actionMenu={(row) => actionMenu(row)}
+                  // filter={(data, onChange) => {
+                  //    return (
+                  //       <Stack sx={{ width: "30%" }}>
+                  //          <CustomAutocomplete
+                  //             label="Role"
+                  //             options={names}
+                  //             value={data.userRole || ""} // controlled
+                  //             onChange={(v: string) =>
+                  //                onChange?.({
+                  //                   ...data,
+                  //                   userRole: v || "",
+                  //                })
+                  //             }
+                  //          />
+                  //       </Stack>
+                  //    );
+                  // }}
                />
             </Stack>
          </Stack>

@@ -8,7 +8,7 @@ import YearlySalesChart from "./YearlySalesChart";
 import Scrollbar from "react-browser-scrollbar";
 import SalesOverview from "./SalesOverview";
 import Balance from "./Balance";
-import CustomTable, { TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 
 const analyticsItem = [
    {
@@ -35,90 +35,74 @@ const analyticsItem = [
 ];
 
 export const SellerProFile = ({ name, url }: { name: string; url: string }) => (
-   <Stack spacing={1} direction="row" alignItems="center">
+   <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
       <Avatar src={url} />
       <Typography variant="body1">{name}</Typography>
    </Stack>
 );
 
-const rankSalesman: Omit<TableProps, "type"> = {
-   head: ["Seller", "Call", "Conform", "Cancel", "Rank"],
-   body: [
-      {
-         seller: (
-            <SellerProFile
-               name={"Ikhtiar (Repeat Sales Exicutive)"}
-               url={
-                  "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-25.webp"
-               }
-            />
-         ),
-         call: 3000,
-         conform: 2000,
-         cancel: 1000,
-         rank: "Top 1",
-         chip: "rank",
-         color: "primary",
+const columns: ColumnConfig[] = [
+   {
+      field: "seller",
+      headerName: "Seller",
+      flex: 1,
+      renderCell: (params) => {
+         const row = params.row;
+         return <SellerProFile name={row.seller.name} url={row.seller.url} />;
       },
-      {
-         seller: (
-            <SellerProFile
-               name={"Mohammod siam hossian (Manager)"}
-               url={
-                  "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-10.webp"
-               }
-            />
-         ),
-         call: 2000,
-         conform: 1500,
-         cancel: 500,
-         rank: "Top 2",
-         chip: "rank",
-         color: "secondary",
-      },
-      {
-         seller: <SellerProFile name={"Sheikh Rejvi (Team Leader)"} url={""} />,
-         call: 1500,
-         conform: 1000,
-         cancel: 500,
-         rank: "Top 3",
-         chip: "rank",
-         color: "success",
-      },
-      {
-         seller: (
-            <SellerProFile
-               name={"Samanta Islam (Courier Exicutive)"}
-               url={
-                  "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-11.webp"
-               }
-            />
-         ),
-         call: 1000,
-         conform: 750,
-         cancel: 250,
-         rank: "Top 4",
-         chip: "rank",
-         color: "warning",
-      },
-      {
-         seller: (
-            <SellerProFile
-               name={"Sumaiya Islam (Reseller)"}
-               url={
-                  "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-13.webp"
-               }
-            />
-         ),
-         call: 750,
-         conform: 500,
-         cancel: 250,
-         rank: "Top 5",
-         chip: "rank",
-         color: "error",
-      },
-   ],
-};
+   },
+   { field: "call", headerName: "Call" },
+   { field: "conform", headerName: "Conform" },
+   { field: "cancel", headerName: "Cancel" },
+   { field: "rank", headerName: "Rank", chip: true },
+];
+const rows = [
+   {
+      id: 1,
+      seller: { name: "Jubayer Ahmed", url: "/assets/avatar.jpg" },
+      call: 120,
+      conform: 110,
+      cancel: 10,
+      rank: "A",
+      color: "primary",
+   },
+   {
+      id: 2,
+      seller: { name: "Najrul Ahmed", url: "/assets/avatar.jpg" },
+      call: 80,
+      conform: 60,
+      cancel: 20,
+      rank: "B",
+      color: "secondary",
+   },
+   {
+      id: 3,
+      seller: { name: "Sajib Ahmed", url: "/assets/avatar.jpg" },
+      call: 100,
+      conform: 70,
+      cancel: 30,
+      rank: "C",
+      color: "warning",
+   },
+   {
+      id: 4,
+      seller: { name: "Sajib Ahmed", url: "/assets/avatar.jpg" },
+      call: 100,
+      conform: 70,
+      cancel: 30,
+      rank: "D",
+      color: "error",
+   },
+   {
+      id: 5,
+      seller: { name: "Sajib Ahmed", url: "/assets/avatar.jpg" },
+      call: 100,
+      conform: 70,
+      cancel: 30,
+      rank: "E",
+      color: "info",
+   },
+];
 
 const Dashboard = () => {
    return (
@@ -145,11 +129,7 @@ const Dashboard = () => {
                   <Balance />
                </Grid>
                <Grid size={{ xs: 12, md: 12 }}>
-                  <CustomTable
-                     type="rank"
-                     head={rankSalesman.head}
-                     body={rankSalesman.body}
-                  />
+                  <CustomTable rows={rows} columns={columns} />
                </Grid>
             </Grid>
          </Scrollbar>

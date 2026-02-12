@@ -1,159 +1,45 @@
 "use client";
 
-import {
-   Stack,
-   Avatar,
-   Typography,
-   IconButton,
-   alpha,
-   useTheme,
-} from "@mui/material";
+import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
 import {
    DataGrid,
    GridCallbackDetails,
    GridColDef,
    GridRenderCellParams,
    GridRowSelectionModel,
+   GridRowsProp,
 } from "@mui/x-data-grid";
 import { useEffect, useState } from "react";
+import Icon from "../Icon";
+import CustomPopover from "../CustomPopover";
+import Menu, { MenuItem } from "../Menu";
 
-const UserProfile = ({
-   name,
-   email,
-   url,
-}: {
-   name: string;
-   email: string;
-   url?: string;
-}) => {
-   return (
-      <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
-         <Avatar src={url} />
-         <Stack>
-            <Typography
-               variant="body1"
-               fontSize={16}
-               color="textPrimary"
-               sx={{
-                  "&:hover": {
-                     cursor: "pointer",
-                     textDecoration: "underline",
-                  },
-               }}
-            >
-               {name}
-            </Typography>
-            <Typography variant="body2" fontSize={14} color="textSecondary">
-               {email}
-            </Typography>
-         </Stack>
-      </Stack>
-   );
+export type ColumnConfig = GridColDef & {
+   menu?: MenuItem[];
+   chip?: boolean;
 };
 
-import MoreVertIcon from "@mui/icons-material/MoreVert";
+interface DataTableProps {
+   rows: GridRowsProp;
+   columns: ColumnConfig[];
+   checkBox?: boolean;
+}
 
-export const rows = [
-   {
-      id: 1,
-      name: "Jubayer Ahmed",
-      email: "devxub@gmail.com",
-      phone: "01325584606",
-      role: "Manager",
-      hireDate: "2021-05-10",
-      salary: 80000,
-   },
-   {
-      id: 2,
-      name: "Najrul Ahmed",
-      email: "najrul787@gmail.com",
-      phone: "01818388585",
-      role: "CEO",
-      hireDate: "2019-03-22",
-      salary: 120000,
-   },
-   {
-      id: 3,
-      name: "John Doe",
-      email: "john.doe@example.com",
-      phone: "01325584606",
-      role: "Sales Manager",
-      hireDate: "2020-03-15",
-      salary: 75000,
-   },
-   {
-      id: 4,
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      phone: "01818388585",
-      role: "HR Specialist",
-      hireDate: "2019-07-22",
-      salary: 65000,
-   },
-   {
-      id: 5,
-      name: "Mike Johnson",
-      email: "mike.johnson@example.com",
-      phone: "01711223344",
-      role: "Software Developer",
-      hireDate: "2021-11-05",
-      salary: 85000,
-   },
-];
-
-export const columns: GridColDef[] = [
-   {
-      field: "name",
-      headerName: "Name",
-      flex: 1,
-      // minWidth: 260,
-      sortable: false,
-      renderCell: (params: GridRenderCellParams) => (
-         <UserProfile name={params.row.name} email={params.row.email} />
-      ),
-   },
-   {
-      field: "phone",
-      headerName: "Phone Number",
-      flex: 1,
-      // minWidth: 160,
-      description: "true",
-   },
-   {
-      field: "role",
-      headerName: "Role",
-      flex: 1,
-      // minWidth: 160,
-   },
-   {
-      field: "hireDate",
-      headerName: "Hire Date",
-      flex: 1,
-      // minWidth: 140,
-   },
-   {
-      field: "salary",
-      headerName: "Salary",
-      flex: 1,
-      // minWidth: 120,
-      valueFormatter: (value: number) => `$${value.toLocaleString()}`,
-   },
-   {
-      field: "actions",
-      headerName: "",
-      sortable: false,
-      filterable: false,
-      renderCell: () => (
-         <IconButton size="small">
-            <MoreVertIcon fontSize="small" />
-         </IconButton>
-      ),
-   },
-];
-
-export default function DataTable() {
+export default function DataTable({
+   rows,
+   columns,
+   checkBox = false,
+}: DataTableProps) {
    const theme = useTheme();
    const [mounted, setMounted] = useState(false);
+   const [actionMenuOpen, setActionMenuOpen] = useState(
+      null as null | HTMLElement,
+   );
+
+   const [paginationModel, setPaginationModel] = useState({
+      pageSize: 25,
+      page: 0,
+   });
 
    useEffect(() => {
       setMounted(true);
@@ -161,21 +47,120 @@ export default function DataTable() {
 
    if (!mounted) return null; // or loader
 
+   columns = columns.map((col) => {
+      console.log(col);
+
+      // * Action column
+      if (col.field === "@actions") {
+         return {
+            ...col,
+            sortable: false,
+            filterable: false,
+            headerAlign: "right",
+            align: "right",
+
+            renderCell: (r) => (
+               <>
+                  <IconButton
+                     size="small"
+                     onClick={(e) => setActionMenuOpen(e.currentTarget)}
+                  >
+                     <Icon size="small" icon="eva:more-vertical-fill" />
+                  </IconButton>
+                  <CustomPopover
+                     anchorEl={actionMenuOpen}
+                     onClose={() => setActionMenuOpen(null)}
+                     anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                     transformOrigin={{ vertical: "top", horizontal: "right" }}
+                  >
+                     <Menu
+                        item={(col.menu ?? [])?.map((menuItem) => ({
+                           ...menuItem,
+                           onClick: () => {
+                              // menuItem.onClick?.();
+                              // setActionMenuOpen(null);
+                              console.log(r);
+                           },
+                        }))}
+                        onClose={() => setActionMenuOpen(null)}
+                     />
+                  </CustomPopover>
+               </>
+            ),
+         };
+      }
+
+      // * Chip column
+      if (col.chip) {
+         return {
+            ...col,
+            flex: 1,
+            headerAlign: "left",
+            align: "left",
+            renderCell: (params: GridRenderCellParams) => {
+               const row = params.row;
+
+               const colorKey =
+                  row.color === "default"
+                     ? "primary"
+                     : (row.color as keyof Palette);
+               const paletteColor: any = theme.palette[colorKey] ?? {
+                  main: row.color || theme.palette.primary.main,
+               };
+
+               return (
+                  <Chip
+                     label={params.formattedValue}
+                     size="small"
+                     color={(row.color as any) || "primary"}
+                     sx={{
+                        borderRadius: 0.5,
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        bgcolor: paletteColor?.main
+                           ? alpha(paletteColor.main, 0.1)
+                           : alpha(theme.palette.primary.main, 0.1),
+                        color: paletteColor?.main || theme.palette.primary.main,
+                     }}
+                  />
+               );
+            },
+         };
+      }
+
+      return {
+         ...col,
+         flex: 1,
+         headerAlign: "left",
+         align: "left",
+      };
+   });
+
    return (
       <div style={{ height: 400, width: "100%" }}>
          <DataGrid
             rows={rows}
             columns={columns}
             density="comfortable"
-            showToolbar
-            checkboxSelection
+            showToolbar={false}
+            checkboxSelection={checkBox}
+            // autoPageSize //* enable this to make Whichever one you show based on the height of the table
+            initialState={{
+               pagination: { paginationModel: { pageSize: 5 } },
+            }}
+            pageSizeOptions={[10, 25, 50, { value: -1, label: "All" }]}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            //
             disableColumnSorting
             disableColumnMenu
             disableColumnResize
             disableColumnFilter
             disableRowSelectionOnClick
-            // disableAutosize/
+            disableAutosize
             disableVirtualization
+            disableColumnSelector
+            disableDensitySelector
             slotProps={{
                loadingOverlay: {
                   variant: "skeleton",
@@ -191,6 +176,8 @@ export default function DataTable() {
                { ids }: GridRowSelectionModel,
                details: GridCallbackDetails,
             ) => {
+               console.log(ids);
+
                const selectedIDs = new Set(ids);
                const selectedRows = rows.filter((row) =>
                   selectedIDs.has(row.id),
@@ -199,6 +186,10 @@ export default function DataTable() {
             }}
             sx={{
                border: "none",
+
+               "& .MuiDataGrid-virtualScroller": {
+                  scrollbarWidth: "none!important",
+               },
 
                "& .MuiDataGrid-toolbar": {
                   border: "none!important",
@@ -211,6 +202,7 @@ export default function DataTable() {
                "& .MuiDataGrid-columnHeaders > div": {
                   height: "auto!important",
                   p: 1,
+                  py: checkBox ? 1 : 2,
                   pl: 0,
                   backgroundColor:
                      alpha(theme.palette.grey[700], 0.1) + "!important",
@@ -271,26 +263,3 @@ export default function DataTable() {
       </div>
    );
 }
-
-const FilterChipWrapper = ({
-   title,
-   children,
-}: {
-   title: string;
-   children: React.ReactNode;
-}) => (
-   <Stack
-      spacing={1}
-      direction="row"
-      alignItems="center"
-      border={1}
-      borderColor="divider"
-      borderRadius={0.5}
-      p={1}
-      my={1}
-      sx={{ borderStyle: "dashed" }}
-   >
-      <Typography variant="subtitle2">{title.toUpperCase()}: </Typography>
-      {children}
-   </Stack>
-);

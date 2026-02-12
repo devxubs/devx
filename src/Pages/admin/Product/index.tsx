@@ -10,7 +10,7 @@ import {
    alpha,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomTable, { TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig, TableProps } from "@src/components/Table";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import LinearProgress, {
@@ -23,20 +23,20 @@ import CustomAutocomplete from "@src/components/Autocomplete";
 export const productsData = [
    {
       id: 1,
-      product_name: "Elegance Stiletto Heels",
-      sub_description: "Stylish high heels for evening wear",
+      productName: "Elegance Stiletto Heels",
+      subDescription: "Stylish high heels for evening wear",
       content:
          "These stiletto heels feature a sleek design, cushioned insole, and durable sole — perfect for parties, events, or formal occasions.",
       images: [
          "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp",
          "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-2.webp",
       ],
-      product_code: "ESH-2025",
-      product_sku: "SH-0004",
+      productCode: "ESH-2025",
+      productSku: "SH-0004",
       quantity: "72",
-      stock_value: "In Stock", // ✅ added
+      stockValue: "In Stock", // ✅ added
       category: "Shoes",
-      product_type: "Heels",
+      productType: "Heels",
       color: ["Red", "Black", "Nude"],
       size: ["36", "37", "38", "39", "40", "41"],
       regularPrice: "95.21",
@@ -46,20 +46,20 @@ export const productsData = [
    },
    {
       id: 2,
-      product_name: "Classic Leather Handbag",
-      sub_description: "Elegant handbag crafted from premium leather",
+      productName: "Classic Leather Handbag",
+      subDescription: "Elegant handbag crafted from premium leather",
       content:
          "Designed with spacious compartments and a timeless design, this leather handbag is perfect for daily or formal use.",
       images: [
          "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-10.webp",
          "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-9.webp",
       ],
-      product_code: "CLH-2025",
-      product_sku: "HB-0005",
+      productCode: "CLH-2025",
+      productSku: "HB-0005",
       quantity: "0",
-      stock_value: "Out of Stock", // ✅ added
+      stockValue: "Out of Stock", // ✅ added
       category: "Bags",
-      product_type: "Handbag",
+      productType: "Handbag",
       color: ["Black", "Brown", "Beige"],
       size: ["Medium"],
       regularPrice: "149.99",
@@ -69,17 +69,17 @@ export const productsData = [
    },
    {
       id: 3,
-      product_name: "Modern Denim Jacket",
-      sub_description: "Casual yet stylish denim jacket",
+      productName: "Modern Denim Jacket",
+      subDescription: "Casual yet stylish denim jacket",
       content:
          "Crafted from durable denim with a modern fit, this jacket provides comfort and a versatile look.",
       images: ["/images/product-3.webp", "/images/product-3a.webp"],
-      product_code: "MDJ-2025",
-      product_sku: "CJ-0006",
+      productCode: "MDJ-2025",
+      productSku: "CJ-0006",
       quantity: "10",
-      stock_value: "Low Stock", // ✅ added
+      stockValue: "Low Stock", // ✅ added
       category: "Clothing",
-      product_type: "Jacket",
+      productType: "Jacket",
       color: ["Blue", "Black", "Light Wash"],
       size: ["S", "M", "L", "XL"],
       regularPrice: "79.99",
@@ -89,20 +89,20 @@ export const productsData = [
    },
    {
       id: 4,
-      product_name: "Smart Fitness Watch",
-      sub_description: "Track your fitness and stay connected",
+      productName: "Smart Fitness Watch",
+      subDescription: "Track your fitness and stay connected",
       content:
          "This smartwatch offers fitness tracking, sleep analysis, and notifications, with long-lasting battery and water resistance.",
       images: [
          "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-8.webp",
          "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-7.webp",
       ],
-      product_code: "SFW-2025",
-      product_sku: "AC-0007",
+      productCode: "SFW-2025",
+      productSku: "AC-0007",
       quantity: "120",
-      stock_value: "In Stock", // ✅ added
+      stockValue: "In Stock", // ✅ added
       category: "Accessories",
-      product_type: "Smartwatch",
+      productType: "Smartwatch",
       color: ["Black", "Silver", "Rose Gold"],
       size: ["One Size"],
       regularPrice: "229.00",
@@ -117,7 +117,7 @@ const Stock = ({ quantity }: { quantity: number }) => {
    const color =
       quantity === 0 ? "error" : quantity <= 10 ? "warning" : "primary";
    return (
-      <Stack spacing={1}>
+      <Stack spacing={1} my="auto">
          <LinearProgress
             variant="determinate"
             value={Math.min(quantity, 80)}
@@ -155,7 +155,7 @@ const Stock = ({ quantity }: { quantity: number }) => {
 
 const CreateAt = ({ date, time }: { date: string; time: string }) => {
    return (
-      <Stack spacing={1} direction="row" alignItems="center">
+      <Stack spacing={1} direction="row" alignItems="center" my="auto">
          <Stack>
             <Typography
                variant="body1"
@@ -219,51 +219,94 @@ const ProductsView = ({
    );
 };
 
-export const products: Omit<TableProps, "type"> = {
-   head: ["@check", "Product", "Create at", "Stock", "price", "@action"],
-   body: productsData.map((product) => ({
-      ...product,
-      id: product.id,
-      product: (
-         <ProductsView
-            key={product.id}
-            name={product.product_name}
-            description={product.category}
-            url={product.images[0]}
-         />
-      ),
-      create_at: (
-         <CreateAt key={product.id} date={product.date} time={product.time} />
-      ),
-      stock: <Stock key={product.id} quantity={parseInt(product.quantity)} />,
-      price: `$${product.salePrice ? product.salePrice : product.regularPrice}`,
-   })),
-};
+const columns: ColumnConfig[] = [
+   {
+      field: "id",
+      headerName: "ID",
+   },
+   {
+      field: "product",
+      headerName: "Product",
+      flex: 2,
+      renderCell: (params: any) => {
+         return (
+            <ProductsView
+               key={params.row.id}
+               name={params.row.productName}
+               description={params.row.category}
+               url={params.row.images[0]}
+            />
+         );
+      },
+   },
+   {
+      field: "createAt",
+      headerName: "Create at",
+      flex: 1,
+      renderCell: (params: any) => {
+         return (
+            <CreateAt
+               key={params.row.id}
+               date={params.row.date}
+               time={params.row.time}
+            />
+         );
+      },
+   },
+   {
+      field: "stock",
+      headerName: "Stock",
+      flex: 1,
+      renderCell: (params: any) => {
+         return (
+            <Stock
+               key={params.row.id}
+               quantity={parseInt(params.row.quantity)}
+            />
+         );
+      },
+   },
+   {
+      field: "price",
+      headerName: "Price",
+      flex: 1,
+      renderCell: (params: any) =>
+         `$${params.row.salePrice ? params.row.salePrice : params.row.regularPrice}`,
+   },
+   {
+      field: "@actions",
+      headerName: "",
+      menu: [
+         { label: "Edit", onClick: () => {} },
+         { label: "Delete", color: "error", onClick: () => {} },
+      ],
+   },
+];
 
 const Product = () => {
-   const actionMenu = (row: any) => [
-      {
-         label: "edit",
-         onClick: () => router.push(`/product/publish?id=${row.id}`),
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-      },
-      {
-         label: "delete",
-         color: "error",
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
-         onClick: () => {
-            // setDeleteConform(true);
-            setProductToDelete(row);
-            setIsDeleteDialogOpen(true);
-         },
-      },
-   ];
+   // const actionMenu = (row: any) => [
+   //    {
+   //       label: "edit",
+   //       onClick: () => router.push(`/product/publish?id=${row.id}`),
+   //       icon: <Icon icon="solar:pen-bold" size="small" />,
+   //    },
+   //    {
+   //       label: "delete",
+   //       color: "error",
+   //       icon: (
+   //          <Icon
+   //             icon="solar:trash-bin-trash-bold"
+   //             size="small"
+   //             color="error"
+   //          />
+   //       ),
+   //       onClick: () => {
+   //          // setDeleteConform(true);
+   //          setProductToDelete(row);
+   //          setIsDeleteDialogOpen(true);
+   //       },
+   //    },
+   // ];
 
    const theme = useTheme();
    const router = useRouter();
@@ -299,27 +342,27 @@ const Product = () => {
             </Stack>
             <Stack>
                <CustomTable
-                  type={"product"}
-                  head={products.head}
-                  body={products.body}
-                  actionMenu={(row) => actionMenu(row)}
-                  filter={(data, onChange) => {
-                     return (
-                        <Stack sx={{ width: "30%" }}>
-                           <CustomAutocomplete
-                              label="Stock"
-                              options={["In stock", "Low stock", "Out of stock"]}
-                              value={data.productStock || ""}
-                              onChange={(val: string) =>
-                                 onChange?.({
-                                    ...data,
-                                    productStock: val,
-                                 })
-                              }
-                           />
-                        </Stack>
-                     );
-                  }}
+                  rows={productsData}
+                  columns={columns}
+                  checkBox={true}
+                  // actionMenu={(row) => actionMenu(row)}
+                  // filter={(data, onChange) => {
+                  //    return (
+                  //       <Stack sx={{ width: "30%" }}>
+                  //          <CustomAutocomplete
+                  //             label="Stock"
+                  //             options={["In stock", "Low stock", "Out of stock"]}
+                  //             value={data.productStock || ""}
+                  //             onChange={(val: string) =>
+                  //                onChange?.({
+                  //                   ...data,
+                  //                   productStock: val,
+                  //                })
+                  //             }
+                  //          />
+                  //       </Stack>
+                  //    );
+                  // }}
                />
             </Stack>
          </Stack>
@@ -327,7 +370,7 @@ const Product = () => {
             type="delete"
             open={isDeleteDialogOpen}
             onClose={() => setIsDeleteDialogOpen(false)}
-            title={productToDelete?.product_name}
+            title={productToDelete?.productName}
             onConfirm={handleDeleteConfirm}
          />
       </Scrollbar>
