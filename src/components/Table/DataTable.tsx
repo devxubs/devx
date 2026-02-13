@@ -5,9 +5,12 @@ import {
    DataGrid,
    GridCallbackDetails,
    GridColDef,
+   GridMenuParams,
    GridRenderCellParams,
+   GridRowParams,
    GridRowSelectionModel,
    GridRowsProp,
+   MuiEvent,
 } from "@mui/x-data-grid";
 import { useEffect, useState } from "react";
 import Icon from "../Icon";
@@ -48,7 +51,7 @@ export default function DataTable({
    if (!mounted) return null; // or loader
 
    columns = columns.map((col) => {
-      console.log(col);
+      // console.log(col);
 
       // * Action column
       if (col.field === "@actions") {
@@ -59,7 +62,7 @@ export default function DataTable({
             headerAlign: "right",
             align: "right",
 
-            renderCell: (r) => (
+            renderCell: (r: GridRenderCellParams) => (
                <>
                   <IconButton
                      size="small"
@@ -76,7 +79,7 @@ export default function DataTable({
                      <Menu
                         item={(col.menu ?? [])?.map((menuItem) => ({
                            ...menuItem,
-                           onClick: () => {
+                           onClick: (r :any) => {
                               // menuItem.onClick?.();
                               // setActionMenuOpen(null);
                               console.log(r);
@@ -168,21 +171,28 @@ export default function DataTable({
                   // noRowsOverlay: "", // you can customize no rows overlay here
                },
             }}
-            // isRowSelectable={(p) => {
-            //    console.log(p);
-            //    return true;
-            // }}
+            onMenuOpen={(
+               params: GridMenuParams,
+               event: MuiEvent<{}>,
+               details: GridCallbackDetails,
+            ) => {
+               console.log(params);
+            }}
+            getRowId={(row) => {
+               console.log(row);
+               return row.id;
+            }}
             onRowSelectionModelChange={(
                { ids }: GridRowSelectionModel,
                details: GridCallbackDetails,
             ) => {
-               console.log(ids);
+               // console.log(ids);
 
                const selectedIDs = new Set(ids);
                const selectedRows = rows.filter((row) =>
                   selectedIDs.has(row.id),
                );
-               console.log(selectedRows);
+               // console.log(selectedRows);
             }}
             sx={{
                border: "none",

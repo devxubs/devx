@@ -117,7 +117,7 @@ const Stock = ({ quantity }: { quantity: number }) => {
    const color =
       quantity === 0 ? "error" : quantity <= 10 ? "warning" : "primary";
    return (
-      <Stack spacing={1} my="auto">
+      <Stack spacing={1} justifyContent="center" height={"100%"}>
          <LinearProgress
             variant="determinate"
             value={Math.min(quantity, 80)}
@@ -155,11 +155,11 @@ const Stock = ({ quantity }: { quantity: number }) => {
 
 const CreateAt = ({ date, time }: { date: string; time: string }) => {
    return (
-      <Stack spacing={1} direction="row" alignItems="center" my="auto">
+      <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
          <Stack>
             <Typography
                variant="body1"
-               fontSize={16}
+               fontSize={15}
                color="textPrimary"
                sx={{
                   "&:hover": {
@@ -170,7 +170,7 @@ const CreateAt = ({ date, time }: { date: string; time: string }) => {
             >
                {date}
             </Typography>
-            <Typography variant="body2" fontSize={14} color="textSecondary">
+            <Typography variant="body2" fontSize={13} color="textSecondary">
                {time}
             </Typography>
          </Stack>
@@ -188,19 +188,19 @@ const ProductsView = ({
    url?: string;
 }) => {
    return (
-      <Stack spacing={1} direction="row" alignItems="center">
+      <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
          <Avatar
             variant="rounded"
             src={url}
             sx={{
-               width: 70,
-               height: 70,
+               width: 50,
+               height: 50,
             }}
          />
          <Stack>
             <Typography
                variant="body1"
-               fontSize={16}
+               fontSize={15}
                color="textPrimary"
                sx={{
                   "&:hover": {
@@ -211,7 +211,7 @@ const ProductsView = ({
             >
                {name}
             </Typography>
-            <Typography variant="body2" fontSize={14} color="textSecondary">
+            <Typography variant="body2" fontSize={13} color="textSecondary">
                {description}
             </Typography>
          </Stack>
@@ -276,10 +276,6 @@ const columns: ColumnConfig[] = [
    {
       field: "@actions",
       headerName: "",
-      menu: [
-         { label: "Edit", onClick: () => {} },
-         { label: "Delete", color: "error", onClick: () => {} },
-      ],
    },
 ];
 
@@ -345,7 +341,10 @@ const Product = () => {
                   rows={productsData}
                   columns={columns}
                   checkBox={true}
-                  // actionMenu={(row) => actionMenu(row)}
+                  menuItems={[
+                     { label: "Edit", onClick: () => {} },
+                     { label: "Delete", color: "error", onClick: () => {} },
+                  ]}
                   // filter={(data, onChange) => {
                   //    return (
                   //       <Stack sx={{ width: "30%" }}>

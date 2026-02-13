@@ -30,10 +30,13 @@ import {
 import { useEffect, useState } from "react";
 import Icon from "../Icon";
 import CustomPopover from "../CustomPopover";
-import Menu, { MenuItem } from "../Menu";
+import Menu, { MenuItem as MenuItemProps } from "../Menu";
+
+type MenuItem = Omit<MenuItemProps, "onClick"> & {
+   onClick?: (params: GridRenderCellParams) => void;
+};
 
 export type ColumnConfig = GridColDef & {
-   menu?: MenuItem[];
    chip?: boolean;
 };
 
@@ -41,6 +44,7 @@ interface DataTableProps {
    rows: GridRowsProp;
    columns: ColumnConfig[];
    checkBox?: boolean;
+   menuItems?: MenuItem[];
 }
 
 export type ActionItem = {
@@ -159,6 +163,7 @@ export default function CustomTable({
    rows,
    columns,
    checkBox = false,
+   menuItems,
 }: DataTableProps) {
    // const [checkedRows, setCheckedRows] = useState<boolean[]>(() =>
    //    body.map(() => false),
@@ -192,7 +197,7 @@ export default function CustomTable({
    );
 
    const [paginationModel, setPaginationModel] = useState({
-      pageSize: 25,
+      pageSize: 10,
       page: 0,
    });
 
@@ -212,34 +217,21 @@ export default function CustomTable({
             headerAlign: "right",
             align: "right",
 
-            renderCell: (r) => (
-               <>
-                  <IconButton
-                     size="small"
-                     onClick={(e) => setActionMenuOpen(e.currentTarget)}
-                  >
-                     <Icon size="small" icon="eva:more-vertical-fill" />
-                  </IconButton>
-                  <CustomPopover
-                     anchorEl={actionMenuOpen}
-                     onClose={() => setActionMenuOpen(null)}
-                     anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                     transformOrigin={{ vertical: "top", horizontal: "right" }}
-                  >
-                     <Menu
-                        item={(col.menu ?? [])?.map((menuItem) => ({
-                           ...menuItem,
-                           onClick: () => {
-                              // menuItem.onClick?.();
-                              // setActionMenuOpen(null);
-                              console.log(r);
-                           },
-                        }))}
-                        onClose={() => setActionMenuOpen(null)}
-                     />
-                  </CustomPopover>
-               </>
-            ),
+            renderCell: (p) => {
+               return (
+                  <>
+                     <IconButton
+                        size="small"
+                        onClick={(e) => {
+                           // console.log("Action menu opened for row:", p.row);
+                           setActionMenuOpen(e.currentTarget);
+                        }}
+                     >
+                        <Icon size="small" icon="eva:more-vertical-fill" />
+                     </IconButton>
+                  </>
+               );
+            },
          };
       }
 
@@ -356,7 +348,8 @@ export default function CustomTable({
          overflow={"hidden"}
          sx={{
             backgroundColor: theme.palette.background.paper + "!important",
-            maxHeight: 600,
+            maxHeight: 560,
+            // minHeight: 600,
          }}
       >
          <DataGrid
@@ -490,6 +483,31 @@ export default function CustomTable({
                },
             }}
          />
+
+         <CustomPopover
+            anchorEl={actionMenuOpen}
+            onClose={() => setActionMenuOpen(null)}
+            anchorOrigin={{
+               vertical: "bottom",
+               horizontal: "right",
+            }}
+            transformOrigin={{
+               vertical: "top",
+               horizontal: "right",
+            }}
+         >
+            <Menu
+               item={(menuItems ?? [])?.map((menuItem) => ({
+                  ...menuItem,
+                  onClick: () => {
+                     // menuItem.onClick?.(p);
+                     setActionMenuOpen(null);
+                  },
+               }))}
+               onClose={() => setActionMenuOpen(null)}
+            />
+         </CustomPopover>
+
          {/* {type === "order" && (
             <Stack>
                <OrderTab

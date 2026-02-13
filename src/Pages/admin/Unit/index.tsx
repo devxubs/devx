@@ -10,7 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig, TableProps } from "@src/components/Table";
 
 const productSchema = z.object({
    name: z.string().min(1, "Name is required!"),
@@ -88,8 +88,8 @@ const Unit = () => {
          // Edit
          setUnit((prev) =>
             prev.map((cat) =>
-               cat.id === selectedUnit.id ? { ...cat, name: data.name } : cat
-            )
+               cat.id === selectedUnit.id ? { ...cat, name: data.name } : cat,
+            ),
          );
       } else {
          // Add
@@ -112,34 +112,14 @@ const Unit = () => {
       }
    };
 
-   // Action menu for each row
-   const actionMenu = (row: UnitType) => [
+   const columns: ColumnConfig[] = [
+      { field: "name", headerName: "Name", flex: 1 },
+      { field: "short", headerName: "Short", flex: 1 },
       {
-         label: "edit",
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => openModal(row),
-      },
-      {
-         label: "delete",
-         color: "error",
-         onClick: () => {
-            setSelectedUnit(row);
-            setIsDeleteDialogOpen(true);
-         },
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
+         field: "@actions",
+         headerName: "",
       },
    ];
-
-   const tableProps: Omit<TableProps, "type"> = {
-      head: ["@check", "Name", "Short", "@action"],
-      body: unit,
-   };
 
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
@@ -165,10 +145,31 @@ const Unit = () => {
 
             {/* Table */}
             <CustomTable
-               type="default"
-               head={tableProps.head}
-               body={tableProps.body}
-               actionMenu={(row) => actionMenu(row as any)}
+               rows={unit}
+               columns={columns}
+               checkBox
+               menuItems={[
+                  {
+                     label: "edit",
+                     icon: <Icon icon="solar:pen-bold" size="small" />,
+                     onClick: (p) => openModal(p.row),
+                  },
+                  {
+                     label: "delete",
+                     color: "error",
+                     icon: (
+                        <Icon
+                           icon="solar:trash-bin-trash-bold"
+                           size="small"
+                           color="error"
+                        />
+                     ),
+                     onClick: (p) => {
+                        // setSelectedUnit(p.row);
+                        // setIsDeleteDialogOpen(true);
+                     },
+                  },
+               ]}
             />
 
             {/* Modal */}

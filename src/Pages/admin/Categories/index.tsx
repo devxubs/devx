@@ -2,7 +2,6 @@
 
 import { Stack, Button, TextField, Typography, useTheme } from "@mui/material";
 import React, { useState } from "react";
-import Scrollbar from "react-browser-scrollbar";
 import { Controller, useForm, SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,7 +9,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
+import { GridRenderCellParams } from "@mui/x-data-grid";
 
 const productSchema = z.object({
    name: z.string().min(1, "Name is required!"),
@@ -73,8 +73,8 @@ const Categories = () => {
             prev.map((cat) =>
                cat.id === selectedCategory.id
                   ? { ...cat, name: data.name }
-                  : cat
-            )
+                  : cat,
+            ),
          );
       } else {
          // Add
@@ -91,41 +91,21 @@ const Categories = () => {
    const handleDelete = () => {
       if (selectedCategory) {
          setCategories((prev) =>
-            prev.filter((cat) => cat.id !== selectedCategory.id)
+            prev.filter((cat) => cat.id !== selectedCategory.id),
          );
          setSelectedCategory(null);
          setIsDeleteDialogOpen(false);
       }
    };
 
-   // Action menu for each row
-   const actionMenu = (row: CategoryType) => [
+   const columns: ColumnConfig[] = [
+      { field: "id", headerName: "ID", flex: 0 },
+      { field: "name", headerName: "Name", flex: 1 },
       {
-         label: "edit",
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => openModal(row),
-      },
-      {
-         label: "delete",
-         color: "error",
-         onClick: () => {
-            setSelectedCategory(row);
-            setIsDeleteDialogOpen(true);
-         },
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
+         field: "@actions",
+         headerName: "",
       },
    ];
-
-   const tableProps: Omit<TableProps, "type"> = {
-      head: ["@check", "Name", "@action"],
-      body: categories,
-   };
 
    return (
       <Stack spacing={2} py={2}>
@@ -150,10 +130,35 @@ const Categories = () => {
 
          {/* Table */}
          <CustomTable
-            type="category"
-            head={tableProps.head}
-            body={tableProps.body}
-            actionMenu={(row) => actionMenu(row as any)}
+            rows={categories}
+            columns={columns}
+            checkBox
+            menuItems={[
+               {
+                  label: "edit",
+                  icon: <Icon icon="solar:pen-bold" size="small" />,
+                  onClick: (p: GridRenderCellParams) => {
+                     console.log(p.row);
+
+                     openModal(p.row as CategoryType);
+                  },
+               },
+               {
+                  label: "delete",
+                  color: "error",
+                  icon: (
+                     <Icon
+                        icon="solar:trash-bin-trash-bold"
+                        size="small"
+                        color="error"
+                     />
+                  ),
+                  onClick: () => {
+                     // setSelectedCategory(row);
+                     // setIsDeleteDialogOpen(true);
+                  },
+               },
+            ]}
          />
 
          {/* Modal */}

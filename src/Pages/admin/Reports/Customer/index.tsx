@@ -1,5 +1,5 @@
 import { Stack } from "@mui/material";
-import CustomerInfo from "@src/components/CustomerInfo";
+import CustomerInfo from "@src/Pages/admin/Customers/CustomerInfo";
 import DateRangePickerCustom from "@src/components/DateRange";
 import CustomTable from "@src/components/Table";
 import { id } from "date-fns/locale";
