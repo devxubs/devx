@@ -2,11 +2,7 @@
 
 import { Stack, Button, Avatar, Typography, useTheme } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomTable, {
-   ColumnConfig,
-   TableProps,
-   TableRow,
-} from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import CustomModal from "@src/components/Modal";
@@ -97,7 +93,7 @@ const rows = [
 ];
 
 const columns: ColumnConfig[] = [
-   { field: "id", headerName: "ID" },
+   { field: "id", headerName: "ID", flex: 0 },
    {
       field: "name",
       headerName: "Name",
@@ -114,24 +110,13 @@ const columns: ColumnConfig[] = [
    {
       field: "@actions",
       headerName: "",
-      menu: [
-         { label: "Edit", onClick: () => {} },
-         { label: "Delete", color: "error", onClick: () => {} },
-      ],
    },
 ];
-// const body = allUser.map((u) => ({
-//    ...u,
-//    full_name: u.name,
-//    name: <UserProfile name={u.name} email={u.email} />,
-//    phoneNumber: u.phoneNumber,
-//    role: u.role,
-// }));
 
 const Users = () => {
    const theme = useTheme();
    const [modalOpen, setModalOpen] = useState(false);
-   const [editableUser, setEditableUser] = useState({} as TableRow);
+   const [editableUser, setEditableUser] = useState({} as any);
    const actionMenu = (row: any) => [
       {
          label: "edit",
@@ -212,24 +197,27 @@ const Users = () => {
                   rows={rows}
                   columns={columns}
                   checkBox={true}
-                  // actionMenu={(row) => actionMenu(row)}
-                  // filter={(data, onChange) => {
-                  //    return (
-                  //       <Stack sx={{ width: "30%" }}>
-                  //          <CustomAutocomplete
-                  //             label="Role"
-                  //             options={names}
-                  //             value={data.userRole || ""} // controlled
-                  //             onChange={(v: string) =>
-                  //                onChange?.({
-                  //                   ...data,
-                  //                   userRole: v || "",
-                  //                })
-                  //             }
-                  //          />
-                  //       </Stack>
-                  //    );
-                  // }}
+                  menuItems={[
+                     { label: "Edit", onClick: () => {} },
+                     { label: "Delete", color: "error", onClick: () => {} },
+                  ]}
+                  filter={(data, onChange) => {
+                     return (
+                        <Stack sx={{ width: "30%" }}>
+                           <CustomAutocomplete
+                              label="Role"
+                              options={names}
+                              value={data.userRole || ""} // controlled
+                              onChange={(v: string) =>
+                                 onChange?.({
+                                    ...data,
+                                    userRole: v || "",
+                                 })
+                              }
+                           />
+                        </Stack>
+                     );
+                  }}
                />
             </Stack>
          </Stack>

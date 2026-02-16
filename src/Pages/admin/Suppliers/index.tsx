@@ -12,7 +12,11 @@ import {
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { Head, TableProps } from "@src/components/Table";
+import CustomTable, {
+   ColumnConfig,
+   Head,
+   TableProps,
+} from "@src/components/Table";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -190,26 +194,74 @@ export type SupplierFormValues = yup.InferType<typeof SuppliersSchema>;
 
 const Suppliers = () => {
    const theme = useTheme();
-   const tableData: Omit<TableProps, "type"> = {
-      head: [
-         "@check",
-         "Id",
-         "Name",
-         "Number",
-         "Total",
-         "Pay",
-         "Due",
-         "Advance",
-         "Pay return",
-         "Due return",
-         "@action",
-      ],
-      body: suppliersData as any,
-   };
+   const columns: ColumnConfig[] = [
+      {
+         field: "id",
+         headerName: "Id",
+         flex: 0.1,
+      },
+      {
+         field: "name",
+         headerName: "Name",
+         flex: 1,
+         renderCell: (params) => (
+            <Stack height={"100%"} justifyContent={"center"}>
+               <Typography
+                  variant="subtitle2"
+                  color="textPrimary"
+                  fontSize={15}
+                  fontWeight={500}
+               >
+                  {params.row.name}
+               </Typography>
+               <Typography
+                  variant="subtitle1"
+                  fontSize={13}
+                  color="text.secondary"
+               >
+                  {params.row.number}
+               </Typography>
+            </Stack>
+         ),
+      },
+      {
+         field: "address",
+         headerName: "Address",
+         flex: 1,
+      },
+      {
+         field: "total",
+         headerName: "Total",
+      },
+      {
+         field: "pay",
+         headerName: "Pay",
+      },
+      {
+         field: "due",
+         headerName: "Due",
+      },
+      {
+         field: "advance",
+         headerName: "Advance",
+      },
+      {
+         field: "pay_return",
+         headerName: "Pay Return",
+      },
+      {
+         field: "due_return",
+         headerName: "Due Return",
+      },
+      {
+         field: "@actions",
+         headerName: "",
+      },
+   ];
 
    const [open, setOpen] = useState(false);
    const [supplier, setSuppliers] = useState<SuppliersTypes>(
-      {} as SuppliersTypes
+      {} as SuppliersTypes,
    );
    const [isEditMode, setIsEditMode] = useState(false);
    const [openDelete, setOpenDelete] = useState(false);
@@ -227,45 +279,6 @@ const Suppliers = () => {
          email: "",
       },
    });
-
-   // Action menu for each row
-   const actionMenu = (row: SuppliersTypes) => [
-      {
-         label: "edit",
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => {
-            setSuppliers(row);
-            setIsEditMode(true);
-            setOpen(true);
-            reset(row);
-         },
-      },
-      {
-         label: "print",
-         icon: <Icon icon="solar:printer-minimalistic-bold" size="small" />,
-         onClick: () => {
-            setSuppliers(row);
-            setIsEditMode(true);
-            setOpen(true);
-            reset(row);
-         },
-      },
-      {
-         label: "delete",
-         color: "error",
-         onClick: () => {
-            setSuppliers(row);
-            setOpenDelete(true);
-         },
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
-      },
-   ];
 
    const onSubmit: SubmitHandler<SuppliersTypes> = (formData) => {
       const newOrder: SuppliersTypes = {
@@ -285,7 +298,7 @@ const Suppliers = () => {
                   <Icon
                      icon="mingcute:add-line"
                      style={{
-                        color: theme.palette.text.primary,
+                        color: theme.palette.common.white,
                      }}
                   />
                }
@@ -295,10 +308,37 @@ const Suppliers = () => {
             </Button>
          </Stack>
          <CustomTable
-            type={"default"}
-            head={tableData.head}
-            body={tableData.body}
-            actionMenu={(row) => actionMenu(row as any)}
+            rows={suppliersData}
+            columns={columns}
+            checkBox={true}
+            menuItems={[
+               {
+                  label: "edit",
+                  onClick: (p) => {
+                     setSuppliers(p.row);
+                     setIsEditMode(true);
+                     setOpen(true);
+                     reset(p.row);
+                  },
+               },
+               {
+                  label: "print",
+                  onClick: (p) => {
+                     setSuppliers(p.row);
+                     setIsEditMode(true);
+                     setOpen(true);
+                     reset(p.row);
+                  },
+               },
+               {
+                  label: "delete",
+                  color: "error",
+                  onClick: (p) => {
+                     setSuppliers(p.row);
+                     setOpenDelete(true);
+                  },
+               },
+            ]}
          />
          <CustomModal
             open={open}

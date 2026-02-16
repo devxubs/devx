@@ -12,10 +12,21 @@ import {
    Button,
    useMediaQuery,
 } from "@mui/material";
-import React from "react";
+
+import {
+   GridPortalWrapper,
+   QuickFilter,
+   QuickFilterClear,
+   QuickFilterControl,
+   ToolbarButton,
+   ColumnsPanelTrigger,
+   FilterPanelTrigger,
+   Toolbar,
+} from "@mui/x-data-grid";
+
+import React, { useMemo } from "react";
 import Icon from "../Icon";
 import dayjs from "dayjs";
-import { Type } from ".";
 
 export type OrderFilter = {
    order_created_at?: [Date | null, Date | null];
@@ -51,12 +62,11 @@ export type FilterData = {
 };
 
 type FilterProps = {
-   type: Type;
    onFilterChange?: (data: FilterData) => void;
    filterData: FilterData;
    customFilter?: (
       data: FilterData,
-      onChange: (data: FilterData) => void
+      onChange: (data: FilterData) => void,
    ) => React.ReactNode;
 };
 
@@ -68,227 +78,272 @@ const Filter: React.FC<FilterProps> = ({
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-   // -----------------------------------------------------
-   // ✅ Extract ACTIVE orderData filters only
-   // -----------------------------------------------------
-   const activeOrderFilters = Object.entries(filterData.orderData || {}).filter(
-      ([_, value]) => {
-         if (!value) return false;
-
-         if (Array.isArray(value)) {
-            const [start, end] = value;
-            return Boolean(start && end);
-         }
-
-         return value !== "";
-      }
-   );
-
    const reportData = Object.entries(filterData.reportData || {});
 
+   const isActive = (val: any) => {
+      if (!val) return false;
+      if (Array.isArray(val)) return !!(val[0] && val[1]); // Active if date range is full
+      return val !== "";
+   };
+
+   const activeOrderFilters = Object.entries(filterData.orderData || {}).filter(
+      ([_, v]) => isActive(v),
+   );
+
+   const activeReportFilters = Object.entries(
+      filterData.reportData || {},
+   ).filter(([key, value]) => key !== "report_type" && isActive(value));
+
+   const hasAnyFilter = useMemo(() => {
+      return (
+         isActive(filterData.searchText) ||
+         isActive(filterData.userRole) ||
+         isActive(filterData.productStock) ||
+         activeOrderFilters.length > 0 ||
+         activeReportFilters.length > 0
+      );
+   }, [filterData, activeOrderFilters, activeReportFilters]);
+
+   const handleClearAll = () => {
+      onFilterChange?.({
+         searchText: "",
+         userRole: "",
+         productStock: "",
+         orderData: {},
+         reportData: {
+            report_type: "default",
+            date: [null, null],
+            product: null,
+         },
+      });
+   };
+
    return (
-      <Stack spacing={2} mb={2}>
-         {/* ================= TOP SEARCH + CUSTOM FILTER ================ */}
-         <Stack
-            spacing={2}
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-         >
-            {/* Search Box */}
-            <FormControl variant="outlined" sx={{ flex: !isMobile ? 0.4 : 1 }}>
-               <TextField
-                  fullWidth
-                  placeholder="Search"
-                  size={isMobile ? "small" : "medium"}
-                  value={filterData.searchText}
-                  onChange={(e) =>
-                     onFilterChange?.({
-                        ...filterData,
-                        searchText: e.target.value,
-                     })
-                  }
-                  InputProps={{
-                     startAdornment: (
-                        <InputAdornment position="start">
-                           <Icon icon="eva:search-fill" />
-                        </InputAdornment>
-                     ),
-                  }}
-               />
-            </FormControl>
+      <QuickFilter expanded>
+         <QuickFilterControl
+            render={({ ref, ...other }) => (
+               <Stack spacing={2} p={2} bgcolor={"background.paper"}>
+                  {/* ================= TOP SEARCH + CUSTOM FILTER ================ */}
+                  <Stack
+                     spacing={2}
+                     direction="row"
+                     alignItems="center"
+                     justifyContent="space-between"
+                  >
+                     {/* Search Box */}
+                     <FormControl
+                        variant="outlined"
+                        sx={{ flex: !isMobile ? 0.4 : 1 }}
+                     >
+                        <TextField
+                           {...other}
+                           inputRef={ref}
+                           fullWidth
+                           placeholder="Search"
+                           size={isMobile ? "small" : "medium"}
+                           // value={filterData.searchText}
+                           // onChange={(e) =>
+                           //    onFilterChange?.({
+                           //       ...filterData,
+                           //       searchText: e.target.value,
+                           //    })
+                           // }
+                           InputProps={{
+                              startAdornment: (
+                                 <InputAdornment position="start">
+                                    <Icon icon="eva:search-fill" />
+                                 </InputAdornment>
+                              ),
+                           }}
+                        />
+                     </FormControl>
 
-            {customFilter &&
-               customFilter(filterData, (updated) => onFilterChange?.(updated))}
-         </Stack>
+                     {customFilter &&
+                        (customFilter(filterData, (updated) =>
+                           onFilterChange?.(updated),
+                        ) as React.ReactElement)}
+                  </Stack>
 
-         {/* ================= ACTIVE FILTER CHIPS ================= */}
-         <Stack
-            spacing={1}
-            direction="row"
-            alignItems="flex-start"
-            flexWrap="wrap"
-         >
-            {/* Search Text */}
-            {filterData.searchText && (
-               <FilterChipWrapper title="Keyword">
-                  <Chip
-                     label={filterData.searchText}
-                     size="small"
-                     onDelete={() =>
-                        onFilterChange?.({ ...filterData, searchText: "" })
-                     }
-                     sx={chipStyle(theme)}
-                  />
-               </FilterChipWrapper>
-            )}
-
-            {/* Product Stock */}
-            {filterData.productStock && (
-               <FilterChipWrapper title="Stock">
-                  <Chip
-                     label={filterData.productStock}
-                     size="small"
-                     onDelete={() =>
-                        onFilterChange?.({ ...filterData, productStock: "" })
-                     }
-                     sx={chipStyle(theme)}
-                  />
-               </FilterChipWrapper>
-            )}
-
-            {/* User Role */}
-            {filterData.userRole && (
-               <FilterChipWrapper title="Role">
-                  <Chip
-                     label={filterData.userRole}
-                     size="small"
-                     onDelete={() =>
-                        onFilterChange?.({ ...filterData, userRole: "" })
-                     }
-                     sx={chipStyle(theme)}
-                  />
-               </FilterChipWrapper>
-            )}
-
-            {/* Reports */}
-            {filterData.reportData && (
-               <>
-                  {reportData.map(([key], idx) => {
-                     const value =
-                        filterData.reportData?.[
-                           key as keyof typeof filterData.reportData
-                        ];
-
-                     if (
-                        key === "report_type" ||
-                        value == null || // null or undefined
-                        (Array.isArray(value) && (!value[0] || !value[1]))
-                     ) {
-                        return null;
-                     }
-
-                     const label =
-                        key === "date" &&
-                        Array.isArray(value) &&
-                        value[0] !== null &&
-                        value[1] !== null
-                           ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
-                                value[1]
-                             ).format("YYYY-MM-DD")}`
-                           : String(value ?? "");
-
-                     return (
-                        filterData.reportData && (
-                           <FilterChipWrapper
-                              key={idx}
-                              title={
-                                 !filterData.reportData.report_type ||
-                                 filterData.reportData.report_type === "default"
-                                    ? key
-                                    : `${filterData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
+                  {/* ================= ACTIVE FILTER CHIPS ================= */}
+                  <Stack
+                     spacing={1}
+                     direction="row"
+                     alignItems="flex-start"
+                     flexWrap="wrap"
+                  >
+                     {/* Search Text */}
+                     {isActive(filterData.searchText) && (
+                        <FilterChipWrapper title="Keyword">
+                           <Chip
+                              label={filterData.searchText}
+                              size="small"
+                              onDelete={() =>
+                                 onFilterChange?.({
+                                    ...filterData,
+                                    searchText: "",
+                                 })
                               }
-                           >
-                              <Chip
-                                 label={label}
+                              sx={chipStyle(theme)}
+                           />
+                        </FilterChipWrapper>
+                     )}
+
+                     {/* Product Stock */}
+                     {isActive(filterData.productStock) && (
+                        <FilterChipWrapper title="Stock">
+                           <Chip
+                              label={filterData.productStock}
+                              size="small"
+                              onDelete={() =>
+                                 onFilterChange?.({
+                                    ...filterData,
+                                    productStock: "",
+                                 })
+                              }
+                              sx={chipStyle(theme)}
+                           />
+                        </FilterChipWrapper>
+                     )}
+
+                     {/* User Role */}
+                     {isActive(filterData.userRole) && (
+                        <FilterChipWrapper title="Role">
+                           <Chip
+                              label={filterData.userRole}
+                              size="small"
+                              onDelete={() =>
+                                 onFilterChange?.({
+                                    ...filterData,
+                                    userRole: "",
+                                 })
+                              }
+                              sx={chipStyle(theme)}
+                           />
+                        </FilterChipWrapper>
+                     )}
+
+                     {/* Reports */}
+                     {activeReportFilters && (
+                        <>
+                           {reportData.map(([key], idx) => {
+                              const value =
+                                 filterData.reportData?.[
+                                    key as keyof typeof filterData.reportData
+                                 ];
+
+                              if (
+                                 key === "report_type" ||
+                                 value == null || // null or undefined
+                                 (Array.isArray(value) &&
+                                    (!value[0] || !value[1]))
+                              ) {
+                                 return null;
+                              }
+
+                              const label =
+                                 key === "date" &&
+                                 Array.isArray(value) &&
+                                 value[0] !== null &&
+                                 value[1] !== null
+                                    ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
+                                         value[1],
+                                      ).format("YYYY-MM-DD")}`
+                                    : String(value ?? "");
+
+                              return (
+                                 filterData.reportData && (
+                                    <FilterChipWrapper
+                                       key={idx}
+                                       title={
+                                          !filterData.reportData.report_type ||
+                                          filterData.reportData.report_type ===
+                                             "default"
+                                             ? key
+                                             : `${filterData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
+                                       }
+                                    >
+                                       <Chip
+                                          label={label}
+                                          size="small"
+                                          onDelete={() =>
+                                             onFilterChange?.({
+                                                ...filterData,
+                                                reportData: {
+                                                   ...filterData.reportData,
+                                                   [key]:
+                                                      key === "date"
+                                                         ? [null, null]
+                                                         : undefined,
+                                                   report_type: "default",
+                                                },
+                                             })
+                                          }
+                                          sx={chipStyle(theme)}
+                                       />
+                                    </FilterChipWrapper>
+                                 )
+                              );
+                           })}
+                        </>
+                     )}
+
+                     {/* ================= Dynamic OrderData Filters ================ */}
+                     {activeOrderFilters.map(([key, value]) => (
+                        <FilterChipWrapper key={key} title={formatLabel(key)}>
+                           <Chip
+                              label={
+                                 Array.isArray(value) && value[0] && value[1]
+                                    ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
+                                         value[1],
+                                      ).format("YYYY-MM-DD")}`
+                                    : String(value)
+                              }
+                              size="small"
+                              onDelete={() =>
+                                 onFilterChange?.({
+                                    ...filterData,
+                                    orderData: {
+                                       ...filterData.orderData,
+                                       [key]: Array.isArray(value)
+                                          ? undefined
+                                          : "",
+                                    },
+                                 })
+                              }
+                              sx={chipStyle(theme)}
+                           />
+                        </FilterChipWrapper>
+                     ))}
+
+                     {/* ================= CLEAR ALL BUTTON ================ */}
+                     {hasAnyFilter && (
+                        <Button
+                           variant="text"
+                           color="error"
+                           startIcon={
+                              <Icon
                                  size="small"
-                                 onDelete={() =>
-                                    onFilterChange?.({
-                                       ...filterData,
-                                       reportData: {
-                                          ...filterData.reportData,
-                                          [key]:
-                                             key === "date"
-                                                ? [null, null]
-                                                : undefined,
-                                          report_type: "default",
-                                       },
-                                    })
-                                 }
-                                 sx={chipStyle(theme)}
+                                 icon="solar:trash-bin-trash-bold"
+                                 color="error"
                               />
-                           </FilterChipWrapper>
-                        )
-                     );
-                  })}
-               </>
+                           }
+                           onClick={() =>
+                              onFilterChange?.({
+                                 searchText: "",
+                                 userRole: "",
+                                 productStock: "",
+                                 orderData: {},
+                              })
+                           }
+                        >
+                           Clear
+                        </Button>
+                     )}
+                  </Stack>
+               </Stack>
             )}
-
-            {/* ================= Dynamic OrderData Filters ================ */}
-            {activeOrderFilters.map(([key, value]) => (
-               <FilterChipWrapper key={key} title={formatLabel(key)}>
-                  <Chip
-                     label={
-                        Array.isArray(value) && value[0] && value[1]
-                           ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
-                                value[1]
-                             ).format("YYYY-MM-DD")}`
-                           : String(value)
-                     }
-                     size="small"
-                     onDelete={() =>
-                        onFilterChange?.({
-                           ...filterData,
-                           orderData: {
-                              ...filterData.orderData,
-                              [key]: Array.isArray(value) ? undefined : "",
-                           },
-                        })
-                     }
-                     sx={chipStyle(theme)}
-                  />
-               </FilterChipWrapper>
-            ))}
-
-            {/* ================= CLEAR ALL BUTTON ================ */}
-            {(filterData.searchText ||
-               filterData.productStock ||
-               filterData.userRole ||
-               activeOrderFilters.length > 0) && (
-               <Button
-                  variant="text"
-                  color="error"
-                  startIcon={
-                     <Icon
-                        size="small"
-                        icon="solar:trash-bin-trash-bold"
-                        color="error"
-                     />
-                  }
-                  onClick={() =>
-                     onFilterChange?.({
-                        searchText: "",
-                        userRole: "",
-                        productStock: "",
-                        orderData: {},
-                     })
-                  }
-               >
-                  Clear
-               </Button>
-            )}
-         </Stack>
-      </Stack>
+         />
+      </QuickFilter>
    );
 };
 
