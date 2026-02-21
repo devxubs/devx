@@ -12,7 +12,7 @@ import {
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { Head, TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -108,10 +108,14 @@ const expenseSchema = yup.object({
 
 const Expense = () => {
    const theme = useTheme();
-   const tableData: Omit<TableProps, "type"> = {
-      head: ["@check", "Id", "Type", "Date", "Amount", "Note", "@action"],
-      body: expenses as any,
-   };
+   const columns: ColumnConfig[] = [
+      { field: "id", headerName: "ID", flex: 0.1 },
+      { field: "type", headerName: "Type" },
+      { field: "date", headerName: "Date" },
+      { field: "amount", headerName: "Amount" },
+      { field: "note", headerName: "Note" },
+      { field: "@actions", headerName: "" },
+   ];
 
    const [open, setOpen] = useState(false);
    const [expense, setExpense] = useState<ExpenseItem>({} as ExpenseItem);
@@ -131,45 +135,6 @@ const Expense = () => {
          note: "",
       },
    });
-
-   // Action menu for each row
-   const actionMenu = (row: ExpenseItem) => [
-      {
-         label: "edit",
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => {
-            setExpense(row);
-            setIsEditMode(true);
-            setOpen(true);
-            reset(row);
-         },
-      },
-      {
-         label: "print",
-         icon: <Icon icon="solar:printer-minimalistic-bold" size="small" />,
-         onClick: () => {
-            setExpense(row);
-            setIsEditMode(true);
-            setOpen(true);
-            reset(row);
-         },
-      },
-      {
-         label: "delete",
-         color: "error",
-         onClick: () => {
-            setExpense(row);
-            setOpenDelete(true);
-         },
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
-      },
-   ];
 
    const onSubmit: SubmitHandler<ExpenseItem> = (formData) => {
       const newOrder: ExpenseItem = {
@@ -199,10 +164,51 @@ const Expense = () => {
             </Button>
          </Stack>
          <CustomTable
-            type={"default"}
-            head={tableData.head}
-            body={tableData.body}
-            actionMenu={(row) => actionMenu(row as any)}
+            rows={expenses}
+            columns={columns}
+            menuItems={[
+               {
+                  label: "edit",
+                  icon: <Icon icon="solar:pen-bold" size="small" />,
+                  onClick: (params) => {
+                     setExpense(params.row);
+                     setIsEditMode(true);
+                     setOpen(true);
+                     reset(params.row);
+                  },
+               },
+               {
+                  label: "print",
+                  icon: (
+                     <Icon
+                        icon="solar:printer-minimalistic-bold"
+                        size="small"
+                     />
+                  ),
+                  onClick: (params) => {
+                     setExpense(params.row);
+                     setIsEditMode(true);
+                     setOpen(true);
+                     reset(params.row);
+                  },
+               },
+               {
+                  label: "delete",
+                  color: "error",
+                  onClick: (params) => {
+                     setExpense(params.row);
+                     setOpenDelete(true);
+                  },
+                  icon: (
+                     <Icon
+                        icon="solar:trash-bin-trash-bold"
+                        size="small"
+                        color="error"
+                     />
+                  ),
+               },
+            ]}
+            checkBox
          />
          <CustomModal
             open={open}

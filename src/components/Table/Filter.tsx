@@ -40,12 +40,12 @@ export type OrderFilter = {
 };
 
 export type FilterData = {
-   userRole: string;
-   productStock: string;
-   searchText: string;
-   orderData: OrderFilter;
+   userRole?: string;
+   productStock?: string;
+   searchText?: string;
+   orderData?: OrderFilter;
    reportData?: {
-      report_type:
+      report_type?:
          | "default"
          | "sales"
          | "couriers"
@@ -110,240 +110,224 @@ const Filter: React.FC<FilterProps> = ({
          userRole: "",
          productStock: "",
          orderData: {},
-         reportData: {
-            report_type: "default",
-            date: [null, null],
-            product: null,
-         },
+         reportData: {},
       });
    };
 
    return (
-      <QuickFilter expanded>
-         <QuickFilterControl
-            render={({ ref, ...other }) => (
-               <Stack spacing={2} p={2} bgcolor={"background.paper"}>
-                  {/* ================= TOP SEARCH + CUSTOM FILTER ================ */}
-                  <Stack
-                     spacing={2}
-                     direction="row"
-                     alignItems="center"
-                     justifyContent="space-between"
-                  >
-                     {/* Search Box */}
-                     <FormControl
-                        variant="outlined"
-                        sx={{ flex: !isMobile ? 0.4 : 1 }}
-                     >
-                        <TextField
-                           {...other}
-                           inputRef={ref}
-                           fullWidth
-                           placeholder="Search"
-                           size={isMobile ? "small" : "medium"}
-                           // value={filterData.searchText}
-                           // onChange={(e) =>
-                           //    onFilterChange?.({
-                           //       ...filterData,
-                           //       searchText: e.target.value,
-                           //    })
-                           // }
-                           InputProps={{
-                              startAdornment: (
-                                 <InputAdornment position="start">
-                                    <Icon icon="eva:search-fill" />
-                                 </InputAdornment>
-                              ),
-                           }}
-                        />
-                     </FormControl>
+      <Stack
+         spacing={2}
+         bgcolor={"background.paper"}
+         borderBottom={1}
+         borderColor="divider"
+      >
+         <Stack spacing={2} p={2} bgcolor={"background.paper"}>
+            {/* ================= TOP SEARCH + CUSTOM FILTER ================ */}
+            <Stack
+               spacing={2}
+               direction="row"
+               alignItems="center"
+               justifyContent="space-between"
+            >
+               {/* Search Box */}
+               <FormControl
+                  variant="outlined"
+                  sx={{ flex: !isMobile ? 0.4 : 1 }}
+               >
+                  <TextField
+                     fullWidth
+                     placeholder="Search"
+                     size={isMobile ? "small" : "medium"}
+                     value={filterData.searchText}
+                     onChange={(e) =>
+                        onFilterChange?.({
+                           searchText: e.target.value,
+                        })
+                     }
+                     InputProps={{
+                        startAdornment: (
+                           <InputAdornment position="start">
+                              <Icon icon="eva:search-fill" />
+                           </InputAdornment>
+                        ),
+                     }}
+                  />
+               </FormControl>
 
-                     {customFilter &&
-                        (customFilter(filterData, (updated) =>
-                           onFilterChange?.(updated),
-                        ) as React.ReactElement)}
-                  </Stack>
+               {customFilter &&
+                  (customFilter(filterData, (updated) =>
+                     onFilterChange?.(updated),
+                  ) as React.ReactElement)}
+            </Stack>
 
-                  {/* ================= ACTIVE FILTER CHIPS ================= */}
-                  <Stack
-                     spacing={1}
-                     direction="row"
-                     alignItems="flex-start"
-                     flexWrap="wrap"
-                  >
-                     {/* Search Text */}
-                     {isActive(filterData.searchText) && (
-                        <FilterChipWrapper title="Keyword">
-                           <Chip
-                              label={filterData.searchText}
-                              size="small"
-                              onDelete={() =>
-                                 onFilterChange?.({
-                                    ...filterData,
-                                    searchText: "",
-                                 })
-                              }
-                              sx={chipStyle(theme)}
-                           />
-                        </FilterChipWrapper>
-                     )}
+            {/* ================= ACTIVE FILTER CHIPS ================= */}
+            <Stack
+               spacing={1}
+               direction="row"
+               alignItems="flex-start"
+               flexWrap="wrap"
+            >
+               {/* Search Text */}
+               {isActive(filterData.searchText) && (
+                  <FilterChipWrapper title="Keyword">
+                     <Chip
+                        label={filterData.searchText}
+                        size="small"
+                        onDelete={() =>
+                           onFilterChange?.({
+                              ...filterData,
+                              searchText: "",
+                           })
+                        }
+                        sx={chipStyle(theme)}
+                     />
+                  </FilterChipWrapper>
+               )}
 
-                     {/* Product Stock */}
-                     {isActive(filterData.productStock) && (
-                        <FilterChipWrapper title="Stock">
-                           <Chip
-                              label={filterData.productStock}
-                              size="small"
-                              onDelete={() =>
-                                 onFilterChange?.({
-                                    ...filterData,
-                                    productStock: "",
-                                 })
-                              }
-                              sx={chipStyle(theme)}
-                           />
-                        </FilterChipWrapper>
-                     )}
+               {/* Product Stock */}
+               {isActive(filterData.productStock) && (
+                  <FilterChipWrapper title="Stock">
+                     <Chip
+                        label={filterData.productStock}
+                        size="small"
+                        onDelete={() =>
+                           onFilterChange?.({
+                              ...filterData,
+                              productStock: "",
+                           })
+                        }
+                        sx={chipStyle(theme)}
+                     />
+                  </FilterChipWrapper>
+               )}
 
-                     {/* User Role */}
-                     {isActive(filterData.userRole) && (
-                        <FilterChipWrapper title="Role">
-                           <Chip
-                              label={filterData.userRole}
-                              size="small"
-                              onDelete={() =>
-                                 onFilterChange?.({
-                                    ...filterData,
-                                    userRole: "",
-                                 })
-                              }
-                              sx={chipStyle(theme)}
-                           />
-                        </FilterChipWrapper>
-                     )}
+               {/* User Role */}
+               {isActive(filterData.userRole) && (
+                  <FilterChipWrapper title="Role">
+                     <Chip
+                        label={filterData.userRole}
+                        size="small"
+                        onDelete={() =>
+                           onFilterChange?.({
+                              ...filterData,
+                              userRole: "",
+                           })
+                        }
+                        sx={chipStyle(theme)}
+                     />
+                  </FilterChipWrapper>
+               )}
 
-                     {/* Reports */}
-                     {activeReportFilters && (
-                        <>
-                           {reportData.map(([key], idx) => {
-                              const value =
-                                 filterData.reportData?.[
-                                    key as keyof typeof filterData.reportData
-                                 ];
+               {/* Reports */}
+               {activeReportFilters && (
+                  <>
+                     {reportData.map(([key], idx) => {
+                        const value =
+                           filterData.reportData?.[
+                              key as keyof typeof filterData.reportData
+                           ];
 
-                              if (
-                                 key === "report_type" ||
-                                 value == null || // null or undefined
-                                 (Array.isArray(value) &&
-                                    (!value[0] || !value[1]))
-                              ) {
-                                 return null;
-                              }
+                        if (
+                           key === "report_type" ||
+                           value == null || // null or undefined
+                           (Array.isArray(value) && (!value[0] || !value[1]))
+                        ) {
+                           return null;
+                        }
 
-                              const label =
-                                 key === "date" &&
-                                 Array.isArray(value) &&
-                                 value[0] !== null &&
-                                 value[1] !== null
-                                    ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
-                                         value[1],
-                                      ).format("YYYY-MM-DD")}`
-                                    : String(value ?? "");
+                        const label =
+                           key === "date" &&
+                           Array.isArray(value) &&
+                           value[0] !== null &&
+                           value[1] !== null
+                              ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
+                                   value[1],
+                                ).format("YYYY-MM-DD")}`
+                              : String(value ?? "");
 
-                              return (
-                                 filterData.reportData && (
-                                    <FilterChipWrapper
-                                       key={idx}
-                                       title={
-                                          !filterData.reportData.report_type ||
-                                          filterData.reportData.report_type ===
-                                             "default"
-                                             ? key
-                                             : `${filterData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
-                                       }
-                                    >
-                                       <Chip
-                                          label={label}
-                                          size="small"
-                                          onDelete={() =>
-                                             onFilterChange?.({
-                                                ...filterData,
-                                                reportData: {
-                                                   ...filterData.reportData,
-                                                   [key]:
-                                                      key === "date"
-                                                         ? [null, null]
-                                                         : undefined,
-                                                   report_type: "default",
-                                                },
-                                             })
-                                          }
-                                          sx={chipStyle(theme)}
-                                       />
-                                    </FilterChipWrapper>
-                                 )
-                              );
-                           })}
-                        </>
-                     )}
+                        return (
+                           filterData.reportData && (
+                              <FilterChipWrapper
+                                 key={idx}
+                                 title={
+                                    !filterData.reportData.report_type ||
+                                    filterData.reportData.report_type ===
+                                       "default"
+                                       ? key
+                                       : `${filterData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
+                                 }
+                              >
+                                 <Chip
+                                    label={label}
+                                    size="small"
+                                    onDelete={() =>
+                                       onFilterChange?.({
+                                          ...filterData,
+                                          reportData: {
+                                             ...filterData.reportData,
+                                             [key]:
+                                                key === "date"
+                                                   ? [null, null]
+                                                   : undefined,
+                                             report_type: "default",
+                                          },
+                                       })
+                                    }
+                                    sx={chipStyle(theme)}
+                                 />
+                              </FilterChipWrapper>
+                           )
+                        );
+                     })}
+                  </>
+               )}
 
-                     {/* ================= Dynamic OrderData Filters ================ */}
-                     {activeOrderFilters.map(([key, value]) => (
-                        <FilterChipWrapper key={key} title={formatLabel(key)}>
-                           <Chip
-                              label={
-                                 Array.isArray(value) && value[0] && value[1]
-                                    ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
-                                         value[1],
-                                      ).format("YYYY-MM-DD")}`
-                                    : String(value)
-                              }
-                              size="small"
-                              onDelete={() =>
-                                 onFilterChange?.({
-                                    ...filterData,
-                                    orderData: {
-                                       ...filterData.orderData,
-                                       [key]: Array.isArray(value)
-                                          ? undefined
-                                          : "",
-                                    },
-                                 })
-                              }
-                              sx={chipStyle(theme)}
-                           />
-                        </FilterChipWrapper>
-                     ))}
+               {/* ================= Dynamic OrderData Filters ================ */}
+               {activeOrderFilters.map(([key, value]) => (
+                  <FilterChipWrapper key={key} title={formatLabel(key)}>
+                     <Chip
+                        label={
+                           Array.isArray(value) && value[0] && value[1]
+                              ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
+                                   value[1],
+                                ).format("YYYY-MM-DD")}`
+                              : String(value)
+                        }
+                        size="small"
+                        onDelete={() =>
+                           onFilterChange?.({
+                              ...filterData,
+                              orderData: {
+                                 ...filterData.orderData,
+                                 [key]: Array.isArray(value) ? undefined : "",
+                              },
+                           })
+                        }
+                        sx={chipStyle(theme)}
+                     />
+                  </FilterChipWrapper>
+               ))}
 
-                     {/* ================= CLEAR ALL BUTTON ================ */}
-                     {hasAnyFilter && (
-                        <Button
-                           variant="text"
+               {/* ================= CLEAR ALL BUTTON ================ */}
+               {hasAnyFilter && (
+                  <Button
+                     variant="text"
+                     color="error"
+                     startIcon={
+                        <Icon
+                           size="small"
+                           icon="solar:trash-bin-trash-bold"
                            color="error"
-                           startIcon={
-                              <Icon
-                                 size="small"
-                                 icon="solar:trash-bin-trash-bold"
-                                 color="error"
-                              />
-                           }
-                           onClick={() =>
-                              onFilterChange?.({
-                                 searchText: "",
-                                 userRole: "",
-                                 productStock: "",
-                                 orderData: {},
-                              })
-                           }
-                        >
-                           Clear
-                        </Button>
-                     )}
-                  </Stack>
-               </Stack>
-            )}
-         />
-      </QuickFilter>
+                        />
+                     }
+                     onClick={handleClearAll}
+                  >
+                     Clear
+                  </Button>
+               )}
+            </Stack>
+         </Stack>
+      </Stack>
    );
 };
 

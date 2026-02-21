@@ -43,6 +43,9 @@ export interface OrderTimestampsType {
 
 // ✅ Order type
 export interface OrderType {
+   id: number; // Added id field for unique identification
+   color?: string;
+
    orderId: string;
    invoiceNo: string;
    status: string;

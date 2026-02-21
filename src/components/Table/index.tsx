@@ -1,19 +1,6 @@
 "use client";
 
-import {
-   Checkbox,
-   Paper,
-   Stack,
-   Table,
-   TableBody,
-   TableCell,
-   TableContainer,
-   TableFooter,
-   TableHead,
-   TablePagination,
-   TableRow,
-} from "@mui/material";
-import Row from "./Row";
+import { Stack } from "@mui/material";
 import Filter, { FilterData } from "./Filter";
 import OrderTab from "./OrderTab";
 import { orderStatuses } from "@src/handler/order_filter";
@@ -21,18 +8,15 @@ import { orderStatuses } from "@src/handler/order_filter";
 import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
 import {
    DataGrid,
-   GridCallbackDetails,
    GridColDef,
    GridRenderCellParams,
-   GridRowSelectionModel,
    GridRowsProp,
-   QuickFilter,
-   QuickFilterControl,
 } from "@mui/x-data-grid";
 import { useEffect, useState } from "react";
 import Icon from "../Icon";
 import CustomPopover from "../CustomPopover";
 import Menu, { MenuItem as MenuItemProps } from "../Menu";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type MenuItem = Omit<MenuItemProps, "onClick"> & {
    onClick?: (params: GridRenderCellParams) => void;
@@ -60,43 +44,71 @@ export default function CustomTable({
    menuItems,
    filter,
 }: DataTableProps) {
-   const [filterData, setFilterData] = useState<FilterData>({
-      userRole: "",
-      productStock: "",
-      searchText: "",
-      orderData: {
-         order_created_at: undefined,
-         courier_submitted_at: undefined,
-         employee: "",
-         status: "",
-         order_source: "",
-         products: "",
-         district: "",
-         print_status: "",
-      },
-      reportData: {
-         date: undefined,
-         product: null,
-         report_type: "default",
-      },
-   });
-
    const theme = useTheme();
    const [mounted, setMounted] = useState(false);
    const [actionMenuOpen, setActionMenuOpen] = useState(
       null as null | HTMLElement,
    );
-
    const [paginationModel, setPaginationModel] = useState({
       pageSize: 10,
       page: 0,
    });
+   const [selectedRowParams, setSelectedRowParams] =
+      useState<GridRenderCellParams | null>(null);
+   const router = useRouter();
+   const pathname = usePathname();
+   const searchParams = useSearchParams();
+
+   const [filterData, setFilterData] = useState<FilterData>({
+      searchText: searchParams?.get("keyword") || "",
+      userRole: searchParams?.get("role") || "",
+      productStock: searchParams?.get("stock") || "",
+      // orderData: {
+      //    order_created_at: [null, null],
+      //    courier_submitted_at: [null, null],
+      //    employee: "",
+      //    status: "",
+      //    order_source: "",
+      //    products: "",
+      //    district: "",
+      //    print_status: "",
+      // },
+      // reportData: {
+      //    report_type: "default",
+      //    date: [null, null],
+      //    product: null,
+      // },
+   });
+
+   const handleSearch = () => {
+      const params = new URLSearchParams(searchParams?.toString());
+
+      if (filterData.searchText) {
+         params.set("keyword", filterData.searchText);
+      } else {
+         params.delete("keyword");
+      }
+
+      if (filterData.userRole) {
+         params.set("role", filterData.userRole);
+      } else {
+         params.delete("role");
+      }
+      if (filterData.productStock) {
+         params.set("stock", filterData.productStock);
+      } else {
+         params.delete("stock");
+      }
+      router.push(`${pathname}?${params.toString()}`);
+   };
 
    useEffect(() => {
-      setMounted(true);
-   }, []);
+      const delayDebounceFn = setTimeout(() => {
+         handleSearch();
+      }, 1000);
 
-   if (!mounted) return null; // or loader
+      return () => clearTimeout(delayDebounceFn);
+   }, [filterData]);
 
    columns = columns.map((col) => {
       // * Action column
@@ -108,12 +120,13 @@ export default function CustomTable({
             headerAlign: "right",
             align: "right",
 
-            renderCell: (p) => {
+            renderCell: (params) => {
                return (
                   <>
                      <IconButton
                         size="small"
                         onClick={(e) => {
+                           setSelectedRowParams(params);
                            setActionMenuOpen(e.currentTarget);
                         }}
                      >
@@ -171,6 +184,12 @@ export default function CustomTable({
       };
    });
 
+   useEffect(() => {
+      setMounted(true);
+   }, []);
+
+   if (!mounted) return null; // or loader
+
    return (
       <Stack
          borderRadius={1}
@@ -180,11 +199,18 @@ export default function CustomTable({
             maxHeight: 560,
          }}
       >
+         <Filter
+            onFilterChange={(d) => {
+               setFilterData({ ...filterData, ...d });
+            }}
+            filterData={filterData}
+            customFilter={filter}
+         />
+
          <DataGrid
             rows={rows}
             columns={columns}
             density="comfortable"
-            showToolbar
             checkboxSelection={checkBox}
             // autoPageSize //* enable this to make Whichever one you show based on the height of the table
             pageSizeOptions={[10, 25, 50, { value: -1, label: "All" }]}
@@ -204,28 +230,9 @@ export default function CustomTable({
                   variant: "skeleton",
                   noRowsVariant: "skeleton",
                },
-               toolbar: {
-                  showQuickFilter: false,
-               },
             }}
             initialState={{
                pagination: { paginationModel: { pageSize: 5 } },
-
-               filter: {
-                  filterModel: {
-                     items: [],
-                     quickFilterExcludeHiddenColumns: false,
-                  },
-               },
-            }}
-            slots={{
-               toolbar: () => (
-                  <Filter
-                     onFilterChange={(d) => setFilterData(d)}
-                     filterData={filterData}
-                     customFilter={filter}
-                  />
-               ),
             }}
             sx={{
                border: "none",
@@ -328,13 +335,15 @@ export default function CustomTable({
             }}
          >
             <Menu
-               item={(menuItems ?? [])?.map((menuItem) => ({
-                  ...menuItem,
-                  onClick: () => {
-                     // menuItem.onClick?.(p);
-                     setActionMenuOpen(null);
-                  },
-               }))}
+               item={
+                  menuItems?.map((menuItem) => ({
+                     ...menuItem,
+                     onClick: () => {
+                        menuItem.onClick?.(selectedRowParams!);
+                        setActionMenuOpen(null);
+                     },
+                  })) ?? []
+               }
                onClose={() => setActionMenuOpen(null)}
             />
          </CustomPopover>

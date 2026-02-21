@@ -9,12 +9,12 @@ import {
 import React from "react";
 import UploadPhoto from "./imageUploader";
 import CustomAutocomplete from "@src/components/Autocomplete";
-import { TableRow } from "@src/components/Table";
+import { roles, UserProps } from ".";
 
 interface ModalProps {
    mode: "add" | "edit";
    onClose?: () => void;
-   userData?: TableRow;
+   userData?: UserProps;
    onChange?: (data: any) => void;
 }
 
@@ -70,9 +70,9 @@ const Modal = ({ mode, onClose, userData, onChange }: ModalProps) => {
                            ),
                         }}
                         onChange={(e) => {
-                           onChange?.({ phone_number: e.target.value });
+                           onChange?.({ phoneNumber: e.target.value });
                         }}
-                        value={userData?.phone_number || ""}
+                        value={userData?.phoneNumber || ""}
                         sx={{
                            "input::-webkit-outer-spin-button, input::-webkit-inner-spin-button":
                               {
@@ -87,10 +87,11 @@ const Modal = ({ mode, onClose, userData, onChange }: ModalProps) => {
                      <Typography variant="body2">Role</Typography>
                      <CustomAutocomplete
                         label="Role"
-                        option={["Active", "Inactive"]}
+                        options={roles}
                         onChange={(v: any) => {
-                           console.log(v);
+                           onChange?.({ role: v });
                         }}
+                        value={userData?.role || ""}
                      />
                   </Stack>
                </Grid>

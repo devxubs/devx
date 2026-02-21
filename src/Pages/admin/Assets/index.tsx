@@ -12,7 +12,7 @@ import {
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { Head, TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -108,10 +108,14 @@ const AssetsSchema = yup.object({
 
 const Asset = () => {
    const theme = useTheme();
-   const tableData: Omit<TableProps, "type"> = {
-      head: ["@check", "Id", "Type", "Date", "Amount", "Note", "@action"],
-      body: AssetsData as any,
-   };
+
+   const columns: ColumnConfig[] = [
+      { field: "id", headerName: "ID", flex: 0.1 },
+      { field: "type", headerName: "Type" },
+      { field: "date", headerName: "Date" },
+      { field: "amount", headerName: "Amount" },
+      { field: "note", headerName: "Note" },
+   ];
 
    const [open, setOpen] = useState(false);
    const [asset, setAsset] = useState<AssetsItem>({} as AssetsItem);
@@ -131,45 +135,6 @@ const Asset = () => {
          note: "",
       },
    });
-
-   // Action menu for each row
-   const actionMenu = (row: AssetsItem) => [
-      {
-         label: "edit",
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => {
-            setAsset(row);
-            setIsEditMode(true);
-            setOpen(true);
-            reset(row);
-         },
-      },
-      {
-         label: "print",
-         icon: <Icon icon="solar:printer-minimalistic-bold" size="small" />,
-         onClick: () => {
-            setAsset(row);
-            setIsEditMode(true);
-            setOpen(true);
-            reset(row);
-         },
-      },
-      {
-         label: "delete",
-         color: "error",
-         onClick: () => {
-            setAsset(row);
-            setOpenDelete(true);
-         },
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
-      },
-   ];
 
    const onSubmit: SubmitHandler<AssetsItem> = (formData) => {
       const newOrder: AssetsItem = {
@@ -199,10 +164,51 @@ const Asset = () => {
             </Button>
          </Stack>
          <CustomTable
-            type={"default"}
-            head={tableData.head}
-            body={tableData.body}
-            actionMenu={(row) => actionMenu(row as any)}
+            rows={AssetsData}
+            columns={columns}
+            checkBox
+            menuItems={[
+               {
+                  label: "edit",
+                  icon: <Icon icon="solar:pen-bold" size="small" />,
+                  onClick: (params) => {
+                     setAsset(params.row);
+                     setIsEditMode(true);
+                     setOpen(true);
+                     reset(params.row);
+                  },
+               },
+               {
+                  label: "print",
+                  icon: (
+                     <Icon
+                        icon="solar:printer-minimalistic-bold"
+                        size="small"
+                     />
+                  ),
+                  onClick: (params) => {
+                     setAsset(params.row);
+                     setIsEditMode(true);
+                     setOpen(true);
+                     reset(params.row);
+                  },
+               },
+               {
+                  label: "delete",
+                  color: "error",
+                  onClick: (params) => {
+                     setAsset(params.row);
+                     setOpenDelete(true);
+                  },
+                  icon: (
+                     <Icon
+                        icon="solar:trash-bin-trash-bold"
+                        size="small"
+                        color="error"
+                     />
+                  ),
+               },
+            ]}
          />
          <CustomModal
             open={open}

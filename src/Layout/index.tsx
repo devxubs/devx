@@ -15,11 +15,10 @@ import {
 } from "@mui/material";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
    const pathname = usePathname();
-   const searchParams = useSearchParams();
    const theme = useTheme();
 
    const isAuthPage = pathname?.startsWith("/auth");
@@ -28,7 +27,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
    const [loading, setLoading] = useState(false);
    const [progress, setProgress] = useState(0);
 
-   // --- Smooth progress animation
    useEffect(() => {
       let timer: NodeJS.Timer;
       if (loading) {
@@ -42,7 +40,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       return () => clearInterval(timer as any);
    }, [loading]);
 
-   // --- Trigger loading on route/query change
    useEffect(() => {
       setLoading(true);
       setProgress(0);
@@ -53,7 +50,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       }, 800);
 
       return () => clearTimeout(timer);
-   }, [pathname, searchParams?.toString()]);
+   }, [pathname]);
 
    return (
       <Stack
@@ -117,7 +114,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                            backdropFilter: "blur(4px)",
                            backgroundColor: alpha(
                               theme.palette.background.default,
-                              0.1
+                              0.1,
                            ),
                         }}
                      >

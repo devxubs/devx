@@ -12,7 +12,7 @@ import {
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
@@ -377,49 +377,80 @@ const Purchase = () => {
    const router = useRouter();
    const [purchase, setPurchase] = useState<PurchaseTypes>({} as PurchaseTypes);
    const [openDelete, setOpenDelete] = useState(false);
-   const [openNote, setOpenNote] = useState<string | null>(null);
+   const [openNoteModal, setOpenNoteModal] = useState<boolean>(false);
+   const [note, setNote] = useState<string>("");
 
-   const tableData: Omit<TableProps, "type"> = {
-      head: [
-         "@check",
-         "Id",
-         "Date",
-         "Invoice",
-         "Supplier",
-         "Product",
-         "Product Amount",
-         "Others Cost",
-         "Discount",
-         "Total",
-         "Note",
-         "@action",
-      ],
-      body: purchaseData.map((pd) => ({
-         ...pd,
-         product: pd.product.name,
-         note: (
+   const columns: ColumnConfig[] = [
+      {
+         field: "id",
+         headerName: "Id",
+         flex: 0.1,
+      },
+      {
+         field: "date",
+         headerName: "Date",
+         flex: 1,
+      },
+      {
+         field: "invoice",
+         headerName: "Invoice",
+         flex: 1,
+      },
+      {
+         field: "supplier",
+         headerName: "Supplier",
+         flex: 1,
+      },
+      {
+         field: "product",
+         headerName: "Product",
+         valueFormatter: (value: any) => value.name,
+         flex: 1,
+      },
+      {
+         field: "product_amount",
+         headerName: "Product Amount",
+         flex: 1,
+      },
+      {
+         field: "others_cost",
+         headerName: "Others Cost",
+         flex: 1,
+      },
+      {
+         field: "discount",
+         headerName: "Discount",
+         flex: 1,
+      },
+      {
+         field: "total",
+         headerName: "Total",
+      },
+      {
+         field: "note",
+         headerName: "Note",
+         renderCell: (params) => (
             <Tooltip
                title={
-                  pd.note?.length === 20
-                     ? pd.note.slice(0, 20) + "..."
-                     : pd.note
+                  params.row.note?.length === 20
+                     ? params.row.note.slice(0, 20) + "..."
+                     : params.row.note
                }
                disableInteractive
             >
                <IconButton
                   size="small"
-                  onClick={() => setOpenNote(pd.note || null)}
+                  onClick={() => {
+                     setOpenNoteModal(true);
+                     setNote(params.row.note || "");
+                  }}
                >
                   <Icon icon="solar:notes-bold-duotone" size="small" />
                </IconButton>
             </Tooltip>
          ),
-         // Convert attachments array into a renderable ReactNode (string)
-         attachments: pd.attachments
-            ? pd.attachments.map((a) => a.name).join(", ")
-            : undefined,
-      })),
-   };
+      },
+   ];
 
    // Action menu for each row
    const actionMenu = (row: PurchaseTypes) => [
@@ -475,17 +506,12 @@ const Purchase = () => {
                Add purchase
             </Button>
          </Stack>
-         <CustomTable
-            type={"default"}
-            head={tableData.head}
-            body={tableData.body}
-            actionMenu={(row) => actionMenu(row as any)}
-         />
+         <CustomTable rows={purchaseData} columns={columns} checkBox />
 
          <CustomModal
-            open={typeof openNote === "string"}
+            open={openNoteModal}
             onClose={function (): void {
-               setOpenNote(null);
+               setOpenNoteModal(false);
             }}
             title="Note"
             sx={{
@@ -498,8 +524,13 @@ const Purchase = () => {
                multiline
                minRows={2}
                maxRows={3}
-               value={openNote || ""}
-               onChange={(e) => setOpenNote(e.target.value || "")}
+               value={note || ""}
+               onChange={(e) => setNote(e.target.value || "")}
+               onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                     setOpenNoteModal(false);
+                  }
+               }}
             />
             <Stack
                spacing={2}
@@ -511,7 +542,7 @@ const Purchase = () => {
                <Button
                   variant="text"
                   color="inherit"
-                  onClick={() => setOpenNote(null)}
+                  onClick={() => setOpenNoteModal(false)}
                >
                   Cancel
                </Button>

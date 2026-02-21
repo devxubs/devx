@@ -10,7 +10,7 @@ import {
    alpha,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomTable, { ColumnConfig, TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import LinearProgress, {
@@ -34,7 +34,7 @@ export const productsData = [
       productCode: "ESH-2025",
       productSku: "SH-0004",
       quantity: "72",
-      stockValue: "In Stock", // ✅ added
+      stockValue: "In Stock",
       category: "Shoes",
       productType: "Heels",
       color: ["Red", "Black", "Nude"],
@@ -57,7 +57,7 @@ export const productsData = [
       productCode: "CLH-2025",
       productSku: "HB-0005",
       quantity: "0",
-      stockValue: "Out of Stock", // ✅ added
+      stockValue: "Out of Stock",
       category: "Bags",
       productType: "Handbag",
       color: ["Black", "Brown", "Beige"],
@@ -77,7 +77,7 @@ export const productsData = [
       productCode: "MDJ-2025",
       productSku: "CJ-0006",
       quantity: "10",
-      stockValue: "Low Stock", // ✅ added
+      stockValue: "Low Stock",
       category: "Clothing",
       productType: "Jacket",
       color: ["Blue", "Black", "Light Wash"],
@@ -100,7 +100,7 @@ export const productsData = [
       productCode: "SFW-2025",
       productSku: "AC-0007",
       quantity: "120",
-      stockValue: "In Stock", // ✅ added
+      stockValue: "In Stock",
       category: "Accessories",
       productType: "Smartwatch",
       color: ["Black", "Silver", "Rose Gold"],
@@ -280,30 +280,6 @@ const columns: ColumnConfig[] = [
 ];
 
 const Product = () => {
-   // const actionMenu = (row: any) => [
-   //    {
-   //       label: "edit",
-   //       onClick: () => router.push(`/product/publish?id=${row.id}`),
-   //       icon: <Icon icon="solar:pen-bold" size="small" />,
-   //    },
-   //    {
-   //       label: "delete",
-   //       color: "error",
-   //       icon: (
-   //          <Icon
-   //             icon="solar:trash-bin-trash-bold"
-   //             size="small"
-   //             color="error"
-   //          />
-   //       ),
-   //       onClick: () => {
-   //          // setDeleteConform(true);
-   //          setProductToDelete(row);
-   //          setIsDeleteDialogOpen(true);
-   //       },
-   //    },
-   // ];
-
    const theme = useTheme();
    const router = useRouter();
    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -345,23 +321,26 @@ const Product = () => {
                      { label: "Edit", onClick: () => {} },
                      { label: "Delete", color: "error", onClick: () => {} },
                   ]}
-                  // filter={(data, onChange) => {
-                  //    return (
-                  //       <Stack sx={{ width: "30%" }}>
-                  //          <CustomAutocomplete
-                  //             label="Stock"
-                  //             options={["In stock", "Low stock", "Out of stock"]}
-                  //             value={data.productStock || ""}
-                  //             onChange={(val: string) =>
-                  //                onChange?.({
-                  //                   ...data,
-                  //                   productStock: val,
-                  //                })
-                  //             }
-                  //          />
-                  //       </Stack>
-                  //    );
-                  // }}
+                  filter={(data, onChange) => {
+                     return (
+                        <Stack sx={{ width: "30%" }}>
+                           <CustomAutocomplete
+                              label="Stock"
+                              options={[
+                                 "In stock",
+                                 "Low stock",
+                                 "Out of stock",
+                              ]}
+                              value={data.productStock || ""}
+                              onChange={(val: string) =>
+                                 onChange?.({
+                                    productStock: val,
+                                 })
+                              }
+                           />
+                        </Stack>
+                     );
+                  }}
                />
             </Stack>
          </Stack>

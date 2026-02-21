@@ -10,6 +10,9 @@ export const paymentMethod = [
 
 export const orders: OrderType[] = [
    {
+      id: 1,
+      color: "warning",
+
       orderId: "#6012",
       invoiceNo: "INV-6012",
       status: "Pending",
@@ -55,6 +58,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 2,
+      color: "info",
+
       orderId: "#6013",
       invoiceNo: "INV-6013",
       status: "Processing",
@@ -108,6 +114,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 3,
+      color: "primary",
+
       orderId: "#6014",
       invoiceNo: "INV-6014",
       status: "Confirmed",
@@ -152,6 +161,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 4,
+      color: "default",
+
       orderId: "#6015",
       invoiceNo: "INV-6015",
       status: "Hold",
@@ -205,7 +217,11 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 5,
+      color: "error",
+
       orderId: "#6016",
+
       invoiceNo: "INV-6016",
       status: "Cancelled",
       orderNote: "Customer requested cancellation",
@@ -251,6 +267,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 6,
+      color: "info",
+
       orderId: "#6017",
       invoiceNo: "INV-6017",
       status: "Processing",
@@ -304,6 +323,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 7,
+      color: "success",
+
       orderId: "#6018",
       invoiceNo: "INV-6018",
       status: "Delivered",
@@ -348,6 +370,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 8,
+      color: "warning",
+
       orderId: "#6019",
       invoiceNo: "INV-6019",
       status: "Pending",
@@ -392,6 +417,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 9,
+      color: "default",
+
       orderId: "#6020",
       invoiceNo: "INV-6020",
       status: "Hold",
@@ -436,6 +464,9 @@ export const orders: OrderType[] = [
    },
 
    {
+      id: 10,
+      color: "primary",
+
       orderId: "#6021",
       invoiceNo: "INV-6021",
       status: "Confirmed",

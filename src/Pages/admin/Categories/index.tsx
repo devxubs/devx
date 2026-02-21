@@ -153,9 +153,9 @@ const Categories = () => {
                         color="error"
                      />
                   ),
-                  onClick: () => {
-                     // setSelectedCategory(row);
-                     // setIsDeleteDialogOpen(true);
+                  onClick: (p: GridRenderCellParams) => {
+                     setSelectedCategory(p.row as CategoryType);
+                     setIsDeleteDialogOpen(true);
                   },
                },
             ]}

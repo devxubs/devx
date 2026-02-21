@@ -10,6 +10,16 @@ import Modal from "./Modal";
 import AlertDialog from "@src/components/AlertDialog";
 import CustomAutocomplete from "@src/components/Autocomplete";
 
+export interface UserProps {
+   id: string;
+   name: string;
+   phoneNumber: string;
+   email: string;
+   role: string;
+   salary: string;
+   hireDate: string;
+}
+
 export const UserProfile = ({
    name,
    email,
@@ -44,7 +54,7 @@ export const UserProfile = ({
    );
 };
 
-const rows = [
+const rows: UserProps[] = [
    {
       id: "E001",
       name: "Jubayer Ahmed",
@@ -113,46 +123,20 @@ const columns: ColumnConfig[] = [
    },
 ];
 
+export const roles = [
+   "CEO",
+   "Manager",
+   "Repeat Sales Exicutive",
+   "Team Leader",
+   "Courier Exicutive",
+   "Reseller",
+];
+
 const Users = () => {
    const theme = useTheme();
    const [modalOpen, setModalOpen] = useState(false);
    const [editableUser, setEditableUser] = useState({} as any);
-   const actionMenu = (row: any) => [
-      {
-         label: "edit",
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => {
-            setEditableUser({ ...row, name: row.full_name }); // store clicked user
-            setMode("edit");
-            setModalOpen(true);
-            console.log(row);
-         },
-      },
-      {
-         label: "delete",
-         color: "error",
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
-         onClick: () => {
-            setUserToDelete(row);
-            setDeleteOpen(true);
-         },
-      },
-   ];
-
-   const names = [
-      "CEO",
-      "Manager",
-      "Repeat Sales Exicutive",
-      "Team Leader",
-      "Courier Exicutive",
-      "Reseller",
-   ];
+  
 
    const [mode, setMode] = useState<"add" | "edit">("edit");
 
@@ -198,19 +182,34 @@ const Users = () => {
                   columns={columns}
                   checkBox={true}
                   menuItems={[
-                     { label: "Edit", onClick: () => {} },
-                     { label: "Delete", color: "error", onClick: () => {} },
+                     {
+                        label: "Edit",
+                        onClick: (p) => {
+                           console.log(p);
+
+                           setEditableUser(p.row);
+                           setMode("edit");
+                           setModalOpen(true);
+                        },
+                     },
+                     {
+                        label: "Delete",
+                        color: "error",
+                        onClick: (p) => {
+                           setUserToDelete(p.row);
+                           setDeleteOpen(true);
+                        },
+                     },
                   ]}
                   filter={(data, onChange) => {
                      return (
                         <Stack sx={{ width: "30%" }}>
                            <CustomAutocomplete
                               label="Role"
-                              options={names}
+                              options={roles}
                               value={data.userRole || ""} // controlled
                               onChange={(v: string) =>
                                  onChange?.({
-                                    ...data,
                                     userRole: v || "",
                                  })
                               }

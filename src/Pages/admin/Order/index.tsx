@@ -10,7 +10,7 @@ import {
    Tooltip,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomTable from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 import React, { useState } from "react";
 import { orders } from "./data";
 import User from "../Customers/CustomerInfo";
@@ -24,6 +24,8 @@ import CustomModal from "@src/components/Modal";
 import OrderFilterModal from "@src/Pages/admin/Order/OrderFilterModel";
 import Scrollbar from "react-browser-scrollbar";
 import OrderFilter from "./OrderFilter";
+import { MenuItem } from "@src/components/Menu";
+import { GridRenderCellParams } from "@mui/x-data-grid";
 
 const statusColor: Record<
    string,
@@ -42,110 +44,160 @@ const statusColor: Record<
    Failed: "error",
 } as const;
 
-const cOrder = (orders as OrderType[]).map((o, i) => {
-   const d = new Date(o.createdAt);
-   const dateOnly = d.toLocaleDateString();
-   const timeOnly = d.toLocaleTimeString();
+// const cOrder = (orders as OrderType[]).map((o, i) => {
+// const d = new Date(o.createdAt);
+// const dateOnly = d.toLocaleDateString();
+// const timeOnly = d.toLocaleTimeString();
 
-   return {
-      ...o,
-      products: o.products,
-      note: <NoteModal note={o.orderNote || ""} />,
-      order: (
-         <Link
-            href={`/order/${encodeURIComponent(o.orderId)}`}
-            style={{ textDecoration: "none" }}
-         >
-            <Typography
-               color="textPrimary"
-               sx={{
-                  cursor: "pointer",
-                  "&:hover": { textDecoration: "underline" },
-               }}
+//    return {
+//       ...o,
+//       products: o.products,
+//       note: <NoteModal note={o.orderNote || ""} />,
+//       order: (
+// <Link
+//    href={`/order/${encodeURIComponent(o.orderId)}`}
+//    style={{ textDecoration: "none" }}
+// >
+//    <Typography
+//       color="textPrimary"
+//       sx={{
+//          cursor: "pointer",
+//          "&:hover": { textDecoration: "underline" },
+//       }}
+//    >
+//       {o.orderId}
+//    </Typography>
+// </Link>
+//       ),
+//       customer: (
+//          <User
+//             name={o.customer.name}
+//             email={o.customer.email}
+//             number={o.customer.phone}
+//          />
+//       ),
+//       date: <CreateAt date={dateOnly} time={timeOnly} />,
+//       address: (
+//          <Typography
+//             variant="body2"
+//             sx={{
+//                display: "-webkit-box",
+//                WebkitLineClamp: 2, // show max 2 lines
+//                WebkitBoxOrient: "vertical",
+//                overflow: "hidden",
+//                textOverflow: "ellipsis",
+//                whiteSpace: "normal", // allow wrapping
+//             }}
+//          >
+//             {o.customer.address}
+//          </Typography>
+//       ),
+//       price: o.pricing.total,
+//       status: o.status,
+//       chip: "status",
+//       color: statusColor[o.status],
+//    };
+// });
+
+const columns: ColumnConfig[] = [
+   { field: "orderId", headerName: "ID", flex: 0.3 },
+   {
+      field: "note",
+      headerName: "Note",
+      renderCell: (params) => {
+         return (
+            <NoteModal
+               note={params.row.orderNote ? params.row.orderNote : ""}
+            />
+         );
+      },
+      flex: 0.3,
+   },
+   {
+      field: "invoiceNo",
+      headerName: "Order",
+      flex: 1,
+      renderCell: (params) => {
+         return (
+            <Stack
+               spacing={1}
+               direction="row"
+               alignItems="center"
+               height={"100%"}
             >
-               {o.orderId}
-            </Typography>
-         </Link>
-      ),
-      customer: (
-         <User
-            name={o.customer.name}
-            email={o.customer.email}
-            number={o.customer.phone}
-         />
-      ),
-      date: <CreateAt date={dateOnly} time={timeOnly} />,
-      address: (
-         <Typography
-            variant="body2"
-            sx={{
-               display: "-webkit-box",
-               WebkitLineClamp: 2, // show max 2 lines
-               WebkitBoxOrient: "vertical",
-               overflow: "hidden",
-               textOverflow: "ellipsis",
-               whiteSpace: "normal", // allow wrapping
-            }}
-         >
-            {o.customer.address}
-         </Typography>
-      ),
-      price: o.pricing.total,
-      status: o.status,
-      chip: "status",
-      color: statusColor[o.status],
-   };
-});
+               <Stack>
+                  <Typography variant="body2" color="textPrimary">
+                     {params.row.employee.name}
+                  </Typography>
+                  <Typography
+                     variant="body2"
+                     fontSize={14}
+                     color="textSecondary"
+                  >
+                     {params.row.orderSource}
+                  </Typography>
+               </Stack>
+            </Stack>
+         );
+         // (
+         // <Link
+         //    href={`/order/${encodeURIComponent(params.row.orderId)}`}
+         //    style={{
+         //       textDecoration: "none",
+         //       height: "100%",
+         //       display: "flex",
+         //       alignItems: "center",
+         //    }}
+         // >
+         //    <Typography
+         //       color="textPrimary"
+         //       variant="body2"
+         //       sx={{
+         //          cursor: "pointer",
+         //          "&:hover": { textDecoration: "underline" },
+         //       }}
+         //    >
+         //       {params.row.invoiceNo}
+         //    </Typography>
+         // </Link>
+         // ),
+      },
+   },
+   {
+      field: "customer",
+      headerName: "Customer",
+      renderCell: (params) => <User {...params.row.customer} />,
+      flex: 1,
+   },
+   {
+      field: "date",
+      headerName: "Date",
+      renderCell: (params) => {
+         const d = new Date(params.row.createdAt);
+         const dateOnly = d.toLocaleDateString();
+         const timeOnly = d.toLocaleTimeString();
 
-export const OrderItem = {
-   head: [
-      "@check",
-      "Note",
-      "Order",
-      "Customer",
-      "Date",
-      "Price",
-      "Address",
-      "Status",
-      "@action",
-   ],
-   body: cOrder,
-};
+         return <CreateAt date={dateOnly} time={timeOnly} />;
+      },
+   },
+   {
+      field: "price",
+      headerName: "Price",
+      renderCell: (params) => `$${params.row.pricing.total}`,
+   },
+   {
+      field: "status",
+      headerName: "Status",
+      chip: true,
+
+      flex: 0.5,
+   },
+   { field: "@actions", headerName: "", flex: 0.1 },
+];
 
 const Order = () => {
    const router = useRouter();
    const theme = useTheme();
-
-   const actionMenu = (row: any) => [
-      {
-         label: "Print",
-         icon: <Icon icon="solar:printer-minimalistic-bold" size="small" />,
-         onClick: () => {},
-      },
-      {
-         label: "edit",
-         icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => {
-            router.push(`/order/publish?id=${encodeURIComponent(row.orderId)}`);
-         },
-      },
-      {
-         label: "delete",
-         color: "error",
-         icon: (
-            <Icon
-               icon="solar:trash-bin-trash-bold"
-               size="small"
-               color="error"
-            />
-         ),
-         onClick: () => {
-            // setDeleteConform(true);
-            setProductToDelete(row);
-            setIsDeleteDialogOpen(true);
-         },
-      },
-   ];
 
    // Delete dialog states
    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -180,11 +232,47 @@ const Order = () => {
             </Stack>
             <Stack width={"100%"} overflow={"hidden"}>
                <CustomTable
-                  type={"order"}
-                  head={OrderItem.head}
-                  body={OrderItem.body as any}
-                  actionMenu={(row) => actionMenu(row)}
-                  filter={(data, onChange) => OrderFilter(data, onChange)}
+                  rows={orders as any}
+                  columns={columns}
+                  // filter={(data, onChange) => OrderFilter(data, onChange)}
+                  checkBox
+                  menuItems={[
+                     {
+                        label: "Print",
+                        icon: (
+                           <Icon
+                              icon="solar:printer-minimalistic-bold"
+                              size="small"
+                           />
+                        ),
+                        onClick: () => {},
+                     },
+                     {
+                        label: "edit",
+                        icon: <Icon icon="solar:pen-bold" size="small" />,
+                        onClick: (params: GridRenderCellParams) => {
+                           router.push(
+                              `/order/publish?id=${encodeURIComponent(params.row.orderId)}`,
+                           );
+                        },
+                     },
+                     {
+                        label: "delete",
+                        color: "error",
+                        icon: (
+                           <Icon
+                              icon="solar:trash-bin-trash-bold"
+                              size="small"
+                              color="error"
+                           />
+                        ),
+                        onClick: (params: GridRenderCellParams) => {
+                           // setDeleteConform(true);
+                           setProductToDelete(params.row);
+                           setIsDeleteDialogOpen(true);
+                        },
+                     },
+                  ]}
                />
             </Stack>
          </Stack>
