@@ -33,7 +33,7 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
    const theme = useTheme();
    const [expanded, setExpanded] = useState(true);
 
-   const products_name = productsData.map((p) => p.product_name);
+   const products_name = productsData.map((p) => p.productName);
 
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -84,16 +84,16 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
                                  onChange={(val: string[]) => {
                                     const newProducts = val.map((name) => {
                                        const existing = allProducts.find(
-                                          (p: any) => p.product_name === name
+                                          (p: any) => p.productName === name,
                                        );
                                        if (existing) return existing;
 
                                        const found = productsData.find(
-                                          (p) => p.product_name === name
+                                          (p) => p.productName === name,
                                        );
                                        return found
                                           ? {
-                                               name: found.product_name,
+                                               name: found.productName,
                                                quantity: 1,
                                                price: found.salePrice ?? 0,
                                                image: found.images[0],
@@ -105,7 +105,7 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
                                  error={!!errors.products}
                                  helperText={errors.products?.message}
                                  arrow
-                                 option={products_name}
+                                 options={products_name}
                                  size="small"
                                  placeholder="Search product..."
                                  label="Search"
@@ -160,14 +160,14 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
                                  scrollbarWidth: "none!important",
                                  backgroundColor: alpha(
                                     theme.palette.grey[400],
-                                    0.1
+                                    0.1,
                                  ),
                                  "&::-webkit-scrollbar": { display: "none" },
                               },
                               theme.applyStyles("dark", {
                                  backgroundColor: alpha(
                                     theme.palette.background.default,
-                                    0.1
+                                    0.1,
                                  ),
                               }),
                            ]}
@@ -205,7 +205,7 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
                                                 const newQuantity =
                                                    parseInt(
                                                       e.target.value,
-                                                      10
+                                                      10,
                                                    ) || 1;
                                                 const updated = [
                                                    ...allProducts,
@@ -229,7 +229,7 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
                                                    e.target.value === ""
                                                       ? 0
                                                       : parseFloat(
-                                                           e.target.value
+                                                           e.target.value,
                                                         );
                                                 const updated = [
                                                    ...allProducts,
@@ -255,7 +255,7 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
                                                 const updated =
                                                    allProducts.filter(
                                                       (_: any, i: number) =>
-                                                         i !== idx
+                                                         i !== idx,
                                                    );
                                                 field.onChange(updated);
                                              }}

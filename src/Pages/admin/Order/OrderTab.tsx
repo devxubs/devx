@@ -1,0 +1,166 @@
+"use client";
+import React, { useEffect } from "react";
+import { alpha, useTheme } from "@mui/material/styles";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import Box from "@mui/material/Box";
+import { Chip } from "@mui/material";
+
+const statusColor: Record<
+   string,
+   "default" | "warning" | "success" | "info" | "error"
+> = {
+   All: "default",
+   Pending: "warning",
+   Confirmed: "success",
+   Processing: "info",
+   Shipped: "info",
+   "Out for Delivery": "info",
+   Delivered: "success",
+   Completed: "success",
+   Hold: "default",
+   Cancelled: "error",
+   Failed: "error",
+} as const;
+
+type OrderTabProps = {
+   onChange?: (data: string) => void;
+   value?: number;
+   status: string[];
+};
+
+const OrderTab = ({ value = 0, onChange, status }: OrderTabProps) => {
+   const theme = useTheme();
+   const [val, setVal] = React.useState(value === -1 ? 0 : value);
+
+   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+      setVal(newValue);
+   };
+   const [statusCounter, setStatusCounts] = React.useState<{
+      [key: string]: number;
+   }>(Object.fromEntries([["All", 0], ...status.map((s) => [s, 0])]));
+
+   useEffect(() => {
+      const counts = Object.fromEntries([
+         ["All", Math.floor(Math.random() * 140) + 1],
+         ...status.map((s) => [s, Math.floor(Math.random() * 140) + 1]),
+      ]);
+
+      setStatusCounts(counts);
+   }, []);
+
+   useEffect(() => {
+      setVal(value);
+   }, [value]);
+
+   useEffect(() => {
+      onChange?.(Object.keys(status[val || 0])[0]);
+   }, [val]);
+
+   return (
+      <Box sx={{ width: "100%" }}>
+         <Tabs
+            value={val}
+            onChange={handleChange}
+            variant="scrollable"
+            TabIndicatorProps={{
+               children: <span className="MuiTabs-indicatorSpan" />,
+            }}
+            sx={{
+               "& .MuiTabs-scroller": {
+                  scrollbarWidth: "none!important",
+               },
+               "& .MuiTabs-indicator": {
+                  display: "flex",
+                  justifyContent: "center",
+                  backgroundColor: "transparent",
+               },
+               "& .MuiTabs-indicatorSpan": {
+                  maxWidth: 40,
+                  width: "100%",
+                  backgroundColor: theme.palette.common.white,
+                  ...theme.applyStyles("light", {
+                     backgroundColor: theme.palette.common.black,
+                  }),
+               },
+            }}
+         >
+            {status.map((s: string, i) => {
+               const statusColo = statusColor[s] || "default";
+               const paletteKey =
+                  statusColo === "default" ? "primary" : statusColo;
+
+               const isAll = s === "All";
+               const isHold = s === "Hold";
+
+               const color =
+                  isAll || isHold
+                     ? theme.palette.mode === "light"
+                        ? theme.palette.common.black
+                        : theme.palette.common.white
+                     : theme.palette[paletteKey]?.main ||
+                       theme.palette.primary.main;
+
+               const isActive = val === i;
+               const isHoldActive = isHold && isActive;
+
+               const bgColor = isAll || isActive ? color : alpha(color, 0.1);
+               const textColor = isAll
+                  ? theme.palette.mode === "dark"
+                     ? theme.palette.common.black
+                     : theme.palette.common.white
+                  : isHoldActive
+                    ? theme.palette.mode === "dark"
+                       ? theme.palette.common.black
+                       : theme.palette.common.white
+                    : isHold
+                      ? theme.palette.text.secondary // 👈 inactive hold → secondary text
+                      : isActive
+                        ? theme.palette.common.white
+                        : color;
+
+               return (
+                  <Tab
+                     key={i}
+                     disableRipple
+                     disableFocusRipple
+                     label={s}
+                     icon={
+                        <Chip
+                           label={
+                              statusCounter[s] >= 99 ? "99+" : statusCounter[s]
+                           }
+                           size="small"
+                           sx={{
+                              borderRadius: "6px!important",
+                              fontSize: 12,
+
+                              bgcolor: bgColor,
+                              color: textColor,
+                           }}
+                        />
+                     }
+                     iconPosition="end"
+                     sx={{
+                        textTransform: "none",
+                        fontWeight: 500,
+                        fontSize: theme.typography.pxToRem(14),
+                        marginRight: theme.spacing(1),
+                        color: theme.palette.text.secondary,
+                        minHeight: 50,
+                        "&.Mui-selected": {
+                           color: theme.palette.common.white,
+                           ...theme.applyStyles("light", {
+                              color: theme.palette.common.black,
+                           }),
+                        },
+                     }}
+                  />
+               );
+            })}
+         </Tabs>
+      </Box>
+   );
+};
+
+export default OrderTab;

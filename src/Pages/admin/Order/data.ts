@@ -22,7 +22,7 @@ export const orders: OrderType[] = [
       updatedAt: "2025-09-12T10:05:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-12T10:00:00Z",
+         createdAt: "2025-09-12T10:00:00Z",
          updatedAt: "2025-09-12T10:05:00Z",
          deliveryTime: null,
       },
@@ -69,7 +69,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-13T15:00:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-13T15:00:00Z",
+         createdAt: "2025-09-13T15:00:00Z",
          updatedAt: "2025-09-13T15:00:00Z",
          deliveryTime: null,
       },
@@ -125,7 +125,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-11T13:00:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-11T13:00:00Z",
+         createdAt: "2025-09-11T13:00:00Z",
          updatedAt: "2025-09-11T13:00:00Z",
          deliveryTime: null,
       },
@@ -172,7 +172,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-11T15:00:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-11T15:00:00Z",
+         createdAt: "2025-09-11T15:00:00Z",
          updatedAt: "2025-09-11T15:00:00Z",
          deliveryTime: null,
       },
@@ -229,7 +229,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-11T15:30:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-11T15:30:00Z",
+         createdAt: "2025-09-11T15:30:00Z",
          updatedAt: "2025-09-11T15:30:00Z",
          deliveryTime: null,
       },
@@ -278,7 +278,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-14T09:00:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-14T09:00:00Z",
+         createdAt: "2025-09-14T09:00:00Z",
          updatedAt: "2025-09-14T09:00:00Z",
          deliveryTime: null,
       },
@@ -334,7 +334,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-11T20:00:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-11T20:00:00Z",
+         createdAt: "2025-09-11T20:00:00Z",
          updatedAt: "2025-09-11T20:00:00Z",
          deliveryTime: "2025-09-11T20:45:00Z",
       },
@@ -381,7 +381,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-15T10:00:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-15T10:00:00Z",
+         createdAt: "2025-09-15T10:00:00Z",
          updatedAt: "2025-09-15T10:00:00Z",
          deliveryTime: null,
       },
@@ -428,7 +428,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-14T19:00:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-14T19:00:00Z",
+         createdAt: "2025-09-14T19:00:00Z",
          updatedAt: "2025-09-14T19:00:00Z",
          deliveryTime: null,
       },
@@ -475,7 +475,7 @@ export const orders: OrderType[] = [
       createdAt: "2025-09-13T17:30:00Z",
 
       timestamps: {
-         orderPlaced: "2025-09-13T17:30:00Z",
+         createdAt: "2025-09-13T17:30:00Z",
          updatedAt: "2025-09-13T17:30:00Z",
          deliveryTime: null,
       },

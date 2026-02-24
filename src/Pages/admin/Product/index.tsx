@@ -178,7 +178,7 @@ const CreateAt = ({ date, time }: { date: string; time: string }) => {
    );
 };
 
-const ProductsView = ({
+export const ProductsView = ({
    name,
    description,
    url,

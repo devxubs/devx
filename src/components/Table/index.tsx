@@ -2,7 +2,7 @@
 
 import { Stack } from "@mui/material";
 import Filter, { FilterData } from "./Filter";
-import OrderTab from "./OrderTab";
+import OrderTab from "../../Pages/admin/Order/OrderTab";
 import { orderStatuses } from "@src/handler/order_filter";
 
 import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
@@ -17,6 +17,9 @@ import Icon from "../Icon";
 import CustomPopover from "../CustomPopover";
 import Menu, { MenuItem as MenuItemProps } from "../Menu";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { P } from "framer-motion/dist/types.d-BJcRxCew";
+import useQueryParams from "@src/handler/useQueryParams";
+import delayExecute from "@src/handler/delayExecute";
 
 type MenuItem = Omit<MenuItemProps, "onClick"> & {
    onClick?: (params: GridRenderCellParams) => void;
@@ -24,6 +27,11 @@ type MenuItem = Omit<MenuItemProps, "onClick"> & {
 
 export type ColumnConfig = GridColDef & {
    chip?: boolean;
+   color?: (params: GridRenderCellParams) => string;
+   onClick?: (
+      params: GridRenderCellParams,
+      e: React.MouseEvent<HTMLDivElement, MouseEvent>,
+   ) => void;
 };
 
 interface DataTableProps {
@@ -31,6 +39,8 @@ interface DataTableProps {
    columns: ColumnConfig[];
    checkBox?: boolean;
    menuItems?: MenuItem[];
+   accordionValue?: number[];
+   onAccordionChange?: (newIds: number[]) => void;
    filter?: (
       data: FilterData,
       onChange: (data: FilterData) => void,
@@ -43,9 +53,12 @@ export default function CustomTable({
    checkBox = false,
    menuItems,
    filter,
+   accordionValue,
+   onAccordionChange,
 }: DataTableProps) {
    const theme = useTheme();
    const [mounted, setMounted] = useState(false);
+
    const [actionMenuOpen, setActionMenuOpen] = useState(
       null as null | HTMLElement,
    );
@@ -58,8 +71,37 @@ export default function CustomTable({
    const router = useRouter();
    const pathname = usePathname();
    const searchParams = useSearchParams();
+   const query = useQueryParams();
+   let getFilterData = {};
+   if (query.get("filter")) {
+      getFilterData = JSON.parse(
+         decodeURIComponent(query.get("filter") || "") || "{}",
+      ); //decodeURIComponent(JSON.parse(query.get("filter") || ""));
+   }
 
    const [filterData, setFilterData] = useState<FilterData>({
+      searchText: searchParams?.get("keyword") || "",
+      userRole: searchParams?.get("role") || "",
+      productStock: searchParams?.get("stock") || "",
+      ...getFilterData,
+      // orderData: {
+      //    order_created_at: [null, null],
+      //    courier_submitted_at: [null, null],
+      //    employee: "",
+      //    status: "",
+      //    order_source: "",
+      //    products: "",
+      //    district: "",
+      //    print_status: "",
+      // },
+      // reportData: {
+      //    report_type: "default",
+      //    date: [null, null],
+      //    product: null,
+      // },
+   });
+
+   let data = {
       searchText: searchParams?.get("keyword") || "",
       userRole: searchParams?.get("role") || "",
       productStock: searchParams?.get("stock") || "",
@@ -78,37 +120,37 @@ export default function CustomTable({
       //    date: [null, null],
       //    product: null,
       // },
-   });
-
-   const handleSearch = () => {
-      const params = new URLSearchParams(searchParams?.toString());
-
-      if (filterData.searchText) {
-         params.set("keyword", filterData.searchText);
-      } else {
-         params.delete("keyword");
-      }
-
-      if (filterData.userRole) {
-         params.set("role", filterData.userRole);
-      } else {
-         params.delete("role");
-      }
-      if (filterData.productStock) {
-         params.set("stock", filterData.productStock);
-      } else {
-         params.delete("stock");
-      }
-      router.push(`${pathname}?${params.toString()}`);
    };
 
    useEffect(() => {
-      const delayDebounceFn = setTimeout(() => {
-         handleSearch();
-      }, 1000);
-
-      return () => clearTimeout(delayDebounceFn);
+      delayExecute(() => {
+         query.set("filter", encodeURIComponent(JSON.stringify(filterData)));
+      });
    }, [filterData]);
+
+   // const handleSearch = () => {
+   //    const params = new URLSearchParams(searchParams?.toString());
+
+   //    // params.set(JSON.stringify(filterData));
+
+   //    if (filterData.searchText) {
+   //       params.set("keyword", filterData.searchText);
+   //    } else {
+   //       params.delete("keyword");
+   //    }
+
+   //    if (filterData.userRole) {
+   //       params.set("role", filterData.userRole);
+   //    } else {
+   //       params.delete("role");
+   //    }
+   //    if (filterData.productStock) {
+   //       params.set("stock", filterData.productStock);
+   //    } else {
+   //       params.delete("stock");
+   //    }
+   //    router.push(`${pathname}?${params.toString()}`);
+   // };
 
    columns = columns.map((col) => {
       // * Action column
@@ -147,28 +189,47 @@ export default function CustomTable({
             align: "left",
             renderCell: (params: GridRenderCellParams) => {
                const row = params.row;
-
-               const colorKey =
-                  row.color === "default"
-                     ? "primary"
-                     : (row.color as keyof Palette);
-               const paletteColor: any = theme.palette[colorKey] ?? {
+               const color = col.color ? col.color(params) : "primary";
+               const validChipColors = [
+                  "primary",
+                  "secondary",
+                  "error",
+                  "warning",
+                  "info",
+                  "success",
+               ];
+               const colorKey = validChipColors.includes(color)
+                  ? (color as any)
+                  : "primary";
+               const paletteColor: any = theme.palette[
+                  colorKey as keyof Palette
+               ] ?? {
                   main: row.color || theme.palette.primary.main,
                };
 
                return (
                   <Chip
+                     component="div" // Add this line
                      label={params.formattedValue}
                      size="small"
-                     color={(row.color as any) || "primary"}
+                     color={colorKey}
+                     onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                        // Change event type to HTMLDivElement
+                        col.onClick && col.onClick(params, e);
+                     }}
                      sx={{
                         borderRadius: 0.5,
                         fontWeight: 700,
                         fontSize: "0.75rem",
-                        bgcolor: paletteColor?.main
+                        bgcolor: paletteColor.main
                            ? alpha(paletteColor.main, 0.1)
                            : alpha(theme.palette.primary.main, 0.1),
-                        color: paletteColor?.main || theme.palette.primary.main,
+                        color: paletteColor.main,
+                        "&:hover": {
+                           bgcolor: paletteColor.main
+                              ? alpha(paletteColor.main, 0.2)
+                              : alpha(theme.palette.primary.main, 0.2),
+                        },
                      }}
                   />
                );
@@ -203,7 +264,7 @@ export default function CustomTable({
             onFilterChange={(d) => {
                setFilterData({ ...filterData, ...d });
             }}
-            filterData={filterData}
+            filterData={filterData as any}
             customFilter={filter}
          />
 
@@ -229,6 +290,7 @@ export default function CustomTable({
                loadingOverlay: {
                   variant: "skeleton",
                   noRowsVariant: "skeleton",
+                  // noRowsOverlay: , no rows
                },
             }}
             initialState={{
@@ -319,6 +381,20 @@ export default function CustomTable({
                   borderTop: "none!important",
                },
             }}
+            // getDetailPanelContent={({ row }) => (
+            //    <Stack p={2} bgcolor="background.default">
+            //       {/* 👇 Put whatever you want here */}
+            //       <div>Order ID: {row.id}</div>
+            //       <div>User: {row.name}</div>
+            //       <div>Email: {row.email}</div>
+            //    </Stack>
+            // )}
+
+            // getDetailPanelHeight={() => 120}
+            // detailPanelExpandedRowIds={expandedRowIds}
+            // onDetailPanelExpandedRowIdsChange={(newIds) =>
+            //    setExpandedRowIds(newIds as number[])
+            // }
          />
 
          {/* //* action menu */}

@@ -1,8 +1,8 @@
 import Publish from "@src/Pages/admin/Order/Publish";
 import React from "react";
 
-const Create = () => {
+const publish = () => {
    return <Publish />;
 };
 
-export default Create;
+export default publish;

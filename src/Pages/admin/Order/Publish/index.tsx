@@ -73,8 +73,7 @@ const Publish = () => {
             reset({
                ...editData,
                status: "Pending",
-               orderNote:
-                  editData.orderNote === null ? undefined : editData.orderNote,
+               orderNote: editData.orderNote == null ? "" : editData.orderNote,
                customer: {
                   name: editData.customer.name,
                   email: editData.customer.email,
@@ -119,9 +118,9 @@ const Publish = () => {
 
       const newOrder: OrderType = {
          ...formData,
+         id: orderData.length + 1,
          status: "Pending",
-         orderNote:
-            formData.orderNote === null ? undefined : formData.orderNote,
+         orderNote: formData.orderNote == null ? "" : formData.orderNote,
          orderId: `#${6000 + orderData.length + 1}`,
          invoiceNo: `INV-${6000 + orderData.length + 1}`,
          createdAt: new Date().toISOString(),
@@ -136,6 +135,11 @@ const Publish = () => {
          },
          products: sanitizedProducts, // ✅ now type-safe
          pricing: formData.pricing,
+         timestamps: {
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deliveryTime: null,
+         },
       };
 
       setOrder(newOrder);
@@ -188,7 +192,7 @@ const Publish = () => {
                      reset();
                      setIsEditMode(false);
 
-                     router.push("/order");
+                     router.push("/admin/order");
                   }}
                >
                   Cancel

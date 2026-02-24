@@ -162,10 +162,10 @@ const Filter: React.FC<FilterProps> = ({
 
             {/* ================= ACTIVE FILTER CHIPS ================= */}
             <Stack
-               spacing={1}
                direction="row"
                alignItems="flex-start"
                flexWrap="wrap"
+               gap={1}
             >
                {/* Search Text */}
                {isActive(filterData.searchText) && (
@@ -352,7 +352,6 @@ const FilterChipWrapper = ({
       borderColor="divider"
       borderRadius={0.5}
       p={1}
-      my={1}
       sx={{ borderStyle: "dashed" }}
    >
       <Typography variant="subtitle2">{title.toUpperCase()}: </Typography>

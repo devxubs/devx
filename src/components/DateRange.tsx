@@ -40,15 +40,15 @@ export default function DateRangePickerCustom({
 
    const [range, setRange] = React.useState<Range[]>([
       {
-         startDate: value?.[0] ?? new Date(),
-         endDate: value?.[1] ?? new Date(),
+         startDate: value?.[0] || undefined,
+         endDate: value?.[1] || undefined,
          key: "selection",
       },
    ]);
 
    const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
    const [monthAnchor, setMonthAnchor] = React.useState<HTMLElement | null>(
-      null
+      null,
    );
    const [yearAnchor, setYearAnchor] = React.useState<HTMLElement | null>(null);
    const [currentMonth, setCurrentMonth] = React.useState(new Date());
@@ -58,18 +58,18 @@ export default function DateRangePickerCustom({
    const months = React.useMemo(
       () =>
          Array.from({ length: 12 }, (_, i) =>
-            new Date(0, i).toLocaleString("default", { month: "long" })
+            new Date(0, i).toLocaleString("default", { month: "long" }),
          ),
-      []
+      [],
    );
 
    const years = React.useMemo(
       () =>
          Array.from(
             { length: 15 },
-            (_, i) => new Date().getFullYear() - 14 + i
+            (_, i) => new Date().getFullYear() - 14 + i,
          ),
-      []
+      [],
    );
 
    // Sync value
@@ -165,14 +165,14 @@ export default function DateRangePickerCustom({
 
       setRange([{ startDate: start, endDate: next, key: "selection" }]);
       onChange?.([start, next]);
-
-      console.log(range);
    };
 
    return (
       <Stack direction="column" spacing={1} alignItems="flex-start">
          {/* INPUT (UNCHANGED DESIGN) */}
          <TextField
+            fullWidth
+            focused={Boolean(anchorEl)}
             size={size}
             label={title || "Select"}
             value={displayValue}
@@ -431,7 +431,7 @@ export default function DateRangePickerCustom({
                      onClick={() => {
                         handleMonthOnly(i);
                         setCurrentMonth(
-                           new Date(currentMonth.getFullYear(), i, 1)
+                           new Date(currentMonth.getFullYear(), i, 1),
                         );
                      }}
                   >

@@ -60,7 +60,7 @@ const Menu = ({ item, size = "medium", onClose }: MenuProps) => {
       <Scrollbar
          darkMode
          autoHide
-         thumbSize={6}
+         thumbSize={1}
          style={{ maxHeight: currentSize.maxHeight }}
       >
          <List

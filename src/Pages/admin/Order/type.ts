@@ -36,7 +36,7 @@ export interface PricingType {
 
 // ✅ Timestamps type
 export interface OrderTimestampsType {
-   orderPlaced: string; // when order was created
+   createdAt: string; // when order was created
    updatedAt: string; // last updated time
    deliveryTime: string | null; // delivery time, null if not delivered
 }

@@ -39,7 +39,7 @@ const OrderFilter = (data: any, onChange: Function) => {
                <OrderFilterModal
                   filterValue={{
                      ...data.orderData,
-                     status: data.orderData.status,
+                     status: data.orderData?.status,
                   }}
                   onCloseModal={() => setModalOpen(false)}
                   onChange={(f: OrderFilterType) =>

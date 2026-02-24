@@ -16,6 +16,8 @@ import {
 } from "@src/handler/order_filter";
 import CustomAutocomplete from "../../../components/Autocomplete";
 import { OrderFilter } from "../../../components/Table/Filter";
+import { useState } from "react";
+import { o } from "framer-motion/dist/types.d-BJcRxCew";
 
 const employeeNames = [
    "John",
@@ -42,6 +44,16 @@ const OrderFilterModal = ({
 }) => {
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+   const [filterData, setFilterData] = useState({
+      order_created_at: filterValue.order_created_at || undefined,
+      courier_submitted_at: filterValue.courier_submitted_at || undefined,
+      employee: filterValue.employee || "",
+      status: filterValue.status || "",
+      order_source: filterValue.order_source || "",
+      products: filterValue.products || "",
+      district: filterValue.district || "",
+      print_status: filterValue.print_status || "",
+   });
 
    const inputSize = isMobile ? "small" : "medium"; // Adjust size on mobile
 
@@ -54,10 +66,11 @@ const OrderFilterModal = ({
                   <Typography variant="body2">Order Created At</Typography>
                   <DateRange
                      size={isMobile ? "small" : "medium"}
-                     value={filterValue.order_created_at}
+                     title="Order Created At"
+                     value={filterData.order_created_at}
                      onChange={(v: any) =>
-                        onChange?.({
-                           ...filterValue,
+                        setFilterData({
+                           ...filterData,
                            order_created_at: v || "",
                         })
                      }
@@ -71,10 +84,11 @@ const OrderFilterModal = ({
                   <Typography variant="body2">Courier Submitted At</Typography>
                   <DateRange
                      size={isMobile ? "small" : "medium"}
-                     value={filterValue.courier_submitted_at}
+                     title="Courier Submitted At"
+                     value={filterData.courier_submitted_at}
                      onChange={(v: any) =>
-                        onChange?.({
-                           ...filterValue,
+                        setFilterData({
+                           ...filterData,
                            courier_submitted_at: v || "",
                         })
                      }
@@ -89,10 +103,10 @@ const OrderFilterModal = ({
                   <CustomAutocomplete
                      size={inputSize}
                      label="Employee"
-                     option={employeeNames}
-                     value={filterValue.employee || ""}
+                     options={employeeNames}
+                     value={filterData.employee || ""}
                      onChange={(v: any) =>
-                        onChange?.({ ...filterValue, employee: v || "" })
+                        setFilterData({ ...filterData, employee: v || "" })
                      }
                   />
                </Stack>
@@ -105,10 +119,10 @@ const OrderFilterModal = ({
                   <CustomAutocomplete
                      size={inputSize}
                      label="Status"
-                     option={orderStatuses}
-                     value={filterValue.status || ""}
+                     options={orderStatuses}
+                     value={filterData.status || ""}
                      onChange={(v: any) =>
-                        onChange?.({ ...filterValue, status: v || "" })
+                        setFilterData({ ...filterData, status: v || "" })
                      }
                   />
                </Stack>
@@ -121,10 +135,10 @@ const OrderFilterModal = ({
                   <CustomAutocomplete
                      size={inputSize}
                      label="Order Source"
-                     option={orderSources}
-                     value={filterValue.order_source || ""}
+                     options={orderSources}
+                     value={filterData.order_source || ""}
                      onChange={(v: any) =>
-                        onChange?.({ ...filterValue, order_source: v || "" })
+                        setFilterData({ ...filterData, order_source: v || "" })
                      }
                   />
                </Stack>
@@ -137,10 +151,10 @@ const OrderFilterModal = ({
                   <CustomAutocomplete
                      size={inputSize}
                      label="Product"
-                     option={products}
-                     value={filterValue.products || ""}
+                     options={products}
+                     value={filterData.products || ""}
                      onChange={(v: any) =>
-                        onChange?.({ ...filterValue, products: v || "" })
+                        setFilterData({ ...filterData, products: v || "" })
                      }
                   />
                </Stack>
@@ -153,10 +167,10 @@ const OrderFilterModal = ({
                   <CustomAutocomplete
                      size={inputSize}
                      label="District"
-                     option={districts}
-                     value={filterValue.district || ""}
+                     options={districts}
+                     value={filterData.district || ""}
                      onChange={(v: any) =>
-                        onChange?.({ ...filterValue, district: v || "" })
+                        setFilterData({ ...filterData, district: v || "" })
                      }
                   />
                </Stack>
@@ -169,10 +183,10 @@ const OrderFilterModal = ({
                   <CustomAutocomplete
                      size={inputSize}
                      label="Print Status"
-                     option={["All", "Printed", "Not Printed"]}
-                     value={filterValue.print_status || ""}
+                     options={["All", "Printed", "Not Printed"]}
+                     value={filterData.print_status || ""}
                      onChange={(v: any) =>
-                        onChange?.({ ...filterValue, print_status: v || "" })
+                        setFilterData({ ...filterData, print_status: v || "" })
                      }
                   />
                </Stack>
@@ -191,7 +205,13 @@ const OrderFilterModal = ({
             <Button color="error" onClick={() => onCloseModal()}>
                Cancel
             </Button>
-            <Button variant="contained" onClick={() => onCloseModal()}>
+            <Button
+               variant="contained"
+               onClick={() => {
+                  onChange?.(filterData);
+                  onCloseModal();
+               }}
+            >
                Apply
             </Button>
          </Stack>
