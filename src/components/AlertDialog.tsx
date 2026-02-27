@@ -70,8 +70,10 @@ const AlertDialog: React.FC<AlertDialogProps> = ({
 
          {/* Content */}
          <Stack spacing={2} py={2}>
-            <Typography variant="body2">{title}</Typography>
-
+            <Typography
+               variant="body2"
+               dangerouslySetInnerHTML={{ __html: title }}
+            />
             <Stack
                direction={isMobile ? "column" : "row"}
                spacing={2}

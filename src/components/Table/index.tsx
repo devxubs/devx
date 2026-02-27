@@ -2,8 +2,6 @@
 
 import { Stack } from "@mui/material";
 import Filter, { FilterData } from "./Filter";
-import OrderTab from "../../Pages/admin/Order/OrderTab";
-import { orderStatuses } from "@src/handler/order_filter";
 
 import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
 import {
@@ -16,10 +14,10 @@ import { useEffect, useState } from "react";
 import Icon from "../Icon";
 import CustomPopover from "../CustomPopover";
 import Menu, { MenuItem as MenuItemProps } from "../Menu";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { P } from "framer-motion/dist/types.d-BJcRxCew";
+import { useSearchParams } from "next/navigation";
 import useQueryParams from "@src/handler/useQueryParams";
 import delayExecute from "@src/handler/delayExecute";
+import NoRows from "./NoRows";
 
 type MenuItem = Omit<MenuItemProps, "onClick"> & {
    onClick?: (params: GridRenderCellParams) => void;
@@ -39,8 +37,6 @@ interface DataTableProps {
    columns: ColumnConfig[];
    checkBox?: boolean;
    menuItems?: MenuItem[];
-   accordionValue?: number[];
-   onAccordionChange?: (newIds: number[]) => void;
    filter?: (
       data: FilterData,
       onChange: (data: FilterData) => void,
@@ -53,8 +49,6 @@ export default function CustomTable({
    checkBox = false,
    menuItems,
    filter,
-   accordionValue,
-   onAccordionChange,
 }: DataTableProps) {
    const theme = useTheme();
    const [mounted, setMounted] = useState(false);
@@ -68,15 +62,14 @@ export default function CustomTable({
    });
    const [selectedRowParams, setSelectedRowParams] =
       useState<GridRenderCellParams | null>(null);
-   const router = useRouter();
-   const pathname = usePathname();
+
    const searchParams = useSearchParams();
    const query = useQueryParams();
    let getFilterData = {};
    if (query.get("filter")) {
       getFilterData = JSON.parse(
          decodeURIComponent(query.get("filter") || "") || "{}",
-      ); //decodeURIComponent(JSON.parse(query.get("filter") || ""));
+      );
    }
 
    const [filterData, setFilterData] = useState<FilterData>({
@@ -101,56 +94,11 @@ export default function CustomTable({
       // },
    });
 
-   let data = {
-      searchText: searchParams?.get("keyword") || "",
-      userRole: searchParams?.get("role") || "",
-      productStock: searchParams?.get("stock") || "",
-      // orderData: {
-      //    order_created_at: [null, null],
-      //    courier_submitted_at: [null, null],
-      //    employee: "",
-      //    status: "",
-      //    order_source: "",
-      //    products: "",
-      //    district: "",
-      //    print_status: "",
-      // },
-      // reportData: {
-      //    report_type: "default",
-      //    date: [null, null],
-      //    product: null,
-      // },
-   };
-
    useEffect(() => {
       delayExecute(() => {
          query.set("filter", encodeURIComponent(JSON.stringify(filterData)));
       });
    }, [filterData]);
-
-   // const handleSearch = () => {
-   //    const params = new URLSearchParams(searchParams?.toString());
-
-   //    // params.set(JSON.stringify(filterData));
-
-   //    if (filterData.searchText) {
-   //       params.set("keyword", filterData.searchText);
-   //    } else {
-   //       params.delete("keyword");
-   //    }
-
-   //    if (filterData.userRole) {
-   //       params.set("role", filterData.userRole);
-   //    } else {
-   //       params.delete("role");
-   //    }
-   //    if (filterData.productStock) {
-   //       params.set("stock", filterData.productStock);
-   //    } else {
-   //       params.delete("stock");
-   //    }
-   //    router.push(`${pathname}?${params.toString()}`);
-   // };
 
    columns = columns.map((col) => {
       // * Action column
@@ -161,6 +109,7 @@ export default function CustomTable({
             filterable: false,
             headerAlign: "right",
             align: "right",
+            flex: 0,
 
             renderCell: (params) => {
                return (
@@ -184,7 +133,7 @@ export default function CustomTable({
       if (col.chip) {
          return {
             ...col,
-            flex: 1,
+            flex: col.flex ? col.flex : 0.5,
             headerAlign: "left",
             align: "left",
             renderCell: (params: GridRenderCellParams) => {
@@ -213,10 +162,14 @@ export default function CustomTable({
                      label={params.formattedValue}
                      size="small"
                      color={colorKey}
-                     onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                        // Change event type to HTMLDivElement
-                        col.onClick && col.onClick(params, e);
-                     }}
+                     {...(col.onClick
+                        ? {
+                             onClick: (e: React.MouseEvent<HTMLDivElement>) => {
+                                // Change event type to HTMLDivElement
+                                col.onClick && col.onClick(params, e);
+                             },
+                          }
+                        : {})}
                      sx={{
                         borderRadius: 0.5,
                         fontWeight: 700,
@@ -225,6 +178,7 @@ export default function CustomTable({
                            ? alpha(paletteColor.main, 0.1)
                            : alpha(theme.palette.primary.main, 0.1),
                         color: paletteColor.main,
+                        userSelect: "none",
                         "&:hover": {
                            bgcolor: paletteColor.main
                               ? alpha(paletteColor.main, 0.2)
@@ -257,6 +211,7 @@ export default function CustomTable({
          overflow={"hidden"}
          sx={{
             backgroundColor: theme.palette.background.paper + "!important",
+            height: rows.length ? "100%" : 560,
             maxHeight: 560,
          }}
       >
@@ -286,11 +241,13 @@ export default function CustomTable({
             disableVirtualization
             disableColumnSelector
             disableDensitySelector
+            slots={{
+               noRowsOverlay: NoRows, //no rows
+            }}
             slotProps={{
                loadingOverlay: {
                   variant: "skeleton",
                   noRowsVariant: "skeleton",
-                  // noRowsOverlay: , no rows
                },
             }}
             initialState={{
@@ -299,6 +256,7 @@ export default function CustomTable({
             sx={{
                border: "none",
                borderRadius: 0,
+               bgcolor: "background.paper",
 
                "& .MuiDataGrid-virtualScroller": {
                   scrollbarWidth: "none!important",
@@ -343,7 +301,7 @@ export default function CustomTable({
                   outline: "none",
                },
 
-               /* column header title focus (extra safe) */
+               /* column header  */
                "& .MuiDataGrid-columnHeaderTitleContainer:focus": {
                   outline: "none",
                },
@@ -381,20 +339,6 @@ export default function CustomTable({
                   borderTop: "none!important",
                },
             }}
-            // getDetailPanelContent={({ row }) => (
-            //    <Stack p={2} bgcolor="background.default">
-            //       {/* 👇 Put whatever you want here */}
-            //       <div>Order ID: {row.id}</div>
-            //       <div>User: {row.name}</div>
-            //       <div>Email: {row.email}</div>
-            //    </Stack>
-            // )}
-
-            // getDetailPanelHeight={() => 120}
-            // detailPanelExpandedRowIds={expandedRowIds}
-            // onDetailPanelExpandedRowIdsChange={(newIds) =>
-            //    setExpandedRowIds(newIds as number[])
-            // }
          />
 
          {/* //* action menu */}
@@ -423,31 +367,6 @@ export default function CustomTable({
                onClose={() => setActionMenuOpen(null)}
             />
          </CustomPopover>
-
-         {/* {type === "order" && (
-            <Stack>
-               <OrderTab
-                  value={
-                     orderStatuses.lastIndexOf(
-                        filterData.orderData.status || "",
-                     ) === -1
-                        ? 0
-                        : orderStatuses.lastIndexOf(
-                             filterData.orderData.status || "",
-                          ) + 1
-                  }
-                  onChange={(s) => {
-                     setFilterData((prev) => ({
-                        ...prev,
-                        orderData: {
-                           ...prev.orderData,
-                           status: s === "All" ? "" : s,
-                        },
-                     }));
-                  }}
-               />
-            </Stack>
-         */}
       </Stack>
    );
 }

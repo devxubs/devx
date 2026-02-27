@@ -1,6 +1,13 @@
 "use client";
 
-import { Stack, Button, Avatar, Typography, useTheme } from "@mui/material";
+import {
+   Stack,
+   Button,
+   Avatar,
+   Typography,
+   useTheme,
+   Tooltip,
+} from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import React, { useState } from "react";
@@ -16,9 +23,21 @@ export interface UserProps {
    phoneNumber: string;
    email: string;
    role: string;
+   password: string;
+   confirmPassword: string;
    salary: string;
-   hireDate: string;
+   hireDate: Date;
+   status: "active" | "inactive" | "suspended";
 }
+
+const statusColor: Record<
+   string,
+   "default" | "warning" | "success" | "info" | "error"
+> = {
+   active: "default",
+   inactive: "warning",
+   suspended: "error",
+} as const;
 
 export const UserProfile = ({
    name,
@@ -46,9 +65,11 @@ export const UserProfile = ({
             >
                {name}
             </Typography>
-            <Typography variant="body2" fontSize={14} color="textSecondary">
-               {email}
-            </Typography>
+            <Tooltip title={email} disableInteractive>
+               <Typography variant="body2" fontSize={14} color="textSecondary">
+                  {email.length >= 20 ? email.slice(0, 15) + "..." : email}
+               </Typography>
+            </Tooltip>
          </Stack>
       </Stack>
    );
@@ -62,7 +83,10 @@ const rows: UserProps[] = [
       email: "devxub@gmail.com",
       role: "Manager",
       salary: "$80,000",
-      hireDate: "2021-05-10",
+      hireDate: new Date("2021-05-10"),
+      status: "active",
+      password: "12345",
+      confirmPassword: "12345",
    },
    {
       id: "E002",
@@ -71,7 +95,10 @@ const rows: UserProps[] = [
       email: "najrul787@gmail.com",
       role: "CEO",
       salary: "$120,000",
-      hireDate: "2019-03-22",
+      hireDate: new Date("2019-03-22"),
+      status: "active",
+      password: "65432",
+      confirmPassword: "65432",
    },
    {
       id: "E003",
@@ -79,8 +106,11 @@ const rows: UserProps[] = [
       role: "Sales Manager",
       phoneNumber: "01325584606",
       email: "john.doe@example.com",
-      hireDate: "2020-03-15",
+      hireDate: new Date("2020-03-15"),
       salary: "$75,000",
+      status: "active",
+      password: "34567",
+      confirmPassword: "34567",
    },
    {
       id: "E004",
@@ -88,8 +118,11 @@ const rows: UserProps[] = [
       role: "HR Specialist",
       phoneNumber: "01818388585",
       email: "jane.smith@example.com",
-      hireDate: "2019-07-22",
+      hireDate: new Date("2019-07-22"),
       salary: "$65,000",
+      status: "inactive",
+      password: "98765",
+      confirmPassword: "98765",
    },
    {
       id: "E005",
@@ -97,13 +130,16 @@ const rows: UserProps[] = [
       role: "Software Developer",
       phoneNumber: "01711223344",
       email: "mike.johnson@example.com",
-      hireDate: "2021-11-05",
+      hireDate: new Date("2021-11-05"),
       salary: "$85,000",
+      status: "suspended",
+      password: "23452",
+      confirmPassword: "23452",
    },
 ];
 
 const columns: ColumnConfig[] = [
-   { field: "id", headerName: "ID", flex: 0 },
+   { field: "id", headerName: "ID", flex: 0.3 },
    {
       field: "name",
       headerName: "Name",
@@ -113,9 +149,32 @@ const columns: ColumnConfig[] = [
       ),
    },
    { field: "phoneNumber", headerName: "Phone" },
-   { field: "role", headerName: "Role" },
-   { field: "hireDate", headerName: "Hire Date" },
-   { field: "salary", headerName: "Salary" },
+   {
+      field: "role",
+      headerName: "Role",
+   },
+   {
+      field: "hireDate",
+      headerName: "Hire Date",
+      valueFormatter: (value: Date) => {
+         const date = new Date(value);
+
+         const month = date.toLocaleString("en-US", { month: "short" });
+         const day = date.getDate();
+         const year = date.getFullYear();
+
+         return `${month} ${day} ${year}`;
+      },
+   },
+   // { field: "salary", headerName: "Salary" },
+   {
+      field: "status",
+      headerName: "Status",
+      chip: true,
+      flex: 0.5,
+      valueFormatter: (v: string) => v.toLocaleUpperCase(),
+      color: (params) => statusColor[params.row.status] || "default",
+   },
 
    {
       field: "@actions",
@@ -134,22 +193,17 @@ export const roles = [
 
 const Users = () => {
    const theme = useTheme();
+   const [users, setUsers] = useState<UserProps[]>(rows);
    const [modalOpen, setModalOpen] = useState(false);
    const [editableUser, setEditableUser] = useState({} as any);
-  
 
    const [mode, setMode] = useState<"add" | "edit">("edit");
 
    // Delete dialog states
-   const [deleteOpen, setDeleteOpen] = useState(false);
-   const [userToDelete, setUserToDelete] = useState<any>(null);
+   const [deleteUser, setDeleteUser] = useState<UserProps | null>(null);
 
-   const handleDeleteConfirm = () => {
-      console.log("Deleting user:", userToDelete);
-      // 👉 Here you can call API or update state
-      setDeleteOpen(false);
-      setUserToDelete(null);
-   };
+   // suspended dialog
+   const [suspendedUser, setSuspendedUser] = useState<UserProps | null>(null);
 
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
@@ -178,7 +232,7 @@ const Users = () => {
             </Stack>
             <Stack>
                <CustomTable
-                  rows={rows}
+                  rows={users}
                   columns={columns}
                   checkBox={true}
                   menuItems={[
@@ -193,11 +247,17 @@ const Users = () => {
                         },
                      },
                      {
+                        label: "Suspended",
+                        color: "warning",
+                        onClick: (p) => {
+                           setSuspendedUser(p.row);
+                        },
+                     },
+                     {
                         label: "Delete",
                         color: "error",
                         onClick: (p) => {
-                           setUserToDelete(p.row);
-                           setDeleteOpen(true);
+                           setDeleteUser(p.row);
                         },
                      },
                   ]}
@@ -229,22 +289,68 @@ const Users = () => {
             <Modal
                mode={mode}
                onClose={() => setModalOpen(false)}
-               userData={editableUser || {}}
-               onChange={(d) => {
-                  setEditableUser({ ...editableUser, ...d });
+               editUserData={editableUser || {}}
+               onAddUser={(d) => {
+                  setUsers([
+                     {
+                        ...d,
+                        id: `E00${users.length + 1}`,
+                        hireDate: new Date(),
+                        status: "inactive",
+                     },
+                     ...users,
+                  ]);
+               }}
+               onEditUser={(newData, old) => {
+                  setUsers((prev) =>
+                     prev.map((user) =>
+                        user.id === old.id ? { ...user, ...newData } : user,
+                     ),
+                  );
                }}
             />
          </CustomModal>
+
+         {/* delete user */}
          <AlertDialog
-            // sx={{ width: { xs: "90%", md: 900 } }}
             type="delete"
-            open={deleteOpen}
-            onClose={() => setDeleteOpen(false)}
-            title={
-               "Are you sure you want to delete" + userToDelete?.email ||
-               "this user"
-            }
-            onConfirm={handleDeleteConfirm}
+            open={Boolean(deleteUser)}
+            onClose={() => setDeleteUser(null)}
+            title={`Are you sure you want to delete <b>${
+               deleteUser?.email || "this user"
+            }</b>`}
+            onConfirm={() => {
+               if (!deleteUser) return;
+
+               setUsers((prev) =>
+                  prev.filter((user) => user.id !== deleteUser.id),
+               );
+
+               setDeleteUser(null);
+            }}
+         />
+
+         {/* suspended user */}
+         <AlertDialog
+            type="warning"
+            open={Boolean(suspendedUser)}
+            onClose={() => setSuspendedUser(null)}
+            title={`Are you sure you want to suspend <b>${
+               suspendedUser?.email || "this user"
+            }</b>`}
+            onConfirm={() => {
+               if (!suspendedUser) return;
+
+               setUsers((prev) =>
+                  prev.map((user) =>
+                     user.id === suspendedUser.id
+                        ? { ...user, status: "suspended" }
+                        : user,
+                  ),
+               );
+
+               setSuspendedUser(null);
+            }}
          />
       </Scrollbar>
    );

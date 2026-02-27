@@ -20,7 +20,27 @@ import AlertDialog from "@src/components/AlertDialog";
 import { useRouter } from "next/navigation";
 import CustomAutocomplete from "@src/components/Autocomplete";
 
-export const productsData = [
+export type ProductType = {
+   id: number;
+   productName: string;
+   subDescription: string;
+   content: string;
+   images: string[];
+   productCode: string;
+   productSku: string;
+   quantity: string;
+   stockValue: string;
+   category: string;
+   productType: string;
+   color: string[];
+   size: string[];
+   regularPrice: string;
+   salePrice: string;
+   date: string;
+   time: string;
+};
+
+export const productsData: ProductType[] = [
    {
       id: 1,
       productName: "Elegance Stiletto Heels",

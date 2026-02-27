@@ -17,6 +17,7 @@ import { orderStatuses } from "@src/handler/order_filter";
 import CustomModal from "@src/components/Modal";
 import { OrderType, ProductType } from "./type";
 import QuickEditModal from "./QuickEditModal";
+import AlertDialog from "@src/components/AlertDialog";
 
 const statusColor: Record<
    string,
@@ -35,20 +36,33 @@ const statusColor: Record<
    Failed: "error",
 } as const;
 
-const status = ["All", ...orderStatuses];
+const OrderStatus = ["All", ...orderStatuses];
 
 const OrderTable = () => {
    const router = useRouter();
-   const [statusAnchorEl, setStatusAnchorEl] = useState<HTMLElement | null>(
-      null,
+   const [status, setStatus] = useState<{
+      orderRow: OrderType;
+      anchorEl: HTMLElement | null;
+   }>(
+      {} as {
+         orderRow: OrderType;
+         anchorEl: HTMLElement | null;
+      },
    );
+   const [orderRows, setOrderRows] = useState(orders);
 
    // note info
    const [noteModal, setNoteModal] = useState<OrderType | null>(null);
    const [note, setNote] = useState(noteModal?.orderNote || "");
 
    // quick edit info
-   const [editModal, setEditModal] = useState<ProductType[] | null>(null);
+   const [editModal, setEditModal] = useState<OrderType | null>(null);
+
+   // delete dialog
+   const [deleteDialog, setDeleteDialog] = useState<{
+      open: boolean;
+      orderRow: OrderType;
+   }>({} as { open: boolean; orderRow: OrderType });
 
    const columns: ColumnConfig[] = [
       { field: "orderId", headerName: "ID", flex: 0.3 },
@@ -110,7 +124,7 @@ const OrderTable = () => {
             return statusColor[params.row.status] || "default";
          },
          onClick: (params, e) => {
-            setStatusAnchorEl(e.currentTarget);
+            setStatus({ orderRow: params.row, anchorEl: e.currentTarget });
          },
       },
       {
@@ -126,7 +140,7 @@ const OrderTable = () => {
                <Tooltip title={"Quick Edit"} disableInteractive>
                   <IconButton
                      size="small"
-                     onClick={() => setEditModal(params.row.products)}
+                     onClick={() => setEditModal(params.row)}
                   >
                      <Icon icon="solar:pen-bold" size="small" />
                   </IconButton>
@@ -148,7 +162,7 @@ const OrderTable = () => {
          {/* Order tab */}
          <Stack>
             <OrderTab
-               status={status}
+               status={OrderStatus}
                // value={
                //    orderStatuses.lastIndexOf(
                //       filterData.orderData.status || "",
@@ -170,7 +184,7 @@ const OrderTable = () => {
             />
          </Stack>
          <CustomTable
-            rows={orders as any}
+            rows={orderRows as OrderType[]}
             columns={columns}
             filter={(data, onChange) => OrderFilter(data, onChange)}
             checkBox
@@ -207,7 +221,7 @@ const OrderTable = () => {
                   onClick: (params: GridRenderCellParams) => {
                      // setDeleteConform(true);
                      // setProductToDelete(params.row);
-                     // setIsDeleteDialogOpen(true);
+                     setDeleteDialog({ open: true, orderRow: params.row });
                   },
                },
             ]}
@@ -215,8 +229,8 @@ const OrderTable = () => {
 
          {/* status Changing */}
          <CustomPopover
-            anchorEl={statusAnchorEl}
-            onClose={() => setStatusAnchorEl(null)}
+            anchorEl={status.anchorEl}
+            onClose={() => setStatus((prev) => ({ ...prev, anchorEl: null }))}
             anchorOrigin={{
                vertical: "bottom",
                horizontal: "right",
@@ -228,14 +242,23 @@ const OrderTable = () => {
          >
             <Menu
                item={
-                  orderStatuses?.map((status) => ({
-                     label: status,
-                     onClick: () => {
-                        setStatusAnchorEl(null);
+                  orderStatuses?.map((s) => ({
+                     label: s,
+                     onClick: (l) => {
+                        setOrderRows((prev) =>
+                           prev.map((or) =>
+                              or.orderId === status.orderRow.orderId
+                                 ? { ...or, status: l }
+                                 : or,
+                           ),
+                        );
+                        setStatus((prev) => ({ ...prev, anchorEl: null }));
                      },
                   })) ?? []
                }
-               onClose={() => setStatusAnchorEl(null)}
+               onClose={() =>
+                  setStatus((prev) => ({ ...prev, anchorEl: null }))
+               }
             />
          </CustomPopover>
 
@@ -276,7 +299,18 @@ const OrderTable = () => {
                      color="primary"
                      type="submit"
                      disabled={note.length === 0}
-                     // onClick={}
+                     onClick={() => {
+                        if (noteModal === null) return;
+
+                        setOrderRows((prev) =>
+                           prev.map((or) =>
+                              or.orderId === noteModal.orderId
+                                 ? { ...or, orderNote: note }
+                                 : or,
+                           ),
+                        );
+                        setNoteModal(null);
+                     }}
                   >
                      {noteModal?.orderNote.length ? "Update note" : "Add note"}
                   </Button>
@@ -288,14 +322,51 @@ const OrderTable = () => {
          <CustomModal
             open={Boolean(editModal)}
             onClose={() => setEditModal(null)}
-            sx={{ width: 500 }}
-            title="Note"
+            sx={{
+               width: {
+                  xs: "90%",
+                  sm: 650,
+               },
+            }}
+            title="Quick Edit"
          >
             <QuickEditModal
-               products={editModal || []}
+               products={editModal?.products || []}
                onClose={() => setEditModal(null)}
+               onUpdate={(p) => {
+                  if (!editModal) return;
+                  setOrderRows((prev) =>
+                     prev.map((or) =>
+                        or.orderId === editModal.orderId
+                           ? { ...or, products: p }
+                           : or,
+                     ),
+                  );
+               }}
             />
          </CustomModal>
+
+         <AlertDialog
+            open={deleteDialog.open}
+            type={"delete"}
+            title={`Are you sure you want to delete <b>${deleteDialog.orderRow?.orderId || "this"}</b> order?`}
+            onClose={() => {
+               setDeleteDialog((prev) => ({ ...prev, open: false }));
+            }}
+            onConfirm={() => {
+               if (!deleteDialog.orderRow) return;
+
+               setOrderRows((prev) =>
+                  prev.filter(
+                     (or) => or.orderId !== deleteDialog.orderRow.orderId,
+                  ),
+               );
+               setDeleteDialog({
+                  open: false,
+                  orderRow: {} as OrderType,
+               });
+            }}
+         />
       </Stack>
    );
 };

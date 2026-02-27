@@ -6,7 +6,6 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { TableRow } from "@src/components/Table";
 import Details from "./Details";
 import Properties from "./Properties";
 import Pricing from "./Pricing";
@@ -15,36 +14,32 @@ import { productsData } from "..";
 
 const productSchema = z
    .object({
-      // PRODUCT DETAILS
       product_name: z.string().min(1, "Name is required!"),
       sub_description: z.string().optional(),
+
       content: z
          .string()
-         .min(1, "Description is required!") // handles empty string
+         .min(1, "Description is required!")
          .min(100, "Description must be at least 100 chars"),
-      images: z
-         .array(z.any())
-         .min(1, "Image is required!")
-         .min(2, "At least 2 image is required!"),
 
-      // PRODUCT PROPERTIES
+      images: z.array(z.any()).min(2, "At least 2 images are required!"),
+
       product_code: z.string().min(1, "Product code is required!"),
       product_sku: z.string().min(1, "Product SKU is required!"),
-      low_stock_alert: z.string(),
-      quantity: z.coerce.number(),
+
+      low_stock_alert: z.string().optional(),
+
+      quantity: z.coerce.number().min(0, "Quantity must be positive"),
+
       category: z.string().min(1, "Choose at least one category!"),
       product_type: z.string().min(1, "Select at least one type!"),
-      unit: z.array(z.string()),
-      color: z.array(z.string()),
 
-      // PRODUCT PRICING
-      regularPrice: z.coerce.number().min(1, "Price is required!"), // ✅ coercion
-      salePrice: z.coerce
-         .number()
-         .optional()
-         .refine((val) => val === undefined || val >= 0, {
-            message: "Sale price must be positive",
-         }),
+      unit: z.array(z.string()).optional(),
+      color: z.array(z.string()).optional(),
+
+      regularPrice: z.coerce.number().min(1, "Price is required!"),
+
+      salePrice: z.coerce.number().optional(),
    })
    .refine((data) => !data.salePrice || data.salePrice <= data.regularPrice, {
       message: "Sale price must be less than or equal to regular price",
@@ -54,7 +49,22 @@ const productSchema = z
 type PricingValues = z.infer<typeof productSchema>;
 
 const Publish = () => {
-   const [data, setData] = useState({} as TableRow);
+   const [data, setData] = useState<PricingValues>({
+      product_name: "",
+      sub_description: "",
+      content: "",
+      images: [],
+      product_code: "",
+      product_sku: "",
+      low_stock_alert: "", // Added low_stock_alert
+      quantity: 0 as number, // Ensure quantity is a number
+      category: "",
+      product_type: "",
+      color: [],
+      unit: [],
+      regularPrice: 0 as number, // Ensure regularPrice is a number
+      salePrice: undefined,
+   });
    const router = useRouter();
    const params = useSearchParams();
    const id = params?.get("id");
@@ -65,42 +75,54 @@ const Publish = () => {
       handleSubmit,
       formState: { errors },
       reset,
-   } = useForm<
-      z.input<typeof productSchema>,
-      any,
-      z.output<typeof productSchema>
-   >({
-      resolver: zodResolver(productSchema),
+   } = useForm<z.infer<typeof productSchema>>({
+      resolver: zodResolver(productSchema as any),
       defaultValues: {
-         product_name: (data?.product_name as any) || "",
-         sub_description: (data?.sub_description as any) || "",
-         content: (data?.content as any) || "",
-         images: (data?.images as any) || [],
-
-         product_code: (data?.product_code as any) || "",
-         product_sku: (data?.product_sku as any) || "",
-         quantity: (data?.quantity as any) || "",
-         category: (data?.category as any) || "",
-         product_type: (data?.product_type as any) || "",
-         color: (data?.color as any) || [],
-         unit: (data?.unit as any) || [],
-
-         regularPrice: (data?.regularPrice as any) || "",
+         product_name: "",
+         sub_description: "",
+         content: "",
+         images: [],
+         product_code: "",
+         product_sku: "",
+         low_stock_alert: "",
+         quantity: 0,
+         category: "",
+         product_type: "",
+         color: [],
+         unit: [],
+         regularPrice: 0,
          salePrice: undefined,
       },
    });
 
    useEffect(() => {
-      if (id) {
-         const findProduct = productsData.find((p) => p.id === Number(id));
-         setData(findProduct as TableRow);
-         reset(findProduct);
+      if (!id) return;
+
+      const findProduct = productsData.find((p) => p.id === Number(id));
+
+      if (findProduct) {
+         reset({
+            ...findProduct,
+            quantity: Number(findProduct.quantity),
+            regularPrice: Number(findProduct.regularPrice),
+            salePrice: findProduct.salePrice
+               ? Number(findProduct.salePrice)
+               : undefined,
+         });
       }
-   }, [id]);
+   }, [id, reset]);
 
    // 3. Submit handler
-   const onSubmit: SubmitHandler<PricingValues> = (data) => {
-      setData(data);
+   const onSubmit: SubmitHandler<z.infer<typeof productSchema>> = (data) => {
+      console.log("Form Data:", data);
+
+      if (id) {
+         // update logic
+      } else {
+         // add logic
+      }
+
+      router.push("/admin/product");
    };
 
    return (
@@ -110,6 +132,7 @@ const Publish = () => {
          mx={"auto"}
          height={"100%"}
          component="form"
+         onSubmit={handleSubmit(onSubmit)}
       >
          <Stack spacing={4}>
             <Stack>
@@ -145,17 +168,12 @@ const Publish = () => {
             <Button
                variant="text"
                color="inherit"
-               onClick={() => router.push("/product")}
+               onClick={() => router.push("/admin/product")}
             >
                Cancel
             </Button>
 
-            <Button
-               variant="contained"
-               color="primary"
-               type="submit"
-               onClick={handleSubmit(onSubmit)}
-            >
+            <Button variant="contained" color="primary" type="submit">
                {id ? "Update product" : "Add product"}
             </Button>
          </Stack>

@@ -5,7 +5,7 @@ import Scrollbar from "react-browser-scrollbar";
 export type MenuItem = {
    label: string;
    icon?: React.ReactNode;
-   color?: "error" | "default";
+   color?: "default" | "warning" | "success" | "info" | "error";
    onClick?: (l: string) => void;
 };
 
@@ -69,49 +69,52 @@ const Menu = ({ item, size = "medium", onClose }: MenuProps) => {
                minWidth: currentSize.minWidth,
             }}
          >
-            {item.map(({ label, icon, color, onClick }) => (
-               <ListItemButton
-                  key={label}
-                  sx={{
-                     borderRadius: 0.5,
-                     mb: currentSize.listItemMarginBottom,
-                     px: currentSize.px,
-                     py: currentSize.py,
-                     gap: currentSize.gap,
-                     ...(color === "error" && {
+            {item.map(({ label, icon, color, onClick }: MenuItem) => {
+               const colorKey =
+                  color === "default" ? "primary.main" : color + ".main";
+               return (
+                  <ListItemButton
+                     key={label}
+                     sx={{
+                        borderRadius: 0.5,
+                        mb: currentSize.listItemMarginBottom,
+                        px: currentSize.px,
+                        py: currentSize.py,
+                        gap: currentSize.gap,
+
                         "& .MuiTypography-root": {
-                           color: "error.main",
+                           color: colorKey,
                         },
                         "& .MuiTouchRipple-root": {
-                           color: "error.main",
+                           color: colorKey,
                            opacity: 0.3,
                         },
-                     }),
-                  }}
-                  onClick={() => {
-                     onClick?.(label);
-                     onClose?.();
-                  }}
-               >
-                  <ListItemIcon
-                     sx={{
-                        minWidth: "auto",
-                        mr: currentSize.gap,
-                        fontSize: currentSize.iconFontSize,
+                     }}
+                     onClick={() => {
+                        onClick?.(label);
+                        onClose?.();
                      }}
                   >
-                     {icon}
-                  </ListItemIcon>
-                  <Typography
-                     variant="body2"
-                     fontWeight={400}
-                     textTransform="capitalize"
-                     fontSize={currentSize.labelFontSize}
-                  >
-                     {label}
-                  </Typography>
-               </ListItemButton>
-            ))}
+                     <ListItemIcon
+                        sx={{
+                           minWidth: "auto",
+                           mr: currentSize.gap,
+                           fontSize: currentSize.iconFontSize,
+                        }}
+                     >
+                        {icon}
+                     </ListItemIcon>
+                     <Typography
+                        variant="body2"
+                        fontWeight={500}
+                        textTransform="capitalize"
+                        fontSize={currentSize.labelFontSize}
+                     >
+                        {label}
+                     </Typography>
+                  </ListItemButton>
+               );
+            })}
          </List>
       </Scrollbar>
    );
