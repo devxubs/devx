@@ -9,10 +9,11 @@ import {
    Typography,
    TextField,
 } from "@mui/material";
+import { GridRenderCellParams } from "@mui/x-data-grid";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { ColumnConfig } from "@src/components/Table";
+import CustomTable, { ColumnConfig, MenuItem } from "@src/components/Table";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
@@ -375,52 +376,49 @@ const purchaseData: PurchaseTypes[] = [
 const Purchase = () => {
    const theme = useTheme();
    const router = useRouter();
-   const [purchase, setPurchase] = useState<PurchaseTypes>({} as PurchaseTypes);
-   const [openDelete, setOpenDelete] = useState(false);
-   const [openNoteModal, setOpenNoteModal] = useState<boolean>(false);
+   const [purchases, setPurchases] = useState<PurchaseTypes[]>(purchaseData);
+
+   // note
    const [note, setNote] = useState<string>("");
+   const [updateNote, setUpdateNote] = useState<PurchaseTypes | null>(null);
+
+   // delete
+   const [deleteItem, setDeleteItem] = useState<PurchaseTypes | null>(null);
 
    const columns: ColumnConfig[] = [
       {
          field: "id",
          headerName: "Id",
-         flex: 0.1,
+         width: 70,
       },
       {
          field: "date",
          headerName: "Date",
-         flex: 1,
       },
       {
          field: "invoice",
          headerName: "Invoice",
-         flex: 1,
       },
       {
          field: "supplier",
          headerName: "Supplier",
-         flex: 1,
       },
       {
          field: "product",
          headerName: "Product",
          valueFormatter: (value: any) => value.name,
-         flex: 1,
       },
       {
          field: "product_amount",
          headerName: "Product Amount",
-         flex: 1,
       },
       {
          field: "others_cost",
          headerName: "Others Cost",
-         flex: 1,
       },
       {
          field: "discount",
          headerName: "Discount",
-         flex: 1,
       },
       {
          field: "total",
@@ -441,7 +439,7 @@ const Purchase = () => {
                <IconButton
                   size="small"
                   onClick={() => {
-                     setOpenNoteModal(true);
+                     setUpdateNote(params.row);
                      setNote(params.row.note || "");
                   }}
                >
@@ -450,31 +448,32 @@ const Purchase = () => {
             </Tooltip>
          ),
       },
+      {
+         field: "@actions",
+         headerName: "",
+      },
    ];
 
    // Action menu for each row
-   const actionMenu = (row: PurchaseTypes) => [
+   const actionMenu: MenuItem[] = [
       {
          label: "edit",
          icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => {
-            setPurchase(row);
-            router.push("/purchase/publish?id=" + row.id);
+         onClick: (params: GridRenderCellParams) => {
+            router.push("/admin/purchase/publish?id=" + params.row.id);
          },
       },
       {
          label: "print",
          icon: <Icon icon="solar:printer-minimalistic-bold" size="small" />,
-         onClick: () => {
-            setPurchase(row);
-         },
+         color: undefined,
+         onClick: (params: GridRenderCellParams) => {},
       },
       {
          label: "delete",
          color: "error",
-         onClick: () => {
-            setPurchase(row);
-            setOpenDelete(true);
+         onClick: (params: GridRenderCellParams) => {
+            setDeleteItem(params.row);
          },
          icon: (
             <Icon
@@ -506,12 +505,17 @@ const Purchase = () => {
                Add purchase
             </Button>
          </Stack>
-         <CustomTable rows={purchaseData} columns={columns} checkBox />
+         <CustomTable
+            rows={purchases}
+            columns={columns}
+            checkBox
+            menuItems={actionMenu}
+         />
 
          <CustomModal
-            open={openNoteModal}
-            onClose={function (): void {
-               setOpenNoteModal(false);
+            open={Boolean(updateNote)}
+            onClose={() => {
+               setUpdateNote(null);
             }}
             title="Note"
             sx={{
@@ -528,7 +532,16 @@ const Purchase = () => {
                onChange={(e) => setNote(e.target.value || "")}
                onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                     setOpenNoteModal(false);
+                     if (updateNote) {
+                        setPurchases((prev) =>
+                           prev.map((item) =>
+                              item.id === updateNote.id
+                                 ? { ...item, note: note }
+                                 : item,
+                           ),
+                        );
+                     }
+                     setUpdateNote(null);
                   }
                }}
             />
@@ -542,7 +555,7 @@ const Purchase = () => {
                <Button
                   variant="text"
                   color="inherit"
-                  onClick={() => setOpenNoteModal(false)}
+                  onClick={() => setUpdateNote(null)}
                >
                   Cancel
                </Button>
@@ -550,10 +563,24 @@ const Purchase = () => {
                <Button
                   variant="contained"
                   color="primary"
-                  sx={{
-                     position: "relative",
-                     overflow: "hidden",
+                  onClick={() => {
+                     if (updateNote) {
+                        setPurchases((prev) =>
+                           prev.map((item) =>
+                              item.id === updateNote.id
+                                 ? { ...item, note: note }
+                                 : item,
+                           ),
+                        );
+                        setUpdateNote(null);
+                     }
                   }}
+                  sx={
+                     {
+                        // position: "relative",
+                        // overflow: "hidden",
+                     }
+                  }
                >
                   Submit
                </Button>
@@ -561,12 +588,20 @@ const Purchase = () => {
          </CustomModal>
 
          <AlertDialog
-            open={openDelete}
+            open={Boolean(deleteItem)}
             onClose={function (): void {
-               setOpenDelete(false);
+               setDeleteItem(null);
+            }}
+            onConfirm={() => {
+               if (deleteItem) {
+                  setPurchases((prev) =>
+                     prev.filter((item) => item.id !== deleteItem.id),
+                  );
+                  setDeleteItem(null);
+               }
             }}
             type={"error"}
-            title={`Are you sure want to delete "${purchase?.invoice}"?`}
+            title={`Are you sure want to delete "${deleteItem?.invoice}"?`}
          />
       </Stack>
    );

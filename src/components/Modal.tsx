@@ -46,7 +46,10 @@ export default function CustomModal({
                   bgcolor: "background.paper",
                   boxShadow: 24,
                   p: 2,
-                  px: 3,
+                  px: {
+                     xs: 1,
+                     sm: 3,
+                  },
                   borderRadius: 2,
                   ...sx,
                }}
@@ -57,6 +60,7 @@ export default function CustomModal({
                      justifyContent={title ? "space-between" : "flex-end"}
                      alignItems="center"
                      mb={2}
+                     px={{ xs: 2, sm: 0 }}
                   >
                      {title && (
                         <Typography fontSize={22} fontWeight={600}>

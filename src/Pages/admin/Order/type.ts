@@ -22,6 +22,7 @@ export interface ProductType {
    code: string;
    quantity: number;
    price: number;
+   subtotal?: number;
    images: string;
 }
 

@@ -12,11 +12,7 @@ import {
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, {
-   ColumnConfig,
-   Head,
-   TableProps,
-} from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -168,11 +164,6 @@ export const suppliersData: SuppliersTypes[] = [
 ];
 
 export const SuppliersSchema = yup.object({
-   id: yup
-      .number()
-      .integer("ID must be whole number")
-      .required("ID is required"),
-
    name: yup
       .string()
       .min(2, "Name is too short")
@@ -183,10 +174,12 @@ export const SuppliersSchema = yup.object({
       .string()
       .matches(/^01[0-9]{9}$/, "Invalid Bangladeshi mobile number")
       .required("Mobile number is required"),
+
    email: yup
       .string()
       .email("Invalid email format")
       .required("Email is required"),
+
    address: yup.string().required("Address is required"),
 });
 
@@ -259,12 +252,16 @@ const Suppliers = () => {
       },
    ];
 
-   const [open, setOpen] = useState(false);
-   const [supplier, setSuppliers] = useState<SuppliersTypes>(
-      {} as SuppliersTypes,
-   );
-   const [isEditMode, setIsEditMode] = useState(false);
-   const [openDelete, setOpenDelete] = useState(false);
+   const [suppliers, setSuppliers] = useState<SuppliersTypes[]>(suppliersData);
+
+   // modal
+   const [open, setModalOpen] = useState(false);
+
+   // edit
+   const [edit, setEdit] = useState<SuppliersTypes | null>(null);
+
+   // delete
+   const [deleteOpen, setDeleteOpen] = useState<SuppliersTypes | null>(null);
 
    const {
       control,
@@ -277,14 +274,34 @@ const Suppliers = () => {
          name: "",
          number: "",
          email: "",
+         address: "",
       },
    });
 
-   const onSubmit: SubmitHandler<SuppliersTypes> = (formData) => {
-      const newOrder: SuppliersTypes = {
+   const onSubmit: SubmitHandler<SupplierFormValues> = (formData) => {
+      const newSupplier: SuppliersTypes = {
+         id: suppliers.length + 1,
          ...formData,
+         advance: 0,
+         due: 0,
+         pay: 0,
+         pay_return: 0,
+         due_return: 0,
+         total: 0,
       };
-      setSuppliers(newOrder);
+
+      if (!edit) {
+         setSuppliers([...suppliers, newSupplier]);
+      } else {
+         setSuppliers(
+            suppliers.map((s) =>
+               s.id === edit.id ? { ...s, ...formData } : s,
+            ),
+         );
+         setEdit(null);
+      }
+
+      setModalOpen(false);
    };
 
    return (
@@ -302,51 +319,59 @@ const Suppliers = () => {
                      }}
                   />
                }
-               onClick={() => setOpen(true)}
+               onClick={() => {
+                  reset({
+                     name: "",
+                     number: "",
+                     email: "",
+                     address: "",
+                  });
+
+                  setModalOpen(true);
+               }}
             >
                Add Supplier
             </Button>
          </Stack>
          <CustomTable
-            rows={suppliersData}
+            rows={suppliers}
             columns={columns}
             checkBox={true}
             menuItems={[
                {
                   label: "edit",
                   onClick: (p) => {
-                     setSuppliers(p.row);
-                     setIsEditMode(true);
-                     setOpen(true);
-                     reset(p.row);
+                     setEdit(p.row);
+                     setModalOpen(true);
                   },
                },
                {
                   label: "print",
-                  onClick: (p) => {
-                     setSuppliers(p.row);
-                     setIsEditMode(true);
-                     setOpen(true);
-                     reset(p.row);
-                  },
+                  onClick: (p) => {},
                },
                {
                   label: "delete",
                   color: "error",
                   onClick: (p) => {
-                     setSuppliers(p.row);
-                     setOpenDelete(true);
+                     setDeleteOpen(p.row);
                   },
                },
             ]}
          />
          <CustomModal
             open={open}
-            onClose={() => setOpen(false)}
+            onClose={() => setModalOpen(false)}
             title="Add Supplier"
          >
             <Stack
-               width={600}
+               width={{
+                  xs: "90vw",
+                  sm: "500px",
+               }}
+               p={{
+                  xs: 2,
+                  sm: 1,
+               }}
                component={"form"}
                onSubmit={handleSubmit(onSubmit)}
             >
@@ -363,10 +388,11 @@ const Suppliers = () => {
                         <Controller
                            name="name"
                            control={control}
-                           defaultValue={supplier.name}
                            render={({ field }) => (
                               <TextField
                                  {...field}
+                                 value={field.value}
+                                 onChange={field.onChange}
                                  fullWidth
                                  placeholder="Name"
                                  label="Name"
@@ -389,10 +415,11 @@ const Suppliers = () => {
                         <Controller
                            name="number"
                            control={control}
-                           defaultValue={supplier.number}
                            render={({ field }) => (
                               <TextField
                                  {...field}
+                                 value={field.value}
+                                 onChange={field.onChange}
                                  fullWidth
                                  placeholder="Number"
                                  label="Number"
@@ -416,10 +443,11 @@ const Suppliers = () => {
                         <Controller
                            name="email"
                            control={control}
-                           defaultValue={supplier.email}
                            render={({ field }) => (
                               <TextField
                                  {...field}
+                                 value={field.value}
+                                 onChange={field.onChange}
                                  fullWidth
                                  placeholder="Email"
                                  label="Email"
@@ -442,10 +470,11 @@ const Suppliers = () => {
                         <Controller
                            name="address"
                            control={control}
-                           defaultValue={supplier.address}
                            render={({ field }) => (
                               <TextField
                                  {...field}
+                                 value={field.value}
+                                 onChange={field.onChange}
                                  fullWidth
                                  placeholder="Address"
                                  label="Address"
@@ -469,8 +498,8 @@ const Suppliers = () => {
                      color="inherit"
                      onClick={() => {
                         reset();
-                        setOpen(false);
-                        setIsEditMode(false);
+                        setModalOpen(false);
+                        setEdit(null);
                      }}
                   >
                      Cancel
@@ -485,18 +514,22 @@ const Suppliers = () => {
                         overflow: "hidden",
                      }}
                   >
-                     {isEditMode ? "Update Supplier" : "Add Supplier"}
+                     {edit ? "Update Supplier" : "Add Supplier"}
                   </Button>
                </Stack>
             </Stack>
          </CustomModal>
          <AlertDialog
-            open={openDelete}
-            onClose={function (): void {
-               setOpenDelete(false);
-            }}
+            open={Boolean(deleteOpen)}
             type={"error"}
-            title={`Are you sure want to delete "${supplier?.name}"?`}
+            title={`Are you sure want to delete "${deleteOpen?.name}"?`}
+            onConfirm={() => {
+               setSuppliers(suppliers.filter((s) => s.id !== deleteOpen?.id));
+               setDeleteOpen(null);
+            }}
+            onClose={function (): void {
+               setDeleteOpen(null);
+            }}
          />
       </Stack>
    );

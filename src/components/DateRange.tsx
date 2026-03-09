@@ -73,19 +73,27 @@ export default function DateRangePickerCustom({
    );
 
    // Sync value
-   React.useEffect(() => {
+   useEffect(() => {
       if (!value) return;
+
+      const start = value[0] ? new Date(value[0]) : undefined;
+      const end = value[1] ? new Date(value[1]) : undefined;
 
       setRange([
          {
-            startDate: value[0] ?? undefined,
-            endDate: value[1] ?? undefined,
+            startDate: start,
+            endDate: end,
             key: "selection",
          },
       ]);
 
-      value[0] && (setCurrentMonth(value[0]), setCalendarKey((k) => k + 1));
+      if (start) {
+         setCurrentMonth(start);
+         setCalendarKey((k) => k + 1);
+      }
    }, [value]);
+
+   // console.log(currentMonth.getMonth());
 
    // Display value
    const displayValue = React.useMemo(() => {

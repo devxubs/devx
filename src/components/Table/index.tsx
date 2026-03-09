@@ -10,16 +10,13 @@ import {
    GridRenderCellParams,
    GridRowsProp,
 } from "@mui/x-data-grid";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "../Icon";
 import CustomPopover from "../CustomPopover";
 import Menu, { MenuItem as MenuItemProps } from "../Menu";
-import { useSearchParams } from "next/navigation";
-import useQueryParams from "@src/handler/useQueryParams";
-import delayExecute from "@src/handler/delayExecute";
 import NoRows from "./NoRows";
 
-type MenuItem = Omit<MenuItemProps, "onClick"> & {
+export type MenuItem = Omit<MenuItemProps, "onClick"> & {
    onClick?: (params: GridRenderCellParams) => void;
 };
 
@@ -41,6 +38,10 @@ interface DataTableProps {
       data: FilterData,
       onChange: (data: FilterData) => void,
    ) => React.ReactNode;
+   onFilterChange?: (
+      data: FilterData,
+      setData: (f: FilterData) => void,
+   ) => void;
 }
 
 export default function CustomTable({
@@ -63,141 +64,109 @@ export default function CustomTable({
    const [selectedRowParams, setSelectedRowParams] =
       useState<GridRenderCellParams | null>(null);
 
-   const searchParams = useSearchParams();
-   const query = useQueryParams();
-   let getFilterData = {};
-   if (query.get("filter")) {
-      getFilterData = JSON.parse(
-         decodeURIComponent(query.get("filter") || "") || "{}",
-      );
-   }
+   const processedColumns = useMemo(() => {
+      return columns.map((col) => {
+         // * Action column
+         if (col.field === "@actions") {
+            return {
+               ...col,
+               sortable: false,
+               filterable: false,
+               headerAlign: "right",
+               align: "right",
+               flex: 0,
+               width: 10,
 
-   const [filterData, setFilterData] = useState<FilterData>({
-      searchText: searchParams?.get("keyword") || "",
-      userRole: searchParams?.get("role") || "",
-      productStock: searchParams?.get("stock") || "",
-      ...getFilterData,
-      // orderData: {
-      //    order_created_at: [null, null],
-      //    courier_submitted_at: [null, null],
-      //    employee: "",
-      //    status: "",
-      //    order_source: "",
-      //    products: "",
-      //    district: "",
-      //    print_status: "",
-      // },
-      // reportData: {
-      //    report_type: "default",
-      //    date: [null, null],
-      //    product: null,
-      // },
-   });
+               renderCell: (params: GridRenderCellParams) => {
+                  return (
+                     <>
+                        <IconButton
+                           size="small"
+                           onClick={(e) => {
+                              setSelectedRowParams(params);
+                              setActionMenuOpen(e.currentTarget);
+                           }}
+                        >
+                           <Icon size="small" icon="eva:more-vertical-fill" />
+                        </IconButton>
+                     </>
+                  );
+               },
+            };
+         }
 
-   useEffect(() => {
-      delayExecute(() => {
-         query.set("filter", encodeURIComponent(JSON.stringify(filterData)));
-      });
-   }, [filterData]);
+         // * Chip column
+         if (col.chip) {
+            return {
+               ...col,
+               // flex: col.flex ? col.flex : 0.5,
+               headerAlign: "left",
+               align: "left",
+               renderCell: (params: GridRenderCellParams) => {
+                  const row = params.row;
+                  const color = col.color ? col.color(params) : "primary";
+                  const validChipColors = [
+                     "primary",
+                     "secondary",
+                     "error",
+                     "warning",
+                     "info",
+                     "success",
+                  ];
+                  const colorKey = validChipColors.includes(color)
+                     ? (color as any)
+                     : "primary";
+                  const paletteColor: any = theme.palette[
+                     colorKey as keyof Palette
+                  ] ?? {
+                     main: row.color || theme.palette.primary.main,
+                  };
 
-   columns = columns.map((col) => {
-      // * Action column
-      if (col.field === "@actions") {
-         return {
-            ...col,
-            sortable: false,
-            filterable: false,
-            headerAlign: "right",
-            align: "right",
-            flex: 0,
-
-            renderCell: (params) => {
-               return (
-                  <>
-                     <IconButton
+                  return (
+                     <Chip
+                        component="div" // Add this line
+                        label={params.formattedValue}
                         size="small"
-                        onClick={(e) => {
-                           setSelectedRowParams(params);
-                           setActionMenuOpen(e.currentTarget);
+                        color={colorKey}
+                        {...(col.onClick
+                           ? {
+                                onClick: (
+                                   e: React.MouseEvent<HTMLDivElement>,
+                                ) => {
+                                   // Change event type to HTMLDivElement
+                                   col.onClick && col.onClick(params, e);
+                                },
+                             }
+                           : {})}
+                        sx={{
+                           borderRadius: 0.5,
+                           fontWeight: 700,
+                           fontSize: "0.75rem",
+                           bgcolor: paletteColor.main
+                              ? alpha(paletteColor.main, 0.1)
+                              : alpha(theme.palette.primary.main, 0.1),
+                           color: paletteColor.main,
+                           userSelect: "none",
+                           "&:hover": {
+                              bgcolor: paletteColor.main
+                                 ? alpha(paletteColor.main, 0.2)
+                                 : alpha(theme.palette.primary.main, 0.2),
+                           },
                         }}
-                     >
-                        <Icon size="small" icon="eva:more-vertical-fill" />
-                     </IconButton>
-                  </>
-               );
-            },
-         };
-      }
+                     />
+                  );
+               },
+            };
+         }
 
-      // * Chip column
-      if (col.chip) {
          return {
-            ...col,
-            flex: col.flex ? col.flex : 0.5,
+            // flex: col.flex ? col.flex : 0.5,
             headerAlign: "left",
             align: "left",
-            renderCell: (params: GridRenderCellParams) => {
-               const row = params.row;
-               const color = col.color ? col.color(params) : "primary";
-               const validChipColors = [
-                  "primary",
-                  "secondary",
-                  "error",
-                  "warning",
-                  "info",
-                  "success",
-               ];
-               const colorKey = validChipColors.includes(color)
-                  ? (color as any)
-                  : "primary";
-               const paletteColor: any = theme.palette[
-                  colorKey as keyof Palette
-               ] ?? {
-                  main: row.color || theme.palette.primary.main,
-               };
-
-               return (
-                  <Chip
-                     component="div" // Add this line
-                     label={params.formattedValue}
-                     size="small"
-                     color={colorKey}
-                     {...(col.onClick
-                        ? {
-                             onClick: (e: React.MouseEvent<HTMLDivElement>) => {
-                                // Change event type to HTMLDivElement
-                                col.onClick && col.onClick(params, e);
-                             },
-                          }
-                        : {})}
-                     sx={{
-                        borderRadius: 0.5,
-                        fontWeight: 700,
-                        fontSize: "0.75rem",
-                        bgcolor: paletteColor.main
-                           ? alpha(paletteColor.main, 0.1)
-                           : alpha(theme.palette.primary.main, 0.1),
-                        color: paletteColor.main,
-                        userSelect: "none",
-                        "&:hover": {
-                           bgcolor: paletteColor.main
-                              ? alpha(paletteColor.main, 0.2)
-                              : alpha(theme.palette.primary.main, 0.2),
-                        },
-                     }}
-                  />
-               );
-            },
+            ...col,
          };
-      }
-
-      return {
-         flex: col.flex ? col.flex : 0.5,
-         headerAlign: "left",
-         align: "left",
-         ...col,
-      };
-   });
+      });
+   }, [columns]);
 
    useEffect(() => {
       setMounted(true);
@@ -213,19 +182,15 @@ export default function CustomTable({
             backgroundColor: theme.palette.background.paper + "!important",
             height: rows.length ? "100%" : 560,
             maxHeight: 560,
+            width: "100%",
+            overflow: "auto",
          }}
       >
-         <Filter
-            onFilterChange={(d) => {
-               setFilterData({ ...filterData, ...d });
-            }}
-            filterData={filterData as any}
-            customFilter={filter}
-         />
+         <Filter customFilter={filter} />
 
          <DataGrid
             rows={rows}
-            columns={columns}
+            columns={processedColumns as GridColDef[]}
             density="comfortable"
             checkboxSelection={checkBox}
             // autoPageSize //* enable this to make Whichever one you show based on the height of the table
@@ -238,7 +203,7 @@ export default function CustomTable({
             disableColumnFilter
             disableRowSelectionOnClick
             disableAutosize
-            disableVirtualization
+            // disableVirtualization
             disableColumnSelector
             disableDensitySelector
             slots={{
@@ -252,6 +217,7 @@ export default function CustomTable({
             }}
             initialState={{
                pagination: { paginationModel: { pageSize: 5 } },
+               scroll: { top: 1000, left: 1000 },
             }}
             sx={{
                border: "none",
@@ -259,7 +225,12 @@ export default function CustomTable({
                bgcolor: "background.paper",
 
                "& .MuiDataGrid-virtualScroller": {
-                  scrollbarWidth: "none!important",
+                  overflowX: "auto",
+                  scrollbarWidth: "none!important", // Firefox
+
+                  "&::-webkit-scrollbar": {
+                     width: "0px!important", // Chrome
+                  },
                },
 
                "& .MuiDataGrid-toolbar": {
@@ -268,14 +239,14 @@ export default function CustomTable({
 
                "& .MuiDataGrid-scrollbar > div": {
                   display: "none",
-                  // backgroundColor: "transparent",
+                  backgroundColor: "transparent",
                },
                "& .MuiDataGrid-filler": {
                   display: "none",
                },
                "& .MuiDataGrid-columnHeaders > div": {
                   width: "100%",
-                  height: "auto!important",
+                  height: "60px!important",
                   p: 1,
                   py: checkBox ? 1 : 2,
                   pl: 0,

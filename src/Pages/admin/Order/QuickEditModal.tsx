@@ -40,116 +40,204 @@ const QuickEditModal = ({
 
    return (
       <Stack spacing={2}>
-         <Table
-            sx={{
-               bgcolor: "background.default",
-               borderRadius: 1,
-            }}
-         >
-            <TableHead>
-               <TableRow>
-                  <TableCell>Product</TableCell>
-                  <TableCell>Quantity</TableCell>
-                  <TableCell>Price</TableCell>
-               </TableRow>
-            </TableHead>
-            <TableBody>
-               {editableProducts.map((product, i) => {
-                  return (
-                     <TableRow
-                        key={product.name}
-                        sx={{
-                           "&:last-child td, &:last-child th": { border: 0 },
-                        }}
-                     >
-                        {/* Name */}
-                        <TableCell component="th" scope="row">
-                           <Stack
-                              spacing={1}
-                              direction="row"
-                              alignItems="center"
-                              height={"100%"}
-                           >
-                              {!isSmDown && (
-                                 <Avatar
-                                    variant="rounded"
-                                    src={product.images[0]}
-                                    sx={{
-                                       width: 50,
-                                       height: 50,
-                                    }}
-                                 />
-                              )}
-                              <Stack>
-                                 <Tooltip
-                                    title={product.name}
-                                    disableInteractive
-                                 >
-                                    <Typography
-                                       variant="body1"
-                                       fontSize={{
-                                          xs: 14,
-                                          sm: 15,
-                                       }}
-                                       color="textPrimary"
+         <Stack width={"100%"} overflow={"scroll"}>
+            <Table
+               sx={{
+                  bgcolor: "background.default",
+                  borderRadius: 1,
+               }}
+            >
+               <TableHead>
+                  <TableRow>
+                     <TableCell>Product</TableCell>
+                     <TableCell>Quantity</TableCell>
+                     <TableCell>Product Price</TableCell>
+                     <TableCell>Subtotal</TableCell>
+                  </TableRow>
+               </TableHead>
+               <TableBody>
+                  {editableProducts.map((product, i) => {
+                     product.subtotal = product.price * product.quantity;
+                     return (
+                        <TableRow
+                           key={product.name}
+                           sx={{
+                              "&:last-child td, &:last-child th": { border: 0 },
+                           }}
+                        >
+                           {/* Name */}
+                           <TableCell component="th" scope="row">
+                              <Stack
+                                 spacing={1}
+                                 direction="row"
+                                 alignItems="center"
+                                 height={"100%"}
+                              >
+                                 {!isSmDown && (
+                                    <Avatar
+                                       variant="rounded"
+                                       src={product.images[0]}
                                        sx={{
-                                          "&:hover": {
-                                             cursor: "pointer",
-                                             textDecoration: "underline",
-                                          },
+                                          width: 50,
+                                          height: 50,
+                                       }}
+                                    />
+                                 )}
+                                 <Stack>
+                                    <Tooltip
+                                       title={product.name}
+                                       disableInteractive
+                                    >
+                                       <Typography
+                                          variant="body1"
+                                          fontSize={{
+                                             xs: 14,
+                                             sm: 15,
+                                          }}
+                                          color="textPrimary"
+                                          sx={{
+                                             "&:hover": {
+                                                cursor: "pointer",
+                                                textDecoration: "underline",
+                                             },
+                                          }}
+                                       >
+                                          {product.name.length >= 10 && isSmDown
+                                             ? product.name.slice(0, 8) + "..."
+                                             : isSmUp
+                                               ? product.name.slice(0, 12)
+                                               : product.name}
+                                       </Typography>
+                                    </Tooltip>
+                                 </Stack>
+                              </Stack>
+                           </TableCell>
+
+                           {/* Quantity */}
+                           <TableCell>
+                              <Stack
+                                 direction={"row"}
+                                 alignItems={"center"}
+                                 spacing={0.5}
+                              >
+                                 {!isSmDown && (
+                                    <IconButton
+                                       size="small"
+                                       disabled={product.quantity <= 1}
+                                       onClick={() => {
+                                          setEditableProducts((prev) =>
+                                             prev.map((item, index) =>
+                                                index === i
+                                                   ? {
+                                                        ...item,
+                                                        quantity: Math.max(
+                                                           1,
+                                                           item.quantity - 1,
+                                                        ),
+
+                                                        //   price:
+                                                        //      item.price *
+                                                        //      (item.quantity - 1),
+                                                     }
+                                                   : item,
+                                             ),
+                                          );
                                        }}
                                     >
-                                       {product.name.length >= 10 && isSmDown
-                                          ? product.name.slice(0, 8) + "..."
-                                          : isSmUp
-                                            ? product.name.slice(0, 12)
-                                            : product.name}
-                                    </Typography>
-                                 </Tooltip>
-                              </Stack>
-                           </Stack>
-                        </TableCell>
-
-                        {/* Quantity */}
-                        <TableCell>
-                           <Stack
-                              direction={"row"}
-                              alignItems={"center"}
-                              spacing={0.5}
-                           >
-                              {!isSmDown && (
-                                 <IconButton
+                                       <Icon
+                                          icon="lets-icons:remove-fill"
+                                          size="small"
+                                       />
+                                    </IconButton>
+                                 )}
+                                 <TextField
                                     size="small"
-                                    disabled={product.quantity <= 1}
-                                    onClick={() => {
+                                    value={product.quantity}
+                                    type="text"
+                                    inputProps={{
+                                       inputMode: "numeric",
+                                       pattern: "[0-9]*",
+                                    }}
+                                    sx={{
+                                       "& .MuiInputBase-root": {
+                                          p: "8px 4px !important",
+                                       },
+                                       "& .MuiInputBase-input": {
+                                          p: "8px 4px !important",
+                                          width: {
+                                             xs: "30px !important",
+                                             sm: "40px !important",
+                                          },
+                                          fontSize: "15px !important",
+                                       },
+                                    }}
+                                    onChange={(e) => {
+                                       const value = e.target.value;
                                        setEditableProducts((prev) =>
                                           prev.map((item, index) =>
                                              index === i
                                                 ? {
                                                      ...item,
-                                                     quantity: Math.max(
-                                                        1,
-                                                        item.quantity - 1,
-                                                     ),
+                                                     quantity:
+                                                        Number(value || 1) || 1,
+
+                                                     //   price:
+                                                     //      item.price *
+                                                     //      item.quantity,
                                                   }
                                                 : item,
                                           ),
                                        );
                                     }}
-                                 >
-                                    <Icon
-                                       icon="lets-icons:remove-fill"
+                                 />
+                                 {!isSmDown && (
+                                    <IconButton
                                        size="small"
-                                    />
-                                 </IconButton>
-                              )}
+                                       onClick={() => {
+                                          setEditableProducts((prev) =>
+                                             prev.map((item, index) =>
+                                                index === i
+                                                   ? {
+                                                        ...item,
+                                                        quantity:
+                                                           item.quantity + 1,
+                                                        //   price:
+                                                        //      item.price *
+                                                        //      (item.quantity + 1),
+                                                     }
+                                                   : item,
+                                             ),
+                                          );
+                                       }}
+                                    >
+                                       <Icon
+                                          icon="solar:add-circle-bold"
+                                          size="small"
+                                       />
+                                    </IconButton>
+                                 )}
+                              </Stack>
+                           </TableCell>
+
+                           {/* Price */}
+                           <TableCell>
                               <TextField
                                  size="small"
-                                 value={product.quantity}
-                                 type="text"
-                                 inputProps={{
-                                    inputMode: "numeric",
-                                    pattern: "[0-9]*",
+                                 value={product.price}
+                                 onChange={(e) => {
+                                    const value = e.target.value;
+
+                                    setEditableProducts((prev) =>
+                                       prev.map((item, index) =>
+                                          index === i
+                                             ? {
+                                                  ...item,
+                                                  price:
+                                                     Number(value || 0) || 0,
+                                               }
+                                             : item,
+                                       ),
+                                    );
                                  }}
                                  sx={{
                                     "& .MuiInputBase-root": {
@@ -158,92 +246,54 @@ const QuickEditModal = ({
                                     "& .MuiInputBase-input": {
                                        p: "8px 4px !important",
                                        width: {
-                                          xs: "30px !important",
-                                          sm: "40px !important",
+                                          xs: "40px !important",
+                                          sm: "80px !important",
                                        },
                                        fontSize: "15px !important",
                                     },
                                  }}
+                              />
+                           </TableCell>
+                           <TableCell>
+                              <TextField
+                                 size="small"
+                                 value={product.subtotal}
                                  onChange={(e) => {
                                     const value = e.target.value;
+
                                     setEditableProducts((prev) =>
                                        prev.map((item, index) =>
                                           index === i
                                              ? {
                                                   ...item,
-                                                  quantity:
-                                                     Number(value || 1) || 1,
+                                                  subtotal:
+                                                     Number(value || 0) || 0,
                                                }
                                              : item,
                                        ),
                                     );
                                  }}
-                              />
-                              {!isSmDown && (
-                                 <IconButton
-                                    size="small"
-                                    onClick={() => {
-                                       setEditableProducts((prev) =>
-                                          prev.map((item, index) =>
-                                             index === i
-                                                ? {
-                                                     ...item,
-                                                     quantity:
-                                                        item.quantity + 1,
-                                                  }
-                                                : item,
-                                          ),
-                                       );
-                                    }}
-                                 >
-                                    <Icon
-                                       icon="solar:add-circle-bold"
-                                       size="small"
-                                    />
-                                 </IconButton>
-                              )}
-                           </Stack>
-                        </TableCell>
-
-                        {/* Price */}
-                        <TableCell>
-                           <TextField
-                              size="small"
-                              value={product.price}
-                              onChange={(e) => {
-                                 const value = e.target.value;
-
-                                 setEditableProducts((prev) =>
-                                    prev.map((item, index) =>
-                                       index === i
-                                          ? {
-                                               ...item,
-                                               price: Number(value || 0) || 0,
-                                            }
-                                          : item,
-                                    ),
-                                 );
-                              }}
-                              sx={{
-                                 "& .MuiInputBase-root": {
-                                    p: "8px 4px !important",
-                                 },
-                                 "& .MuiInputBase-input": {
-                                    p: "8px 4px !important",
-                                    width: {
-                                       xs: "40px !important",
-                                       sm: "80px !important",
+                                 sx={{
+                                    "& .MuiInputBase-root": {
+                                       p: "8px 4px !important",
                                     },
-                                    fontSize: "15px !important",
-                                 },
-                              }}
-                           />
-                        </TableCell>
-                     </TableRow>
-                  );
-               })}
-            </TableBody>
-         </Table>
+                                    "& .MuiInputBase-input": {
+                                       p: "8px 4px !important",
+                                       width: {
+                                          xs: "40px !important",
+                                          sm: "80px !important",
+                                       },
+                                       fontSize: "15px !important",
+                                    },
+                                 }}
+                              />
+                           </TableCell>
+                        </TableRow>
+                     );
+                  })}
+               </TableBody>
+            </Table>
+         </Stack>
          <Stack
             spacing={2}
             direction={"row"}

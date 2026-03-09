@@ -77,7 +77,7 @@ export const UserProfile = ({
 
 const rows: UserProps[] = [
    {
-      id: "E001",
+      id: "UR001",
       name: "Jubayer Ahmed",
       phoneNumber: "01325584606",
       email: "devxub@gmail.com",
@@ -89,7 +89,7 @@ const rows: UserProps[] = [
       confirmPassword: "12345",
    },
    {
-      id: "E002",
+      id: "UR002",
       name: "Najrul Ahmed",
       phoneNumber: "01818388585",
       email: "najrul787@gmail.com",
@@ -101,7 +101,7 @@ const rows: UserProps[] = [
       confirmPassword: "65432",
    },
    {
-      id: "E003",
+      id: "UR003",
       name: "John Doe",
       role: "Sales Manager",
       phoneNumber: "01325584606",
@@ -113,7 +113,7 @@ const rows: UserProps[] = [
       confirmPassword: "34567",
    },
    {
-      id: "E004",
+      id: "UR004",
       name: "Jane Smith",
       role: "HR Specialist",
       phoneNumber: "01818388585",
@@ -125,7 +125,7 @@ const rows: UserProps[] = [
       confirmPassword: "98765",
    },
    {
-      id: "E005",
+      id: "UR005",
       name: "Mike Johnson",
       role: "Software Developer",
       phoneNumber: "01711223344",
@@ -280,21 +280,27 @@ const Users = () => {
                />
             </Stack>
          </Stack>
+
+         {/* Add or update user */}
          <CustomModal
             sx={{ width: { xs: "90%", md: 900 } }}
             open={modalOpen}
             onClose={() => setModalOpen(false)}
-            title={mode === "add" ? "Add User" : "Edit User"}
+            title={mode === "add" ? "Add User" : "Update User"}
          >
             <Modal
                mode={mode}
                onClose={() => setModalOpen(false)}
                editUserData={editableUser || {}}
                onAddUser={(d) => {
+                  const URId =
+                     users.length >= 10
+                        ? "0" + (users.length + 1)
+                        : "00" + (users.length + 1);
                   setUsers([
                      {
                         ...d,
-                        id: `E00${users.length + 1}`,
+                        id: `UR${URId}`,
                         hireDate: new Date(),
                         status: "inactive",
                      },

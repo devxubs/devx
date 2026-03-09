@@ -13,7 +13,6 @@ import UploadPhoto from "./imageUploader";
 import Icon from "@src/components/Icon";
 // import RichTextEditor from "@src/components/RichTextEditor";
 import dynamic from "next/dynamic";
-import { TableRow } from "@src/components/Table";
 
 const RichTextEditor = dynamic(() => import("@src/components/RichTextEditor"), {
    ssr: false,
@@ -22,10 +21,9 @@ const RichTextEditor = dynamic(() => import("@src/components/RichTextEditor"), {
 interface DetailsProps {
    formControl: any;
    errors: any;
-   data: TableRow;
 }
 
-const Details = ({ formControl, errors, data }: DetailsProps) => {
+const Details = ({ formControl, errors }: DetailsProps) => {
    const [expanded, setExpanded] = useState(true);
 
    return (
@@ -69,15 +67,14 @@ const Details = ({ formControl, errors, data }: DetailsProps) => {
                      Product Name
                   </Typography>
                   <Controller
-                     name="product_name"
+                     name="productName"
                      control={formControl}
-                     defaultValue={data.product_name || ""}
                      render={({ field }) => (
                         <TextField
                            {...field}
                            value={field.value ?? ""}
-                           error={!!errors.product_name}
-                           helperText={errors.product_name?.message}
+                           error={!!errors.productName}
+                           helperText={errors.productName?.message}
                            label="Product Name"
                            variant="outlined"
                            required
@@ -96,15 +93,14 @@ const Details = ({ formControl, errors, data }: DetailsProps) => {
                      Sub Description
                   </Typography>
                   <Controller
-                     name="sub_description"
+                     name="subDescription"
                      control={formControl}
-                     defaultValue={data.sub_description || ""}
                      render={({ field }) => (
                         <TextField
                            {...field}
                            value={field.value ?? ""}
-                           error={!!errors.sub_description}
-                           helperText={errors.sub_description?.message}
+                           error={!!errors.subDescription}
+                           helperText={errors.subDescription?.message}
                            label="Sub Description"
                            variant="outlined"
                            multiline
@@ -127,7 +123,6 @@ const Details = ({ formControl, errors, data }: DetailsProps) => {
                      <Controller
                         name="content"
                         control={formControl}
-                        defaultValue={data.content || ""}
                         render={({ field }) => (
                            <RichTextEditor
                               {...field}
@@ -156,7 +151,6 @@ const Details = ({ formControl, errors, data }: DetailsProps) => {
                      <Controller
                         name="images"
                         control={formControl}
-                        defaultValue={data.images || []}
                         render={({ field }) => (
                            <UploadPhoto
                               {...field}

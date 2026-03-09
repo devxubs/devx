@@ -21,28 +21,28 @@ import { useRouter } from "next/navigation";
 import CustomAutocomplete from "@src/components/Autocomplete";
 
 export type ProductType = {
-   id: number;
+   id: string;
    productName: string;
    subDescription: string;
    content: string;
    images: string[];
    productCode: string;
    productSku: string;
-   quantity: string;
+   quantity: number;
    stockValue: string;
    category: string;
    productType: string;
    color: string[];
    size: string[];
-   regularPrice: string;
-   salePrice: string;
+   regularPrice: number;
+   salePrice?: number;
    date: string;
    time: string;
 };
 
 export const productsData: ProductType[] = [
    {
-      id: 1,
+      id: "PD001",
       productName: "Elegance Stiletto Heels",
       subDescription: "Stylish high heels for evening wear",
       content:
@@ -53,19 +53,19 @@ export const productsData: ProductType[] = [
       ],
       productCode: "ESH-2025",
       productSku: "SH-0004",
-      quantity: "72",
+      quantity: 72,
       stockValue: "In Stock",
       category: "Shoes",
       productType: "Heels",
       color: ["Red", "Black", "Nude"],
       size: ["36", "37", "38", "39", "40", "41"],
-      regularPrice: "95.21",
-      salePrice: "85.21",
+      regularPrice: 95.21,
+      salePrice: 85.21,
       date: "31 Aug 2025",
       time: "2:59 pm",
    },
    {
-      id: 2,
+      id: "PD002",
       productName: "Classic Leather Handbag",
       subDescription: "Elegant handbag crafted from premium leather",
       content:
@@ -76,19 +76,19 @@ export const productsData: ProductType[] = [
       ],
       productCode: "CLH-2025",
       productSku: "HB-0005",
-      quantity: "0",
+      quantity: 0,
       stockValue: "Out of Stock",
       category: "Bags",
       productType: "Handbag",
       color: ["Black", "Brown", "Beige"],
       size: ["Medium"],
-      regularPrice: "149.99",
-      salePrice: "129.99",
+      regularPrice: 149.99,
+      salePrice: 129.99,
       date: "02 Sep 2025",
       time: "11:45 am",
    },
    {
-      id: 3,
+      id: "PD003",
       productName: "Modern Denim Jacket",
       subDescription: "Casual yet stylish denim jacket",
       content:
@@ -96,19 +96,19 @@ export const productsData: ProductType[] = [
       images: ["/images/product-3.webp", "/images/product-3a.webp"],
       productCode: "MDJ-2025",
       productSku: "CJ-0006",
-      quantity: "10",
+      quantity: 10,
       stockValue: "Low Stock",
       category: "Clothing",
       productType: "Jacket",
       color: ["Blue", "Black", "Light Wash"],
       size: ["S", "M", "L", "XL"],
-      regularPrice: "79.99",
-      salePrice: "69.50",
+      regularPrice: 79.99,
+      salePrice: 69.5,
       date: "05 Sep 2025",
       time: "4:20 pm",
    },
    {
-      id: 4,
+      id: "PD004",
       productName: "Smart Fitness Watch",
       subDescription: "Track your fitness and stay connected",
       content:
@@ -119,14 +119,14 @@ export const productsData: ProductType[] = [
       ],
       productCode: "SFW-2025",
       productSku: "AC-0007",
-      quantity: "120",
+      quantity: 120,
       stockValue: "In Stock",
       category: "Accessories",
       productType: "Smartwatch",
       color: ["Black", "Silver", "Rose Gold"],
       size: ["One Size"],
-      regularPrice: "229.00",
-      salePrice: "199.00",
+      regularPrice: 229.0,
+      salePrice: 199.0,
       date: "08 Sep 2025",
       time: "9:10 am",
    },
@@ -302,14 +302,16 @@ const columns: ColumnConfig[] = [
 const Product = () => {
    const theme = useTheme();
    const router = useRouter();
-   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-   const [productToDelete, setProductToDelete] = useState<any>(null);
+
+   const [products, setProducts] = useState(productsData);
+
+   // delete dialog
+   const [deleteDialog, setDeleteDialog] = useState<ProductType | null>(null);
 
    const handleDeleteConfirm = () => {
-      console.log("Deleting user:", productToDelete);
-      // 👉 Here you can call API or update state
-      setIsDeleteDialogOpen(false);
-      setProductToDelete(null);
+      if (!deleteDialog) return;
+      setProducts((prev) => prev.filter((p) => p.id !== deleteDialog.id));
+      setDeleteDialog(null);
    };
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
@@ -334,12 +336,22 @@ const Product = () => {
             </Stack>
             <Stack>
                <CustomTable
-                  rows={productsData}
+                  rows={products}
                   columns={columns}
                   checkBox={true}
                   menuItems={[
-                     { label: "Edit", onClick: () => {} },
-                     { label: "Delete", color: "error", onClick: () => {} },
+                     {
+                        label: "Edit",
+                        onClick: (params) =>
+                           router.push(
+                              "/admin/product/publish?id=" + params.id,
+                           ),
+                     },
+                     {
+                        label: "Delete",
+                        color: "error",
+                        onClick: (params) => setDeleteDialog(params.row),
+                     },
                   ]}
                   filter={(data, onChange) => {
                      return (
@@ -366,9 +378,9 @@ const Product = () => {
          </Stack>
          <AlertDialog
             type="delete"
-            open={isDeleteDialogOpen}
-            onClose={() => setIsDeleteDialogOpen(false)}
-            title={productToDelete?.productName}
+            open={Boolean(deleteDialog)}
+            onClose={() => setDeleteDialog(null)}
+            title={`Are you sure want to delete <b> ${deleteDialog?.productName || ""} </b>`}
             onConfirm={handleDeleteConfirm}
          />
       </Scrollbar>

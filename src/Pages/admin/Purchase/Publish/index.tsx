@@ -56,7 +56,7 @@ export const purchaseSchema = yup.object({
                .min(0, "Price must be positive")
                .required("Price is required"),
             images: yup.array().of(yup.string().url("Invalid image URL")),
-         })
+         }),
       )
       .min(1, "At least one product is required"),
 
@@ -93,7 +93,7 @@ export const purchaseSchema = yup.object({
                .number()
                .min(0, "Attachment size must be positive")
                .optional(),
-         })
+         }),
       )
       .optional(),
 });
@@ -176,7 +176,7 @@ const Publish = () => {
             <Button
                variant="text"
                color="inherit"
-               onClick={() => router.push("/product")}
+               onClick={() => router.push("admin/purchase")}
             >
                Cancel
             </Button>
@@ -187,7 +187,7 @@ const Publish = () => {
                type="submit"
                onClick={handleSubmit(onSubmit)}
             >
-               {"id" + 0 ? "Update product" : "Add product"}
+               {"id" + 0 ? "Update Purchase" : "Add Purchase"}
             </Button>
          </Stack>
       </Stack>

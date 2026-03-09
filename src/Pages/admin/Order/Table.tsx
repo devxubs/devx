@@ -4,20 +4,22 @@ import { Stack, IconButton, Tooltip, TextField, Button } from "@mui/material";
 import { GridRenderCellParams } from "@mui/x-data-grid";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { orders } from "./data";
 import CreateAt from "./CreateAt";
 import User from "../Customers/CustomerInfo";
 import OrderFilter from "./OrderFilter";
-import OrderTab from "./OrderTab";
+import OrderTab, { StatusProps } from "./OrderTab";
 import { useRouter } from "next/navigation";
 import CustomPopover from "@src/components/CustomPopover";
 import Menu from "@src/components/Menu";
 import { orderStatuses } from "@src/handler/order_filter";
 import CustomModal from "@src/components/Modal";
-import { OrderType, ProductType } from "./type";
+import { OrderType } from "./type";
 import QuickEditModal from "./QuickEditModal";
 import AlertDialog from "@src/components/AlertDialog";
+import { ProductType } from "../Product";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 
 const statusColor: Record<
    string,
@@ -36,7 +38,12 @@ const statusColor: Record<
    Failed: "error",
 } as const;
 
-const OrderStatus = ["All", ...orderStatuses];
+const orderStatus: StatusProps[] = [
+   {
+      label: "All",
+   },
+   ...orderStatuses.map((os, i) => ({ label: os, value: (i + 10) * i })),
+];
 
 const OrderTable = () => {
    const router = useRouter();
@@ -63,6 +70,29 @@ const OrderTable = () => {
       open: boolean;
       orderRow: OrderType;
    }>({} as { open: boolean; orderRow: OrderType });
+
+   // order tab
+   const { filterQueryData, setFilterQueryData } = useFilterQuery();
+   const [orderTab, setOrderTab] = useState(4);
+
+   useEffect(() => {
+      if (filterQueryData.orderData?.status) {
+         const findOSIndex = orderStatus.findIndex(
+            (os) => os.label === filterQueryData.orderData?.status,
+         );
+         if (findOSIndex !== -1) {
+            setOrderTab(findOSIndex);
+         }
+      }
+   }, [filterQueryData]);
+
+   useEffect(() => {
+      setFilterQueryData({
+         orderData: {
+            status: orderStatus[orderTab]?.label || "",
+         },
+      });
+   }, [orderTab]);
 
    const columns: ColumnConfig[] = [
       { field: "orderId", headerName: "ID", flex: 0.3 },
@@ -111,9 +141,17 @@ const OrderTable = () => {
          headerName: "Source",
       },
       {
-         field: "price",
+         field: "subtotal",
          headerName: "Price",
-         renderCell: (params) => `$${params.row.pricing.total}`,
+         renderCell: (params) => {
+            let productSubtotal = 0;
+            params.row.products.map((p: any) => {
+               p.subtotal = p.price * p.quantity;
+               productSubtotal += p.subtotal;
+            });
+
+            return `$${productSubtotal.toFixed(2)}`;
+         },
       },
       {
          field: "status",
@@ -162,31 +200,23 @@ const OrderTable = () => {
          {/* Order tab */}
          <Stack>
             <OrderTab
-               status={OrderStatus}
-               // value={
-               //    orderStatuses.lastIndexOf(
-               //       filterData.orderData.status || "",
-               //    ) === -1
-               //       ? 0
-               //       : orderStatuses.lastIndexOf(
-               //            filterData.orderData.status || "",
-               //         ) + 1
-               // }
-               // onChange={(s) => {
-               //    setFilterData((prev) => ({
-               //       ...prev,
-               //       orderData: {
-               //          ...prev.orderData,
-               //          status: s === "All" ? "" : s,
-               //       },
-               //    }));
-               // }}
+               status={orderStatus}
+               value={orderTab}
+               onChange={(s) => {
+                  setFilterQueryData({
+                     orderData: { status: s.label !== "All" ? s.label : null },
+                  });
+               }}
             />
          </Stack>
          <CustomTable
             rows={orderRows as OrderType[]}
             columns={columns}
-            filter={(data, onChange) => OrderFilter(data, onChange)}
+            filter={(data, onChange) =>
+               OrderFilter(data, (d: any) => {
+                  onChange(d);
+               })
+            }
             checkBox
             menuItems={[
                {
@@ -324,8 +354,8 @@ const OrderTable = () => {
             onClose={() => setEditModal(null)}
             sx={{
                width: {
-                  xs: "90%",
-                  sm: 650,
+                  xs: "100%",
+                  sm: 700,
                },
             }}
             title="Quick Edit"
@@ -335,6 +365,8 @@ const OrderTable = () => {
                onClose={() => setEditModal(null)}
                onUpdate={(p) => {
                   if (!editModal) return;
+                  console.log(p);
+
                   setOrderRows((prev) =>
                      prev.map((or) =>
                         or.orderId === editModal.orderId

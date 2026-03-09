@@ -23,39 +23,29 @@ const statusColor: Record<
    Failed: "error",
 } as const;
 
-type OrderTabProps = {
-   onChange?: (data: string) => void;
+export interface StatusProps {
+   label: string;
    value?: number;
-   status: string[];
+}
+
+type OrderTabProps = {
+   onChange?: (data: any) => void;
+   value?: number;
+   status: StatusProps[];
 };
 
-const OrderTab = ({ value = 0, onChange, status }: OrderTabProps) => {
+const OrderTab = ({ value, onChange, status }: OrderTabProps) => {
    const theme = useTheme();
-   const [val, setVal] = React.useState(value === -1 ? 0 : value);
+   const [val, setVal] = React.useState(value || 0);
 
    const handleChange = (event: React.SyntheticEvent, newValue: number) => {
       setVal(newValue);
+      onChange?.(status[newValue]);
    };
-   const [statusCounter, setStatusCounts] = React.useState<{
-      [key: string]: number;
-   }>(Object.fromEntries([["All", 0], ...status.map((s) => [s, 0])]));
 
    useEffect(() => {
-      const counts = Object.fromEntries([
-         ["All", Math.floor(Math.random() * 140) + 1],
-         ...status.map((s) => [s, Math.floor(Math.random() * 140) + 1]),
-      ]);
-
-      setStatusCounts(counts);
-   }, []);
-
-   useEffect(() => {
-      setVal(value);
+      setVal(value || 0);
    }, [value]);
-
-   useEffect(() => {
-      onChange?.(Object.keys(status[val || 0])[0]);
-   }, [val]);
 
    return (
       <Box sx={{ width: "100%" }}>
@@ -85,13 +75,13 @@ const OrderTab = ({ value = 0, onChange, status }: OrderTabProps) => {
                },
             }}
          >
-            {status.map((s: string, i) => {
-               const statusColo = statusColor[s] || "default";
+            {status.map((s: StatusProps, i) => {
+               const statusColo = statusColor[s.label] || "default";
                const paletteKey =
                   statusColo === "default" ? "primary" : statusColo;
 
-               const isAll = s === "All";
-               const isHold = s === "Hold";
+               const isAll = s.label === "All";
+               const isHold = s.label === "Hold";
 
                const color =
                   isAll || isHold
@@ -124,12 +114,10 @@ const OrderTab = ({ value = 0, onChange, status }: OrderTabProps) => {
                      key={i}
                      disableRipple
                      disableFocusRipple
-                     label={s}
+                     label={s.label}
                      icon={
                         <Chip
-                           label={
-                              statusCounter[s] >= 99 ? "99+" : statusCounter[s]
-                           }
+                           label={(s.value || 99) >= 99 ? "99+" : s.value}
                            size="small"
                            sx={{
                               borderRadius: "6px!important",

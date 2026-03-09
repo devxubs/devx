@@ -10,7 +10,6 @@ import {
    Collapse,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import { TableRow } from "@src/components/Table";
 import React, { useState } from "react";
 
 import { Controller } from "react-hook-form";
@@ -18,10 +17,9 @@ import { Controller } from "react-hook-form";
 interface PricingProps {
    formControl: any;
    errors: any;
-   data: TableRow;
 }
 
-const Pricing = ({ formControl, errors, data }: PricingProps) => {
+const Pricing = ({ formControl, errors }: PricingProps) => {
    const [expanded, setExpanded] = useState(true);
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -69,7 +67,6 @@ const Pricing = ({ formControl, errors, data }: PricingProps) => {
                      <Controller
                         name="regularPrice"
                         control={formControl}
-                        defaultValue={data.regularPrice || ""}
                         render={({ field }) => (
                            <TextField
                               {...field}
@@ -79,9 +76,9 @@ const Pricing = ({ formControl, errors, data }: PricingProps) => {
                               variant="outlined"
                               error={!!errors.regularPrice}
                               helperText={errors.regularPrice?.message}
-                              InputProps={{
-                                 inputProps: { min: 0 },
-                              }}
+                              // InputProps={{
+                              //    inputProps: { min: 0 },
+                              // }}
                               sx={{
                                  "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button":
                                     {
@@ -107,7 +104,6 @@ const Pricing = ({ formControl, errors, data }: PricingProps) => {
                      <Controller
                         name="salePrice"
                         control={formControl}
-                        defaultValue={data.salePrice || ""}
                         render={({ field }) => (
                            <TextField
                               {...field}

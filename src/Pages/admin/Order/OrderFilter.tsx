@@ -4,10 +4,16 @@ import Scrollbar from "react-browser-scrollbar";
 import OrderFilterModal from "./OrderFilterModel";
 import { useState } from "react";
 import Icon from "@src/components/Icon";
-import { OrderFilter as OrderFilterType } from "@src/components/Table/Filter";
+import {
+   FilterData,
+   OrderFilter as OrderFilterType,
+} from "@src/components/Table/Filter";
 
-const OrderFilter = (data: any, onChange: Function) => {
+const OrderFilter = (data: FilterData, onChange: Function) => {
    const [modalOpen, setModalOpen] = useState(false);
+   const today = new Date();
+   const tenDaysLater = new Date();
+   tenDaysLater.setDate(today.getDate() + 10);
 
    return (
       <Box>
@@ -39,18 +45,20 @@ const OrderFilter = (data: any, onChange: Function) => {
                <OrderFilterModal
                   filterValue={{
                      ...data.orderData,
+                     order_created_at: data.orderData?.order_created_at,
                      status: data.orderData?.status,
                   }}
                   onCloseModal={() => setModalOpen(false)}
-                  onChange={(f: OrderFilterType) =>
+                  onChange={(f: OrderFilterType) => {
                      onChange?.({
                         ...data,
                         orderData: {
+                           ...data.orderData,
                            ...f,
                            status: f.status !== null ? f.status : "",
                         },
-                     })
-                  }
+                     });
+                  }}
                />
             </Scrollbar>
          </CustomModal>

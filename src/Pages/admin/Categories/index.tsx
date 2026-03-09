@@ -17,7 +17,7 @@ const productSchema = z.object({
 });
 
 type CategoryType = {
-   id: number;
+   id: string;
    name: string;
 };
 
@@ -26,10 +26,10 @@ type FormValues = z.infer<typeof productSchema>;
 const Categories = () => {
    const theme = useTheme();
    const [categories, setCategories] = useState<CategoryType[]>([
-      { id: 1, name: "Smart Fitness Watch" },
-      { id: 2, name: "Smart Fitness Watch" },
-      { id: 3, name: "Smart Fitness Watch" },
-      { id: 4, name: "Smart Fitness Watch" },
+      { id: "CTG001", name: "Smart Fitness Watch" },
+      { id: "CTG002", name: "Smart Fitness Watch" },
+      { id: "CTG003", name: "Smart Fitness Watch" },
+      { id: "CTG004", name: "Smart Fitness Watch" },
    ]);
 
    const [isModalOpen, setIsModalOpen] = useState(false);
@@ -67,6 +67,10 @@ const Categories = () => {
 
    // Add / Edit submit handler
    const onSubmit: SubmitHandler<FormValues> = (data) => {
+      const CTGId =
+         categories.length >= 10
+            ? "0" + (categories.length + 1)
+            : "00" + (categories.length + 1);
       if (selectedCategory) {
          // Edit
          setCategories((prev) =>
@@ -79,7 +83,7 @@ const Categories = () => {
       } else {
          // Add
          const newCategory: CategoryType = {
-            id: Date.now(), // simple id generator
+            id: `CTG${CTGId}`, // simple id generator
             name: data.name,
          };
          setCategories((prev) => [...prev, newCategory]);

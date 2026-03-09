@@ -10,7 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
-import CustomTable, { ColumnConfig, TableProps } from "@src/components/Table";
+import CustomTable, { ColumnConfig } from "@src/components/Table";
 
 const productSchema = z.object({
    name: z.string().min(1, "Name is required!"),
@@ -18,34 +18,36 @@ const productSchema = z.object({
 });
 
 type UnitType = {
-   id: number;
+   id: string;
    name: string;
    short: string;
 };
 
 type FormValues = z.infer<typeof productSchema>;
+
 const productUnits = [
-   { id: 1, name: "Piece", short: "pc" },
-   { id: 2, name: "Kilogram", short: "kg" },
-   { id: 3, name: "Gram", short: "g" },
-   { id: 4, name: "Liter", short: "l" },
-   { id: 5, name: "Milliliter", short: "ml" },
-   { id: 6, name: "Meter", short: "m" },
-   { id: 7, name: "Centimeter", short: "cm" },
-   { id: 8, name: "Inch", short: "in" },
-   { id: 9, name: "Foot", short: "ft" },
-   { id: 10, name: "Dozen", short: "dz" },
-   { id: 11, name: "Pack", short: "pk" },
-   { id: 12, name: "Box", short: "box" },
-   { id: 13, name: "Carton", short: "ctn" },
-   { id: 14, name: "Bottle", short: "btl" },
-   { id: 15, name: "Bag", short: "bag" },
-   { id: 16, name: "Roll", short: "roll" },
-   { id: 17, name: "Sheet", short: "sht" },
-   { id: 18, name: "Pair", short: "pr" },
-   { id: 19, name: "Set", short: "set" },
-   { id: 20, name: "Bundle", short: "bndl" },
+   { id: "UN001", name: "Piece", short: "pc" },
+   { id: "UN002", name: "Kilogram", short: "kg" },
+   { id: "UN003", name: "Gram", short: "g" },
+   { id: "UN004", name: "Liter", short: "l" },
+   { id: "UN005", name: "Milliliter", short: "ml" },
+   { id: "UN006", name: "Meter", short: "m" },
+   { id: "UN007", name: "Centimeter", short: "cm" },
+   { id: "UN008", name: "Inch", short: "in" },
+   { id: "UN009", name: "Foot", short: "ft" },
+   { id: "UN010", name: "Dozen", short: "dz" },
+   { id: "UN011", name: "Pack", short: "pk" },
+   { id: "UN012", name: "Box", short: "box" },
+   { id: "UN013", name: "Carton", short: "ctn" },
+   { id: "UN014", name: "Bottle", short: "btl" },
+   { id: "UN015", name: "Bag", short: "bag" },
+   { id: "UN016", name: "Roll", short: "roll" },
+   { id: "UN017", name: "Sheet", short: "sht" },
+   { id: "UN018", name: "Pair", short: "pr" },
+   { id: "UN019", name: "Set", short: "set" },
+   { id: "UN020", name: "Bundle", short: "bndl" },
 ];
+
 const Unit = () => {
    const theme = useTheme();
    const [unit, setUnit] = useState<UnitType[]>(productUnits);
@@ -84,6 +86,8 @@ const Unit = () => {
 
    // Add / Edit submit handler
    const onSubmit: SubmitHandler<FormValues> = (data) => {
+      const UNId =
+         unit.length >= 10 ? "0" + unit.length + 1 : "00" + unit.length + 1;
       if (selectedUnit) {
          // Edit
          setUnit((prev) =>
@@ -94,7 +98,7 @@ const Unit = () => {
       } else {
          // Add
          const newUnit: UnitType = {
-            id: Date.now(), // simple id generator
+            id: `UN${UNId}`, // simple id generator
             name: data.name,
             short: data.short,
          };
@@ -113,6 +117,7 @@ const Unit = () => {
    };
 
    const columns: ColumnConfig[] = [
+      { field: "id", headerName: "ID", flex: 0.3 },
       { field: "name", headerName: "Name", flex: 1 },
       { field: "short", headerName: "Short", flex: 1 },
       {
@@ -165,8 +170,8 @@ const Unit = () => {
                         />
                      ),
                      onClick: (p) => {
-                        // setSelectedUnit(p.row);
-                        // setIsDeleteDialogOpen(true);
+                        setSelectedUnit(p.row);
+                        setIsDeleteDialogOpen(true);
                      },
                   },
                ]}

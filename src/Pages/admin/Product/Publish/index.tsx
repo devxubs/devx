@@ -10,12 +10,12 @@ import Details from "./Details";
 import Properties from "./Properties";
 import Pricing from "./Pricing";
 import { useRouter, useSearchParams } from "next/navigation";
-import { productsData } from "..";
+import { productsData, ProductType } from "..";
 
 const productSchema = z
    .object({
-      product_name: z.string().min(1, "Name is required!"),
-      sub_description: z.string().optional(),
+      productName: z.string().min(1, "Name is required!"),
+      subDescription: z.string().optional(),
 
       content: z
          .string()
@@ -24,21 +24,20 @@ const productSchema = z
 
       images: z.array(z.any()).min(2, "At least 2 images are required!"),
 
-      product_code: z.string().min(1, "Product code is required!"),
-      product_sku: z.string().min(1, "Product SKU is required!"),
+      productCode: z.string().min(1, "Product code is required!"),
+      productSku: z.string().min(1, "Product SKU is required!"),
 
-      low_stock_alert: z.string().optional(),
+      lowStockAlert: z.string().optional(),
 
       quantity: z.coerce.number().min(0, "Quantity must be positive"),
 
       category: z.string().min(1, "Choose at least one category!"),
-      product_type: z.string().min(1, "Select at least one type!"),
+      productType: z.string().min(1, "Select at least one type!"),
 
       unit: z.array(z.string()).optional(),
       color: z.array(z.string()).optional(),
 
       regularPrice: z.coerce.number().min(1, "Price is required!"),
-
       salePrice: z.coerce.number().optional(),
    })
    .refine((data) => !data.salePrice || data.salePrice <= data.regularPrice, {
@@ -46,25 +45,9 @@ const productSchema = z
       path: ["salePrice"],
    });
 
-type PricingValues = z.infer<typeof productSchema>;
+export type ProductSchemaType = z.infer<typeof productSchema>;
 
 const Publish = () => {
-   const [data, setData] = useState<PricingValues>({
-      product_name: "",
-      sub_description: "",
-      content: "",
-      images: [],
-      product_code: "",
-      product_sku: "",
-      low_stock_alert: "", // Added low_stock_alert
-      quantity: 0 as number, // Ensure quantity is a number
-      category: "",
-      product_type: "",
-      color: [],
-      unit: [],
-      regularPrice: 0 as number, // Ensure regularPrice is a number
-      salePrice: undefined,
-   });
    const router = useRouter();
    const params = useSearchParams();
    const id = params?.get("id");
@@ -78,16 +61,17 @@ const Publish = () => {
    } = useForm<z.infer<typeof productSchema>>({
       resolver: zodResolver(productSchema as any),
       defaultValues: {
-         product_name: "",
-         sub_description: "",
+         productName: "",
+         subDescription: "",
          content: "",
          images: [],
-         product_code: "",
-         product_sku: "",
-         low_stock_alert: "",
+         productCode: "",
+         productSku: "",
+         lowStockAlert: "",
          quantity: 0,
+
          category: "",
-         product_type: "",
+         productType: "",
          color: [],
          unit: [],
          regularPrice: 0,
@@ -98,28 +82,68 @@ const Publish = () => {
    useEffect(() => {
       if (!id) return;
 
-      const findProduct = productsData.find((p) => p.id === Number(id));
+      const findProduct = productsData.find((p) => p.id === id);
 
       if (findProduct) {
          reset({
             ...findProduct,
-            quantity: Number(findProduct.quantity),
-            regularPrice: Number(findProduct.regularPrice),
-            salePrice: findProduct.salePrice
-               ? Number(findProduct.salePrice)
-               : undefined,
          });
       }
    }, [id, reset]);
 
    // 3. Submit handler
-   const onSubmit: SubmitHandler<z.infer<typeof productSchema>> = (data) => {
-      console.log("Form Data:", data);
+   const onSubmit: SubmitHandler<ProductSchemaType> = (data) => {
+      const now = new Date();
+      const PDId =
+         productsData.length >= 10
+            ? "0" + (productsData.length + 1)
+            : "00" + (productsData.length + 1);
+
+      // 🔥 auto-calculate stock status
+      let stockValue = "In Stock";
+      if (data.quantity === 0) {
+         stockValue = "Out of Stock";
+      } else if (data.quantity <= 10) {
+         stockValue = "Low Stock";
+      }
+
+      const newProduct: ProductType = {
+         id: `PD${PDId}`,
+
+         // form fields
+         productName: data.productName,
+         subDescription: data.subDescription ?? "",
+         content: data.content,
+         images: data.images,
+         productCode: data.productCode,
+         productSku: data.productSku,
+         quantity: data.quantity,
+         category: data.category,
+         productType: data.productType,
+         color: data.color ?? [],
+         size: data.unit ?? [],
+
+         regularPrice: data.regularPrice,
+         salePrice: data.salePrice ?? data.regularPrice,
+
+         // auto-generated fields
+         stockValue,
+         date: now.toLocaleDateString(),
+         time: now.toLocaleTimeString(),
+      };
 
       if (id) {
          // update logic
+         const index = productsData.findIndex((p) => p.id === id);
+
+         if (index !== -1) {
+            productsData[index] = newProduct;
+         }
       } else {
          // add logic
+         // productsData.push(newProduct);
+
+         if (confirm("Add logic is working!")) return;
       }
 
       router.push("/admin/product");
@@ -136,25 +160,13 @@ const Publish = () => {
       >
          <Stack spacing={4}>
             <Stack>
-               <Details
-                  data={data || {}}
-                  formControl={control}
-                  errors={errors}
-               />
+               <Details formControl={control} errors={errors} />
             </Stack>
             <Stack>
-               <Properties
-                  data={data || {}}
-                  formControl={control}
-                  errors={errors}
-               />
+               <Properties formControl={control} errors={errors} />
             </Stack>
             <Stack>
-               <Pricing
-                  data={data || {}}
-                  formControl={control}
-                  errors={errors}
-               />
+               <Pricing formControl={control} errors={errors} />
             </Stack>
          </Stack>
 

@@ -145,8 +145,8 @@ const Publish = () => {
       setOrder(newOrder);
 
       setTimeout(() => {
+         router.push("/admin/order");
          setLoading(false);
-         router.push("/order");
          reset();
       }, 3000);
    };

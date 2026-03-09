@@ -24,9 +24,10 @@ import {
    Toolbar,
 } from "@mui/x-data-grid";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Icon from "../Icon";
 import dayjs from "dayjs";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 
 export type OrderFilter = {
    order_created_at?: [Date | null, Date | null];
@@ -62,23 +63,23 @@ export type FilterData = {
 };
 
 type FilterProps = {
-   onFilterChange?: (data: FilterData) => void;
-   filterData: FilterData;
    customFilter?: (
       data: FilterData,
       onChange: (data: FilterData) => void,
    ) => React.ReactNode;
 };
 
-const Filter: React.FC<FilterProps> = ({
-   filterData,
-   onFilterChange,
-   customFilter,
-}) => {
+const Filter: React.FC<FilterProps> = ({ customFilter }) => {
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+   const { filterQueryData, setFilterQueryData } = useFilterQuery();
+   const [searchText, setSearchText] = useState("");
 
-   const reportData = Object.entries(filterData.reportData || {});
+   useEffect(() => {
+      setSearchText(filterQueryData.searchText || "");
+   }, [filterQueryData.searchText]);
+
+   const reportData = Object.entries(filterQueryData.reportData || {});
 
    const isActive = (val: any) => {
       if (!val) return false;
@@ -86,26 +87,26 @@ const Filter: React.FC<FilterProps> = ({
       return val !== "";
    };
 
-   const activeOrderFilters = Object.entries(filterData.orderData || {}).filter(
-      ([_, v]) => isActive(v),
-   );
+   const activeOrderFilters = Object.entries(
+      filterQueryData.orderData || {},
+   ).filter(([_, v]) => isActive(v));
 
    const activeReportFilters = Object.entries(
-      filterData.reportData || {},
+      filterQueryData.reportData || {},
    ).filter(([key, value]) => key !== "report_type" && isActive(value));
 
    const hasAnyFilter = useMemo(() => {
       return (
-         isActive(filterData.searchText) ||
-         isActive(filterData.userRole) ||
-         isActive(filterData.productStock) ||
+         isActive(filterQueryData.searchText) ||
+         isActive(filterQueryData.userRole) ||
+         isActive(filterQueryData.productStock) ||
          activeOrderFilters.length > 0 ||
          activeReportFilters.length > 0
       );
-   }, [filterData, activeOrderFilters, activeReportFilters]);
+   }, [filterQueryData, activeOrderFilters, activeReportFilters]);
 
    const handleClearAll = () => {
-      onFilterChange?.({
+      setFilterQueryData({
          searchText: "",
          userRole: "",
          productStock: "",
@@ -122,7 +123,7 @@ const Filter: React.FC<FilterProps> = ({
          borderColor="divider"
       >
          <Stack spacing={2} p={2} bgcolor={"background.paper"}>
-            {/* ================= TOP SEARCH + CUSTOM FILTER ================ */}
+            {/* TOP SEARCH + CUSTOM FILTER */}
             <Stack
                spacing={2}
                direction="row"
@@ -138,12 +139,13 @@ const Filter: React.FC<FilterProps> = ({
                      fullWidth
                      placeholder="Search"
                      size={isMobile ? "small" : "medium"}
-                     value={filterData.searchText}
-                     onChange={(e) =>
-                        onFilterChange?.({
+                     value={searchText}
+                     onChange={(e) => {
+                        setFilterQueryData({
                            searchText: e.target.value,
-                        })
-                     }
+                        });
+                        setSearchText(e.target.value);
+                     }}
                      InputProps={{
                         startAdornment: (
                            <InputAdornment position="start">
@@ -155,12 +157,12 @@ const Filter: React.FC<FilterProps> = ({
                </FormControl>
 
                {customFilter &&
-                  (customFilter(filterData, (updated) =>
-                     onFilterChange?.(updated),
-                  ) as React.ReactElement)}
+                  (customFilter(filterQueryData, (updated) => {
+                     setFilterQueryData(updated);
+                  }) as React.ReactElement)}
             </Stack>
 
-            {/* ================= ACTIVE FILTER CHIPS ================= */}
+            {/* ACTIVE FILTER CHIPS */}
             <Stack
                direction="row"
                alignItems="flex-start"
@@ -168,14 +170,13 @@ const Filter: React.FC<FilterProps> = ({
                gap={1}
             >
                {/* Search Text */}
-               {isActive(filterData.searchText) && (
+               {isActive(filterQueryData.searchText) && (
                   <FilterChipWrapper title="Keyword">
                      <Chip
-                        label={filterData.searchText}
+                        label={filterQueryData.searchText}
                         size="small"
                         onDelete={() =>
-                           onFilterChange?.({
-                              ...filterData,
+                           setFilterQueryData({
                               searchText: "",
                            })
                         }
@@ -185,14 +186,13 @@ const Filter: React.FC<FilterProps> = ({
                )}
 
                {/* Product Stock */}
-               {isActive(filterData.productStock) && (
+               {isActive(filterQueryData.productStock) && (
                   <FilterChipWrapper title="Stock">
                      <Chip
-                        label={filterData.productStock}
+                        label={filterQueryData.productStock}
                         size="small"
                         onDelete={() =>
-                           onFilterChange?.({
-                              ...filterData,
+                           setFilterQueryData({
                               productStock: "",
                            })
                         }
@@ -202,14 +202,13 @@ const Filter: React.FC<FilterProps> = ({
                )}
 
                {/* User Role */}
-               {isActive(filterData.userRole) && (
+               {isActive(filterQueryData.userRole) && (
                   <FilterChipWrapper title="Role">
                      <Chip
-                        label={filterData.userRole}
+                        label={filterQueryData.userRole}
                         size="small"
                         onDelete={() =>
-                           onFilterChange?.({
-                              ...filterData,
+                           setFilterQueryData({
                               userRole: "",
                            })
                         }
@@ -223,8 +222,8 @@ const Filter: React.FC<FilterProps> = ({
                   <>
                      {reportData.map(([key], idx) => {
                         const value =
-                           filterData.reportData?.[
-                              key as keyof typeof filterData.reportData
+                           filterQueryData.reportData?.[
+                              key as keyof typeof filterQueryData.reportData
                            ];
 
                         if (
@@ -246,25 +245,24 @@ const Filter: React.FC<FilterProps> = ({
                               : String(value ?? "");
 
                         return (
-                           filterData.reportData && (
+                           filterQueryData.reportData && (
                               <FilterChipWrapper
                                  key={idx}
                                  title={
-                                    !filterData.reportData.report_type ||
-                                    filterData.reportData.report_type ===
+                                    !filterQueryData.reportData.report_type ||
+                                    filterQueryData.reportData.report_type ===
                                        "default"
                                        ? key
-                                       : `${filterData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
+                                       : `${filterQueryData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
                                  }
                               >
                                  <Chip
                                     label={label}
                                     size="small"
                                     onDelete={() =>
-                                       onFilterChange?.({
-                                          ...filterData,
+                                       setFilterQueryData({
                                           reportData: {
-                                             ...filterData.reportData,
+                                             ...filterQueryData.reportData,
                                              [key]:
                                                 key === "date"
                                                    ? [null, null]
@@ -282,7 +280,7 @@ const Filter: React.FC<FilterProps> = ({
                   </>
                )}
 
-               {/* ================= Dynamic OrderData Filters ================ */}
+               {/* Order */}
                {activeOrderFilters.map(([key, value]) => (
                   <FilterChipWrapper key={key} title={formatLabel(key)}>
                      <Chip
@@ -295,10 +293,9 @@ const Filter: React.FC<FilterProps> = ({
                         }
                         size="small"
                         onDelete={() =>
-                           onFilterChange?.({
-                              ...filterData,
+                           setFilterQueryData({
                               orderData: {
-                                 ...filterData.orderData,
+                                 ...filterQueryData.orderData,
                                  [key]: Array.isArray(value) ? undefined : "",
                               },
                            })
@@ -308,7 +305,7 @@ const Filter: React.FC<FilterProps> = ({
                   </FilterChipWrapper>
                ))}
 
-               {/* ================= CLEAR ALL BUTTON ================ */}
+               {/* CLEAR ALL BUTTON */}
                {hasAnyFilter && (
                   <Button
                      variant="text"
@@ -364,7 +361,8 @@ const chipStyle = (theme: any) => ({
    fontWeight: 700,
    fontSize: "0.75rem",
    bgcolor: alpha(theme.palette.grey[300], 0.1),
-   color: theme.palette.grey[300],
+   color:
+      theme.mode === "dark" ? theme.palette.grey[300] : theme.palette.grey[600],
 });
 
 // Convert snake_case → Normal Label

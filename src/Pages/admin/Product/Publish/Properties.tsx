@@ -12,15 +12,13 @@ import { Controller, get } from "react-hook-form";
 
 import Icon from "@src/components/Icon";
 import React, { useState } from "react";
-import { TableRow } from "@src/components/Table";
 
 interface PricingProps {
    formControl: any;
    errors: any;
-   data: TableRow;
 }
 
-const Properties = ({ formControl, errors, data }: PricingProps) => {
+const Properties = ({ formControl, errors }: PricingProps) => {
    const [expanded, setExpanded] = useState(true);
    const [type, setType] = useState("");
 
@@ -67,15 +65,14 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                         Product code
                      </Typography>
                      <Controller
-                        name="product_code"
+                        name="productCode"
                         control={formControl}
-                        defaultValue={data.product_code || ""}
                         render={({ field }) => (
                            <TextField
                               {...field}
                               value={field.value ?? ""}
-                              error={!!errors.product_code}
-                              helperText={errors.product_code?.message}
+                              error={!!errors.productCode}
+                              helperText={errors.productCode?.message}
                               label="Product code"
                               variant="outlined"
                               required
@@ -94,14 +91,13 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                         Product sku
                      </Typography>
                      <Controller
-                        name="product_sku"
+                        name="productSku"
                         control={formControl}
-                        defaultValue={data.product_sku || ""}
                         render={({ field }) => (
                            <TextField
                               {...field}
-                              error={!!errors.product_sku}
-                              helperText={errors.product_sku?.message}
+                              error={!!errors.productSku}
+                              helperText={errors.productSku?.message}
                               label="Product sku"
                               variant="outlined"
                               required
@@ -120,14 +116,13 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                         Low stock alert
                      </Typography>
                      <Controller
-                        name="low_stock_alert"
+                        name="lowStockAlert"
                         control={formControl}
-                        defaultValue={data.low_stock_alert || ""}
                         render={({ field }) => (
                            <TextField
                               {...field}
-                              error={!!errors.low_stock_alert}
-                              helperText={errors.low_stock_alert?.message}
+                              error={!!errors.lowStockAlert}
+                              helperText={errors.lowStockAlert?.message}
                               label="Low stock alert"
                               variant="outlined"
                            />
@@ -147,7 +142,6 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                      <Controller
                         name="quantity"
                         control={formControl}
-                        defaultValue={data.quantity || ""}
                         render={({ field }) => (
                            <TextField
                               {...field}
@@ -180,7 +174,6 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                      <Controller
                         name="category"
                         control={formControl}
-                        defaultValue={data.category || []}
                         render={({ field }) => (
                            <CustomAutocomplete
                               {...field}
@@ -192,7 +185,7 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                               helperText={errors.category?.message}
                               arrow
                               label="Category"
-                              option={["Active", "Inactive"]}
+                              options={["Active", "Inactive"]}
                               getOptionLabel={(option) => option.toString()}
                            />
                         )}
@@ -209,9 +202,8 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                         Product type
                      </Typography>
                      <Controller
-                        name="product_type"
+                        name="productType"
                         control={formControl}
-                        defaultValue={data.product_type || []}
                         render={({ field }) => (
                            <CustomAutocomplete
                               {...field}
@@ -220,11 +212,11 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                                  field.onChange(val);
                                  setType(val);
                               }}
-                              error={!!errors.product_type}
-                              helperText={errors.product_type?.message}
+                              error={!!errors.productType}
+                              helperText={errors.productType?.message}
                               arrow
                               label="Product type"
-                              option={["Simple", "Variable", "Bundle"]}
+                              options={["Simple", "Variable", "Bundle"]}
                               getOptionLabel={(option) => option.toString()}
                            />
                         )}
@@ -245,7 +237,6 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                            <Controller
                               name="color"
                               control={formControl}
-                              defaultValue={data.color || []}
                               render={({ field }) => (
                                  <CustomAutocomplete
                                     {...field}
@@ -258,7 +249,7 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                                     arrow
                                     label="Color"
                                     limitTags={1}
-                                    option={[
+                                    options={[
                                        "Red",
                                        "Blue",
                                        "Green",
@@ -333,7 +324,6 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                            <Controller
                               name="unit"
                               control={formControl}
-                              defaultValue={data.unit || []}
                               render={({ field }) => (
                                  <CustomAutocomplete
                                     {...field}
@@ -346,7 +336,7 @@ const Properties = ({ formControl, errors, data }: PricingProps) => {
                                     arrow
                                     label="Unit"
                                     limitTags={1}
-                                    option={[
+                                    options={[
                                        "66 inch",
                                        "45 inch",
                                        "34 inch",

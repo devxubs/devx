@@ -45,8 +45,8 @@ const OrderFilterModal = ({
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
    const [filterData, setFilterData] = useState({
-      order_created_at: filterValue.order_created_at || undefined,
-      courier_submitted_at: filterValue.courier_submitted_at || undefined,
+      order_created_at: filterValue.order_created_at,
+      courier_submitted_at: filterValue.courier_submitted_at,
       employee: filterValue.employee || "",
       status: filterValue.status || "",
       order_source: filterValue.order_source || "",
@@ -56,6 +56,8 @@ const OrderFilterModal = ({
    });
 
    const inputSize = isMobile ? "small" : "medium"; // Adjust size on mobile
+
+   console.log(filterData.order_created_at);
 
    return (
       <Stack height={"100%"}>
@@ -68,12 +70,12 @@ const OrderFilterModal = ({
                      size={isMobile ? "small" : "medium"}
                      title="Order Created At"
                      value={filterData.order_created_at}
-                     onChange={(v: any) =>
+                     onChange={(v: any) => {
                         setFilterData({
                            ...filterData,
-                           order_created_at: v || "",
-                        })
-                     }
+                           order_created_at: v,
+                        });
+                     }}
                   />
                </Stack>
             </Grid>
@@ -86,12 +88,12 @@ const OrderFilterModal = ({
                      size={isMobile ? "small" : "medium"}
                      title="Courier Submitted At"
                      value={filterData.courier_submitted_at}
-                     onChange={(v: any) =>
+                     onChange={(v: any) => {
                         setFilterData({
                            ...filterData,
-                           courier_submitted_at: v || "",
-                        })
-                     }
+                           courier_submitted_at: v,
+                        });
+                     }}
                   />
                </Stack>
             </Grid>
