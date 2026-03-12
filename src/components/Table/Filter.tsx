@@ -13,17 +13,6 @@ import {
    useMediaQuery,
 } from "@mui/material";
 
-import {
-   GridPortalWrapper,
-   QuickFilter,
-   QuickFilterClear,
-   QuickFilterControl,
-   ToolbarButton,
-   ColumnsPanelTrigger,
-   FilterPanelTrigger,
-   Toolbar,
-} from "@mui/x-data-grid";
-
 import React, { useEffect, useMemo, useState } from "react";
 import Icon from "../Icon";
 import dayjs from "dayjs";
@@ -110,8 +99,21 @@ const Filter: React.FC<FilterProps> = ({ customFilter }) => {
          searchText: "",
          userRole: "",
          productStock: "",
-         orderData: {},
-         reportData: {},
+         orderData: {
+            order_created_at: undefined,
+            courier_submitted_at: undefined,
+            employee: "",
+            status: "",
+            order_source: "",
+            products: "",
+            district: "",
+            print_status: "",
+         },
+         reportData: {
+            report_type: "default",
+            date: [null, null],
+            product: null,
+         },
       });
    };
 
@@ -244,17 +246,18 @@ const Filter: React.FC<FilterProps> = ({ customFilter }) => {
                                 ).format("YYYY-MM-DD")}`
                               : String(value ?? "");
 
+                        const title =
+                           filterQueryData.reportData &&
+                           (!filterQueryData.reportData.report_type ||
+                           filterQueryData.reportData.report_type === "default"
+                              ? key
+                              : `${key !== "product" ? filterQueryData.reportData.report_type?.toUpperCase() + " " + key.toUpperCase() : key.toUpperCase()}`);
+
                         return (
                            filterQueryData.reportData && (
                               <FilterChipWrapper
                                  key={idx}
-                                 title={
-                                    !filterQueryData.reportData.report_type ||
-                                    filterQueryData.reportData.report_type ===
-                                       "default"
-                                       ? key
-                                       : `${filterQueryData.reportData.report_type?.toUpperCase()} ${key.toUpperCase()}`
-                                 }
+                                 title={title || key.toUpperCase()}
                               >
                                  <Chip
                                     label={label}

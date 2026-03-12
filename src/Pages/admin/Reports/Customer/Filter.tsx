@@ -63,8 +63,8 @@ const Filter = ({
                   <CustomAutocomplete
                      placeholder="Select Product"
                      label="Select Product"
-                     option={productsData.map((item) => ({
-                        label: item.product_name,
+                     options={productsData.map((item) => ({
+                        label: item.productName,
                         value: item.id,
                      }))}
                      onChange={(val: any) => {

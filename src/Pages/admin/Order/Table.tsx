@@ -73,7 +73,7 @@ const OrderTable = () => {
 
    // order tab
    const { filterQueryData, setFilterQueryData } = useFilterQuery();
-   const [orderTab, setOrderTab] = useState(4);
+   const [orderTab, setOrderTab] = useState(0);
 
    useEffect(() => {
       if (filterQueryData.orderData?.status) {

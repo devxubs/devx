@@ -52,7 +52,11 @@ export default function CustomTable({
    filter,
 }: DataTableProps) {
    const theme = useTheme();
-   const [mounted, setMounted] = useState(false);
+   const [tableRows, setTableRows] = useState(rows);
+
+   useEffect(() => {
+      setTableRows(rows);
+   }, [rows]);
 
    const [actionMenuOpen, setActionMenuOpen] = useState(
       null as null | HTMLElement,
@@ -168,12 +172,6 @@ export default function CustomTable({
       });
    }, [columns]);
 
-   useEffect(() => {
-      setMounted(true);
-   }, []);
-
-   if (!mounted) return null; // or loader
-
    return (
       <Stack
          borderRadius={1}
@@ -181,136 +179,145 @@ export default function CustomTable({
          sx={{
             backgroundColor: theme.palette.background.paper + "!important",
             height: rows.length ? "100%" : 560,
-            maxHeight: 560,
             width: "100%",
             overflow: "auto",
          }}
       >
          <Filter customFilter={filter} />
 
-         <DataGrid
-            rows={rows}
-            columns={processedColumns as GridColDef[]}
-            density="comfortable"
-            checkboxSelection={checkBox}
-            // autoPageSize //* enable this to make Whichever one you show based on the height of the table
-            pageSizeOptions={[10, 25, 50, { value: -1, label: "All" }]}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            disableColumnSorting
-            disableColumnMenu
-            disableColumnResize
-            disableColumnFilter
-            disableRowSelectionOnClick
-            disableAutosize
-            // disableVirtualization
-            disableColumnSelector
-            disableDensitySelector
-            slots={{
-               noRowsOverlay: NoRows, //no rows
-            }}
-            slotProps={{
-               loadingOverlay: {
-                  variant: "skeleton",
-                  noRowsVariant: "skeleton",
-               },
-            }}
-            initialState={{
-               pagination: { paginationModel: { pageSize: 5 } },
-               scroll: { top: 1000, left: 1000 },
-            }}
+         <Stack
             sx={{
-               border: "none",
-               borderRadius: 0,
-               bgcolor: "background.paper",
-
-               "& .MuiDataGrid-virtualScroller": {
-                  overflowX: "auto",
-                  scrollbarWidth: "none!important", // Firefox
-
-                  "&::-webkit-scrollbar": {
-                     width: "0px!important", // Chrome
+               maxHeight: 560,
+               height: "100%",
+            }}
+         >
+            <DataGrid
+               rows={tableRows}
+               columns={processedColumns as GridColDef[]}
+               density="comfortable"
+               checkboxSelection={checkBox}
+               // autoPageSize //* enable this to make Whichever one you show based on the height of the table
+               pageSizeOptions={[10, 25, 50, { value: -1, label: "All" }]}
+               paginationModel={paginationModel}
+               onPaginationModelChange={setPaginationModel}
+               disableColumnSorting
+               disableColumnMenu
+               disableColumnResize
+               disableColumnFilter
+               disableRowSelectionOnClick
+               disableAutosize
+               // disableVirtualization
+               disableColumnSelector 
+               // disableDensitySelector
+               slots={{
+                  noRowsOverlay: NoRows, //no rows
+               }}
+               slotProps={{
+                  loadingOverlay: {
+                     variant: "skeleton",
+                     noRowsVariant: "skeleton",
                   },
-               },
+               }}
+               initialState={{
+                  pagination: { paginationModel: { pageSize: 5 } },
+                  scroll: { top: 1000, left: 1000 },
+               }}
+               sx={{
+                  border: "none",
+                  borderRadius: 0,
+                  bgcolor: "background.paper",
 
-               "& .MuiDataGrid-toolbar": {
-                  border: "none!important",
-               },
+                  "& .MuiDataGrid-virtualScroller": {
+                     overflowX: "auto",
+                     scrollbarWidth: "none!important", // Firefox
 
-               "& .MuiDataGrid-scrollbar > div": {
-                  display: "none",
-                  backgroundColor: "transparent",
-               },
-               "& .MuiDataGrid-filler": {
-                  display: "none",
-               },
-               "& .MuiDataGrid-columnHeaders > div": {
-                  width: "100%",
-                  height: "60px!important",
-                  p: 1,
-                  py: checkBox ? 1 : 2,
-                  pl: 0,
-                  backgroundColor:
-                     alpha(theme.palette.grey[600], 0.1) + "!important",
-                  ...theme.applyStyles("dark", {
+                     "&::-webkit-scrollbar": {
+                        width: "0px!important", // Chrome
+                     },
+                  },
+
+                  "& .MuiDataGrid-toolbar": {
+                     border: "none!important",
+                  },
+
+                  "& .MuiDataGrid-scrollbar > div": {
+                     display: "none",
+                     backgroundColor: "transparent",
+                  },
+                  "& .MuiDataGrid-filler": {
+                     display: "none",
+                  },
+                  "& .MuiDataGrid-columnHeaders > div": {
+                     width: "100%",
+                     height: "60px!important",
+                     p: 1,
+                     py: checkBox ? 1 : 2,
+                     pl: 0,
                      backgroundColor:
-                        alpha(theme.palette.grey[700], 0.5) + "!important",
-                  }),
-               },
-               "& .MuiDataGrid-columnHeader, & .MuiDataGrid-scrollbarFiller": {
-                  backgroundColor: "transparent!important",
-                  border: "none!important",
-               },
-               "& .MuiDataGrid-columnHeader > .MuiDataGrid-columnSeparator": {
-                  display: "none",
-               },
+                        alpha(theme.palette.grey[600], 0.1) + "!important",
+                     ...theme.applyStyles("dark", {
+                        backgroundColor:
+                           alpha(theme.palette.grey[700], 0.5) + "!important",
+                     }),
+                  },
+                  "& .MuiDataGrid-columnHeader, & .MuiDataGrid-scrollbarFiller":
+                     {
+                        backgroundColor: "transparent!important",
+                        border: "none!important",
+                     },
+                  "& .MuiDataGrid-columnHeader > .MuiDataGrid-columnSeparator":
+                     {
+                        display: "none",
+                     },
 
-               "& .MuiDataGrid-columnHeader:focus": {
-                  outline: "none",
-               },
-               "& .MuiDataGrid-columnHeader:focus-within": {
-                  outline: "none",
-               },
+                  "& .MuiDataGrid-columnHeader:focus": {
+                     outline: "none",
+                  },
+                  "& .MuiDataGrid-columnHeader:focus-within": {
+                     outline: "none",
+                  },
 
-               /* column header  */
-               "& .MuiDataGrid-columnHeaderTitleContainer:focus": {
-                  outline: "none",
-               },
-               "& .MuiDataGrid-row": {
-                  borderBottom: "1px solid",
-                  borderColor: "divider",
-                  transition: "all 0.2s ease-in-out",
-                  height: "fit-content !important",
-               },
-               "& .MuiDataGrid-row:hover": {
-                  backgroundColor:
-                     alpha(theme.palette.grey[700], 0.03) + "!important",
-                  ...theme.applyStyles("dark", {
+                  /* column header  */
+                  "& .MuiDataGrid-columnHeaderTitleContainer:focus": {
+                     outline: "none",
+                  },
+                  "& .MuiDataGrid-row": {
+                     borderBottom: "1px solid",
+                     borderColor: "divider",
+                     transition: "all 0.2s ease-in-out",
+                     height: "fit-content !important",
+                  },
+                  "& .MuiDataGrid-row:hover": {
                      backgroundColor:
-                        alpha(theme.palette.grey[700], 0.3) + "!important",
-                  }),
-               },
-               "& .MuiDataGrid-row.Mui-selected": {
-                  backgroundColor:
-                     alpha(theme.palette.primary.dark, 0.05) + "!important",
-                  ...theme.applyStyles("dark", {
+                        alpha(theme.palette.grey[700], 0.03) + "!important",
+                     ...theme.applyStyles("dark", {
+                        backgroundColor:
+                           alpha(theme.palette.grey[700], 0.3) + "!important",
+                     }),
+                  },
+                  "& .MuiDataGrid-row.Mui-selected": {
                      backgroundColor:
                         alpha(theme.palette.primary.dark, 0.05) + "!important",
-                  }),
-               },
+                     ...theme.applyStyles("dark", {
+                        backgroundColor:
+                           alpha(theme.palette.primary.dark, 0.05) +
+                           "!important",
+                     }),
+                  },
 
-               "& .MuiDataGrid-cell": {
-                  outline: "none !important",
-                  border: 0,
-                  alignItems: "center",
-               },
+                  "& .MuiDataGrid-cell": {
+                     outline: "none !important",
+                     border: 0,
+                     alignItems: "center",
+                  },
 
-               // FOOTER STYLES
-               "& .MuiDataGrid-footerContainer": {
-                  borderTop: "none!important",
-               },
-            }}
-         />
+                  // FOOTER STYLES
+                  "& .MuiDataGrid-footerContainer": {
+                     borderTop: "none!important",
+                  },
+               }}
+            />
+         </Stack>
 
          {/* //* action menu */}
          <CustomPopover

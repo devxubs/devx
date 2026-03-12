@@ -1,10 +1,10 @@
-import { Stack } from "@mui/material";
+import { Grid, Stack, Typography } from "@mui/material";
 import CustomerInfo from "@src/Pages/admin/Customers/CustomerInfo";
-import DateRangePickerCustom from "@src/components/DateRange";
 import CustomTable from "@src/components/Table";
-import { id } from "date-fns/locale";
 import React from "react";
 import Filter from "./Filter";
+import AnalyticsCard from "../components/AnalyticsCard";
+import AnalyticsGraph from "../components/AnalyticsGraph";
 
 export const customerOrderData = [
    {
@@ -110,43 +110,118 @@ export const customerOrderData = [
 ];
 
 const Customer = () => {
-   const tableData = {
-      head: [
-         "ID",
-         "Customer",
-         "Last Order At",
-         "Total Orders",
-         "Completed Orders",
-         "Failed Orders",
-         "Address",
-      ],
-
-      body: customerOrderData.map((item) => ({
-         id: item.id,
-         customer: (
-            <CustomerInfo name={item.customerName} number={item.phone} />
+   const columns = [
+      {
+         field: "id",
+         headerName: "ID",
+         width: 100,
+      },
+      {
+         field: "customerName",
+         headerName: "Customer",
+         width: 200,
+         renderCell: (params: any) => (
+            <CustomerInfo
+               name={params.row.customerName}
+               phone={params.row.phone}
+            />
          ),
-         last_order_at: item.lastOrderAt,
-         total_orders: item.totalOrders,
-         completed_orders: item.completedOrders,
-         failed_orders: item.failedOrders,
-         address: item.address,
-      })),
-   };
-
+      },
+      {
+         field: "lastOrderAt",
+         headerName: "Last Order At",
+         width: 150,
+         renderCell: (params: any) => (
+            <Stack justifyContent="center" height={"100%"}>
+               <Typography variant="body2" color="textPrimary">
+                  {new Date(params.row.lastOrderAt).toLocaleDateString() ||
+                     "N/A"}
+               </Typography>
+            </Stack>
+         ),
+      },
+      {
+         field: "totalOrders",
+         headerName: "Total Orders",
+         width: 150,
+      },
+      {
+         field: "completedOrders",
+         headerName: "Completed Orders",
+         width: 150,
+      },
+      {
+         field: "failedOrders",
+         headerName: "Failed Orders",
+         width: 150,
+      },
+      {
+         field: "address",
+         headerName: "Address",
+         width: 300,
+      },
+   ];
    return (
       <Stack>
-         {/* --------------------------------
-               ✅ TABLE
-            -------------------------------- */}
-         <CustomTable
-            type="default"
-            head={tableData.head}
-            body={tableData.body}
-            filter={(data, onChange) => (
-               <Filter data={data} onChange={onChange} />
-            )}
-         />
+         <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+               <AnalyticsCard
+                  title={"Total Customer"}
+                  isPositive={true}
+                  data={[10, 30, 40, 40, 30, 10, 20]}
+                  value={"1000"}
+                  percentage={"90%"}
+               />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+               <AnalyticsCard
+                  title={"New Customer"}
+                  isPositive={true}
+                  data={[1, 4, 2, 9, 30, 10, 20]}
+                  value={"189"}
+                  percentage={"70%"}
+               />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+               <AnalyticsCard
+                  title={"Repeat Customer"}
+                  isPositive={true}
+                  data={[1, 9, 5, 2, 10, 30]}
+                  value={"50"}
+                  percentage={"40%"}
+               />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+               <AnalyticsGraph
+                  title={"Customer Growth"}
+                  isPositive={true}
+                  type="day"
+                  data={[
+                     { x: "2026-1-01", y: 10 },
+                     { x: "2026-1-02", y: 20 },
+                     { x: "2026-1-03", y: 15 },
+                     { x: "2026-1-04", y: 25 },
+                     { x: "2026-1-05", y: 30 },
+                     { x: "2026-1-06", y: 28 },
+                     { x: "2026-1-07", y: 35 },
+                     { x: "2026-1-08", y: 40 },
+                     { x: "2026-1-09", y: 38 },
+                     { x: "2026-1-10", y: 45 },
+                     { x: "2026-1-11", y: 50 },
+                     { x: "2026-1-12", y: 48 },
+                  ]}
+               />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+               <CustomTable
+                  rows={customerOrderData}
+                  columns={columns}
+                  filter={(data, onChange) => (
+                     <Filter data={data} onChange={onChange} />
+                  )}
+               />
+            </Grid>
+         </Grid>
       </Stack>
    );
 };

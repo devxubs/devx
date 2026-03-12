@@ -5,33 +5,38 @@ import AnalyticsCard from "../components/AnalyticsCard";
 import CustomTable from "@src/components/Table";
 import DateRangePickerCustom from "@src/components/DateRange";
 
+const data = [
+   {
+      id: "P001",
+      supplier: "Supplier A",
+      date: "2026-01-15",
+      totalAmount: "৳ 150,000",
+      status: "Completed",
+   },
+   {
+      id: "P002",
+      supplier: "Supplier B",
+      date: "2026-01-20",
+      totalAmount: "৳ 85,000",
+      status: "Pending",
+   },
+   {
+      id: "P003",
+      supplier: "Supplier C",
+      date: "2026-01-25",
+      totalAmount: "৳ 120,000",
+      status: "Completed",
+   },
+];
+
 const Purchases = () => {
-   const tableData = {
-      head: ["Purchase ID", "Supplier", "Date", "Total Amount", "Status"],
-      body: [
-         {
-            purchase_id: "P001",
-            supplier: "Supplier A",
-            date: "2026-01-15",
-            total_amount: "৳ 150,000",
-            status: "Completed",
-         },
-         {
-            purchase_id: "P002",
-            supplier: "Supplier B",
-            date: "2026-01-20",
-            total_amount: "৳ 85,000",
-            status: "Pending",
-         },
-         {
-            purchase_id: "P003",
-            supplier: "Supplier C",
-            date: "2026-01-25",
-            total_amount: "৳ 120,000",
-            status: "Completed",
-         },
-      ],
-   };
+   const columns = [
+      { field: "id", headerName: "Purchase ID", width: 150 },
+      { field: "supplier", headerName: "Supplier", width: 200 },
+      { field: "date", headerName: "Date", width: 150 },
+      { field: "totalAmount", headerName: "Total Amount", width: 150 },
+      { field: "status", headerName: "Status", width: 150 },
+   ];
 
    return (
       <Stack spacing={3}>
@@ -124,9 +129,8 @@ const Purchases = () => {
             </Grid>
             <Grid size={{ xs: 12 }}>
                <CustomTable
-                  type={"default"}
-                  head={tableData.head}
-                  body={tableData.body}
+                  rows={data}
+                  columns={columns}
                   filter={(d, onChange) => (
                      <DateRangePickerCustom
                         type={"range"}

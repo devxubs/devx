@@ -20,6 +20,7 @@ import "react-date-range/dist/theme/default.css"; // theme css file
 
 import CustomPopover from "./CustomPopover";
 import Icon from "./Icon";
+import { on } from "events";
 
 type Props = {
    onChange?: (value: [Date | null, Date | null]) => void;
@@ -93,8 +94,6 @@ export default function DateRangePickerCustom({
       }
    }, [value]);
 
-   // console.log(currentMonth.getMonth());
-
    // Display value
    const displayValue = React.useMemo(() => {
       const s = range[0]?.startDate;
@@ -122,11 +121,9 @@ export default function DateRangePickerCustom({
                key: "selection",
             },
          ]);
-         return onChange?.([d, d]);
       }
 
       setRange([sel]);
-      onChange?.([sel.startDate || null, sel.endDate || null]);
    };
 
    // Month only
@@ -144,7 +141,6 @@ export default function DateRangePickerCustom({
       const end = new Date(y, m + 1, 0);
 
       setRange([{ startDate: start, endDate: end, key: "selection" }]);
-      onChange?.([start, end]);
 
       setMonthAnchor(null);
    };
@@ -157,7 +153,6 @@ export default function DateRangePickerCustom({
       const end = new Date(y, 0, 31);
 
       setRange([{ startDate: start, endDate: end, key: "selection" }]);
-      onChange?.([start, end]);
 
       setYearAnchor(null);
    };
@@ -165,14 +160,18 @@ export default function DateRangePickerCustom({
    // Reset
    const handleReset = () => {
       const newD = new Date();
-      const start = new Date(newD.getFullYear(), 0, 1);
-      const end = new Date(newD.getFullYear(), 0, 31);
-      const next = type === "range" ? addDays(newD, 7) : end;
 
       setCurrentMonth(new Date(newD.getFullYear(), 0, 1));
 
-      setRange([{ startDate: start, endDate: next, key: "selection" }]);
-      onChange?.([start, next]);
+      setRange([
+         {
+            startDate: undefined,
+            endDate: undefined,
+            key: "selection",
+         },
+      ]);
+
+      setCalendarKey((k) => k + 1);
    };
 
    return (
@@ -182,7 +181,8 @@ export default function DateRangePickerCustom({
             fullWidth
             focused={Boolean(anchorEl)}
             size={size}
-            label={title || "Select"}
+            // label={title || "Select"}
+            placeholder={title || "Select"}
             value={displayValue}
             onClick={(e) => setAnchorEl(e.currentTarget)}
             InputProps={{
@@ -192,6 +192,11 @@ export default function DateRangePickerCustom({
                      <Icon icon="solar:calendar-bold-duotone" />
                   </InputAdornment>
                ),
+            }}
+            sx={{
+               "& .MuiInputLabel-root": {
+                  maxWidth: "calc(100% - 60px)", // reserve space for icon
+               },
             }}
          />
          {/* Popover */}
@@ -418,7 +423,13 @@ export default function DateRangePickerCustom({
                   <Button
                      size="small"
                      variant="contained"
-                     onClick={() => setAnchorEl(null)}
+                     onClick={() => {
+                        onChange?.([
+                           range[0]?.startDate || null,
+                           range[0]?.endDate || null,
+                        ]);
+                        setAnchorEl(null);
+                     }}
                   >
                      Apply
                   </Button>

@@ -3,14 +3,16 @@ import React from "react";
 import AnalyticsCard from "../components/AnalyticsCard";
 import AnalyticsGraph from "../components/AnalyticsGraph";
 import RadialBar from "../components/RadialBar";
-import CustomTable, { TableProps } from "@src/components/Table";
+import CustomTable from "@src/components/Table";
 import { UserProfile } from "../../User";
 import { SellerProFile } from "../../Dashboard";
 import RankFilter from "./RankFilter";
 import Activity from "./ActivityFilter";
+import { GridCellParams } from "@mui/x-data-grid";
 
 const rankData = [
    {
+      id: 1,
       name: "John Doe",
       calls: 1500,
       conforms: 1200,
@@ -18,6 +20,7 @@ const rankData = [
       rank: "Top 1",
    },
    {
+      id: 2,
       name: "Jane Smith",
       calls: 1300,
       conforms: 1000,
@@ -25,6 +28,7 @@ const rankData = [
       rank: "Top 2",
    },
    {
+      id: 3,
       name: "Mike Johnson",
       calls: 1100,
       conforms: 900,
@@ -32,94 +36,109 @@ const rankData = [
       rank: "Top 3",
    },
 ];
-
-const rankSalesman = {
-   head: ["Seller", "Call", "Conform", "Cancel", "Rank", "@action"],
-   body: rankData.map((data, index) => ({
-      seller: (
+const rankSalesmanColumns = [
+   {
+      field: "seller",
+      headerName: "Seller",
+      width: 200,
+      renderCell: (params: GridCellParams) => (
          <SellerProFile
-            name={data.name}
+            name={params.row.name}
             url={
                "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-" +
-               (index + 1) +
+               params.row.id +
                ".webp"
             }
          />
       ),
-      name: data.name,
-      call: data.calls,
-      conform: data.conforms,
-      cancel: data.cancels,
-      rank: data.rank,
-      chip: "rank",
-      color: index === 0 ? "primary" : index === 1 ? "secondary" : "success",
-   })),
-};
+   },
+   { field: "call", headerName: "Call", width: 150 },
+   { field: "conform", headerName: "Conform", width: 150 },
+   { field: "cancel", headerName: "Cancel", width: 150 },
+   { field: "rank", headerName: "Rank", width: 150 },
+   { field: "chip", headerName: "Status", width: 150 },
+];
 
-const employeeActivity = {
-   head: [
-      "Employee",
-      "Date",
-      "Active Time",
-      "Inactive Time",
-      "Activity",
-      "Status",
-   ],
-   body: [
-      {
-         employee: (
-            <SellerProFile
-               name="John Doe"
-               url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-1.webp"
-            />
-         ),
-         name: "John Doe",
-         date: "2023-09-15",
-         active_time: "09:00 AM",
-         inactive_time: "05:00 PM",
-         activity: "Active",
-         status: "Online",
-         chip: "status",
-         color: "success",
-      },
-      {
-         employee: (
-            <SellerProFile
-               name="Jane Smith"
-               url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-2.webp"
-            />
-         ),
-         name: "Jane Smith",
-         date: "2023-09-15",
-         active_time: "08:30 AM",
-         inactive_time: "04:30 PM",
-         activity: "Active",
-         status: "Online",
-         chip: "status",
-         color: "success",
-      },
-      {
-         employee: (
-            <SellerProFile
-               name="Mike Johnson"
-               url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-3.webp"
-            />
-         ),
-         name: "Mike Johnson",
-         date: "2023-09-15",
-         active_time: "10:00 AM",
-         inactive_time: "06:00 PM",
-         activity: "Inactive",
-         status: "Offline",
-         chip: "status",
-         color: "error",
-      },
-   ],
-};
+const employeeActivity = [
+   {
+      id: 1,
+      employee: (
+         <SellerProFile
+            name="John Doe"
+            url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-1.webp"
+         />
+      ),
+      name: "John Doe",
+      date: "2023-09-15",
+      active_time: "09:00 AM",
+      inactive_time: "05:00 PM",
+      activity: "Active",
+      status: "Online",
+      chip: "status",
+      color: "success",
+   },
+   {
+      id: 2,
+      employee: (
+         <SellerProFile
+            name="Jane Smith"
+            url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-2.webp"
+         />
+      ),
+      name: "Jane Smith",
+      date: "2023-09-15",
+      active_time: "08:30 AM",
+      inactive_time: "04:30 PM",
+      activity: "Active",
+      status: "Online",
+      chip: "status",
+      color: "success",
+   },
+   {
+      id: 3,
+      employee: (
+         <SellerProFile
+            name="Mike Johnson"
+            url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-3.webp"
+         />
+      ),
+      name: "Mike Johnson",
+      date: "2023-09-15",
+      active_time: "10:00 AM",
+      inactive_time: "06:00 PM",
+      activity: "Inactive",
+      status: "Offline",
+      chip: "status",
+      color: "error",
+   },
+];
+
+const employeeActivityColumns = [
+   {
+      field: "employee",
+      headerName: "Employee",
+      width: 200,
+      renderCell: (params: GridCellParams) => (
+         <SellerProFile
+            name={params.row.name}
+            url={
+               "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-" +
+               params.row.id +
+               ".webp"
+            }
+         />
+      ),
+   },
+   { field: "date", headerName: "Date", width: 150 },
+   { field: "active_time", headerName: "Active Time", width: 150 },
+   { field: "inactive_time", headerName: "Inactive Time", width: 150 },
+   { field: "activity", headerName: "Activity", width: 150 },
+   { field: "status", headerName: "Status", width: 150 },
+];
 
 const Employees = () => {
    return (
-      <Stack spacing={3}>
+      <Stack>
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
@@ -165,7 +184,6 @@ const Employees = () => {
             <Grid size={{ xs: 12, md: 4 }}>
                <RadialBar
                   title="Top Active Employee"
-                  isPositive={true}
                   data={[
                      { label: "Satisfied", value: 85 },
                      { label: "Neutral", value: 10 },
@@ -175,17 +193,15 @@ const Employees = () => {
             </Grid>
             <Grid size={{ xs: 12, md: 12 }}>
                <CustomTable
-                  type={"default"}
-                  head={rankSalesman.head}
-                  body={rankSalesman.body}
+                  rows={rankData}
+                  columns={rankSalesmanColumns}
                   filter={RankFilter}
                />
             </Grid>
             <Grid size={{ xs: 12, md: 12 }}>
                <CustomTable
-                  type={"default"}
-                  head={employeeActivity.head}
-                  body={employeeActivity.body}
+                  rows={employeeActivity}
+                  columns={employeeActivityColumns}
                   filter={Activity}
                />
             </Grid>

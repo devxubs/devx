@@ -13,7 +13,7 @@ import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 
@@ -21,6 +21,11 @@ type AssetsItem = {
    id: number;
    type: string;
    date: string;
+   amount: string;
+   note: string;
+};
+type AssetForm = {
+   type: string;
    amount: string;
    note: string;
 };
@@ -99,9 +104,7 @@ const AssetsData: AssetsItem[] = [
 ];
 
 const AssetsSchema = yup.object({
-   id: yup.number().required(),
    type: yup.string().required("Type is required"),
-   date: yup.string().required("Date is required"),
    amount: yup.string().required("Amount is required"),
    note: yup.string().required("Note is required"),
 });
@@ -110,25 +113,33 @@ const Asset = () => {
    const theme = useTheme();
 
    const columns: ColumnConfig[] = [
-      { field: "id", headerName: "ID", flex: 0.1 },
-      { field: "type", headerName: "Type" },
-      { field: "date", headerName: "Date" },
-      { field: "amount", headerName: "Amount" },
-      { field: "note", headerName: "Note" },
+      { field: "id", headerName: "ID", width: 50 },
+      { field: "type", headerName: "Type", flex: 1 },
+      { field: "date", headerName: "Date", width: 150 },
+      { field: "amount", headerName: "Amount", width: 150 },
+      { field: "note", headerName: "Note", flex: 1 },
+      {
+         field: "@actions",
+         headerName: "",
+      },
    ];
 
-   const [open, setOpen] = useState(false);
-   const [asset, setAsset] = useState<AssetsItem>({} as AssetsItem);
-   const [isEditMode, setIsEditMode] = useState(false);
-   const [openDelete, setOpenDelete] = useState(false);
+   const [assets, setAssets] = useState(AssetsData);
+   const [openModal, setOpenModal] = useState(false);
+
+   // edit
+   const [editItem, setEditItem] = useState<AssetsItem | null>(null);
+
+   // delete
+   const [deleteItem, setDeleteItem] = useState<AssetsItem | null>(null);
 
    const {
       control,
       handleSubmit,
       reset,
       formState: { errors },
-   } = useForm<AssetsItem>({
-      resolver: yupResolver<AssetsItem, any, any>(AssetsSchema),
+   } = useForm<AssetForm>({
+      resolver: yupResolver(AssetsSchema),
       defaultValues: {
          type: "",
          amount: "",
@@ -136,13 +147,45 @@ const Asset = () => {
       },
    });
 
-   const onSubmit: SubmitHandler<AssetsItem> = (formData) => {
-      const newOrder: AssetsItem = {
-         ...formData,
-      };
-      setAsset(newOrder);
-   };
+   useEffect(() => {
+      if (editItem) {
+         reset({
+            type: editItem.type,
+            amount: editItem.amount,
+            note: editItem.note,
+         });
+      } else {
+         reset({
+            type: "",
+            amount: "",
+            note: "",
+         });
+      }
+   }, [editItem, reset]);
 
+   const onSubmit: SubmitHandler<AssetForm> = (formData) => {
+      if (editItem) {
+         // UPDATE
+         setAssets((prev) =>
+            prev.map((item) =>
+               item.id === editItem.id ? { ...item, ...formData } : item,
+            ),
+         );
+      } else {
+         // ADD
+         const newAsset: AssetsItem = {
+            id: assets.length + 1,
+            date: new Date().toISOString().split("T")[0],
+            ...formData,
+         };
+
+         setAssets((prev) => [newAsset, ...prev]);
+      }
+
+      reset();
+      setEditItem(null);
+      setOpenModal(false);
+   };
    return (
       <Stack spacing={2} py={2}>
          {/* Header */}
@@ -158,13 +201,13 @@ const Asset = () => {
                      }}
                   />
                }
-               onClick={() => setOpen(true)}
+               onClick={() => setOpenModal(true)}
             >
                Add Asset
             </Button>
          </Stack>
          <CustomTable
-            rows={AssetsData}
+            rows={assets}
             columns={columns}
             checkBox
             menuItems={[
@@ -172,10 +215,8 @@ const Asset = () => {
                   label: "edit",
                   icon: <Icon icon="solar:pen-bold" size="small" />,
                   onClick: (params) => {
-                     setAsset(params.row);
-                     setIsEditMode(true);
-                     setOpen(true);
-                     reset(params.row);
+                     setOpenModal(true);
+                     setEditItem(params.row);
                   },
                },
                {
@@ -186,19 +227,13 @@ const Asset = () => {
                         size="small"
                      />
                   ),
-                  onClick: (params) => {
-                     setAsset(params.row);
-                     setIsEditMode(true);
-                     setOpen(true);
-                     reset(params.row);
-                  },
+                  onClick: (params) => {},
                },
                {
                   label: "delete",
                   color: "error",
                   onClick: (params) => {
-                     setAsset(params.row);
-                     setOpenDelete(true);
+                     setDeleteItem(params.row);
                   },
                   icon: (
                      <Icon
@@ -211,8 +246,8 @@ const Asset = () => {
             ]}
          />
          <CustomModal
-            open={open}
-            onClose={() => setOpen(false)}
+            open={openModal}
+            onClose={() => setOpenModal(false)}
             title="Add Asset"
          >
             <Stack
@@ -233,7 +268,6 @@ const Asset = () => {
                         <Controller
                            name="type"
                            control={control}
-                           defaultValue={asset.type}
                            render={({ field }) => (
                               <TextField
                                  {...field}
@@ -259,7 +293,6 @@ const Asset = () => {
                         <Controller
                            name="amount"
                            control={control}
-                           defaultValue={asset.amount}
                            render={({ field }) => (
                               <TextField
                                  {...field}
@@ -286,7 +319,6 @@ const Asset = () => {
                         <Controller
                            name="note"
                            control={control}
-                           defaultValue={asset.note}
                            render={({ field }) => (
                               <TextField
                                  {...field}
@@ -315,9 +347,8 @@ const Asset = () => {
                      variant="text"
                      color="inherit"
                      onClick={() => {
+                        setOpenModal(false);
                         reset();
-                        setOpen(false);
-                        setIsEditMode(false);
                      }}
                   >
                      Cancel
@@ -332,18 +363,24 @@ const Asset = () => {
                         overflow: "hidden",
                      }}
                   >
-                     {isEditMode ? "Update Asset" : "Add Asset"}
+                     {editItem ? "Update Asset" : "Add Asset"}
                   </Button>
                </Stack>
             </Stack>
          </CustomModal>
          <AlertDialog
-            open={openDelete}
+            open={!!deleteItem}
             onClose={function (): void {
-               setOpenDelete(false);
+               setDeleteItem(null);
+            }}
+            onConfirm={() => {
+               setAssets((prev) =>
+                  prev.filter((item) => item.id !== deleteItem?.id),
+               );
+               setDeleteItem(null);
             }}
             type={"error"}
-            title={`Are you sure want to delete "${asset?.type}"?`}
+            title={`Are you sure want to delete "${deleteItem?.type}"?`}
          />
       </Stack>
    );

@@ -4,6 +4,7 @@ import { Stack } from "@mui/material";
 import AnalyticsCard from "../components/AnalyticsCard";
 import AnalyticsGraph from "../components/AnalyticsGraph";
 import RadialBar from "../components/RadialBar";
+import CustomTable from "@src/components/Table";
 
 const Products = () => {
    return (
@@ -60,6 +61,9 @@ const Products = () => {
                      { x: "2026-01-06", y: 80 },
                   ]}
                />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+               <CustomTable rows={[]} columns={[]} />
             </Grid>
          </Grid>
       </Stack>

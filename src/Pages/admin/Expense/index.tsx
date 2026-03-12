@@ -13,7 +13,8 @@ import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
-import React, { useState } from "react";
+import { set } from "date-fns";
+import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 
@@ -24,8 +25,13 @@ type ExpenseItem = {
    amount: string;
    note: string;
 };
+type ExpenseForm = {
+   type: string;
+   amount: string;
+   note: string;
+};
 
-const expenses: ExpenseItem[] = [
+const expensesItems: ExpenseItem[] = [
    {
       id: 1,
       type: "Food",
@@ -99,9 +105,7 @@ const expenses: ExpenseItem[] = [
 ];
 
 const expenseSchema = yup.object({
-   id: yup.number().required(),
    type: yup.string().required("Type is required"),
-   date: yup.string().required("Date is required"),
    amount: yup.string().required("Amount is required"),
    note: yup.string().required("Note is required"),
 });
@@ -109,26 +113,30 @@ const expenseSchema = yup.object({
 const Expense = () => {
    const theme = useTheme();
    const columns: ColumnConfig[] = [
-      { field: "id", headerName: "ID", flex: 0.1 },
-      { field: "type", headerName: "Type" },
-      { field: "date", headerName: "Date" },
-      { field: "amount", headerName: "Amount" },
-      { field: "note", headerName: "Note" },
+      { field: "id", headerName: "ID", width: 50 },
+      { field: "type", headerName: "Type", flex: 1 },
+      { field: "date", headerName: "Date", width: 150 },
+      { field: "amount", headerName: "Amount", width: 150 },
+      { field: "note", headerName: "Note", flex: 1 },
       { field: "@actions", headerName: "" },
    ];
 
-   const [open, setOpen] = useState(false);
-   const [expense, setExpense] = useState<ExpenseItem>({} as ExpenseItem);
-   const [isEditMode, setIsEditMode] = useState(false);
-   const [openDelete, setOpenDelete] = useState(false);
+   const [expenses, setExpenses] = useState<ExpenseItem[]>(expensesItems);
+   const [openModal, setOpenModal] = useState(false);
+
+   // edit
+   const [editItem, setEditItem] = useState<ExpenseItem | null>(null);
+
+   // delete
+   const [deleteItem, setDeleteItem] = useState<ExpenseItem | null>(null);
 
    const {
       control,
       handleSubmit,
       reset,
       formState: { errors },
-   } = useForm<ExpenseItem>({
-      resolver: yupResolver<ExpenseItem, any, any>(expenseSchema),
+   } = useForm<ExpenseForm>({
+      resolver: yupResolver(expenseSchema),
       defaultValues: {
          type: "",
          amount: "",
@@ -136,11 +144,42 @@ const Expense = () => {
       },
    });
 
-   const onSubmit: SubmitHandler<ExpenseItem> = (formData) => {
-      const newOrder: ExpenseItem = {
-         ...formData,
-      };
-      setExpense(newOrder);
+   useEffect(() => {
+      if (editItem) {
+         reset({
+            type: editItem.type,
+            amount: editItem.amount,
+            note: editItem.note,
+         });
+      } else {
+         reset({
+            type: "",
+            amount: "",
+            note: "",
+         });
+      }
+   }, [editItem, reset]);
+
+   const onSubmit: SubmitHandler<ExpenseForm> = (formData) => {
+      if (!editItem) {
+         const newExpense: ExpenseItem = {
+            id: expenses.length + 1,
+            date: new Date().toISOString().split("T")[0],
+            ...formData,
+         };
+
+         setExpenses((prev) => [newExpense, ...prev]);
+      } else {
+         setExpenses((prev) =>
+            prev.map((item) =>
+               item.id === editItem.id ? { ...item, ...formData } : item,
+            ),
+         );
+      }
+
+      reset();
+      setEditItem(null);
+      setOpenModal(false);
    };
 
    return (
@@ -158,7 +197,7 @@ const Expense = () => {
                      }}
                   />
                }
-               onClick={() => setOpen(true)}
+               onClick={() => setOpenModal(true)}
             >
                Add Expense
             </Button>
@@ -171,10 +210,8 @@ const Expense = () => {
                   label: "edit",
                   icon: <Icon icon="solar:pen-bold" size="small" />,
                   onClick: (params) => {
-                     setExpense(params.row);
-                     setIsEditMode(true);
-                     setOpen(true);
-                     reset(params.row);
+                     setEditItem(params.row);
+                     setOpenModal(true);
                   },
                },
                {
@@ -185,19 +222,13 @@ const Expense = () => {
                         size="small"
                      />
                   ),
-                  onClick: (params) => {
-                     setExpense(params.row);
-                     setIsEditMode(true);
-                     setOpen(true);
-                     reset(params.row);
-                  },
+                  onClick: (params) => {},
                },
                {
                   label: "delete",
                   color: "error",
                   onClick: (params) => {
-                     setExpense(params.row);
-                     setOpenDelete(true);
+                     setDeleteItem(params.row);
                   },
                   icon: (
                      <Icon
@@ -211,8 +242,8 @@ const Expense = () => {
             checkBox
          />
          <CustomModal
-            open={open}
-            onClose={() => setOpen(false)}
+            open={openModal}
+            onClose={() => setOpenModal(false)}
             title="Add expense"
          >
             <Stack
@@ -233,7 +264,6 @@ const Expense = () => {
                         <Controller
                            name="type"
                            control={control}
-                           defaultValue={expense.type}
                            render={({ field }) => (
                               <TextField
                                  {...field}
@@ -259,7 +289,6 @@ const Expense = () => {
                         <Controller
                            name="amount"
                            control={control}
-                           defaultValue={expense.amount}
                            render={({ field }) => (
                               <TextField
                                  {...field}
@@ -286,7 +315,6 @@ const Expense = () => {
                         <Controller
                            name="note"
                            control={control}
-                           defaultValue={expense.note}
                            render={({ field }) => (
                               <TextField
                                  {...field}
@@ -315,9 +343,9 @@ const Expense = () => {
                      variant="text"
                      color="inherit"
                      onClick={() => {
+                        setOpenModal(false);
+                        setEditItem(null);
                         reset();
-                        setOpen(false);
-                        setIsEditMode(false);
                      }}
                   >
                      Cancel
@@ -332,18 +360,24 @@ const Expense = () => {
                         overflow: "hidden",
                      }}
                   >
-                     {isEditMode ? "Update Expense" : "Add Expense"}
+                     {editItem ? "Update Expense" : "Add Expense"}
                   </Button>
                </Stack>
             </Stack>
          </CustomModal>
          <AlertDialog
-            open={openDelete}
+            open={deleteItem !== null}
             onClose={function (): void {
-               setOpenDelete(false);
+               setDeleteItem(null);
+            }}
+            onConfirm={() => {
+               setExpenses((prev) =>
+                  prev.filter((item) => item.id !== deleteItem?.id),
+               );
+               setDeleteItem(null);
             }}
             type={"error"}
-            title={`Are you sure want to delete "${expense?.type}"?`}
+            title={`Are you sure want to delete <b>${deleteItem?.type}</b>?`}
          />
       </Stack>
    );
