@@ -132,10 +132,20 @@ export const productsData: ProductType[] = [
    },
 ];
 
-const Stock = ({ quantity }: { quantity: number }) => {
+export const Stock = ({
+   quantity,
+   lowAlert,
+}: {
+   quantity: number;
+   lowAlert?: number;
+}) => {
    const theme = useTheme();
    const color =
-      quantity === 0 ? "error" : quantity <= 10 ? "warning" : "primary";
+      quantity === 0
+         ? "error"
+         : quantity <= (lowAlert || 0)
+           ? "warning"
+           : "primary";
    return (
       <Stack spacing={1} justifyContent="center" height={"100%"}>
          <LinearProgress
@@ -164,8 +174,8 @@ const Stock = ({ quantity }: { quantity: number }) => {
             color="textSecondary"
          >
             {quantity === 0
-               ? "out of stock"
-               : quantity <= 10
+               ? "Out of stock"
+               : quantity <= (lowAlert || 0)
                  ? quantity + " low stock"
                  : quantity + " in stock"}
          </Typography>

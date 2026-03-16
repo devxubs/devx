@@ -1,4 +1,4 @@
-import { Stack } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
 import WeeklySalesChart from "./ExpenseChart";
 import CustomTable from "@src/components/Table";
 import DateRangePicker from "@src/components/DateRange";
@@ -49,6 +49,8 @@ const expensesData = [
    },
 ];
 
+// ! the expenses is optional,
+
 const Expenses = () => {
    const columns = [
       {
@@ -65,24 +67,43 @@ const Expenses = () => {
    return (
       <Stack spacing={3}>
          <WeeklySalesChart />
-         <CustomTable
-            rows={expensesData}
-            columns={columns}
-            filter={(data, onChange) => (
-               <DateRangePicker
-                  title="Filter by Expense Date"
-                  onChange={(v: [Date | null, Date | null]) => {
-                     onChange({
-                        ...data,
-                        reportData: {
-                           date: v,
-                           report_type: "expenses",
-                        },
-                     });
-                  }}
-               />
-            )}
-         />
+         <Stack
+            spacing={2}
+            bgcolor={"background.paper"}
+            sx={{
+               borderRadius: 1.5,
+            }}
+         >
+            <Typography
+               variant="h5"
+               fontWeight={700}
+               sx={{
+                  px: 3,
+                  pt: 2,
+                  pb: 0,
+               }}
+            >
+               Expenses Report
+            </Typography>
+            <CustomTable
+               rows={expensesData}
+               columns={columns}
+               filter={(data, onChange) => (
+                  <DateRangePicker
+                     title="Filter by Expense Date"
+                     onChange={(v: [Date | null, Date | null]) => {
+                        onChange({
+                           ...data,
+                           reportData: {
+                              date: v,
+                              report_type: "expenses",
+                           },
+                        });
+                     }}
+                  />
+               )}
+            />
+         </Stack>
       </Stack>
    );
 };

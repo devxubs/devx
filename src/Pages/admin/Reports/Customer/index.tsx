@@ -213,13 +213,33 @@ const Customer = () => {
                />
             </Grid>
             <Grid size={{ xs: 12 }}>
-               <CustomTable
-                  rows={customerOrderData}
-                  columns={columns}
-                  filter={(data, onChange) => (
-                     <Filter data={data} onChange={onChange} />
-                  )}
-               />
+               <Stack
+                  spacing={2}
+                  bgcolor={"background.paper"}
+                  sx={{
+                     borderRadius: 1.5,
+                  }}
+               >
+                  <Typography
+                     variant="h5"
+                     fontWeight={700}
+                     sx={{
+                        px: 3,
+                        pt: 2,
+                        pb: 0,
+                     }}
+                  >
+                     Repeat Customer
+                  </Typography>
+
+                  <CustomTable
+                     rows={customerOrderData}
+                     columns={columns}
+                     filter={(data, onChange) => (
+                        <Filter data={data} onChange={onChange} />
+                     )}
+                  />
+               </Stack>
             </Grid>
          </Grid>
       </Stack>

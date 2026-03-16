@@ -97,15 +97,28 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                   {value}
                </Typography>
 
-               <Typography
-                  variant="caption"
-                  color={isPositive ? "success.main" : "error.main"}
-                  sx={{
-                     visibility: !percentage ? "hidden" : "visible",
-                  }}
-               >
-                  {percentage}
-               </Typography>
+               <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Typography
+                     variant="caption"
+                     color={isPositive ? "success.main" : "error.main"}
+                     sx={{
+                        visibility: !percentage ? "hidden" : "visible",
+                     }}
+                  >
+                     {percentage}
+                  </Typography>
+                  <Typography
+                     variant="caption"
+                     fontSize={11}
+                     fontWeight={500}
+                     color={isPositive ? "success.main" : "error.main"}
+                     sx={{
+                        visibility: !percentage ? "hidden" : "visible",
+                     }}
+                  >
+                     (Last 7 Days)
+                  </Typography>
+               </Stack>
             </Stack>
 
             <Box sx={{ height: 66, width: 80 }}>

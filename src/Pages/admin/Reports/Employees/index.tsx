@@ -192,18 +192,57 @@ const Employees = () => {
                />
             </Grid>
             <Grid size={{ xs: 12, md: 12 }}>
-               <CustomTable
-                  rows={rankData}
-                  columns={rankSalesmanColumns}
-                  filter={RankFilter}
-               />
+               <Stack
+                  spacing={2}
+                  bgcolor={"background.paper"}
+                  sx={{
+                     borderRadius: 1.5,
+                  }}
+               >
+                  <Typography
+                     variant="h5"
+                     fontWeight={700}
+                     sx={{
+                        px: 3,
+                        pt: 2,
+                        pb: 0,
+                     }}
+                  >
+                     Rank
+                  </Typography>
+
+                  <CustomTable
+                     rows={rankData}
+                     columns={rankSalesmanColumns}
+                     filter={RankFilter}
+                  />
+               </Stack>
             </Grid>
             <Grid size={{ xs: 12, md: 12 }}>
-               <CustomTable
-                  rows={employeeActivity}
-                  columns={employeeActivityColumns}
-                  filter={Activity}
-               />
+               <Stack
+                  spacing={2}
+                  bgcolor={"background.paper"}
+                  sx={{
+                     borderRadius: 1.5,
+                  }}
+               >
+                  <Typography
+                     variant="h5"
+                     fontWeight={700}
+                     sx={{
+                        px: 3,
+                        pt: 2,
+                        pb: 0,
+                     }}
+                  >
+                     Active Employees
+                  </Typography>
+                  <CustomTable
+                     rows={employeeActivity}
+                     columns={employeeActivityColumns}
+                     filter={Activity}
+                  />
+               </Stack>
             </Grid>
          </Grid>
       </Stack>

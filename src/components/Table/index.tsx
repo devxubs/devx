@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
 import Filter, { FilterData } from "./Filter";
 
 import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
@@ -206,11 +206,12 @@ export default function CustomTable({
                disableColumnFilter
                disableRowSelectionOnClick
                disableAutosize
-               // disableVirtualization
-               disableColumnSelector 
-               // disableDensitySelector
+               disableVirtualization
+               disableColumnSelector
+               disableDensitySelector
                slots={{
                   noRowsOverlay: NoRows, //no rows
+                  noColumnsOverlay: NoRows,
                }}
                slotProps={{
                   loadingOverlay: {

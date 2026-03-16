@@ -1,4 +1,4 @@
-import { Stack, Grid } from "@mui/material";
+import { Stack, Grid, Typography } from "@mui/material";
 import React from "react";
 import AnalyticsGraph from "../components/AnalyticsGraph";
 import AnalyticsCard from "../components/AnalyticsCard";
@@ -128,26 +128,46 @@ const Purchases = () => {
                />
             </Grid>
             <Grid size={{ xs: 12 }}>
-               <CustomTable
-                  rows={data}
-                  columns={columns}
-                  filter={(d, onChange) => (
-                     <DateRangePickerCustom
-                        type={"range"}
-                        title="Select Month"
-                        value={d.reportData?.date}
-                        onChange={(date) => {
-                           onChange({
-                              ...d,
-                              reportData: {
-                                 report_type: "purchases",
-                                 date: date,
-                              },
-                           });
-                        }}
-                     />
-                  )}
-               />
+               <Stack
+                  spacing={2}
+                  bgcolor={"background.paper"}
+                  sx={{
+                     borderRadius: 1.5,
+                  }}
+               >
+                  <Typography
+                     variant="h5"
+                     fontWeight={700}
+                     sx={{
+                        px: 3,
+                        pt: 2,
+                        pb: 0,
+                     }}
+                  >
+                     Purchases Report
+                  </Typography>
+
+                  <CustomTable
+                     rows={data}
+                     columns={columns}
+                     filter={(d, onChange) => (
+                        <DateRangePickerCustom
+                           type={"range"}
+                           title="Select Month"
+                           value={d.reportData?.date}
+                           onChange={(date) => {
+                              onChange({
+                                 ...d,
+                                 reportData: {
+                                    report_type: "purchases",
+                                    date: date,
+                                 },
+                              });
+                           }}
+                        />
+                     )}
+                  />
+               </Stack>
             </Grid>
          </Grid>
       </Stack>

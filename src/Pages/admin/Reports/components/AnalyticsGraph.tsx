@@ -30,34 +30,34 @@ interface AnalyticsGraphProps {
 }
 
 /* ---------------- WEEK GROUPING ---------------- */
+const groupInto7Days = (data: AnalyticsDataItem[], weekStart: Date) => {
+   const days: { x: Date; y: number }[] = [];
 
-const groupInto4Weeks = (
-   data: AnalyticsDataItem[],
-   month: Date,
-): AnalyticsDataItem[] => {
-   const year = month.getFullYear();
-   const m = month.getMonth();
+   for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
 
-   const weeks = [
-      { x: "Week 1", y: 0 },
-      { x: "Week 2", y: 0 },
-      { x: "Week 3", y: 0 },
-      { x: "Week 4", y: 0 },
-   ];
+      days.push({
+         x: d,
+         y: 0,
+      });
+   }
 
    data.forEach((item) => {
-      const date = new Date(item.x);
-      if (isNaN(date.getTime())) return;
+      const itemDate = new Date(item.x);
 
-      if (date.getFullYear() !== year || date.getMonth() !== m) return;
-
-      const d = date.getDate();
-      const index = d <= 7 ? 0 : d <= 14 ? 1 : d <= 21 ? 2 : 3;
-
-      weeks[index].y += item.y;
+      days.forEach((day) => {
+         if (
+            itemDate.getFullYear() === day.x.getFullYear() &&
+            itemDate.getMonth() === day.x.getMonth() &&
+            itemDate.getDate() === day.x.getDate()
+         ) {
+            day.y += item.y;
+         }
+      });
    });
 
-   return weeks;
+   return days;
 };
 
 /* ---------------- GET LAST DAY OF CURRENT MONTH ---------------- */
@@ -128,10 +128,15 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
 
       // WEEK VIEW (4 weeks in selected month)
       if (type === "week") {
-         const baseMonth =
-            start ?? new Date(data.find((d) => d.x)?.x ?? new Date());
+         const today = start ?? new Date();
 
-         return groupInto4Weeks(data, baseMonth);
+         const startOfWeek = new Date(today);
+         const day = startOfWeek.getDay();
+         const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+         startOfWeek.setDate(diff);
+         startOfWeek.setHours(0, 0, 0, 0);
+
+         return groupInto7Days(data, startOfWeek);
       }
 
       // DAY / MONTH FILTER
@@ -153,15 +158,10 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
 
    /* -------- FORMATTERS -------- */
    const xLabelFormatter = (val: any) => {
-      if (type === "category" || type === "week") return val;
+      if (type === "category") return val;
+      if (type === "week") return moment(val).format("ddd");
       if (type === "month") return moment(val).format("MMM YYYY");
       return moment(val).format("DD MMM");
-   };
-
-   const tooltipXFormatter = (val: any) => {
-      if (type === "category" || type === "week") return val;
-      if (type === "month") return moment(val).format("MMMM YYYY");
-      return moment(val).format("DD MMM YYYY");
    };
 
    /* -------- CHART OPTIONS -------- */
@@ -224,7 +224,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
          intersect: false,
          theme: theme.palette.mode,
          y: {
-            formatter: (val: number) => `${val.toLocaleString()}${currency}`,
+            formatter: (val: number) => `${currency}${val.toLocaleString()}`,
             title: {
                formatter: () =>
                   currency.length !== 0 ? "Amount: " : "Value: ",

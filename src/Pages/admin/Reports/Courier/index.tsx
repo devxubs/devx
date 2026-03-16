@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Grid } from "@mui/material";
+import { Stack, Grid, Typography } from "@mui/material";
 import React from "react";
 import CourierCard from "./CourierCard";
 import YearlySalesChart from "./WeeklySalesChart";
@@ -134,24 +134,43 @@ const Courier = () => {
                ✅ TABLE
             -------------------------------- */}
             <Grid size={{ xs: 12 }}>
-               <CustomTable
-                  rows={mockData}
-                  columns={columns}
-                  filter={(data, onChange) => (
-                     <DateRange
-                        title="Filter by Courier Submitted Date"
-                        onChange={(v: [Date | null, Date | null]) => {
-                           onChange({
-                              ...data,
-                              reportData: {
-                                 date: v,
-                                 report_type: "couriers",
-                              },
-                           });
-                        }}
-                     />
-                  )}
-               />
+               <Stack
+                  spacing={2}
+                  bgcolor={"background.paper"}
+                  sx={{
+                     borderRadius: 1.5,
+                  }}
+               >
+                  <Typography
+                     variant="h5"
+                     fontWeight={700}
+                     sx={{
+                        px: 3,
+                        pt: 2,
+                        pb: 0,
+                     }}
+                  >
+                     Courier details
+                  </Typography>
+                  <CustomTable
+                     rows={mockData}
+                     columns={columns}
+                     filter={(data, onChange) => (
+                        <DateRange
+                           title="Filter by Courier Submitted Date"
+                           onChange={(v: [Date | null, Date | null]) => {
+                              onChange({
+                                 ...data,
+                                 reportData: {
+                                    date: v,
+                                    report_type: "couriers",
+                                 },
+                              });
+                           }}
+                        />
+                     )}
+                  />
+               </Stack>
             </Grid>
          </Grid>
       </Stack>
