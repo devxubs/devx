@@ -2,12 +2,14 @@
 
 import { Stack, Grid, Typography } from "@mui/material";
 import React from "react";
-import CourierCard from "./CourierCard";
 import YearlySalesChart from "./WeeklySalesChart";
 import GenderSalesChart from "./SalesByGender";
 import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import { useTheme } from "@mui/material/styles";
+import AnalyticsCard from "../components/AnalyticsCard";
+import AnalyticsGraph from "../components/AnalyticsGraph";
+import RadialBar from "../components/RadialBar";
 
 const mockData = [
    {
@@ -109,7 +111,7 @@ const Courier = () => {
             -------------------------------- */}
             {courierData.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>
-                  <CourierCard
+                  <AnalyticsCard
                      title={item.title}
                      value={item.value}
                      percentage={item.percentage}
@@ -123,11 +125,41 @@ const Courier = () => {
                ✅ CHARTS
             -------------------------------- */}
             <Grid size={{ xs: 12, md: 8 }}>
-               <YearlySalesChart />
+               <AnalyticsGraph
+                  title={"Courier Trends"}
+                  isPositive={true}
+                  data={[
+                     { x: "2026-1-01", y: 100 },
+                     { x: "2026-1-02", y: 200 },
+                     { x: "2026-1-03", y: 150 },
+                     { x: "2026-1-04", y: 250 },
+                     { x: "2026-1-05", y: 300 },
+                  ]}
+               />
             </Grid>
 
             <Grid size={{ xs: 12, md: 4 }}>
-               <GenderSalesChart />
+               <RadialBar
+                  title="Deliveries by Region "
+                  data={[
+                     {
+                        label: "North",
+                        value: 40,
+                     },
+                     {
+                        label: "South",
+                        value: 30,
+                     },
+                     {
+                        label: "East",
+                        value: 20,
+                     },
+                     // {
+                     //    label: "West",
+                     //    value: 10,
+                     // },
+                  ]}
+               />
             </Grid>
 
             {/* --------------------------------

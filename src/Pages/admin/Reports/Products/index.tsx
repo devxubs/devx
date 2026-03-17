@@ -100,17 +100,26 @@ const Products = () => {
             </Grid>
             <Grid size={{ xs: 12, sm: 8 }}>
                <AnalyticsGraph
-                  type="day"
-                  title="Revenue"
+                  type="category"
+                  title={"Sales by products"}
                   isPositive={true}
-                  currency="$"
                   data={[
-                     { x: "2026-03-01", y: 50 },
-                     { x: "2026-03-02", y: 60 },
-                     { x: "2026-03-03", y: 55 },
-                     { x: "2026-03-04", y: 70 },
-                     { x: "2026-03-05", y: 65 },
-                     { x: "2026-03-06", y: 80 },
+                     {
+                        x: "Product A",
+                        y: 100,
+                     },
+                     {
+                        x: "Product B",
+                        y: 200,
+                     },
+                     {
+                        x: "Product C",
+                        y: 150,
+                     },
+                     {
+                        x: "Product D  ",
+                        y: 250,
+                     },
                   ]}
                />
             </Grid>
