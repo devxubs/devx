@@ -84,7 +84,8 @@ const Products = () => {
                   title={"Total Revenue"}
                   isPositive={true}
                   data={[90, 70, 10, 40, 30, 10, 20]}
-                  value={"$5000"}
+                  value={"5000"}
+                  currency="$"
                   percentage={"10%"}
                />
             </Grid>

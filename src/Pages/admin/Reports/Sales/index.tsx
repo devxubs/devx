@@ -5,6 +5,10 @@ import AnalyticsCard from "../components/AnalyticsCard";
 import AnalyticsGraph from "../components/AnalyticsGraph";
 import RadialBar from "../components/RadialBar";
 import CustomTable from "@src/components/Table";
+import { orders } from "../../Order/data";
+import CustomerInfo from "../../Customers/CustomerInfo";
+import { GridCellParams } from "@mui/x-data-grid";
+import DateRangePickerCustom from "@src/components/DateRange";
 
 const analyticsItem = [
    {
@@ -16,7 +20,8 @@ const analyticsItem = [
    },
    {
       title: "Total revenue",
-      value: "$165",
+      value: "165",
+      currency: "$",
       isPositive: true,
       percentage: "10%",
       data: [70, 90, 100, 60, 50, 80, 90],
@@ -26,7 +31,7 @@ const analyticsItem = [
       value: 950,
       isPositive: true,
       percentage: "15%",
-      data: [40, 70, 75, 70, 50, 28, 7, 64].reverse(),
+      data: [40, 70, 75, 70, 50, 28, 7, 64],
    },
    {
       title: "Returned orders",
@@ -37,7 +42,59 @@ const analyticsItem = [
    },
 ];
 
+const statusColor: Record<
+   string,
+   "default" | "warning" | "success" | "info" | "error"
+> = {
+   All: "default",
+   Pending: "warning",
+   Confirmed: "success",
+   Processing: "info",
+   Shipped: "info",
+   "Out for Delivery": "info",
+   Delivered: "success",
+   Completed: "success",
+   Hold: "default",
+   Cancelled: "error",
+   Failed: "error",
+} as const;
+
 const Sales = () => {
+   const orderRows = orders.map((order) => ({
+      id: order.id,
+      customer: order.customer,
+      createdAt: order.createdAt,
+      amount: order.pricing.total,
+      payment:
+         order.status === "completed" || order.status === "Delivered"
+            ? "Paid"
+            : order.pricing.paymentMethod,
+      status: order.status,
+   }));
+
+   const columns = [
+      { field: "id", headerName: "Order ID", width: 150 },
+      {
+         field: "customer",
+         headerName: "Customer",
+         width: 200,
+         renderCell: (params: GridCellParams) => (
+            <CustomerInfo {...params.row.customer} />
+         ),
+      },
+      { field: "createdAt", headerName: "Created At", width: 200 },
+      { field: "amount", headerName: "Amount", width: 150 },
+      { field: "payment", headerName: "Payment Method", width: 200 },
+      {
+         field: "status",
+         headerName: "Status",
+         width: 150,
+         chip: true,
+         color: (params: GridCellParams) =>
+            statusColor[params.row.status] || "default",
+      },
+   ];
+
    return (
       <Stack>
          <Grid container spacing={2}>
@@ -57,15 +114,15 @@ const Sales = () => {
                   title={"Orders Status Breakdown"}
                   data={[
                      {
-                        label: "Product A",
+                        label: "Completed",
                         value: 75,
                      },
                      {
-                        label: "Product B",
+                        label: "Cancelled ",
                         value: 25,
                      },
                      {
-                        label: "Product C",
+                        label: "Returned",
                         value: 10,
                      },
                   ]}
@@ -106,7 +163,24 @@ const Sales = () => {
                   >
                      Orders Table
                   </Typography>
-                  <CustomTable rows={[]} columns={[]} />
+                  <CustomTable
+                     rows={orderRows}
+                     columns={columns}
+                     filter={(data, onChange) => (
+                        <DateRangePickerCustom
+                           title="Filter by Courier Submitted Date"
+                           onChange={(v: [Date | null, Date | null]) => {
+                              onChange({
+                                 ...data,
+                                 reportData: {
+                                    date: v,
+                                    report_type: "couriers",
+                                 },
+                              });
+                           }}
+                        />
+                     )}
+                  />
                </Stack>
             </Grid>
          </Grid>

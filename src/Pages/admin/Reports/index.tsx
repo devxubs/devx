@@ -10,13 +10,14 @@ import Expenses from "./Expenses";
 import Purchases from "./Purchases";
 import Employees from "./Employees";
 import Products from "./Products";
+import Summary from "./Summary";
 
 const tabs = [
-   "All",
+   "Summary",
    "Sales",
    "Courier",
    "Customers",
-   "Expenses",
+   // "Expenses",
    "Purchases",
    // "Suppliers",
    "Employees",
@@ -101,7 +102,7 @@ const Report = () => {
                         marginRight: theme.spacing(1),
                         color: theme.palette.text.secondary,
                         minHeight: 50,
-                        width: "11.7%",
+                        width: `calc(100% / ${tabs.length} - ${theme.spacing(1)})`,
                         "&.Mui-selected": {
                            color: theme.palette.common.white,
                            ...theme.applyStyles("light", {
@@ -143,7 +144,7 @@ const Report = () => {
             ) : tabs[val] === "Products" ? (
                <Products />
             ) : (
-               <div>All Reports</div>
+               <Summary />
             )}
          </Stack>
       </Stack>

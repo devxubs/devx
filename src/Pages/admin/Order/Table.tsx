@@ -18,7 +18,6 @@ import CustomModal from "@src/components/Modal";
 import { OrderType } from "./type";
 import QuickEditModal from "./QuickEditModal";
 import AlertDialog from "@src/components/AlertDialog";
-import { ProductType } from "../Product";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 
 const statusColor: Record<

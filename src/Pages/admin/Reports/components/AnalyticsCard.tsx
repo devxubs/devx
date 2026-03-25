@@ -4,6 +4,7 @@ import React from "react";
 import { Stack, Typography, Box, useTheme } from "@mui/material";
 import dynamic from "next/dynamic";
 import useGlobalState from "@src/handler/globalState";
+import { formatCompactNumber } from "@src/handler";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
    ssr: false,
@@ -15,6 +16,7 @@ interface AnalyticsCardProps {
    percentage?: string;
    isPositive: boolean;
    data: number[]; // Should have 7 values (Mon → Sun)
+   currency?: string;
 }
 
 const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
@@ -23,6 +25,7 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    percentage = 0,
    isPositive,
    data,
+   currency,
 }) => {
    const colorState = useGlobalState.get("color");
    const theme = useTheme();
@@ -94,7 +97,9 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                </Typography>
 
                <Typography variant="h4" fontWeight={700}>
-                  {value}
+                  {currency
+                     ? `${currency}${formatCompactNumber(Number(value))}`
+                     : formatCompactNumber(Number(value))}
                </Typography>
 
                <Stack direction="row" spacing={0.5} alignItems="center">

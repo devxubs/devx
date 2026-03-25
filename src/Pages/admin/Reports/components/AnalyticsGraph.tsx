@@ -254,8 +254,8 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
                      variant="subtitle1"
                      color={isPositive ? "success.main" : "error.main"}
                   >
-                     {totalValue.toLocaleString()}
                      {currency && currency}
+                     {totalValue.toLocaleString()}
                   </Typography>
                </Stack>
 
