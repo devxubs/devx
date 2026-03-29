@@ -54,11 +54,11 @@ const Summary = () => {
             ))}
             <Grid size={{ xs: 12, sm: 4 }}>
                <RadialBar
-                  title="Order Overview"
+                  title="Orders Status Breakdown"
                   data={[
-                     { label: "Completed", value: 70 },
-                     { label: "Cancelled", value: 5 },
-                     { label: "Returned", value: 15 },
+                     { label: "Completed", value: 45 },
+                     { label: "Cancelled", value: 35 },
+                     { label: "Returned", value: 20 },
                   ]}
                />
             </Grid>
@@ -137,11 +137,57 @@ const Summary = () => {
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
                <RadialBar
+                  title="Deliveries by Region"
+                  data={[
+                     { label: "North", value: 80 },
+                     { label: "South", value: 15 },
+                     { label: "East", value: 5 },
+                  ]}
+               />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
+               <RadialBar
                   title="Inventory Overview"
                   data={[
                      { label: "In Stock", value: 80 },
                      { label: "Low Stock", value: 15 },
                      { label: "Out of Stock", value: 5 },
+                  ]}
+               />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 8 }}>
+               <AnalyticsGraph
+                  title={"Customer Growth"}
+                  isPositive={true}
+                  data={[
+                     {
+                        x: "2026-03-01",
+                        y: 1000,
+                     },
+                     {
+                        x: "2026-03-02",
+                        y: 4000,
+                     },
+                     {
+                        x: "2026-03-03",
+                        y: 1500,
+                     },
+                     {
+                        x: "2026-03-04",
+                        y: 6000,
+                     },
+                     {
+                        x: "2026-03-05",
+                        y: 2500,
+                     },
+                     {
+                        x: "2026-03-06",
+                        y: 5500,
+                     },
+                     {
+                        x: "2026-03-07",
+                        y: 6000,
+                     },
                   ]}
                />
             </Grid>

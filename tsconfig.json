@@ -1,39 +1,54 @@
 {
-   "compilerOptions": {
-      "target": "es5",
-      "lib": ["dom", "dom.iterable", "esnext"],
-      "allowJs": true,
-      "skipLibCheck": true,
-      "strict": true,
-      "forceConsistentCasingInFileNames": true,
-      "noEmit": true,
-      "esModuleInterop": true,
-      "module": "esnext",
-      "moduleResolution": "node",
-      "resolveJsonModule": true,
-      "isolatedModules": true,
-      "jsx": "preserve",
-      "incremental": true,
-      "plugins": [
-         {
-            "name": "next"
-         }
-      ],
-      "baseUrl": ".",
-      "paths": {
-         "@src/*": ["./src/*"],
-         "@cmp/*": ["./src/components/*"],
-         "@Layout/*": ["./src/Layout/*"],
-         "@Icon/*": ["./src/SvgIcon/*"]
+  "compilerOptions": {
+    "target": "es5",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
       }
-   },
-   "include": [
-      "next-env.d.ts",
-      "**/*.ts",
-      "**/*.tsx",
-      ".next/types/**/*.ts",
-      "src/theme/lightPalette.ts",
-      "src/Pages/admin/User/imageUploader.txs"
-   ],
-   "exclude": ["node_modules"]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": [
+        "./src/*"
+      ],
+      "@cmp/*": [
+        "./src/components/*"
+      ],
+      "@Layout/*": [
+        "./src/Layout/*"
+      ],
+      "@Icon/*": [
+        "./src/SvgIcon/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/theme/lightPalette.ts",
+    "src/Pages/admin/User/imageUploader.txs",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
