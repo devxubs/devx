@@ -75,7 +75,7 @@ export const UserProfile = ({
    );
 };
 
-const rows: UserProps[] = [
+export const UserRows: UserProps[] = [
    {
       id: "UR001",
       name: "Jubayer Ahmed",
@@ -138,7 +138,7 @@ const rows: UserProps[] = [
    },
 ];
 
-const columns: ColumnConfig[] = [
+const UserColumns: ColumnConfig[] = [
    { field: "id", headerName: "ID", flex: 0.3 },
    {
       field: "name",
@@ -193,7 +193,7 @@ export const roles = [
 
 const Users = () => {
    const theme = useTheme();
-   const [users, setUsers] = useState<UserProps[]>(rows);
+   const [users, setUsers] = useState<UserProps[]>(UserRows);
    const [modalOpen, setModalOpen] = useState(false);
    const [editableUser, setEditableUser] = useState({} as any);
 
@@ -233,7 +233,7 @@ const Users = () => {
             <Stack>
                <CustomTable
                   rows={users}
-                  columns={columns}
+                  columns={UserColumns}
                   checkBox={true}
                   menuItems={[
                      {

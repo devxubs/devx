@@ -10,7 +10,7 @@ import {
    GridRenderCellParams,
    GridRowsProp,
 } from "@mui/x-data-grid";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Icon from "../Icon";
 import CustomPopover from "../CustomPopover";
 import Menu, { MenuItem as MenuItemProps } from "../Menu";
@@ -52,11 +52,6 @@ export default function CustomTable({
    filter,
 }: DataTableProps) {
    const theme = useTheme();
-   const [tableRows, setTableRows] = useState(rows);
-
-   useEffect(() => {
-      setTableRows(rows);
-   }, [rows]);
 
    const [actionMenuOpen, setActionMenuOpen] = useState(
       null as null | HTMLElement,
@@ -67,6 +62,10 @@ export default function CustomTable({
    });
    const [selectedRowParams, setSelectedRowParams] =
       useState<GridRenderCellParams | null>(null);
+
+   const handlePaginationChange = useCallback((model: any) => {
+      setPaginationModel(model);
+   }, []);
 
    const processedColumns = useMemo(() => {
       return columns.map((col) => {
@@ -172,6 +171,14 @@ export default function CustomTable({
       });
    }, [columns]);
 
+   const [mount, setMount] = useState(false);
+
+   useEffect(() => {
+      setMount(true);
+   }, []);
+
+   if (!mount) return null;
+
    return (
       <Stack
          borderRadius={1}
@@ -192,14 +199,14 @@ export default function CustomTable({
             }}
          >
             <DataGrid
-               rows={tableRows}
+               rows={rows}
                columns={processedColumns as GridColDef[]}
                density="comfortable"
                checkboxSelection={checkBox}
                // autoPageSize //* enable this to make Whichever one you show based on the height of the table
                pageSizeOptions={[10, 25, 50, { value: -1, label: "All" }]}
                paginationModel={paginationModel}
-               onPaginationModelChange={setPaginationModel}
+               onPaginationModelChange={handlePaginationChange}
                disableColumnSorting
                disableColumnMenu
                disableColumnResize
@@ -320,7 +327,7 @@ export default function CustomTable({
             />
          </Stack>
 
-         {/* //* action menu */}
+         {/* action menu */}
          <CustomPopover
             anchorEl={actionMenuOpen}
             onClose={() => setActionMenuOpen(null)}
