@@ -185,6 +185,29 @@ export const SuppliersSchema = yup.object({
 
 export type SupplierFormValues = yup.InferType<typeof SuppliersSchema>;
 
+interface SuppliersProfileProps {
+   name: string | undefined;
+   number: string | undefined;
+}
+
+export const SuppliersProfile = ({ name, number }: SuppliersProfileProps) => {
+   return (
+      <Stack height={"100%"} justifyContent={"center"}>
+         <Typography
+            variant="subtitle2"
+            color="textPrimary"
+            fontSize={15}
+            fontWeight={500}
+         >
+            {name}
+         </Typography>
+         <Typography variant="subtitle1" fontSize={13} color="text.secondary">
+            {number}
+         </Typography>
+      </Stack>
+   );
+};
+
 const Suppliers = () => {
    const theme = useTheme();
    const columns: ColumnConfig[] = [
@@ -198,23 +221,10 @@ const Suppliers = () => {
          headerName: "Name",
          flex: 1,
          renderCell: (params) => (
-            <Stack height={"100%"} justifyContent={"center"}>
-               <Typography
-                  variant="subtitle2"
-                  color="textPrimary"
-                  fontSize={15}
-                  fontWeight={500}
-               >
-                  {params.row.name}
-               </Typography>
-               <Typography
-                  variant="subtitle1"
-                  fontSize={13}
-                  color="text.secondary"
-               >
-                  {params.row.number}
-               </Typography>
-            </Stack>
+            <SuppliersProfile
+               name={params.row.name}
+               number={params.row.number}
+            />
          ),
       },
       {

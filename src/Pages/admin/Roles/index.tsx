@@ -3,7 +3,8 @@
 import { Button, Stack, useTheme } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
-import CustomTable, { TableProps } from "@src/components/Table";
+import CustomTable, { MenuItem } from "@src/components/Table";
+import { set } from "date-fns";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
@@ -12,47 +13,59 @@ const roles = [
    {
       id: 1,
       name: "Customer Support Officer",
-      action: "Action",
    },
    {
       id: 2,
       name: "Warehouse Supervisor",
-      action: "Action",
    },
    {
       id: 3,
       name: "Team Lead",
-      action: "Action",
    },
    {
       id: 4,
       name: "Delivery Staff",
-      action: "Action",
    },
    {
       id: 5,
       name: "System Admin",
-      action: "Action",
    },
 ];
 
-const rolesData: Omit<TableProps, "type"> = {
-   head: ["@check", "Id", "Name", "@action"],
-   body: roles,
-};
+const columns = [
+   {
+      field: "id",
+      headerName: "Id",
+      width: 100,
+   },
+   {
+      field: "name",
+      headerName: "Name",
+      flex: 1,
+   },
+   {
+      field: "@actions",
+      headerName: "",
+      width: 150,
+   },
+];
 
 const Roles = () => {
    const theme = useTheme();
-   const [deleteDialog, setDeleteDialog] = useState(false);
-   const [roleToDelete, setRoleToDelete] = useState<any>(null);
    const router = useRouter();
 
-   const actionMenu = (row: any) => [
+   const [rolesData, setRolesData] = useState(roles);
+
+   const [roleToDelete, setRoleToDelete] = useState<any>(null);
+
+   const actionMenu: MenuItem[] = [
       {
          label: "edit",
          icon: <Icon icon="solar:pen-bold" size="small" />,
-         onClick: () => {
-            router.push(`/roles/publish?id=${encodeURIComponent(row.id)}`);
+         onClick: (params) => {
+            router.push(
+               `/admin/roles/publish?id=${encodeURIComponent(params.row.id)}`,
+            );
          },
       },
       {
@@ -65,9 +78,8 @@ const Roles = () => {
                color="error"
             />
          ),
-         onClick: () => {
-            setRoleToDelete(row);
-            setDeleteDialog(true);
+         onClick: (params) => {
+            setRoleToDelete(params.row);
          },
       },
    ];
@@ -96,19 +108,23 @@ const Roles = () => {
             </Stack>
             <Stack>
                <CustomTable
-                  type={"default"}
-                  head={rolesData.head}
-                  body={rolesData.body}
-                  actionMenu={actionMenu}
+                  rows={rolesData}
+                  columns={columns}
+                  menuItems={actionMenu}
                />
                <AlertDialog
-                  open={deleteDialog}
+                  open={!!roleToDelete}
                   onClose={() => {
-                     setDeleteDialog(false);
+                     setRoleToDelete(null);
+                  }}
+                  onConfirm={() => {
+                     setRolesData((prev) =>
+                        prev.filter((role) => role.id !== roleToDelete.id),
+                     );
                      setRoleToDelete(null);
                   }}
                   type={"delete"}
-                  title={`Are you sure you want to delete the role "${roleToDelete?.name}"?`}
+                  title={`Are you sure you want to delete the role <b>${roleToDelete?.name}</b>?`}
                />
             </Stack>
          </Stack>

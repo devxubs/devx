@@ -30,7 +30,7 @@ type AssetForm = {
    note: string;
 };
 
-const AssetsData: AssetsItem[] = [
+export const assetsData: AssetsItem[] = [
    {
       id: 1,
       type: "Food",
@@ -124,7 +124,7 @@ const Asset = () => {
       },
    ];
 
-   const [assets, setAssets] = useState(AssetsData);
+   const [assets, setAssets] = useState(assetsData);
    const [openModal, setOpenModal] = useState(false);
 
    // edit

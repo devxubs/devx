@@ -1,15 +1,20 @@
 import * as React from "react";
 import { Stack, SxProps } from "@mui/material";
-import {
-   Modal,
-   Box,
-   Typography,
-   Button,
-   Fade,
-   Backdrop,
-   IconButton,
-} from "@mui/material";
+import { Box, Typography, Fade, IconButton } from "@mui/material";
+import Modal, { ModalProps } from "@mui/material/Modal";
 import Icon from "./Icon";
+
+interface CustomModalProps extends Omit<
+   ModalProps,
+   "open" | "onClose" | "children"
+> {
+   open: boolean;
+   onClose: () => void;
+   children?: React.ReactNode;
+   sx?: SxProps;
+   title?: string;
+   closeIcon?: boolean;
+}
 
 export default function CustomModal({
    open,
@@ -18,16 +23,11 @@ export default function CustomModal({
    sx,
    title,
    closeIcon = false,
-}: {
-   open: boolean;
-   onClose: () => void;
-   children?: React.ReactNode;
-   sx?: SxProps;
-   title?: string;
-   closeIcon?: boolean;
-}) {
+   ...rest
+}: CustomModalProps) {
    return (
       <Modal
+         {...rest}
          open={open}
          onClose={onClose}
          closeAfterTransition

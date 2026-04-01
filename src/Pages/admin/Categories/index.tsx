@@ -23,14 +23,19 @@ type CategoryType = {
 
 type FormValues = z.infer<typeof productSchema>;
 
+export const categoriesData: CategoryType[] = [
+   { id: "CTG001", name: "Beverages" },
+   { id: "CTG002", name: "Snacks" },
+   { id: "CTG003", name: "Dairy" },
+   { id: "CTG004", name: "Smart Fitness Watch" },
+   { id: "CTG005", name: "Wireless Earbuds" },
+   { id: "CTG006", name: "Portable Bluetooth Speaker" },
+   { id: "CTG007", name: "Noise-Canceling Headphones" },
+];
+
 const Categories = () => {
    const theme = useTheme();
-   const [categories, setCategories] = useState<CategoryType[]>([
-      { id: "CTG001", name: "Smart Fitness Watch" },
-      { id: "CTG002", name: "Smart Fitness Watch" },
-      { id: "CTG003", name: "Smart Fitness Watch" },
-      { id: "CTG004", name: "Smart Fitness Watch" },
-   ]);
+   const [categories, setCategories] = useState<CategoryType[]>(categoriesData);
 
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

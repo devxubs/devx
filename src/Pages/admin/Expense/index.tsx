@@ -31,7 +31,7 @@ type ExpenseForm = {
    note: string;
 };
 
-const expensesItems: ExpenseItem[] = [
+export const expensesData: ExpenseItem[] = [
    {
       id: 1,
       type: "Food",
@@ -121,7 +121,7 @@ const Expense = () => {
       { field: "@actions", headerName: "" },
    ];
 
-   const [expenses, setExpenses] = useState<ExpenseItem[]>(expensesItems);
+   const [expenses, setExpenses] = useState<ExpenseItem[]>(expensesData);
    const [openModal, setOpenModal] = useState(false);
 
    // edit

@@ -6,6 +6,7 @@ import {
    Stack,
    Tab,
    Tabs,
+   Tooltip,
    Typography,
    useTheme,
 } from "@mui/material";
@@ -14,6 +15,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { UserProfile, UserRows } from "../User";
 import Icon from "@src/components/Icon";
+import { productsData, ProductsView } from "../Product";
+import { categoriesData } from "../Categories";
+import { productUnits } from "../Unit";
+import { orders } from "../Order/data";
+import CustomerInfo from "../Customers/CustomerInfo";
+import { suppliersData, SuppliersProfile } from "../Suppliers";
+import { expensesData } from "../Expense";
+import { assetsData } from "../Assets";
 
 const tabs = [
    "Users",
@@ -33,7 +42,41 @@ const Bin = () => {
    const params = useSearchParams();
    const tab = params?.get("tab");
 
-   const tableRows = tab === "users" ? UserRows : [];
+   const tableRowsMap: Record<string, any> = {
+      users: UserRows,
+      products: productsData,
+      categories: categoriesData,
+      units: productUnits,
+      orders,
+      suppliers: suppliersData,
+      expenses: expensesData,
+      assets: assetsData,
+   };
+   const tableColumnsMap: Record<string, (params: any) => React.ReactNode> = {
+      users: (params) => (
+         <UserProfile name={params.row.name} email={params.row.email} />
+      ),
+
+      products: (params) => (
+         <ProductsView
+            key={params.row.id}
+            name={params.row.productName}
+            description={params.row.category}
+            url={params.row.images[0]}
+         />
+      ),
+
+      orders: (params) => <CustomerInfo {...params.row.customer} />,
+
+      suppliers: (params) => (
+         <SuppliersProfile name={params.row.name} number={params.row.number} />
+      ),
+
+      expenses: (params) => params.row.type,
+      assets: (params) => params.row.type,
+   };
+
+   const tableRows = tableRowsMap[tab || "users"] || [];
    const tableColumns: ColumnConfig[] = [
       {
          field: "id",
@@ -44,9 +87,7 @@ const Bin = () => {
          headerName: "Name",
          flex: 1,
          renderCell(params) {
-            return (
-               <UserProfile name={params.row.name} email={params.row.email} />
-            );
+            return tableColumnsMap[tab || "users"]?.(params) ?? params.row.name;
          },
       },
       {
@@ -68,9 +109,11 @@ const Bin = () => {
          field: "@restore",
          headerName: "",
          renderCell: () => (
-            <IconButton size="small">
-               <Icon icon="solar:restart-square-bold-duotone" />
-            </IconButton>
+            <Tooltip title="Restore" placement="top" disableInteractive>
+               <IconButton size="small">
+                  <Icon icon="solar:restart-square-bold-duotone" />
+               </IconButton>
+            </Tooltip>
          ),
       },
    ];

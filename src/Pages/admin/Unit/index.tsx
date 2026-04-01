@@ -25,7 +25,7 @@ type UnitType = {
 
 type FormValues = z.infer<typeof productSchema>;
 
-const productUnits = [
+export const productUnits = [
    { id: "UN001", name: "Piece", short: "pc" },
    { id: "UN002", name: "Kilogram", short: "kg" },
    { id: "UN003", name: "Gram", short: "g" },
