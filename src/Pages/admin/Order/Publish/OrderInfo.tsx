@@ -12,7 +12,7 @@ import {
 import React, { useState } from "react";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
-import { orderSources, orderStatuses } from "@src/handler/order_filter";
+import { orderSources, orderStatuses } from "../data";
 import { OrderType } from "../type";
 import { Controller } from "react-hook-form";
 
@@ -132,7 +132,7 @@ const OrderInfo = ({ control, errors, data }: DetailsProps) => {
                                  error={!!errors.orderSource}
                                  helperText={errors.orderSource?.message}
                                  arrow
-                                 option={orderSources}
+                                 options={orderSources}
                                  placeholder="Source"
                                  label="Source"
                                  getOptionLabel={(option) => option.toString()}
@@ -164,7 +164,7 @@ const OrderInfo = ({ control, errors, data }: DetailsProps) => {
                                  error={!!errors.status}
                                  helperText={errors.status?.message}
                                  arrow
-                                 option={orderStatuses}
+                                 options={orderStatuses}
                                  placeholder="Status"
                                  label="Status"
                                  getOptionLabel={(option) => option.toString()}

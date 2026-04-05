@@ -12,7 +12,7 @@ import {
 import React, { useState } from "react";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
-import { orderSources, orderStatuses } from "@src/handler/order_filter";
+import { orderSources, orderStatuses } from "@src/Pages/admin/Order/data";
 import { Controller } from "react-hook-form";
 import { PurchaseTypes } from "..";
 import AttachmentUploader from "./AttachmentUploader";

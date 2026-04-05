@@ -8,16 +8,10 @@ import {
    useTheme,
 } from "@mui/material";
 import DateRange from "../../../components/DateRange";
-import {
-   orderStatuses,
-   districts,
-   products,
-   orderSources,
-} from "@src/handler/order_filter";
 import CustomAutocomplete from "../../../components/Autocomplete";
 import { OrderFilter } from "../../../components/Table/Filter";
 import { useState } from "react";
-import { o } from "framer-motion/dist/types.d-BJcRxCew";
+import { orderStatuses, districts, orderSources, products } from "./data";
 
 const employeeNames = [
    "John",

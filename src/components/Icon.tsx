@@ -2,6 +2,7 @@ import React, { CSSProperties } from "react";
 
 import { Icon as Iconify, IconProps } from "@iconify/react";
 import { Palette, useTheme } from "@mui/material";
+import dynamic from "next/dynamic";
 
 const Icon = ({
    icon,
@@ -34,19 +35,19 @@ const Icon = ({
             size === "small"
                ? 20
                : size === "medium"
-               ? 24
-               : size === "large"
-               ? 28
-               : size
+                 ? 24
+                 : size === "large"
+                   ? 28
+                   : size
          }
          height={
             size === "small"
                ? 20
                : size === "medium"
-               ? 24
-               : size === "large"
-               ? 28
-               : size
+                 ? 24
+                 : size === "large"
+                   ? 28
+                   : size
          }
          style={{
             color:
