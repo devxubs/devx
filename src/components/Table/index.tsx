@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Typography } from "@mui/material";
+import { Stack } from "@mui/material";
 import Filter, { FilterData } from "./Filter";
 
 import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
@@ -73,6 +73,7 @@ export default function CustomTable({
          if (col.field === "@actions") {
             return {
                ...col,
+               headerName: "",
                sortable: false,
                filterable: false,
                headerAlign: "right",

@@ -18,6 +18,7 @@ const NoRows = () => {
             justifyContent={"center"}
             sx={{
                borderStyle: "dashed",
+               userSelect: "none",
             }}
          >
             <Content />

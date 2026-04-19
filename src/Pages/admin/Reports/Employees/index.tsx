@@ -1,8 +1,8 @@
 import { Stack, Grid, Avatar, Typography } from "@mui/material";
 import React from "react";
-import AnalyticsCard from "../components/AnalyticsCard";
-import AnalyticsGraph from "../components/AnalyticsGraph";
-import RadialBar from "../components/RadialBar";
+import AnalyticsCard from "@cmp/AnalyticsCard";
+import AnalyticsGraph from "@cmp/AnalyticsGraph";
+import RadialBar from "@cmp/RadialBar";
 import CustomTable from "@src/components/Table";
 import { UserProfile } from "../../User";
 import { SellerProFile } from "../../Dashboard";

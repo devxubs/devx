@@ -7,9 +7,9 @@ import GenderSalesChart from "./SalesByGender";
 import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import { useTheme } from "@mui/material/styles";
-import AnalyticsCard from "../components/AnalyticsCard";
-import AnalyticsGraph from "../components/AnalyticsGraph";
-import RadialBar from "../components/RadialBar";
+import AnalyticsCard from "@cmp/AnalyticsCard";
+import AnalyticsGraph from "@cmp/AnalyticsGraph";
+import RadialBar from "@cmp/RadialBar";
 
 const mockData = [
    {

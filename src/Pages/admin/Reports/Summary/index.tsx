@@ -1,9 +1,8 @@
 import { Grid, Stack } from "@mui/material";
 import React from "react";
-import AnalyticsCard from "../components/AnalyticsCard";
-import { formatCompactNumber } from "@src/handler";
-import RadialBar from "../components/RadialBar";
-import AnalyticsGraph from "../components/AnalyticsGraph";
+import AnalyticsCard from "@cmp/AnalyticsCard";
+import RadialBar from "@cmp/RadialBar";
+import AnalyticsGraph from "@cmp/AnalyticsGraph";
 
 const summaryData = [
    {

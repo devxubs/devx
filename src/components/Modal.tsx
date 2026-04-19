@@ -47,7 +47,7 @@ export default function CustomModal({
                   boxShadow: 24,
                   p: 2,
                   px: {
-                     xs: 1,
+                     xs: 2,
                      sm: 3,
                   },
                   borderRadius: 2,

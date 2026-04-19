@@ -10,6 +10,13 @@ import {
 
 import { type AutocompleteProps } from "@mui/material/Autocomplete";
 
+interface OptionType {
+   label: string;
+   value: string;
+}
+
+export interface CustomAutocompleteOptionType extends OptionType {}
+
 interface CustomAutocompleteProps extends Omit<
    AutocompleteProps<any, boolean, boolean, boolean>,
    "renderInput" | "options" | "value" | "onChange" | "multiple"
@@ -17,9 +24,9 @@ interface CustomAutocompleteProps extends Omit<
    placeholder?: string;
    arrow?: boolean;
    label?: string;
-   options: any[];
+   options: OptionType[];
    value?: string | string[] | null;
-   onChange?: (d: any, e: Event | Element) => void;
+   onChange?: (d: OptionType | OptionType[] | null, e: Event | Element) => void;
    multiple?: boolean;
    error?: boolean;
    helperText?: string;
@@ -90,6 +97,7 @@ const CustomAutocomplete = ({
          options={Array.isArray(options) ? options : []} // ✅ safe guard
          value={multiple ? (value ?? []) : (value ?? null)} // ✅ safe value
          onChange={(event, newValue) => {
+            console.log("Selected value:", newValue);
             onChange?.(newValue, event as any);
          }}
          renderInput={(params) => (

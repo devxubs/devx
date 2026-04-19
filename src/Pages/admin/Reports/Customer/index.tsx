@@ -3,8 +3,8 @@ import CustomerInfo from "@src/Pages/admin/Customers/CustomerInfo";
 import CustomTable from "@src/components/Table";
 import React from "react";
 import Filter from "./Filter";
-import AnalyticsCard from "../components/AnalyticsCard";
-import AnalyticsGraph from "../components/AnalyticsGraph";
+import AnalyticsCard from "@cmp/AnalyticsCard";
+import AnalyticsGraph from "@cmp/AnalyticsGraph";
 
 export const customerOrderData = [
    {
