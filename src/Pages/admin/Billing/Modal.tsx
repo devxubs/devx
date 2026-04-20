@@ -1,4 +1,4 @@
-import { Button, Stack, TextField } from "@mui/material";
+import { Button, Stack, TextField, Typography } from "@mui/material";
 import CustomAutocomplete, {
    CustomAutocompleteOptionType,
 } from "@src/components/Autocomplete";
@@ -13,9 +13,10 @@ interface FormData {
 
 interface ModalProps {
    onSubmit: (formData: FormData) => void;
+   onClose: () => void;
 }
 
-const Modal = ({ onSubmit }: ModalProps) => {
+const Modal = ({ onSubmit, onClose }: ModalProps) => {
    const {
       control,
       handleSubmit,
@@ -36,6 +37,39 @@ const Modal = ({ onSubmit }: ModalProps) => {
          spacing={2}
          width={{ xs: "300px", sm: "400px" }}
       >
+         <Stack
+            bgcolor="background.paper"
+            borderRadius={2}
+            p={2}
+            pt={0}
+            spacing={0.1}
+         >
+            <Stack direction={"row"} alignItems="center" spacing={1} mb={1}>
+               <Typography variant="body1" color="textSecondary">
+                  Account name
+               </Typography>
+               :<Typography variant="subtitle2">Demo Commerce BD</Typography>
+            </Stack>
+            <Stack direction={"row"} alignItems="center" spacing={1} mb={1}>
+               <Typography variant="body1" color="textSecondary">
+                  Account number
+               </Typography>
+               :<Typography variant="subtitle2">22334455667788</Typography>
+            </Stack>
+            <Stack direction={"row"} alignItems="center" spacing={1} mb={1}>
+               <Typography variant="body1" color="textSecondary">
+                  Routing number
+               </Typography>
+               :<Typography variant="subtitle2">112233445</Typography>
+            </Stack>
+            <Stack direction={"row"} alignItems="center" spacing={1} mb={1}>
+               <Typography variant="body1" color="textSecondary">
+                  Brunch
+               </Typography>
+               :
+               <Typography variant="subtitle2">Uttara Branch, Dhaka</Typography>
+            </Stack>
+         </Stack>
          <Stack>
             <Controller
                name="amount"
@@ -71,7 +105,7 @@ const Modal = ({ onSubmit }: ModalProps) => {
                         { label: "Bank Transfer", value: "bank_transfer" },
                         { label: "Bkash", value: "bkash" },
                      ]}
-                     value={field.value?.value || null}
+                     value={field.value?.label || null}
                      onChange={(newValue, event) =>
                         field.onChange(newValue || { label: "", value: "" })
                      }
@@ -106,7 +140,14 @@ const Modal = ({ onSubmit }: ModalProps) => {
             justifyContent="flex-end"
             spacing={2}
          >
-            <Button variant="text" color="inherit" onClick={() => reset()}>
+            <Button
+               variant="text"
+               color="inherit"
+               onClick={() => {
+                  reset();
+                  onClose();
+               }}
+            >
                Cancel
             </Button>
             <Button variant="contained" color="primary" type="submit">

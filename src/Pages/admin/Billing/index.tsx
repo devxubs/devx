@@ -270,6 +270,7 @@ const Billing = () => {
                   ]);
                   setOpenModal(false);
                }}
+               onClose={() => setOpenModal(false)}
             />
          </CustomModal>
       </Stack>
