@@ -9,7 +9,7 @@ import {
    Drawer,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomList from "@src/components/List";
+import CustomList from "@src/Layout/List";
 import useGlobalState from "@src/handler/globalState";
 import Logo from "@src/SvgIcon/logo";
 import LogoNameIcon from "@src/SvgIcon/logoName";
@@ -172,11 +172,11 @@ const Sidebar = () => {
                onClick={() => {
                   globalState.set("layoutFull", !layout);
                   const cd = JSON.parse(
-                     localStorage.getItem("customize") || "{}"
+                     localStorage.getItem("customize") || "{}",
                   );
                   localStorage.setItem(
                      "customize",
-                     JSON.stringify({ ...cd, layoutFull: !layout })
+                     JSON.stringify({ ...cd, layoutFull: !layout }),
                   );
                }}
             >

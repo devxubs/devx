@@ -25,7 +25,10 @@ export interface SidebarItem {
    icon?: string | ReactNode;
    label: string;
    selected?: boolean;
-   children?: SidebarItem[];
+   children?: Omit<
+      SidebarItem,
+      "heading" | "headingId" | "icon" | "children"
+   >[];
    headingId?: string;
    url?: string;
    onItemClick?: () => void;
@@ -154,15 +157,20 @@ export default function CustomList({ items, fullMenu }: CustomListProps) {
                               {item.label}
                            </Typography>
                         </Stack>
-                        <Box>
-                           {fullMenu &&
-                              hasChildren &&
-                              (isOpen ? (
-                                 <Icon icon="solar:alt-arrow-down-bold-duotone" />
-                              ) : (
-                                 <Icon icon="solar:alt-arrow-right-bold-duotone" />
-                              ))}
-                        </Box>
+                        {fullMenu && hasChildren && (
+                           <Box sx={{ display: "flex", alignItems: "center" }}>
+                              <Icon
+                                 icon="solar:alt-arrow-down-bold-duotone"
+                                 size="small"
+                                 style={{
+                                    transition: "transform 0.3s ease",
+                                    transform: isOpen
+                                       ? "rotate(0deg)"
+                                       : "rotate(-90deg)",
+                                 }}
+                              />
+                           </Box>
+                        )}
                      </ListItemButton>
 
                      {fullMenu && hasChildren && (
@@ -192,7 +200,7 @@ export default function CustomList({ items, fullMenu }: CustomListProps) {
                                           backgroundColor: child.selected
                                              ? alpha(
                                                   theme.palette.primary.main,
-                                                  0.1
+                                                  0.1,
                                                )
                                              : "transparent",
                                        }}
