@@ -1,5 +1,5 @@
-import { orderStatuses } from "@src/handler/order_filter";
 import * as yup from "yup";
+import { orderStatuses } from "../data";
 
 export const orderSchema = yup.object({
    status: yup.string().oneOf(orderStatuses).required("Status is required"),
@@ -30,7 +30,7 @@ export const orderSchema = yup.object({
                .min(0, "Price must be positive")
                .required("Price is required"),
             images: yup.array().of(yup.string().url("Invalid image URL")),
-         })
+         }),
       )
       .min(1, "At least one product is required"),
 

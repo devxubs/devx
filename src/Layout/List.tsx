@@ -177,9 +177,9 @@ export default function CustomList({ items, fullMenu }: CustomListProps) {
                         <Collapse in={isOpen} timeout="auto" unmountOnExit>
                            <Box
                               sx={{
-                                 ml: item.heading || item.headingId ? 5 : 0,
+                                 ml: 3,
 
-                                 borderLeft: `1px solid ${theme.palette.divider}`,
+                                 borderLeft: `2px solid ${theme.palette.divider}`,
                               }}
                            >
                               <List disablePadding>

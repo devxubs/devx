@@ -1,15 +1,13 @@
 "use client";
 import React, { useState } from "react";
 
-import { Box, Stack } from "@mui/material";
+import { Stack, useMediaQuery } from "@mui/material";
 import CustomList, { SidebarItem } from "@src/Layout/List";
 
 const items: SidebarItem[] = [
    {
-      heading: { title: "MANAGEMENT", id: "management" },
-      icon: "solar:calendar-bold-duotone",
-      label: "General",
-
+      label: "General Settings",
+      icon: "solar:settings-bold-duotone",
       children: [
          {
             label: "Analytics",
@@ -18,90 +16,48 @@ const items: SidebarItem[] = [
             label: "Sales",
          },
       ],
+      onItemClick() {
+         console.log("General Settings clicked");
+      },
    },
    {
-      headingId: "management",
-      icon: "solar:shop-bold-duotone",
-      label: "Store",
+      label: "Orders",
+      icon: "solar:cart-plus-bold-duotone",
    },
    {
-      headingId: "management",
-      icon: "solar:user-circle-bold-duotone",
-      label: "Users",
-   },
-   {
-      headingId: "management",
-      icon: "solar:wallet-money-bold-duotone",
-      label: "Payments",
-   },
-   {
-      headingId: "management",
-      icon: "solar:notebook-bold-duotone",
-      label: "Invoice",
-   },
-   {
-      headingId: "management",
-      icon: "solar:box-bold-duotone",
       label: "Products",
+      icon: "solar:box-bold-duotone",
    },
    {
-      headingId: "management",
-      icon: "solar:sale-square-bold-duotone",
-      label: "Sales",
+      label: "Appearance",
+      icon: "solar:pen-new-square-bold-duotone",
    },
    {
-      headingId: "management",
-      icon: "solar:users-group-two-rounded-bold-duotone",
       label: "Notifications",
+      icon: "solar:bell-bing-bold-duotone",
    },
    {
-      headingId: "management",
-      icon: "solar:cart-large-2-bold-duotone",
-      label: "Purchase",
+      label: "Shipping",
+      icon: "solar:delivery-bold-duotone",
    },
    {
-      headingId: "management",
-      icon: "solar:explicit-bold-duotone",
-      label: "Expenses",
+      label: "Invoices",
+      icon: "solar:printer-bold-duotone",
    },
    {
-      headingId: "management",
-      icon: "solar:cassette-2-bold-duotone",
-      label: "Assets",
-   },
-   {
-      headingId: "management",
-      icon: "solar:pie-chart-2-bold-duotone",
-      label: "Reports",
-   },
-   {
-      headingId: "management",
-      icon: "solar:trash-bin-trash-bold-duotone",
-      label: "Bin",
-   },
-   {
-      heading: { title: "ACCOUNT", id: "account" },
-      icon: "solar:settings-bold-duotone",
-      label: "Setting",
-   },
-   {
-      headingId: "account",
-      icon: "solar:lock-keyhole-bold-duotone",
-      label: "Roles",
-   },
-   {
-      headingId: "account",
+      label: "Payments",
       icon: "solar:wallet-money-bold-duotone",
-      label: "Billing",
+   },
+   {
+      label: "Backups",
+      icon: "solar:database-bold-duotone",
    },
 ];
 
 const Sidebar = () => {
    return (
       <Stack flex={1}>
-         <Box pb={2} sx={{ transition: "padding 0.3s ease" }}>
-            <CustomList items={items} fullMenu />
-         </Box>
+         <CustomList items={items} fullMenu />
       </Stack>
    );
 };
