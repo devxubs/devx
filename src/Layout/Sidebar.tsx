@@ -9,7 +9,7 @@ import {
    Drawer,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomList from "@src/Layout/List";
+import CustomList from "@src/components/List";
 import useGlobalState from "@src/handler/globalState";
 import Logo from "@src/SvgIcon/logo";
 import LogoNameIcon from "@src/SvgIcon/logoName";

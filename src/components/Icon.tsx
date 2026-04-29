@@ -1,16 +1,9 @@
 import React, { CSSProperties } from "react";
 
-import { Icon as Iconify, IconProps } from "@iconify/react";
+import { Icon as Iconify, IconProps as IconifyProps } from "@iconify/react";
 import { Palette, useTheme } from "@mui/material";
-import dynamic from "next/dynamic";
 
-const Icon = ({
-   icon,
-   size = "medium",
-   style,
-   color = "default",
-   ...rest
-}: {
+interface IconProps extends Omit<IconifyProps, "icon"> {
    icon: string;
    size?: "small" | "medium" | "large" | string;
    color?:
@@ -22,7 +15,15 @@ const Icon = ({
       | "error"
       | "default";
    style?: CSSProperties;
-}) => {
+}
+
+const Icon = ({
+   icon,
+   size = "medium",
+   style,
+   color = "default",
+   ...rest
+}: IconProps) => {
    const theme = useTheme();
    const colorKey = color as keyof Palette;
    const paletteColor: any = theme.palette[colorKey] ?? {

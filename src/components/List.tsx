@@ -67,7 +67,7 @@ export default function CustomList({ items, fullMenu }: CustomListProps) {
                const isOpen = openStates[item.label] || false;
                const hasChildren = !!item.children?.length;
 
-               item.selected = item.url ? pathname === item.url : false;
+               item.selected = item.url ? pathname === item.url : item.selected;
 
                return (
                   <React.Fragment key={index}>

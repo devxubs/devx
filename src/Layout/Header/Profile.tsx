@@ -10,7 +10,7 @@ import {
 import AnimatedAvatar from "@src/components/AnimateAvatar";
 import CustomBox from "@src/components/CustomBox";
 import Icon from "@src/components/Icon";
-import CustomList from "@src/Layout/List";
+import CustomList from "@src/components/List";
 import useGlobalState from "@src/handler/globalState";
 import React, { useEffect } from "react";
 import Scrollbar from "react-browser-scrollbar";
