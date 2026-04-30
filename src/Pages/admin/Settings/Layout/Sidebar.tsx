@@ -1,13 +1,19 @@
 "use client";
 import React, { useEffect, useState } from "react";
 
-import { Stack } from "@mui/material";
+import { Stack, useMediaQuery, useTheme } from "@mui/material";
 import CustomList, { SidebarItem } from "@src/components/List";
 import useQueryParams from "@src/handler/useQueryParams";
 
-const Sidebar = () => {
+interface SidebarProps {
+   onItemClick?: (tab: string) => void;
+}
+
+const Sidebar = ({ onItemClick }: SidebarProps) => {
+   const theme = useTheme();
    const query = useQueryParams();
    const [active, setActive] = useState<string>("general");
+   const isSm = useMediaQuery(theme.breakpoints.only("sm"));
 
    useEffect(() => {
       const tab = query.get("tab");
@@ -20,12 +26,36 @@ const Sidebar = () => {
 
    const items: SidebarItem[] = [
       {
-         label: "General Settings",
-         icon: "solar:settings-bold-duotone",
-         selected: active === "general",
+         label: "Profile",
+         icon: "solar:user-circle-bold-duotone",
+         selected: active === "profile",
          onItemClick() {
-            query.set("tab", "general");
-            setActive("general");
+            query.set("tab", "profile");
+            setActive("profile");
+            if (onItemClick) {
+               onItemClick("profile");
+            }
+         },
+      },
+      // {
+      //    label: "Account",
+      //    icon: "solar:user-circle-bold-duotone",
+      //    selected: active === "account",
+      //    onItemClick() {
+      //       query.set("tab", "account");
+      //       setActive("account");
+      //    },
+      // },
+      {
+         label: "Security",
+         icon: "solar:lock-keyhole-bold-duotone",
+         selected: active === "security",
+         onItemClick() {
+            query.set("tab", "security");
+            setActive("security");
+            if (onItemClick) {
+               onItemClick("security");
+            }
          },
       },
       {
@@ -35,6 +65,9 @@ const Sidebar = () => {
          onItemClick() {
             query.set("tab", "orders");
             setActive("orders");
+            if (onItemClick) {
+               onItemClick("orders");
+            }
          },
       },
       {
@@ -44,6 +77,9 @@ const Sidebar = () => {
          onItemClick() {
             query.set("tab", "products");
             setActive("products");
+            if (onItemClick) {
+               onItemClick("products");
+            }
          },
       },
       {
@@ -53,6 +89,9 @@ const Sidebar = () => {
          onItemClick() {
             query.set("tab", "appearance");
             setActive("appearance");
+            if (onItemClick) {
+               onItemClick("appearance");
+            }
          },
       },
       {
@@ -62,6 +101,9 @@ const Sidebar = () => {
          onItemClick() {
             query.set("tab", "notifications");
             setActive("notifications");
+            if (onItemClick) {
+               onItemClick("notifications");
+            }
          },
       },
       {
@@ -71,6 +113,9 @@ const Sidebar = () => {
          onItemClick() {
             query.set("tab", "shipping");
             setActive("shipping");
+            if (onItemClick) {
+               onItemClick("shipping");
+            }
          },
       },
       {
@@ -80,15 +125,21 @@ const Sidebar = () => {
          onItemClick() {
             query.set("tab", "invoices");
             setActive("invoices");
+            if (onItemClick) {
+               onItemClick("invoices");
+            }
          },
       },
       {
-         label: "Payments",
+         label: "Billing",
          icon: "solar:wallet-money-bold-duotone",
-         selected: active === "payments",
+         selected: active === "billing",
          onItemClick() {
-            query.set("tab", "payments");
-            setActive("payments");
+            query.set("tab", "billing");
+            setActive("billing");
+            if (onItemClick) {
+               onItemClick("billing");
+            }
          },
       },
       {
@@ -98,12 +149,15 @@ const Sidebar = () => {
          onItemClick() {
             query.set("tab", "backups");
             setActive("backups");
+            if (onItemClick) {
+               onItemClick("backups");
+            }
          },
       },
    ];
    return (
       <Stack flex={1}>
-         <CustomList items={items} fullMenu />
+         <CustomList items={items} fullMenu={!isSm} />
       </Stack>
    );
 };

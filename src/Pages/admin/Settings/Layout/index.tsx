@@ -1,44 +1,29 @@
 "use client";
 import {
    Stack,
-   TextField,
-   Button,
-   keyframes,
    useTheme,
    Typography,
    Box,
+   useMediaQuery,
+   Drawer,
 } from "@mui/material";
-import React from "react";
+import React, { useState } from "react";
 import Sidebar from "./Sidebar";
 import Icon from "@src/components/Icon";
+import useQueryParams from "@src/handler/useQueryParams";
+import SettingItem from "./SettingItem";
+import Header from "./Header";
+import CustomBox from "@src/components/CustomBox";
 
 const Layout = () => {
    const theme = useTheme();
-   const rotate = keyframes`
-      0% {
-         transform: translateX(-5px) rotate(0deg);
-      }
+   const query = useQueryParams();
+   const selectedTab = query.get("tab") || "profile";
+   const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
+   const isSm = useMediaQuery(theme.breakpoints.only("sm"));
 
-      25% {
-         transform: translateX(0px) rotate(90deg);
-      }
+   const [showSidebar, setShowSidebar] = useState(false);
 
-      50% {
-         transform: translateX(5px) rotate(180deg);
-      }
-
-      65% {
-         transform: translateX(5px) rotate(200deg);
-      }
-
-      75% {
-         transform: translateX(5px) rotate(180deg);
-      }
-
-      100% {
-         transform: translateX(-5px) rotate(360deg);
-      }
-      `;
    return (
       <Stack
          spacing={1}
@@ -50,59 +35,67 @@ const Layout = () => {
          borderRadius={2}
          height={"calc(100vh - 64px - 44px)"}
       >
-         <Stack
-            py={2}
-            pl={2}
-            pr={1}
-            bgcolor={"background.default"}
-            borderRadius={2}
-            width={{
-               xs: 100,
-               sm: 260,
-            }}
-            height={"100%"}
-            sx={{
-               overflowY: "auto",
-               scrollbarWidth: "none!important",
-
-               "&::-webkit-scrollbar": {
-                  display: "none!important",
-               },
-            }}
-         >
-            <Sidebar />
-         </Stack>
-         <Stack flex={1} bgcolor={"background.default"} borderRadius={2}>
-            <Stack
-               px={2}
-               height={65}
-               borderBottom={1}
-               borderColor={"divider"}
-               direction={"row"}
-               alignItems={"center"}
-               justifyContent={"space-between"}
-            >
-               <TextField
-                  variant="outlined"
-                  size="small"
-                  placeholder="Search..."
+         {/*//? Sidebar  */}
+         {isSmDown ? (
+            <Drawer open={showSidebar} onClose={() => setShowSidebar(false)}>
+               <CustomBox
                   sx={{
-                     width: 300,
-                  }}
-               />
-               <Button
-                  variant="contained"
-                  startIcon={<Icon icon="solar:settings-bold-duotone" />}
-                  sx={{
-                     "& svg": {
-                        color: theme.palette.common.white + "!important",
-                        animation: `${rotate} 4s linear infinite`, // ?  Rotate when changing.
-                     },
+                     width: 260,
+                     height: "100%",
+                     display: "flex",
+                     flexDirection: "column",
+                     justifyContent: "center",
                   }}
                >
-                  Save Changes
-               </Button>
+                  <Stack
+                     px={2}
+                     direction={"column"}
+                     justifyContent={"center"}
+                     width={260}
+                     sx={{
+                        overflowY: "auto",
+                        scrollbarWidth: "none!important",
+
+                        "&::-webkit-scrollbar": {
+                           display: "none!important",
+                        },
+                     }}
+                  >
+                     <Sidebar onItemClick={() => setShowSidebar(false)} />
+                  </Stack>
+               </CustomBox>
+            </Drawer>
+         ) : (
+            <Stack
+               py={2}
+               pl={{ sm: 1, md: 2 }}
+               pr={1}
+               bgcolor={"background.default"}
+               borderRadius={2}
+               width={{
+                  sm: 130,
+                  md: 260,
+               }}
+               height={"100%"}
+               sx={{
+                  overflowY: "auto",
+                  scrollbarWidth: "none!important",
+
+                  "&::-webkit-scrollbar": {
+                     display: "none!important",
+                  },
+               }}
+            >
+               <Sidebar />
             </Stack>
+         )}
+         {/*//? Sidebar  */}
+
+         <Stack flex={1} bgcolor={"background.default"} borderRadius={2}>
+            {/*//? Header  */}
+            <Header onShowSidebar={() => setShowSidebar(true)} />
+            {/*//? Header  */}
+
             <Stack p={2} spacing={2}>
                <Stack direction={"row"} alignItems={"center"} spacing={2}>
                   <Box
@@ -125,13 +118,25 @@ const Layout = () => {
                      />
                   </Box>
                   <Stack>
-                     <Typography variant="h4">General Settings</Typography>
+                     <Typography variant="h4">
+                        {selectedTab.charAt(0).toUpperCase() +
+                           selectedTab.slice(1)}{" "}
+                        Settings
+                     </Typography>
                      <Typography variant="body2" color="textSecondary">
-                        Manage your store settings and preferences.
+                        Manage your{" "}
+                        {selectedTab.charAt(0).toUpperCase() +
+                           selectedTab.slice(1)}{" "}
+                        information and preferences.
                      </Typography>
                   </Stack>
                </Stack>
-               <Stack></Stack>
+               <Stack>
+                  <SettingItem
+                     title="Name"
+                     description="Update your name and display name."
+                  />
+               </Stack>
             </Stack>
          </Stack>
       </Stack>
