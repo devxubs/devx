@@ -15,19 +15,22 @@ import Scrollbar from "react-browser-scrollbar";
 import CustomModal from "@src/components/Modal";
 import Modal from "./Modal";
 import AlertDialog from "@src/components/AlertDialog";
-import CustomAutocomplete from "@src/components/Autocomplete";
+import CustomAutocomplete, { OptionType } from "@src/components/Autocomplete";
 
 export interface UserProps {
    id: string;
    name: string;
    phoneNumber: string;
    email: string;
+   address: string;
    role: string;
    password: string;
    confirmPassword: string;
+   profileUrl?: string;
    salary: string;
    hireDate: Date;
    status: "active" | "inactive" | "suspended";
+   file?: File | null;
 }
 
 const statusColor: Record<
@@ -81,12 +84,14 @@ export const UserRows: UserProps[] = [
       name: "Jubayer Ahmed",
       phoneNumber: "01325584606",
       email: "devxub@gmail.com",
+      address: "123 Main St, City, Country",
       role: "Manager",
       salary: "$80,000",
       hireDate: new Date("2021-05-10"),
       status: "active",
       password: "12345",
       confirmPassword: "12345",
+      profileUrl: "https://avatars.githubusercontent.com/u/22456794?v=4",
    },
    {
       id: "UR002",
@@ -99,6 +104,8 @@ export const UserRows: UserProps[] = [
       status: "active",
       password: "65432",
       confirmPassword: "65432",
+      profileUrl: "https://avatars.githubusercontent.com/u/22456795?v=4",
+      address: "456 Elm St, City, Country",
    },
    {
       id: "UR003",
@@ -111,6 +118,8 @@ export const UserRows: UserProps[] = [
       status: "active",
       password: "34567",
       confirmPassword: "34567",
+      address: "789 Oak St, City, Country",
+      profileUrl: "https://avatars.githubusercontent.com/u/22456796?v=4",
    },
    {
       id: "UR004",
@@ -123,6 +132,8 @@ export const UserRows: UserProps[] = [
       status: "inactive",
       password: "98765",
       confirmPassword: "98765",
+      profileUrl: "https://avatars.githubusercontent.com/u/22456797?v=4",
+      address: "321 Pine St, City, Country",
    },
    {
       id: "UR005",
@@ -135,27 +146,36 @@ export const UserRows: UserProps[] = [
       status: "suspended",
       password: "23452",
       confirmPassword: "23452",
+      profileUrl: "https://avatars.githubusercontent.com/u/22456793?v=4",
+      address: "654 Cedar St, City, Country",
    },
 ];
 
 const UserColumns: ColumnConfig[] = [
-   { field: "id", headerName: "ID", flex: 0.3 },
+   { field: "id", headerName: "ID", width: 80 },
    {
       field: "name",
       headerName: "Name",
-      flex: 1,
+      width: 250,
       renderCell: (params) => (
-         <UserProfile name={params.row.name} email={params.row.email} />
+         <UserProfile
+            name={params.row.name}
+            email={params.row.email}
+            url={params.row.profileUrl}
+         />
       ),
    },
-   { field: "phoneNumber", headerName: "Phone" },
+   { field: "phoneNumber", headerName: "Phone", width: 150 },
+   { field: "address", headerName: "Address", width: 200 },
    {
       field: "role",
       headerName: "Role",
+      width: 150,
    },
    {
       field: "hireDate",
       headerName: "Hire Date",
+      width: 150,
       valueFormatter: (value: Date) => {
          const date = new Date(value);
 
@@ -171,7 +191,7 @@ const UserColumns: ColumnConfig[] = [
       field: "status",
       headerName: "Status",
       chip: true,
-      flex: 0.5,
+      width: 150,
       valueFormatter: (v: string) => v.toLocaleUpperCase(),
       color: (params) => statusColor[params.row.status] || "default",
    },
@@ -266,11 +286,14 @@ const Users = () => {
                         <Stack sx={{ width: "30%" }}>
                            <CustomAutocomplete
                               label="Role"
-                              options={roles}
+                              options={roles.map((r) => ({
+                                 label: r,
+                                 value: r,
+                              }))}
                               value={data.userRole || ""} // controlled
-                              onChange={(v: string) =>
+                              onChange={(v: OptionType | null) =>
                                  onChange?.({
-                                    userRole: v || "",
+                                    userRole: v?.value || "",
                                  })
                               }
                            />
@@ -307,10 +330,12 @@ const Users = () => {
                      ...users,
                   ]);
                }}
-               onEditUser={(newData, old) => {
+               onEditUser={(newData) => {
                   setUsers((prev) =>
                      prev.map((user) =>
-                        user.id === old.id ? { ...user, ...newData } : user,
+                        user.id === editableUser.id
+                           ? { ...user, ...newData }
+                           : user,
                      ),
                   );
                }}

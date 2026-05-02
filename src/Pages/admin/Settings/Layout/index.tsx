@@ -96,8 +96,13 @@ const Layout = () => {
             <Header onShowSidebar={() => setShowSidebar(true)} />
             {/*//? Header  */}
 
-            <Stack p={2} spacing={2}>
-               <Stack direction={"row"} alignItems={"center"} spacing={2}>
+            <Stack p={2} spacing={2} overflow={"auto"}>
+               <Stack
+                  direction={"row"}
+                  alignItems={"center"}
+                  spacing={2}
+                  flexWrap={"wrap"}
+               >
                   <Box
                      sx={{
                         width: 50,
@@ -117,8 +122,11 @@ const Layout = () => {
                         }}
                      />
                   </Box>
-                  <Stack>
-                     <Typography variant="h4">
+                  <Stack flex={1}>
+                     <Typography
+                        variant="h4"
+                        fontSize={{ xs: "1.4rem", sm: "1.6rem" }}
+                     >
                         {selectedTab.charAt(0).toUpperCase() +
                            selectedTab.slice(1)}{" "}
                         Settings
@@ -131,10 +139,22 @@ const Layout = () => {
                      </Typography>
                   </Stack>
                </Stack>
-               <Stack>
+               <Stack spacing={2}>
                   <SettingItem
                      title="Name"
                      description="Update your name and display name."
+                  />
+                  <SettingItem
+                     title="Email"
+                     description="Update your email address."
+                  />
+                  <SettingItem
+                     title="Phone"
+                     description="Update your phone number."
+                  />
+                  <SettingItem
+                     title="Password"
+                     description="Update your password."
                   />
                </Stack>
             </Stack>

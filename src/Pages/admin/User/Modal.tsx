@@ -7,9 +7,9 @@ import {
    InputAdornment,
    IconButton,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import UploadPhoto from "./imageUploader";
-import CustomAutocomplete from "@src/components/Autocomplete";
+import CustomAutocomplete, { OptionType } from "@src/components/Autocomplete";
 import { roles, UserProps } from ".";
 import { Controller, useForm } from "react-hook-form";
 import Icon from "@src/components/Icon";
@@ -19,7 +19,7 @@ interface ModalProps {
    onClose?: () => void;
    editUserData?: UserProps;
    onAddUser?: (data: UserProps) => void;
-   onEditUser?: (newData: UserProps, oldData: UserProps) => void;
+   onEditUser?: (newData: UserProps) => void;
 }
 
 const Modal = ({
@@ -40,19 +40,26 @@ const Modal = ({
          name: editUserData?.name || "",
          email: editUserData?.email || "",
          phoneNumber: editUserData?.phoneNumber || "",
+         address: editUserData?.address || "",
          role: editUserData?.role || "",
          password: "",
          confirmPassword: "",
+         profileUrl: editUserData?.profileUrl || "",
       },
    });
    const passwordValue = watch("password");
    const [passwordShow, setPasswordShow] = useState(false);
+   const [file, setFile] = useState<File | null>(editUserData?.file || null);
 
    const onSubmit = (data: UserProps) => {
+      const finalData = {
+         ...data,
+         file, // send file to backend
+      };
       if (mode === "edit") {
-         onEditUser?.(data, editUserData as UserProps);
+         onEditUser?.(finalData);
       } else {
-         onAddUser?.(data);
+         onAddUser?.(finalData);
       }
       onClose?.();
    };
@@ -60,7 +67,20 @@ const Modal = ({
    return (
       <Stack direction={"row"} alignItems={"center"} spacing={4} p={2}>
          <Stack direction={"row"}>
-            <UploadPhoto />
+            <Controller
+               name="profileUrl"
+               control={control}
+               render={({ field }) => (
+                  <UploadPhoto
+                     onUpload={(file: File) => {
+                        setFile(file);
+                        const objectUrl = URL.createObjectURL(file);
+                        field.onChange(objectUrl);
+                     }}
+                     file={file}
+                  />
+               )}
+            />
          </Stack>
          <form onSubmit={handleSubmit(onSubmit)}>
             <Stack direction={"row"} alignItems={"center"} spacing={4} p={2}>
@@ -114,6 +134,26 @@ const Modal = ({
                         />
                      </Grid>
 
+                     {/* Address */}
+                     <Grid size={{ xs: 12 }}>
+                        <Controller
+                           name="address"
+                           control={control}
+                           rules={{
+                              required: "Address is required",
+                           }}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 label="Address"
+                                 error={!!errors.address}
+                                 helperText={errors.address?.message}
+                                 fullWidth
+                              />
+                           )}
+                        />
+                     </Grid>
+
                      {/* Phone */}
                      <Grid size={{ xs: 12, md: 6 }}>
                         <Controller
@@ -161,9 +201,14 @@ const Modal = ({
                               <>
                                  <CustomAutocomplete
                                     {...field}
-                                    options={roles}
+                                    options={roles.map((r) => ({
+                                       label: r,
+                                       value: r,
+                                    }))}
                                     label="Role"
-                                    onChange={(v: any) => field.onChange(v)}
+                                    onChange={(v: OptionType | null) =>
+                                       field.onChange(v?.value || "")
+                                    }
                                     value={field.value}
                                     error={!!errors.role}
                                  />
@@ -183,13 +228,11 @@ const Modal = ({
                            name="password"
                            control={control}
                            rules={{
-                              required:
-                                 mode === "add"
-                                    ? "Password is required"
-                                    : false,
-                              minLength: {
-                                 value: 6,
-                                 message: "Minimum 6 characters",
+                              validate: (value) => {
+                                 if (mode === "edit" && !value) return true;
+                                 if (value.length < 6)
+                                    return "Minimum 6 characters";
+                                 return true;
                               },
                            }}
                            render={({ field }) => (
@@ -230,12 +273,9 @@ const Modal = ({
                            name="confirmPassword"
                            control={control}
                            rules={{
-                              required:
-                                 mode === "add"
-                                    ? "Confirm Password is required"
-                                    : false,
                               validate: (value) => {
-                                 if (mode === "edit" && !value) return true;
+                                 if (mode === "edit" && !watch("password"))
+                                    return true;
                                  return (
                                     value === passwordValue ||
                                     "Passwords do not match"

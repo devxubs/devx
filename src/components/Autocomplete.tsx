@@ -10,7 +10,7 @@ import {
 
 import { type AutocompleteProps } from "@mui/material/Autocomplete";
 
-interface OptionType {
+export interface OptionType {
    label: string;
    value: string;
 }
@@ -26,7 +26,7 @@ interface CustomAutocompleteProps extends Omit<
    label?: string;
    options: OptionType[];
    value?: string | string[] | null;
-   onChange?: (d: OptionType | OptionType[] | null, e: Event | Element) => void;
+   onChange?: (d: OptionType | null, e: Event | Element) => void;
    multiple?: boolean;
    error?: boolean;
    helperText?: string;
