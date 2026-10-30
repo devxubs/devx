@@ -33,6 +33,8 @@ export interface PricingType {
    deliveryCharge: number;
    discount: number;
    total: number;
+   advancePayment?: number;
+   dueAmount?: number;
 }
 
 // ✅ Timestamps type
@@ -44,7 +46,7 @@ export interface OrderTimestampsType {
 
 // ✅ Order type
 export interface OrderType {
-   id: number; // Added id field for unique identification
+   id: number | string; // Added id field for unique identification
    color?: string;
 
    orderId: string;

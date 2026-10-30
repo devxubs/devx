@@ -14,14 +14,18 @@ import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig, MenuItem } from "@src/components/Table";
+import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import { PurchaseDetailModal, SupplierDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 
 export type PurchaseTypes = {
-   id: number;
+   id: number | string;
+   customId?: string;
    date: string; // YYYY-MM-DD
    invoice: string;
    supplier: string;
+   supplierId?: string;
    product: {
       id?: string;
       name: string;
@@ -46,337 +50,59 @@ export type PurchaseTypes = {
       size?: number;
    }[];
 };
-const purchaseData: PurchaseTypes[] = [
-   {
-      id: 1,
-      date: "2025-10-01",
-      invoice: "INV-1001",
-      supplier: "Md. Rahim",
-      product: {
-         name: "Rice",
-         code: "RICE-001",
-         quantity: 1,
-         price: 50,
-         sub_total: 1 * 50,
-         images: "",
-      },
-      product_amount: 5000,
-      others_cost: 100,
-      discount: 200,
-      total: 4900,
-      pay: 3000,
-      advance: 1000,
-      due: 900,
-      note: "Urgent order",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice1.pdf",
-            type: "pdf",
-            size: 102400,
-         },
-         {
-            name: "Product Image",
-            url: "https://example.com/rice.jpg",
-            type: "image",
-            size: 204800,
-         },
-      ],
-   },
-   {
-      id: 2,
-      date: "2025-10-02",
-      invoice: "INV-1002",
-      supplier: "Abdul Karim",
-      product: {
-         name: "Sugar",
-         code: "SUGAR-001",
-         quantity: 1,
-         price: 16,
-         sub_total: 1 * 16,
-         images: "",
-      },
-      product_amount: 3200,
-      others_cost: 50,
-      discount: 0,
-      total: 3250,
-      pay: 2000,
-      advance: 1000,
-      due: 250,
-      note: "Regular supplier",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice2.pdf",
-            type: "pdf",
-            size: 95000,
-         },
-      ],
-   },
-   {
-      id: 3,
-      date: "2025-10-03",
-      invoice: "INV-1003",
-      supplier: "Jubayer Hosen",
-      product: {
-         name: "Flour",
-         code: "FLOUR-001",
-         quantity: 1,
-         price: 50,
-         sub_total: 1 * 50,
-         images: "",
-      },
-      product_amount: 2500,
-      others_cost: 0,
-      discount: 100,
-      total: 2400,
-      pay: 1500,
-      advance: 500,
-      due: 400,
-      note: "Check quality",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice3.pdf",
-            type: "pdf",
-            size: 80000,
-         },
-         {
-            name: "Product Image",
-            url: "https://example.com/flour.jpg",
-            type: "image",
-            size: 150000,
-         },
-      ],
-   },
-   {
-      id: 4,
-      date: "2025-10-04",
-      invoice: "INV-1004",
-      supplier: "Sakib Hasan",
-      product: {
-         name: "Oil",
-         code: "OIL-001",
-         quantity: 1,
-         price: 50,
-         sub_total: 1 * 50,
-         images: "",
-      },
-      product_amount: 1500,
-      others_cost: 50,
-      discount: 50,
-      total: 1500,
-      pay: 1000,
-      advance: 300,
-      due: 200,
-      note: "Priority shipment",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice4.pdf",
-            type: "pdf",
-            size: 90000,
-         },
-      ],
-   },
-   {
-      id: 5,
-      date: "2025-10-05",
-      invoice: "INV-1005",
-      supplier: "Hasan Ali",
-      product: {
-         name: "Salt",
-         code: "SALT-001",
-         quantity: 1,
-         price: 10,
-         sub_total: 1 * 10,
-         images: "",
-      },
-      product_amount: 800,
-      others_cost: 20,
-      discount: 0,
-      total: 820,
-      pay: 500,
-      advance: 200,
-      due: 120,
-      note: "Bulk purchase",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice5.pdf",
-            type: "pdf",
-            size: 75000,
-         },
-      ],
-   },
-   {
-      id: 6,
-      date: "2025-10-06",
-      invoice: "INV-1006",
-      supplier: "Iqbal Ahmed",
-      product: {
-         name: "Tea",
-         code: "TEA-001",
-         quantity: 1,
-         price: 10,
-         sub_total: 1 * 10,
-         images: "",
-      },
-      product_amount: 4000,
-      others_cost: 100,
-      discount: 200,
-      total: 3900,
-      pay: 2000,
-      advance: 1500,
-      due: 400,
-      note: "Priority shipment",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice6.pdf",
-            type: "pdf",
-            size: 102000,
-         },
-      ],
-   },
-   {
-      id: 7,
-      date: "2025-10-07",
-      invoice: "INV-1007",
-      supplier: "Nazmul Islam",
-      product: {
-         name: "Coffee",
-         code: "COFFEE-001",
-         quantity: 1,
-         price: 10,
-         sub_total: 1 * 10,
-         images: "",
-      },
-      product_amount: 500,
-      others_cost: 990,
-      discount: 100,
-      total: 1390,
-      pay: 1000,
-      advance: 300,
-      due: 90,
-      note: "Priority shipment",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice7.pdf",
-            type: "pdf",
-            size: 87000,
-         },
-         {
-            name: "Product Image",
-            url: "https://example.com/coffee.jpg",
-            type: "image",
-            size: 120000,
-         },
-      ],
-   },
-   {
-      id: 8,
-      date: "2025-10-08",
-      invoice: "INV-1008",
-      supplier: "Rafiq",
-      product: {
-         name: "Milk",
-         code: "MILK-001",
-         quantity: 1,
-         price: 20,
-         sub_total: 1 * 20,
-         images: "",
-      },
-      product_amount: 1200,
-      others_cost: 50,
-      discount: 100,
-      total: 1150,
-      pay: 800,
-      advance: 200,
-      due: 150,
-      note: "Check expiration date",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice8.pdf",
-            type: "pdf",
-            size: 88000,
-         },
-      ],
-   },
-   {
-      id: 9,
-      date: "2025-10-09",
-      invoice: "INV-1009",
-      supplier: "Imran",
-      product: {
-         name: "Eggs",
-         code: "EGGS-001",
-         quantity: 1,
-         price: 10,
-         sub_total: 1 * 10,
-         images: "",
-      },
-      product_amount: 900,
-      others_cost: 30,
-      discount: 50,
-      total: 880,
-      pay: 600,
-      advance: 200,
-      due: 80,
-      note: "Priority shipment",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice9.pdf",
-            type: "pdf",
-            size: 92000,
-         },
-      ],
-   },
-   {
-      id: 10,
-      date: "2025-10-10",
-      invoice: "INV-1010",
-      supplier: "Shakil",
-      product: {
-         name: "Butter",
-         code: "BUTTER-001",
-         quantity: 1,
-         price: 20,
-         sub_total: 1 * 20,
-         images: "",
-      },
-      product_amount: 1400,
-      others_cost: 30,
-      discount: 50,
-      total: 1380,
-      pay: 1000,
-      advance: 200,
-      due: 180,
-      note: "Store in cold room",
-      attachments: [
-         {
-            name: "Invoice PDF",
-            url: "https://example.com/invoice10.pdf",
-            type: "pdf",
-            size: 95000,
-         },
-         {
-            name: "Product Image",
-            url: "https://example.com/butter.jpg",
-            type: "image",
-            size: 130000,
-         },
-      ],
-   },
-];
+export const purchaseData: PurchaseTypes[] = [];
 
 const Purchase = () => {
    const theme = useTheme();
    const router = useRouter();
-   const [purchases, setPurchases] = useState<PurchaseTypes[]>(purchaseData);
+   const [purchases, setPurchases] = useState<PurchaseTypes[]>([]);
+   const [loading, setLoading] = useState(false);
+   const [detailPurchaseId, setDetailPurchaseId] = useState<string | null>(null);
+   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
+
+   const loadPurchases = React.useCallback(async () => {
+      setLoading(true);
+      try {
+         const res = await fetch("/api/purchases?limit=100");
+         if (res.ok) {
+            const data = await res.json();
+            const mapped = (data.purchases || []).map((p: any) => ({
+               id: p.id,
+               customId: p.customId,
+               date: p.createdAt ? new Date(p.createdAt).toISOString().split("T")[0] : "",
+               invoice: p.invoice || p.customId,
+               supplier: p.supplier?.name || "Direct Supplier",
+               supplierId: p.supplierId || p.supplier?.id || p.supplier?.customId,
+               product: {
+                  name: p.items?.[0]?.name || "Purchased Goods",
+                  code: p.items?.[0]?.code || "",
+                  quantity: p.items?.[0]?.quantity || 1,
+                  price: Number(p.items?.[0]?.price) || 0,
+                  sub_total: Number(p.items?.[0]?.subtotal) || 0,
+                  images: "",
+               },
+               product_amount: Number(p.productAmount),
+               others_cost: Number(p.othersCost),
+               discount: Number(p.discount),
+               total: Number(p.total),
+               pay: Number(p.paid),
+               advance: 0,
+               due: Number(p.due),
+               note: p.note || "",
+               attachments: p.attachments || [],
+            }));
+            setPurchases(mapped);
+         }
+      } catch {
+         // fallback
+      } finally {
+         setLoading(false);
+      }
+   }, []);
+
+   React.useEffect(() => {
+      loadPurchases();
+   }, [loadPurchases]);
 
    // note
    const [note, setNote] = useState<string>("");
@@ -387,21 +113,54 @@ const Purchase = () => {
 
    const columns: ColumnConfig[] = [
       {
-         field: "id",
-         headerName: "Id",
-         width: 70,
+         field: "customId",
+         headerName: "Purchase ID",
+         width: 110,
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               fontWeight={700}
+               color="primary.main"
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailPurchaseId(params.row.customId || params.row.id)}
+            >
+               {params.row.customId || params.row.id}
+            </Typography>
+         ),
+      },
+      {
+         field: "invoice",
+         headerName: "Invoice ID",
+         width: 130,
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               fontWeight={600}
+               color="secondary.main"
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailPurchaseId(params.row.customId || params.row.invoice || params.row.id)}
+            >
+               {params.row.invoice || "N/A"}
+            </Typography>
+         ),
       },
       {
          field: "date",
          headerName: "Date",
-      },
-      {
-         field: "invoice",
-         headerName: "Invoice",
+         width: 110,
       },
       {
          field: "supplier",
          headerName: "Supplier",
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}
+               onClick={() => setDetailSupplierId(params.row.supplierId || params.row.supplier)}
+            >
+               {params.row.supplier}
+            </Typography>
+         ),
       },
       {
          field: "product",
@@ -457,6 +216,13 @@ const Purchase = () => {
    // Action menu for each row
    const actionMenu: MenuItem[] = [
       {
+         label: "view",
+         icon: <Icon icon="solar:eye-bold" size="small" />,
+         onClick: (params: GridRenderCellParams) => {
+            setDetailPurchaseId(params.row.customId || params.row.invoice || params.row.id);
+         },
+      },
+      {
          label: "edit",
          icon: <Icon icon="solar:pen-bold" size="small" />,
          onClick: (params: GridRenderCellParams) => {
@@ -467,7 +233,9 @@ const Purchase = () => {
          label: "print",
          icon: <Icon icon="solar:printer-minimalistic-bold" size="small" />,
          color: undefined,
-         onClick: (params: GridRenderCellParams) => {},
+         onClick: (params: GridRenderCellParams) => {
+            setDetailPurchaseId(params.row.customId || params.row.invoice || params.row.id);
+         },
       },
       {
          label: "delete",
@@ -505,12 +273,51 @@ const Purchase = () => {
                Add purchase
             </Button>
          </Stack>
-         <CustomTable
-            rows={purchases}
-            columns={columns}
-            checkBox
-            menuItems={actionMenu}
-         />
+         {loading ? (
+            <TableSkeleton rows={5} cols={6} />
+         ) : (
+            <CustomTable
+               rows={purchases}
+               columns={columns}
+               checkBox
+               canPrint={true}
+               canExport={true}
+               printConfig={{
+                  title: "DevX POS - Purchases Summary Register",
+               }}
+               exportConfig={{
+                  filename: `Purchases_Summary_${new Date().toISOString().split("T")[0]}`,
+                  title: "DevX POS - Purchases Summary",
+                  fetchAllData: async () => {
+                     try {
+                        const res = await fetch("/api/purchases?all=true");
+                        if (!res.ok) return [];
+                        const d = await res.json();
+                        return (d.purchases || []).map((p: any, idx: number) => ({
+                           id: p.customId || `PUR_${idx + 1}`,
+                           invoice: p.invoice || "-",
+                           date: p.purchaseDate ? new Date(p.purchaseDate).toLocaleDateString() : "-",
+                           supplier: p.supplier?.name || "-",
+                           total: Number(p.totalAmount || 0),
+                           paid: Number(p.paid || 0),
+                           due: Number(p.due || 0),
+                           status: p.status || "RECEIVED",
+                        }));
+                     } catch {
+                        return [];
+                     }
+                  },
+                  summaryRows: (data: any[]) => {
+                     const totalSum = data.reduce((acc, row) => acc + (Number(row.total) || 0), 0);
+                     return [
+                        { label: "Total Purchases Count:", value: String(data.length) },
+                        { label: "Grand Total Value:", value: `৳ ${totalSum.toFixed(2)}`, isTotal: true },
+                     ];
+                  },
+               }}
+               menuItems={actionMenu}
+            />
+         )}
 
          <CustomModal
             open={Boolean(updateNote)}
@@ -592,8 +399,11 @@ const Purchase = () => {
             onClose={function (): void {
                setDeleteItem(null);
             }}
-            onConfirm={() => {
+            onConfirm={async () => {
                if (deleteItem) {
+                  try {
+                     await fetch(`/api/purchases/${deleteItem.id}`, { method: "DELETE" });
+                  } catch {}
                   setPurchases((prev) =>
                      prev.filter((item) => item.id !== deleteItem.id),
                   );
@@ -602,6 +412,18 @@ const Purchase = () => {
             }}
             type={"error"}
             title={`Are you sure want to delete "${deleteItem?.invoice}"?`}
+         />
+
+         <PurchaseDetailModal
+            open={Boolean(detailPurchaseId)}
+            onClose={() => setDetailPurchaseId(null)}
+            purchaseId={detailPurchaseId}
+         />
+
+         <SupplierDetailModal
+            open={Boolean(detailSupplierId)}
+            onClose={() => setDetailSupplierId(null)}
+            supplierId={detailSupplierId}
          />
       </Stack>
    );

@@ -3,44 +3,67 @@ import React from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import RadialBar from "@cmp/RadialBar";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
-
-const summaryData = [
-   {
-      title: "Total Revenue",
-      value: "25000",
-      currency: "$",
-      percentage: 15,
-      isPositive: true,
-      data: [2000, 3000, 2500, 4000, 3500, 4500, 5000],
-   },
-   {
-      title: "Total Orders",
-      value: 1200,
-      percentage: -5,
-      isPositive: false,
-      data: [150, 200, 180, 220, 210, 190, 250],
-   },
-   {
-      title: "Total Products",
-      value: "20",
-      percentage: 10,
-      isPositive: true,
-      data: [18, 20, 19, 22, 21, 20, 23],
-   },
-   {
-      title: "Total Customers",
-      value: "7350",
-      percentage: 5,
-      isPositive: true,
-      data: [70, 72, 74, 75, 76, 78, 80],
-   },
-];
+import { useSettings } from "@src/lib/settingsContext";
 
 const Summary = () => {
+   const { formatCurrency, settings } = useSettings();
+   const [report, setReport] = React.useState<any>(null);
+
+   React.useEffect(() => {
+      fetch("/api/reports")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => {
+            if (d) setReport(d);
+         })
+         .catch(() => {});
+   }, []);
+
+   const dynamicCards = [
+      {
+         title: "Total Revenue",
+         value: formatCurrency(report?.totalRevenue ?? 0),
+         percentage: 0,
+         isPositive: true,
+         data: [0, 0, 0, 0, 0, 0, Number(report?.totalRevenue || 0)],
+      },
+      {
+         title: "Total Orders",
+         value: report?.totalOrders ?? 0,
+         percentage: 0,
+         isPositive: true,
+         data: [0, 0, 0, 0, 0, 0, Number(report?.totalOrders || 0)],
+      },
+      {
+         title: "Total Products",
+         value: report?.totalProducts ?? 0,
+         percentage: 0,
+         isPositive: true,
+         data: [0, 0, 0, 0, 0, 0, Number(report?.totalProducts || 0)],
+      },
+      {
+         title: "Total Customers",
+         value: report?.totalCustomers ?? 0,
+         percentage: 0,
+         isPositive: true,
+         data: [0, 0, 0, 0, 0, 0, Number(report?.totalCustomers || 0)],
+      },
+   ];
+
+   const dynamicBreakdown = report?.ordersByStatus?.length
+      ? report.ordersByStatus.map((s: any) => ({
+           label: s.status,
+           value: s.count,
+        }))
+      : [
+           { label: "Completed", value: 0 },
+           { label: "Pending", value: 0 },
+           { label: "Cancelled", value: 0 },
+        ];
+
    return (
       <Stack spacing={2}>
          <Grid container spacing={2}>
-            {summaryData.map((item, index) => (
+            {dynamicCards.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>
                   <AnalyticsCard
                      title={item.title}
@@ -54,18 +77,14 @@ const Summary = () => {
             <Grid size={{ xs: 12, sm: 4 }}>
                <RadialBar
                   title="Orders Status Breakdown"
-                  data={[
-                     { label: "Completed", value: 45 },
-                     { label: "Cancelled", value: 35 },
-                     { label: "Returned", value: 20 },
-                  ]}
+                  data={dynamicBreakdown}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 8 }}>
                <AnalyticsGraph
                   title={"Revenue Analysis"}
                   isPositive={true}
-                  currency="$"
+                  currency={settings.currencySymbol || "৳"}
                   data={[
                      {
                         x: "2026-03-01",

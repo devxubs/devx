@@ -3,13 +3,12 @@ import * as React from "react";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import ThemeProviderClient from "@src/theme/ThemeProviderClient";
-import Layout from "@src/Layout";
 import { Public_Sans } from "next/font/google";
 import "./globals.css";
 
 export const metadata = {
-   title: "My App",
-   description: "A working dark/light theme setup",
+   title: "DevX POS",
+   description: "Point of Sale & Business Management System",
 };
 
 const Public_Sans_font = Public_Sans({
@@ -17,12 +16,10 @@ const Public_Sans_font = Public_Sans({
    variable: "--font-inter",
 });
 
-export default async function RootLayout({
+export default function RootLayout({
    children,
-   params,
 }: {
    children: React.ReactNode;
-   params: Promise<{ team: string }>;
 }) {
    return (
       <html
@@ -30,12 +27,6 @@ export default async function RootLayout({
          suppressHydrationWarning
          className={Public_Sans_font.className}
       >
-         <head>
-            <link
-               href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,100..900;1,100..900&display=swap"
-               rel="stylesheet"
-            />
-         </head>
          <body suppressHydrationWarning className={Public_Sans_font.className}>
             <InitColorSchemeScript attribute="class" />
             <AppRouterCacheProvider options={{ enableCssLayer: true }}>

@@ -74,8 +74,16 @@ const RadialBar = ({ data, title, value }: RadialBarProps) => {
       },
    };
 
-   const series = data.map((item) => item.value);
-   const labels = data.map((item) => item.label);
+   const safeData = data || [];
+   const series = safeData.map((item) => Number(item?.value) || 0);
+   const labels = safeData.map((item) => item?.label || "");
+   const colors = [
+      theme.palette.primary.main,
+      theme.palette.warning.main,
+      theme.palette.error.main,
+      theme.palette.info.main,
+      theme.palette.secondary.main,
+   ];
 
    return (
       <CustomCard title={title || "No title"}>
@@ -92,36 +100,18 @@ const RadialBar = ({ data, title, value }: RadialBarProps) => {
             />
 
             {/* Legend */}
-            <Stack direction="row" spacing={3} mt={0}>
-               <Stack alignItems="center" spacing={0.5}>
-                  <Box
-                     width={10}
-                     height={10}
-                     borderRadius="50%"
-                     bgcolor="#30D987"
-                  />
-                  <Typography variant="caption">{labels[0]}</Typography>
-               </Stack>
-
-               <Stack alignItems="center" spacing={0.5}>
-                  <Box
-                     width={10}
-                     height={10}
-                     borderRadius="50%"
-                     bgcolor="#FFC300"
-                  />
-                  <Typography variant="caption">{labels[1]}</Typography>
-               </Stack>
-
-               <Stack alignItems="center" spacing={0.5}>
-                  <Box
-                     width={10}
-                     height={10}
-                     borderRadius="50%"
-                     bgcolor="#FF6B6B"
-                  />
-                  <Typography variant="caption">{labels[2]}</Typography>
-               </Stack>
+            <Stack direction="row" spacing={2} mt={0} flexWrap="wrap" justifyContent="center">
+               {safeData.map((item, i) => (
+                  <Stack key={item.label || i} alignItems="center" spacing={0.5}>
+                     <Box
+                        width={10}
+                        height={10}
+                        borderRadius="50%"
+                        bgcolor={colors[i % colors.length]}
+                     />
+                     <Typography variant="caption">{item.label || `Item ${i + 1}`}</Typography>
+                  </Stack>
+               ))}
             </Stack>
          </Box>
       </CustomCard>

@@ -1,72 +1,74 @@
+"use client";
+
 import { Stack, Typography } from "@mui/material";
-import WeeklySalesChart from "./ExpenseChart";
 import CustomTable from "@src/components/Table";
 import DateRangePicker from "@src/components/DateRange";
-import { useEffect, useState } from "react";
-
-const expensesData = [
-   {
-      id: 1,
-      type: "Food",
-      date: "2025-10-20",
-      amount: 15.99,
-      note: "Lunch at local restaurant",
-   },
-   {
-      id: 2,
-      type: "Transport",
-      date: "2025-10-21",
-      amount: 8.5,
-      note: "Uber ride to office",
-   },
-   {
-      id: 3,
-      type: "Utilities",
-      date: "2025-10-18",
-      amount: 60,
-      note: "Electricity bill payment",
-   },
-   {
-      id: 4,
-      type: "Groceries",
-      date: "2025-10-19",
-      amount: 45.75,
-      note: "Weekly grocery shopping",
-   },
-   {
-      id: 5,
-      type: "Entertainment",
-      date: "2025-10-17",
-      amount: 25,
-      note: "Netflix subscription renewal",
-   },
-   {
-      id: 6,
-      type: "Health",
-      date: "2025-10-22",
-      amount: 12.99,
-      note: "Medicine purchase",
-   },
-];
-
-// ! the expenses is optional,
+import { useEffect, useState, useCallback } from "react";
+import { useSettings } from "@src/lib/settingsContext";
+import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import ExpenseChart from "./ExpenseChart";
 
 const Expenses = () => {
+   const { formatCurrency } = useSettings();
+   const [report, setReport] = useState<any>(null);
+   const [loading, setLoading] = useState(false);
+   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+   const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
+
+   const loadExpensesReport = useCallback(async () => {
+      setLoading(true);
+      try {
+         const params = new URLSearchParams();
+         params.set("tab", "expenses");
+         if (dateRange[0]) params.set("startDate", dateRange[0].toISOString());
+         if (dateRange[1]) params.set("endDate", dateRange[1].toISOString());
+
+         const res = await fetch(`/api/reports?${params.toString()}`);
+         if (res.ok) {
+            const data = await res.json();
+            setReport(data);
+         }
+      } catch {}
+      setLoading(false);
+   }, [dateRange]);
+
+   useEffect(() => {
+      loadExpensesReport();
+   }, [loadExpensesReport]);
+
    const columns = [
       {
          field: "id",
          headerName: "ID",
          width: 100,
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               fontWeight={600}
+               color="primary.main"
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailExpenseId(params.row.id)}
+            >
+               {params.row.id}
+            </Typography>
+         ),
       },
       { field: "type", headerName: "Type", width: 150 },
       { field: "date", headerName: "Date", width: 150 },
-      { field: "amount", headerName: "Amount", width: 150 },
+      {
+         field: "amount",
+         headerName: "Amount",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(params.row.amount),
+      },
       { field: "note", headerName: "Note", width: 200 },
    ];
 
+   const rows = report?.rows || [];
+
    return (
       <Stack spacing={3}>
-         <WeeklySalesChart />
+         <ExpenseChart />
          <Stack
             spacing={2}
             bgcolor={"background.paper"}
@@ -86,24 +88,35 @@ const Expenses = () => {
                Expenses Report
             </Typography>
             <CustomTable
-               rows={expensesData}
+               rows={rows}
                columns={columns}
+               checkBox={true}
+               canExport={true}
+               canPrint={true}
+               exportConfig={{
+                  filename: `Expenses_Report_${new Date().toISOString().split("T")[0]}`,
+                  title: "DevX POS - Expenses Report",
+               }}
+               printConfig={{
+                  title: "DevX POS - Expenses Report",
+               }}
                filter={(data, onChange) => (
                   <DateRangePicker
                      title="Filter by Expense Date"
+                     value={dateRange}
                      onChange={(v: [Date | null, Date | null]) => {
-                        onChange({
-                           ...data,
-                           reportData: {
-                              date: v,
-                              report_type: "expenses",
-                           },
-                        });
+                        setDateRange(v);
                      }}
                   />
                )}
             />
          </Stack>
+
+         <ExpenseDetailModal
+            open={Boolean(detailExpenseId)}
+            onClose={() => setDetailExpenseId(null)}
+            expenseId={detailExpenseId}
+         />
       </Stack>
    );
 };

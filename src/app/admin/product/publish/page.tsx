@@ -1,11 +1,11 @@
 import Publish from "@src/Pages/admin/Product/Publish";
-import React from "react";
+import React, { Suspense } from "react";
 
 const publish = () => {
    return (
-      <div>
+      <Suspense fallback={<div>Loading...</div>}>
          <Publish />
-      </div>
+      </Suspense>
    );
 };
 

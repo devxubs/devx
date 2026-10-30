@@ -20,9 +20,10 @@ interface WritingProps {
    user: User;
    imageUpload: any;
    attachmentUpload: any;
+   onSendMessage?: (text: string) => void;
 }
 
-const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
+const Writing = ({ attachmentUpload, imageUpload, user, onSendMessage }: WritingProps) => {
    const theme = useTheme();
    const state = useChatState();
    const [emojiAnchor, setEmojiAnchor] = useState<null | HTMLElement>(null);
@@ -68,15 +69,19 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
    }, []);
 
    // ⏎ Handle Enter
+   const submitMessage = () => {
+      const text = ref.current?.innerText.trim();
+      if (text) {
+         if (onSendMessage) onSendMessage(text);
+         ref.current!.innerHTML = "";
+         setMessageHTML("");
+      }
+   };
+
    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
          e.preventDefault();
-         const text = ref.current?.innerText.trim();
-         if (text) {
-            console.log("Send:", text);
-            ref.current!.innerHTML = "";
-            setMessageHTML("");
-         }
+         submitMessage();
       }
    };
 
@@ -243,7 +248,7 @@ const Writing = ({ attachmentUpload, imageUpload, user }: WritingProps) => {
                      style={{ color: theme.palette.text.secondary }}
                   />
                </IconButton>
-               <IconButton size="small" disabled={!user.id}>
+               <IconButton size="small" disabled={!user.id} onClick={submitMessage}>
                   <SendIcon />
                </IconButton>
             </Stack>

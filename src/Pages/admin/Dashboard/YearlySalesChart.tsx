@@ -5,26 +5,50 @@ import { ApexOptions } from "apexcharts";
 import CustomPopover from "@src/components/CustomPopover";
 import Menu from "@src/components/Menu";
 import CustomCard from "@src/components/CustomCard";
+import { useSettings } from "@src/lib/settingsContext";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
    ssr: false,
 });
 
-const YearlySalesChart = () => {
+interface YearlySalesChartProps {
+   incomeData?: number[];
+   expenseData?: number[];
+   onYearChange?: (year: string) => void;
+}
+
+const YearlySalesChart = ({
+   incomeData,
+   expenseData,
+   onYearChange,
+}: YearlySalesChartProps) => {
    const theme = useTheme();
+   const { formatCurrency } = useSettings();
+   const currentYear = new Date().getFullYear().toString();
    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-   const [year, setYear] = useState("2022");
+   const [year, setYear] = useState(currentYear);
+
+   const defaultIncome = incomeData && incomeData.length === 12
+      ? incomeData
+      : [400, 350, 300, 250, 800, 900, 750, 1600, 1200, 1000, 800, 700];
+
+   const defaultExpenses = expenseData && expenseData.length === 12
+      ? expenseData
+      : [250, 200, 100, 150, 400, 500, 350, 400, 300, 250, 200, 180];
 
    const series = [
       {
          name: "Total income",
-         data: [40, 35, 30, 25, 80, 90, 75, 160, 120, 100, 80, 70],
+         data: defaultIncome,
       },
       {
          name: "Total expenses",
-         data: [50, 20, 10, 15, 90, 100, 110, 80, 100, 110, 95, 85],
+         data: defaultExpenses,
       },
    ];
+
+   const totalIncomeSum = defaultIncome.reduce((a, b) => a + b, 0);
+   const totalExpenseSum = defaultExpenses.reduce((a, b) => a + b, 0);
 
    const tooltip = {
       shared: true,
@@ -32,13 +56,12 @@ const YearlySalesChart = () => {
       custom: function ({ series, seriesIndex, dataPointIndex, w }: any) {
          const labels = ["Total income", "Total expenses"];
          const colors = [
-            theme.palette.success.main, // income
-            theme.palette.warning.main, // expenses
+            theme.palette.success.main,
+            theme.palette.warning.main,
          ];
-         const name = w.globals.categoryLabels[dataPointIndex]; // x-axis label like "Mar"
+         const name = w.globals.categoryLabels[dataPointIndex];
 
          return `
-     
         <div style="
             font-weight: 600; 
             padding: 5px 0; 
@@ -55,7 +78,7 @@ const YearlySalesChart = () => {
                 display: flex; 
                 align-items: center; 
                 gap: 6px;
-                padding: 10px 12px;
+                padding: 8px 12px;
                 background-color: ${theme.palette.background.default}
             ">
               <span style="
@@ -66,37 +89,24 @@ const YearlySalesChart = () => {
                 display: inline-block;
               "></span>
               <span>${labels[i]}:</span>
-              <span style="marg
-              in-left: auto; font-weight: 600;">${val[dataPointIndex]}</span>
+              <span style="margin-left: auto; font-weight: 600;">৳ ${Number(val[dataPointIndex]).toFixed(2)}</span>
             </div>
-          `
+            `,
            )
            .join("")}
-    `;
+      `;
       },
    };
 
    const options: ApexOptions = {
       chart: {
-         type: "line", // ✅ This is now correct
          toolbar: { show: false },
          zoom: { enabled: false },
       },
-      colors: [theme.palette.primary.main, theme.palette.secondary.main],
-      fill: {
-         type: "gradient",
-         gradient: {
-            shadeIntensity: 1,
-            opacityFrom: 0.4,
-            opacityTo: 0,
-         },
-      },
-      stroke: {
-         curve: "smooth",
-         width: 2,
-      },
+      colors: [theme.palette.success.main, theme.palette.warning.main],
+      dataLabels: { enabled: false },
+      stroke: { curve: "smooth", width: 2.5 },
       xaxis: {
-         type: "category",
          categories: [
             "Jan",
             "Feb",
@@ -111,27 +121,41 @@ const YearlySalesChart = () => {
             "Nov",
             "Dec",
          ],
-         labels: { style: { colors: theme.palette.text.secondary } },
+         axisBorder: { show: false },
+         axisTicks: { show: false },
+         labels: {
+            style: {
+               colors: theme.palette.text.secondary,
+            },
+         },
       },
       yaxis: {
-         labels: { style: { colors: theme.palette.text.secondary } },
+         labels: {
+            formatter: (v) => `${(v / 1000).toFixed(1)}k`,
+            style: {
+               colors: theme.palette.text.secondary,
+            },
+         },
       },
-      legend: { show: false },
+      grid: {
+         strokeDashArray: 3,
+         borderColor: theme.palette.divider,
+      },
       tooltip: tooltip,
+      legend: { show: false },
+   };
+
+   const handleSelectYear = (selectedYear: string) => {
+      setYear(selectedYear);
+      setAnchorEl(null);
+      if (onYearChange) {
+         onYearChange(selectedYear);
+      }
    };
 
    return (
-      <CustomCard title="Yearly sales">
-         <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            mb={2}
-         >
-            <Typography variant="caption" color="success.main">
-               (+43%) than last year
-            </Typography>
-
+      <CustomCard title="Yearly sales & expenses" subtitle="Monthly revenue trends">
+         <Stack direction="row" justifyContent="flex-end" mb={1}>
             <CustomPopover
                anchorEl={anchorEl}
                onClose={() => setAnchorEl(null)}
@@ -141,18 +165,16 @@ const YearlySalesChart = () => {
                <Menu
                   item={[
                      {
-                        label: "2022",
-                        onClick: (l) => {
-                           setYear(l);
-                           setAnchorEl(null);
-                        },
+                        label: currentYear,
+                        onClick: () => handleSelectYear(currentYear),
                      },
                      {
-                        label: "2023",
-                        onClick: (l) => {
-                           setYear(l);
-                           setAnchorEl(null);
-                        },
+                        label: (parseInt(currentYear) - 1).toString(),
+                        onClick: () => handleSelectYear((parseInt(currentYear) - 1).toString()),
+                     },
+                     {
+                        label: (parseInt(currentYear) - 2).toString(),
+                        onClick: () => handleSelectYear((parseInt(currentYear) - 2).toString()),
                      },
                   ]}
                   size="small"
@@ -160,17 +182,18 @@ const YearlySalesChart = () => {
             </CustomPopover>
             <Button
                variant="outlined"
+               size="small"
                onClick={(e: React.MouseEvent<HTMLElement>) =>
                   setAnchorEl(e.currentTarget)
                }
             >
-               {year}
+               Year: {year}
             </Button>
          </Stack>
 
          <Stack direction="row" spacing={4} mb={2}>
-            <Stat label="Total income" value="1.23k" color="#30D987" />
-            <Stat label="Total expenses" value="6.79k" color="#FFC300" />
+            <Stat label="Total income" value={formatCurrency(totalIncomeSum)} color="#30D987" />
+            <Stat label="Total expenses" value={formatCurrency(totalExpenseSum)} color="#FFC300" />
          </Stack>
 
          <Box height={260}>
@@ -198,7 +221,7 @@ const Stat = ({
       <Typography fontSize={13} fontWeight={500} color={color}>
          {label}
       </Typography>
-      <Typography fontSize={18} fontWeight={600}>
+      <Typography fontSize={18} fontWeight={700}>
          {value}
       </Typography>
    </Stack>

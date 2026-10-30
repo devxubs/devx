@@ -127,13 +127,45 @@ const Publish = () => {
       },
    });
 
-   const onSubmit: SubmitHandler<PurchaseFormValues> = (formData) => {
-      // Map/cast form values to PurchaseTypes; use a cast because PurchaseTypes
-      // may expect a slightly different shape (e.g. product item fields).
-      const newOrder: PurchaseTypes = {
-         ...(formData as unknown as PurchaseTypes),
-      };
-      setData(newOrder);
+   const [submitting, setSubmitting] = useState(false);
+   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+   const onSubmit: SubmitHandler<PurchaseFormValues> = async (formData) => {
+      setSubmitting(true);
+      setErrorMsg(null);
+      try {
+         const payload = {
+            supplierId: null,
+            invoice: formData.invoice?.trim() || undefined,
+            items: (formData.product || []).map((p: any) => ({
+               name: p.name,
+               quantity: p.quantity,
+               price: p.price,
+            })),
+            productAmount: formData.product_amount,
+            othersCost: formData.others_cost,
+            discount: formData.discount,
+            paid: 0,
+            note: formData.note || "",
+         };
+
+         const res = await fetch("/api/purchases", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+         });
+
+         if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Failed to create purchase");
+         }
+
+         router.push("/admin/purchase");
+      } catch (err: any) {
+         setErrorMsg(err.message || "Failed to save purchase");
+      } finally {
+         setSubmitting(false);
+      }
    };
 
    return (
@@ -173,10 +205,16 @@ const Publish = () => {
             width={"100%"}
             mt={2}
          >
+            {errorMsg && (
+               <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                  {errorMsg}
+               </Typography>
+            )}
             <Button
                variant="text"
                color="inherit"
-               onClick={() => router.push("admin/purchase")}
+               disabled={submitting}
+               onClick={() => router.push("/admin/purchase")}
             >
                Cancel
             </Button>
@@ -185,9 +223,10 @@ const Publish = () => {
                variant="contained"
                color="primary"
                type="submit"
+               disabled={submitting}
                onClick={handleSubmit(onSubmit)}
             >
-               {"id" + 0 ? "Update Purchase" : "Add Purchase"}
+               {submitting ? "Saving..." : "Add Purchase"}
             </Button>
          </Stack>
       </Stack>

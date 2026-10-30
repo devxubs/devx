@@ -10,6 +10,7 @@ import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
+import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { GridRenderCellParams } from "@mui/x-data-grid";
 
 const productSchema = z.object({
@@ -18,24 +19,45 @@ const productSchema = z.object({
 
 type CategoryType = {
    id: string;
+   customId?: string;
    name: string;
 };
 
 type FormValues = z.infer<typeof productSchema>;
 
 export const categoriesData: CategoryType[] = [
-   { id: "CTG001", name: "Beverages" },
-   { id: "CTG002", name: "Snacks" },
-   { id: "CTG003", name: "Dairy" },
-   { id: "CTG004", name: "Smart Fitness Watch" },
-   { id: "CTG005", name: "Wireless Earbuds" },
-   { id: "CTG006", name: "Portable Bluetooth Speaker" },
-   { id: "CTG007", name: "Noise-Canceling Headphones" },
+   { id: "1", customId: "CAT_1", name: "Beverages" },
+   { id: "2", customId: "CAT_2", name: "Snacks" },
+   { id: "3", customId: "CAT_3", name: "Dairy" },
+   { id: "4", customId: "CAT_4", name: "Smart Fitness Watch" },
+   { id: "5", customId: "CAT_5", name: "Wireless Earbuds" },
+   { id: "6", customId: "CAT_6", name: "Portable Bluetooth Speaker" },
+   { id: "7", customId: "CAT_7", name: "Noise-Canceling Headphones" },
 ];
 
 const Categories = () => {
    const theme = useTheme();
-   const [categories, setCategories] = useState<CategoryType[]>(categoriesData);
+   const [categories, setCategories] = useState<CategoryType[]>([]);
+   const [loading, setLoading] = useState(false);
+
+   const loadCategories = React.useCallback(async () => {
+      setLoading(true);
+      try {
+         const res = await fetch("/api/categories");
+         if (res.ok) {
+            const data = await res.json();
+            setCategories(data);
+         }
+      } catch {
+         // fallback
+      } finally {
+         setLoading(false);
+      }
+   }, []);
+
+   React.useEffect(() => {
+      loadCategories();
+   }, [loadCategories]);
 
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -71,44 +93,51 @@ const Categories = () => {
    };
 
    // Add / Edit submit handler
-   const onSubmit: SubmitHandler<FormValues> = (data) => {
-      const CTGId =
-         categories.length >= 10
-            ? "0" + (categories.length + 1)
-            : "00" + (categories.length + 1);
-      if (selectedCategory) {
-         // Edit
-         setCategories((prev) =>
-            prev.map((cat) =>
-               cat.id === selectedCategory.id
-                  ? { ...cat, name: data.name }
-                  : cat,
-            ),
-         );
-      } else {
-         // Add
-         const newCategory: CategoryType = {
-            id: `CTG${CTGId}`, // simple id generator
-            name: data.name,
-         };
-         setCategories((prev) => [...prev, newCategory]);
-      }
+   const onSubmit: SubmitHandler<FormValues> = async (data) => {
+      try {
+         if (selectedCategory) {
+            await fetch(`/api/categories/${selectedCategory.id}`, {
+               method: "PUT",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({ name: data.name }),
+            });
+         } else {
+            await fetch("/api/categories", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({ name: data.name }),
+            });
+         }
+         loadCategories();
+      } catch {}
       closeModal();
    };
 
    // Delete handler
-   const handleDelete = () => {
+   const handleDelete = async () => {
       if (selectedCategory) {
-         setCategories((prev) =>
-            prev.filter((cat) => cat.id !== selectedCategory.id),
-         );
+         try {
+            await fetch(`/api/categories/${selectedCategory.id}`, {
+               method: "DELETE",
+            });
+            loadCategories();
+         } catch {}
          setSelectedCategory(null);
          setIsDeleteDialogOpen(false);
       }
    };
 
    const columns: ColumnConfig[] = [
-      { field: "id", headerName: "ID", flex: 0 },
+      {
+         field: "customId",
+         headerName: "ID",
+         flex: 0,
+         renderCell: (params: GridRenderCellParams) => (
+            <Typography variant="body2" fontWeight={600} color="primary.main">
+               {params.row.customId || params.row.id}
+            </Typography>
+         ),
+      },
       { field: "name", headerName: "Name", flex: 1 },
       {
          field: "@actions",
@@ -138,37 +167,41 @@ const Categories = () => {
          </Stack>
 
          {/* Table */}
-         <CustomTable
-            rows={categories}
-            columns={columns}
-            checkBox
-            menuItems={[
-               {
-                  label: "edit",
-                  icon: <Icon icon="solar:pen-bold" size="small" />,
-                  onClick: (p: GridRenderCellParams) => {
-                     console.log(p.row);
-
-                     openModal(p.row as CategoryType);
+         {loading ? (
+            <TableSkeleton rows={5} cols={3} />
+         ) : (
+            <CustomTable
+               rows={categories}
+               columns={columns}
+               checkBox
+               canPrint={false}
+               canExport={false}
+               menuItems={[
+                  {
+                     label: "edit",
+                     icon: <Icon icon="solar:pen-bold" size="small" />,
+                     onClick: (p: GridRenderCellParams) => {
+                        openModal(p.row as CategoryType);
+                     },
                   },
-               },
-               {
-                  label: "delete",
-                  color: "error",
-                  icon: (
-                     <Icon
-                        icon="solar:trash-bin-trash-bold"
-                        size="small"
-                        color="error"
-                     />
-                  ),
-                  onClick: (p: GridRenderCellParams) => {
-                     setSelectedCategory(p.row as CategoryType);
-                     setIsDeleteDialogOpen(true);
+                  {
+                     label: "delete",
+                     color: "error",
+                     icon: (
+                        <Icon
+                           icon="solar:trash-bin-trash-bold"
+                           size="small"
+                           color="error"
+                        />
+                     ),
+                     onClick: (p: GridRenderCellParams) => {
+                        setSelectedCategory(p.row as CategoryType);
+                        setIsDeleteDialogOpen(true);
+                     },
                   },
-               },
-            ]}
-         />
+               ]}
+            />
+         )}
 
          {/* Modal */}
          <CustomModal

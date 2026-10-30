@@ -83,6 +83,7 @@ const LoginPage = () => {
    const [isSignUp, setIsSignUp] = useState(false);
    const [openForgotModal, setOpenForgotModal] = useState(false);
    const [snackbarOpen, setSnackbarOpen] = useState(false);
+   const [snackbarMessage, setSnackbarMessage] = useState("");
    const [loading, setLoading] = useState(false);
    const [passwordValue, setPasswordValue] = useState("");
 
@@ -130,15 +131,41 @@ const LoginPage = () => {
    const onSubmit = async (data: any) => {
       setLoading(true);
       try {
-         await new Promise((r) => setTimeout(r, 2000)); // simulate network delay
          if (isSignUp) {
-            alert("Signup successful!");
+            const res = await fetch("/api/auth/register", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify(data),
+            });
+            if (res.ok) {
+               setSnackbarMessage("Account registered successfully! Please sign in.");
+               setSnackbarOpen(true);
+               setIsSignUp(false);
+               reset();
+            } else {
+               const errData = await res.json().catch(() => ({}));
+               setSnackbarMessage(errData.error || "Registration failed");
+               setSnackbarOpen(true);
+            }
          } else {
-            alert("Login successful!");
+            const res = await fetch("/api/auth/login", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify(data),
+            });
+            if (res.ok) {
+               setSnackbarMessage("Login successful!");
+               setSnackbarOpen(true);
+               window.location.href = "/admin/dashboard";
+            } else {
+               const errData = await res.json().catch(() => ({}));
+               setSnackbarMessage(errData.error || "Invalid email or password");
+               setSnackbarOpen(true);
+            }
          }
-         reset();
-      } catch (err) {
-         alert("Something went wrong");
+      } catch {
+         setSnackbarMessage("Network error. Please try again.");
+         setSnackbarOpen(true);
       } finally {
          setLoading(false);
       }
@@ -157,8 +184,8 @@ const LoginPage = () => {
    };
 
    // Dummy social login handlers
-   const handleGoogleLogin = () => alert("Google login clicked");
-   const handleGitHubLogin = () => alert("GitHub login clicked");
+   const handleGoogleLogin = () => { setSnackbarMessage("Google login integration in progress"); setSnackbarOpen(true); };
+   const handleGitHubLogin = () => { setSnackbarMessage("GitHub login integration in progress"); setSnackbarOpen(true); };
 
    return (
       <Box
@@ -596,7 +623,7 @@ const LoginPage = () => {
             open={snackbarOpen}
             autoHideDuration={4000}
             onClose={() => setSnackbarOpen(false)}
-            message="Reset link has been sent!"
+            message={snackbarMessage || "Reset link has been sent!"}
          />
       </Box>
    );

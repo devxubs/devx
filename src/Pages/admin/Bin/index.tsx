@@ -2,7 +2,6 @@
 
 import {
    IconButton,
-   Paper,
    Stack,
    Tab,
    Tabs,
@@ -12,27 +11,31 @@ import {
 } from "@mui/material";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import { UserProfile, UserRows } from "../User";
+import React, { useEffect, useState, useMemo } from "react";
 import Icon from "@src/components/Icon";
-import { productsData, ProductsView } from "../Product";
-import { categoriesData } from "../Categories";
-import { productUnits } from "../Unit";
-import { orders } from "../Order/data";
-import CustomerInfo from "../Customers/CustomerInfo";
-import { suppliersData, SuppliersProfile } from "../Suppliers";
-import { expensesData } from "../Expense";
-import { assetsData } from "../Assets";
+import AlertDialog from "@src/components/AlertDialog";
+import {
+   EmployeeDetailModal,
+   ProductDetailModal,
+   OrderDetailModal,
+   CustomerDetailModal,
+   PurchaseDetailModal,
+   SupplierDetailModal,
+   ExpenseDetailModal,
+   AssetDetailModal,
+} from "@src/components/EntityDetailModals/EntityModals";
 
 const tabs = [
-   "Users",
    "Products",
    "Categories",
    "Units",
    "Orders",
+   "Purchases",
+   "Customers",
    "Suppliers",
    "Expenses",
    "Assets",
+   "Users",
 ];
 
 const Bin = () => {
@@ -40,80 +43,127 @@ const Bin = () => {
    const [val, setVal] = React.useState(0);
    const router = useRouter();
    const params = useSearchParams();
-   const tab = params?.get("tab");
+   const tab = params?.get("tab") || "products";
 
-   const tableRowsMap: Record<string, any> = {
-      users: UserRows,
-      products: productsData,
-      categories: categoriesData,
-      units: productUnits,
-      orders,
-      suppliers: suppliersData,
-      expenses: expensesData,
-      assets: assetsData,
-   };
-   const tableColumnsMap: Record<string, (params: any) => React.ReactNode> = {
-      users: (params) => (
-         <UserProfile name={params.row.name} email={params.row.email} />
-      ),
+   const [binItems, setBinItems] = useState<any[]>([]);
+   const [loading, setLoading] = useState(false);
+   const [deleteConfirmItem, setDeleteConfirmItem] = useState<any | null>(null);
+   const [selectedDetail, setSelectedDetail] = useState<{ type: string; id: string } | null>(null);
 
-      products: (params) => (
-         <ProductsView
-            key={params.row.id}
-            name={params.row.productName}
-            description={params.row.category}
-            url={params.row.images[0]}
-         />
-      ),
+   const loadBinItems = React.useCallback(async () => {
+      setLoading(true);
+      try {
+         const res = await fetch("/api/bin");
+         if (res.ok) {
+            const data = await res.json();
+            setBinItems(data);
+         }
+      } catch {}
+      setLoading(false);
+   }, []);
 
-      orders: (params) => <CustomerInfo {...params.row.customer} />,
+   useEffect(() => {
+      loadBinItems();
+   }, [loadBinItems]);
 
-      suppliers: (params) => (
-         <SuppliersProfile name={params.row.name} number={params.row.number} />
-      ),
-
-      expenses: (params) => params.row.type,
-      assets: (params) => params.row.type,
+   const handleAction = async (item: any, action: "restore" | "delete") => {
+      try {
+         await fetch("/api/bin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: item.type, id: item.id, action }),
+         });
+         loadBinItems();
+      } catch {}
    };
 
-   const tableRows = tableRowsMap[tab || "users"] || [];
+   // Map active tab to item type safely
+   const tabToTypeMap: Record<string, string> = {
+      users: "user",
+      products: "product",
+      categories: "category",
+      units: "unit",
+      orders: "order",
+      purchases: "purchase",
+      customers: "customer",
+      suppliers: "supplier",
+      expenses: "expense",
+      assets: "asset",
+   };
+   const normalizedTab = (tab || "products").toLowerCase();
+   const targetType = tabToTypeMap[normalizedTab] || normalizedTab.replace(/s$/, "");
+   const filteredItems = useMemo(
+      () => binItems.filter((i) => i.type === targetType || i.type === normalizedTab),
+      [binItems, targetType, normalizedTab],
+   );
+
    const tableColumns: ColumnConfig[] = [
       {
          field: "id",
          headerName: "ID",
+         flex: 0.3,
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               fontWeight={600}
+               color="primary.main"
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() =>
+                  setSelectedDetail({
+                     type: params.row.type,
+                     id: params.row.customId || params.row.id,
+                  })
+               }
+            >
+               {params.row.customId || params.row.id}
+            </Typography>
+         ),
       },
       {
          field: "name",
-         headerName: "Name",
+         headerName: "Item Name",
          flex: 1,
-         renderCell(params) {
-            return tableColumnsMap[tab || "users"]?.(params) ?? params.row.name;
-         },
       },
       {
          field: "deleteDate",
-         headerName: "Date",
+         headerName: "Deleted At",
          flex: 0.8,
          renderCell: (params) => {
-            const currentDate = new Date();
-
-            const formattedDate = currentDate.toLocaleDateString("en-US", {
+            const d = params.row.deletedAt ? new Date(params.row.deletedAt) : new Date();
+            return d.toLocaleDateString("en-US", {
                year: "numeric",
-               month: "long",
+               month: "short",
                day: "numeric",
+               hour: "2-digit",
+               minute: "2-digit",
             });
-            return formattedDate;
          },
       },
       {
          field: "@restore",
-         headerName: "",
-         renderCell: () => (
-            <Tooltip title="Restore" placement="top" disableInteractive>
-               <IconButton size="small">
-                  <Icon icon="solar:restart-square-bold-duotone" />
-               </IconButton>
-            </Tooltip>
+         headerName: "Actions",
+         flex: 0.4,
+         renderCell: (params) => (
+            <Stack direction="row" spacing={1}>
+               <Tooltip title="Restore" placement="top" disableInteractive>
+                  <IconButton
+                     size="small"
+                     color="primary"
+                     onClick={() => handleAction(params.row, "restore")}
+                  >
+                     <Icon icon="solar:restart-square-bold-duotone" />
+                  </IconButton>
+               </Tooltip>
+               <Tooltip title="Permanent Delete" placement="top" disableInteractive>
+                  <IconButton
+                     size="small"
+                     color="error"
+                     onClick={() => setDeleteConfirmItem(params.row)}
+                  >
+                     <Icon icon="solar:trash-bin-trash-bold" />
+                  </IconButton>
+               </Tooltip>
+            </Stack>
          ),
       },
    ];
@@ -127,7 +177,7 @@ const Bin = () => {
             setVal(tabIndex);
          }
       }
-   }, []);
+   }, [tab]);
 
    const handleChange = (event: React.SyntheticEvent, newValue: number) => {
       setVal(newValue);
@@ -174,10 +224,10 @@ const Bin = () => {
                   },
                }}
             >
-               {tabs.map((tab, index) => (
+               {tabs.map((t, index) => (
                   <Tab
                      key={index}
-                     label={tab}
+                     label={t}
                      sx={{
                         textTransform: "none",
                         fontWeight: 500,
@@ -198,8 +248,70 @@ const Bin = () => {
             </Tabs>
          </Stack>
 
-         <CustomTable rows={tableRows} columns={tableColumns} />
-         {/* )} */}
+         <CustomTable rows={filteredItems} columns={tableColumns} />
+
+         {/* Permanent delete confirmation dialog */}
+         <AlertDialog
+            open={Boolean(deleteConfirmItem)}
+            onClose={() => setDeleteConfirmItem(null)}
+            type="error"
+            title={`Are you sure you want to permanently delete <b>${deleteConfirmItem?.name || deleteConfirmItem?.customId || "this item"}</b>?`}
+            onConfirm={async () => {
+               if (deleteConfirmItem) {
+                  await handleAction(deleteConfirmItem, "delete");
+                  setDeleteConfirmItem(null);
+               }
+            }}
+         />
+
+         {/* Detail Modals */}
+         <EmployeeDetailModal
+            open={Boolean(selectedDetail && (selectedDetail.type === "user" || selectedDetail.type === "employee"))}
+            onClose={() => setSelectedDetail(null)}
+            employeeId={selectedDetail?.id}
+         />
+
+         <ProductDetailModal
+            open={Boolean(selectedDetail && selectedDetail.type === "product")}
+            onClose={() => setSelectedDetail(null)}
+            productId={selectedDetail?.id}
+         />
+
+         <OrderDetailModal
+            open={Boolean(selectedDetail && selectedDetail.type === "order")}
+            onClose={() => setSelectedDetail(null)}
+            orderId={selectedDetail?.id}
+         />
+
+         <CustomerDetailModal
+            open={Boolean(selectedDetail && selectedDetail.type === "customer")}
+            onClose={() => setSelectedDetail(null)}
+            customerId={selectedDetail?.id}
+         />
+
+         <PurchaseDetailModal
+            open={Boolean(selectedDetail && selectedDetail.type === "purchase")}
+            onClose={() => setSelectedDetail(null)}
+            purchaseId={selectedDetail?.id}
+         />
+
+         <SupplierDetailModal
+            open={Boolean(selectedDetail && selectedDetail.type === "supplier")}
+            onClose={() => setSelectedDetail(null)}
+            supplierId={selectedDetail?.id}
+         />
+
+         <ExpenseDetailModal
+            open={Boolean(selectedDetail && selectedDetail.type === "expense")}
+            onClose={() => setSelectedDetail(null)}
+            expenseId={selectedDetail?.id}
+         />
+
+         <AssetDetailModal
+            open={Boolean(selectedDetail && selectedDetail.type === "asset")}
+            onClose={() => setSelectedDetail(null)}
+            assetId={selectedDetail?.id}
+         />
       </Stack>
    );
 };

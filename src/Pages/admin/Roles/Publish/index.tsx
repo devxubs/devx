@@ -12,6 +12,7 @@ import Masonry from "@mui/lab/Masonry";
 
 import Icon from "@src/components/Icon";
 import React, { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Item from "./Item";
 import Scrollbar from "react-browser-scrollbar";
 import { orderStatuses } from "../../Order/data";
@@ -427,8 +428,27 @@ const data: DataItem[] = [
 const Publish = () => {
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+   const router = useRouter();
+   const params = useSearchParams();
+   const id = params?.get("id");
 
    const [role, setRole] = useState(data);
+   const [roleName, setRoleName] = useState("");
+   const [submitting, setSubmitting] = useState(false);
+
+   useEffect(() => {
+      if (!id) return;
+      const fetchRole = async () => {
+         try {
+            const res = await fetch(`/api/roles/${id}`);
+            if (res.ok) {
+               const r = await res.json();
+               setRoleName(r.name || "");
+            }
+         } catch {}
+      };
+      fetchRole();
+   }, [id]);
 
    const updatePermissions = (id: number, updater: (p: any) => any) => {
       setRole((prev) =>
@@ -443,9 +463,47 @@ const Publish = () => {
       );
    };
 
-   useEffect(() => {
-      console.log(role);
-   }, [role]);
+   const handleSaveRole = async () => {
+      if (!roleName.trim()) {
+         alert("Please enter a role name");
+         return;
+      }
+      setSubmitting(true);
+      try {
+         const permissionSummary: Record<string, boolean> = {};
+         role.forEach((cat) => {
+            cat.permissions.forEach((perm) => {
+               if (perm.allow) {
+                  permissionSummary[`${cat.name}_${perm.name}`.toLowerCase().replace(/\s+/g, "_")] = true;
+               }
+            });
+         });
+
+         const url = id ? `/api/roles/${id}` : "/api/roles";
+         const method = id ? "PUT" : "POST";
+
+         const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+               name: roleName.trim(),
+               description: `${roleName.trim()} role permissions`,
+               permissions: permissionSummary,
+            }),
+         });
+
+         if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Failed to save role");
+         }
+
+         router.push("/admin/roles");
+      } catch (err: any) {
+         alert(err.message || "Failed to save role");
+      } finally {
+         setSubmitting(false);
+      }
+   };
 
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
@@ -487,20 +545,12 @@ const Publish = () => {
                <TextField
                   fullWidth
                   placeholder="Role Name"
+                  value={roleName}
                   size={isMobile ? "small" : "medium"}
                   sx={{
                      flex: !isMobile ? 0.4 : 1,
                   }}
-                  onChange={(e) => {
-                     // Handle search logic here
-                     setRole(
-                        data.filter((item) => {
-                           return item.name
-                              .toLowerCase()
-                              .includes(e.target.value.toLowerCase());
-                        }),
-                     );
-                  }}
+                  onChange={(e) => setRoleName(e.target.value)}
                />
             </Stack>
 
@@ -538,23 +588,22 @@ const Publish = () => {
                spacing={2}
                direction={"row"}
                justifyContent={"flex-end"}
-               // position={"fixed"}
-               // bottom={10}
-               // right={10}
-               // zIndex={1000}
-               // borderRadius={1}
-               // p={2}
-               // boxShadow={15}
-               // bgcolor={alpha(theme.palette.background.paper, 0.15)}
-               // sx={{
-               //    backdropFilter: "blur(12px) saturate(180%)",
-               // }}
             >
-               <Button variant="text" color="inherit">
+               <Button
+                  variant="text"
+                  color="inherit"
+                  disabled={submitting}
+                  onClick={() => router.push("/admin/roles")}
+               >
                   Cancel
                </Button>
-               <Button variant="contained" color="primary">
-                  Submit
+               <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={submitting}
+                  onClick={handleSaveRole}
+               >
+                  {submitting ? "Saving..." : id ? "Update Role" : "Create Role"}
                </Button>
             </Stack>
          </Stack>

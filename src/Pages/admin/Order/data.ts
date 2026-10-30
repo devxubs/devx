@@ -162,7 +162,7 @@ export const orders: OrderType[] = [
          subtotal: 51.98,
          deliveryCharge: 0,
          discount: 5,
-         total: 51.14,
+         total: 46.98,
       },
    },
 
@@ -218,7 +218,7 @@ export const orders: OrderType[] = [
          subtotal: 94.94,
          deliveryCharge: 5,
          discount: 0,
-         total: 107.53,
+         total: 99.94,
       },
    },
 
@@ -265,7 +265,7 @@ export const orders: OrderType[] = [
          subtotal: 22.75,
          deliveryCharge: 0,
          discount: 5,
-         total: 19.54,
+         total: 17.75,
       },
    },
 
@@ -321,7 +321,7 @@ export const orders: OrderType[] = [
          subtotal: 119.48,
          deliveryCharge: 0,
          discount: 10,
-         total: 119.04,
+         total: 109.48,
       },
    },
 
@@ -369,7 +369,7 @@ export const orders: OrderType[] = [
          subtotal: 49.99,
          deliveryCharge: 0,
          discount: 0,
-         total: 53.98,
+         total: 49.99,
       },
 
       cancellationReason: "Customer changed mind",
@@ -427,7 +427,7 @@ export const orders: OrderType[] = [
          subtotal: 175.49,
          deliveryCharge: 10,
          discount: 15,
-         total: 183.33,
+         total: 170.49,
       },
    },
 
@@ -474,7 +474,7 @@ export const orders: OrderType[] = [
          subtotal: 199.99,
          deliveryCharge: 0,
          discount: 20,
-         total: 194.39,
+         total: 179.99,
       },
    },
 
@@ -521,7 +521,7 @@ export const orders: OrderType[] = [
          subtotal: 89.99,
          deliveryCharge: 0,
          discount: 0,
-         total: 96.74,
+         total: 89.99,
       },
    },
 
@@ -568,7 +568,7 @@ export const orders: OrderType[] = [
          subtotal: 249.99,
          deliveryCharge: 20,
          discount: 30,
-         total: 258.89,
+         total: 239.99,
       },
    },
 
@@ -624,7 +624,7 @@ export const orders: OrderType[] = [
          subtotal: 129.98,
          deliveryCharge: 0,
          discount: 10,
-         total: 129.57,
+         total: 119.98,
       },
    },
 ];

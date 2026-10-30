@@ -7,6 +7,8 @@ import {
    Typography,
    useMediaQuery,
    useTheme,
+   CircularProgress,
+   Alert,
 } from "@mui/material";
 import AnimatedAvatar from "@src/components/AnimateAvatar";
 import CustomModal from "@src/components/Modal";
@@ -21,22 +23,58 @@ interface ModalProps {
    open: boolean;
    users: User[];
    onClose: () => void;
+   onGroupCreated?: (newConv: any) => void;
 }
 
-const Modal = ({ users, open, onClose }: ModalProps) => {
+const Modal = ({ users, open, onClose, onGroupCreated }: ModalProps) => {
    const theme = useTheme();
-   const user = users.map((u) => u.name);
-   const [selectUser, setSelectUser] = useState();
+   const [groupName, setGroupName] = useState("");
    const [selected, setSelected] = useState<User[]>([]);
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
    const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
+
+   const handleCreateGroup = async () => {
+      if (!groupName.trim()) {
+         setError("Group name is required");
+         return;
+      }
+
+      setLoading(true);
+      setError(null);
+      try {
+         const res = await fetch("/api/chat/conversations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+               type: "group",
+               name: groupName.trim(),
+               memberIds: selected.map((s) => s.id),
+            }),
+         });
+
+         if (res.ok) {
+            const data = await res.json();
+            setGroupName("");
+            setSelected([]);
+            if (onGroupCreated) onGroupCreated(data);
+            onClose();
+         } else {
+            const errData = await res.json();
+            setError(errData.error || "Failed to create group");
+         }
+      } catch {
+         setError("Error creating group conversation");
+      } finally {
+         setLoading(false);
+      }
+   };
 
    return (
       <CustomModal
          title="Create Group"
          open={open}
-         onClose={function (): void {
-            onClose();
-         }}
+         onClose={onClose}
          sx={{
             width: {
                xs: 300,
@@ -45,6 +83,11 @@ const Modal = ({ users, open, onClose }: ModalProps) => {
             },
          }}
       >
+         {error && (
+            <Alert severity="error" sx={{ mb: 1.5 }}>
+               {error}
+            </Alert>
+         )}
          <Stack
             spacing={2}
             direction={{
@@ -63,6 +106,8 @@ const Modal = ({ users, open, onClose }: ModalProps) => {
                <TextField
                   placeholder="Group name"
                   label="Group name"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
                   sx={{
                      mt: 2,
                      mb: !selected.length ? 2 : 0,
@@ -104,7 +149,7 @@ const Modal = ({ users, open, onClose }: ModalProps) => {
                               }
                            >
                               <Stack spacing={0.5} alignItems={"center"}>
-                                 <AnimatedAvatar />
+                                 <AnimatedAvatar src={su.avatar} />
                                  <Typography variant="body2" fontSize={10}>
                                     {su.name}
                                  </Typography>
@@ -128,12 +173,11 @@ const Modal = ({ users, open, onClose }: ModalProps) => {
                label="Users"
                multiple
                limitTags={isSmDown ? 1 : 2}
-               option={users || []}
+               options={users || []}
                getOptionLabel={(option) => option.name || ""}
-               value={selected as any}
+               value={selected}
                onChange={(va) => {
-                  setSelectUser(va);
-                  setSelected(va);
+                  setSelected(Array.isArray(va) ? va : []);
                }}
             />
          </Stack>
@@ -144,12 +188,17 @@ const Modal = ({ users, open, onClose }: ModalProps) => {
             width={"100%"}
             mt={2}
          >
-            <Button variant="text" color="inherit" onClick={onClose}>
+            <Button variant="text" color="inherit" onClick={onClose} disabled={loading}>
                Cancel
             </Button>
 
-            <Button variant="contained" color="primary">
-               {"Add user"}
+            <Button
+               variant="contained"
+               color="primary"
+               onClick={handleCreateGroup}
+               disabled={loading}
+            >
+               {loading ? <CircularProgress size={20} color="inherit" /> : "Add user"}
             </Button>
          </Stack>
       </CustomModal>

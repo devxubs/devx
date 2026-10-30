@@ -15,6 +15,7 @@ import { OrderType } from "../type";
 import { Controller } from "react-hook-form";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import { paymentMethod } from "../data";
+import { useSettings } from "@src/lib/settingsContext";
 
 interface DetailsProps {
    control: any;
@@ -25,6 +26,7 @@ interface DetailsProps {
 }
 
 const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
+   const { settings } = useSettings();
    const [expanded, setExpanded] = useState(true);
 
    const subtotal = Number(watch("pricing.subtotal") ?? 0);
@@ -87,12 +89,12 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                            name="pricing.paymentMethod"
                            control={control}
                            defaultValue={
-                              data?.paymentMethod ?? "Cash on Delivery"
+                              data?.paymentMethod ?? (settings.defaultPaymentMethod || "Cash on Delivery")
                            }
                            render={({ field }) => (
                               <CustomAutocomplete
                                  {...field}
-                                 value={field.value || []} // ✅ always controlled
+                                 value={field.value || ""}
                                  onChange={(val: any, e: any) =>
                                     field.onChange(val)
                                  }
@@ -128,7 +130,8 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                                  {...field}
                                  type="number"
                                  fullWidth
-                                 label="Subtotal"
+                                 label="Subtotal (Auto-calculated)"
+                                 InputProps={{ readOnly: true }}
                                  error={!!errors?.subtotal}
                                  helperText={errors?.subtotal?.message}
                               />
@@ -158,7 +161,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                         <Controller
                            name="pricing.deliveryCharge"
                            control={control}
-                           defaultValue={data?.deliveryCharge ?? 0} // free by default
+                           defaultValue={data?.deliveryCharge ?? (settings.defaultDeliveryCharge ?? 0)}
                            render={({ field }) => (
                               <TextField
                                  {...field}
@@ -186,7 +189,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: DetailsProps) => {
                         <Controller
                            name="pricing.discount"
                            control={control}
-                           defaultValue={data?.discount ?? 0}
+                           defaultValue={data?.discount ?? (settings.defaultDiscountRate ?? 0)}
                            render={({ field }) => (
                               <TextField
                                  {...field}

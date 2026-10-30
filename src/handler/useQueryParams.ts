@@ -9,7 +9,8 @@ import { useRouter } from "next/navigation";
 const useQueryParams = (basepath?: string) => {
    const searchParams = useSearchParams() as ReadonlyURLSearchParams;
    const router = useRouter();
-   const pathname: string = basepath || (usePathname() as string);
+   const currentPathname = usePathname();
+   const pathname: string = basepath || (currentPathname as string);
 
    const root = {
       toString: () => searchParams?.toString(),

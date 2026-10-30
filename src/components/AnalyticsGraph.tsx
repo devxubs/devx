@@ -152,7 +152,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
 
    /* -------- TOTAL -------- */
    const totalValue = React.useMemo(
-      () => filteredData.reduce((sum, item) => sum + item.y, 0),
+      () => (filteredData || []).reduce((sum, item) => sum + (Number(item?.y) || 0), 0),
       [filteredData],
    );
 
@@ -212,7 +212,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
       },
       yaxis: {
          labels: {
-            formatter: (val: number) => val.toLocaleString(),
+            formatter: (val: number) => (Number(val) || 0).toLocaleString(),
             style: {
                colors: theme.palette.text.secondary,
                fontSize: "11px",
@@ -224,7 +224,7 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
          intersect: false,
          theme: theme.palette.mode,
          y: {
-            formatter: (val: number) => `${currency}${val.toLocaleString()}`,
+            formatter: (val: number) => `${currency}${(Number(val) || 0).toLocaleString()}`,
             title: {
                formatter: () =>
                   currency.length !== 0 ? "Amount: " : "Value: ",

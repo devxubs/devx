@@ -1,11 +1,11 @@
 import Order from "@src/Pages/admin/Order";
-import React from "react";
+import React, { Suspense } from "react";
 
 const OrderPage = () => {
    return (
-      <div>
+      <Suspense fallback={<div>Loading...</div>}>
          <Order />
-      </div>
+      </Suspense>
    );
 };
 

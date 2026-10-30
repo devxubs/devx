@@ -11,6 +11,7 @@ import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
+import { TableSkeleton } from "@src/components/SkeletonLoader";
 
 const productSchema = z.object({
    name: z.string().min(1, "Name is required!"),
@@ -19,6 +20,7 @@ const productSchema = z.object({
 
 type UnitType = {
    id: string;
+   customId?: string;
    name: string;
    short: string;
 };
@@ -26,31 +28,57 @@ type UnitType = {
 type FormValues = z.infer<typeof productSchema>;
 
 export const productUnits = [
-   { id: "UN001", name: "Piece", short: "pc" },
-   { id: "UN002", name: "Kilogram", short: "kg" },
-   { id: "UN003", name: "Gram", short: "g" },
-   { id: "UN004", name: "Liter", short: "l" },
-   { id: "UN005", name: "Milliliter", short: "ml" },
-   { id: "UN006", name: "Meter", short: "m" },
-   { id: "UN007", name: "Centimeter", short: "cm" },
-   { id: "UN008", name: "Inch", short: "in" },
-   { id: "UN009", name: "Foot", short: "ft" },
-   { id: "UN010", name: "Dozen", short: "dz" },
-   { id: "UN011", name: "Pack", short: "pk" },
-   { id: "UN012", name: "Box", short: "box" },
-   { id: "UN013", name: "Carton", short: "ctn" },
-   { id: "UN014", name: "Bottle", short: "btl" },
-   { id: "UN015", name: "Bag", short: "bag" },
-   { id: "UN016", name: "Roll", short: "roll" },
-   { id: "UN017", name: "Sheet", short: "sht" },
-   { id: "UN018", name: "Pair", short: "pr" },
-   { id: "UN019", name: "Set", short: "set" },
-   { id: "UN020", name: "Bundle", short: "bndl" },
+   { id: "1", customId: "UNIT_1", name: "Piece", short: "pc" },
+   { id: "2", customId: "UNIT_2", name: "Kilogram", short: "kg" },
+   { id: "3", customId: "UNIT_3", name: "Gram", short: "g" },
+   { id: "4", customId: "UNIT_4", name: "Liter", short: "l" },
+   { id: "5", customId: "UNIT_5", name: "Milliliter", short: "ml" },
+   { id: "6", customId: "UNIT_6", name: "Meter", short: "m" },
+   { id: "7", customId: "UNIT_7", name: "Centimeter", short: "cm" },
+   { id: "8", customId: "UNIT_8", name: "Inch", short: "in" },
+   { id: "9", customId: "UNIT_9", name: "Foot", short: "ft" },
+   { id: "10", customId: "UNIT_10", name: "Dozen", short: "dz" },
+   { id: "11", customId: "UNIT_11", name: "Pack", short: "pk" },
+   { id: "12", customId: "UNIT_12", name: "Box", short: "box" },
+   { id: "13", customId: "UNIT_13", name: "Carton", short: "ctn" },
+   { id: "14", customId: "UNIT_14", name: "Bottle", short: "btl" },
+   { id: "15", customId: "UNIT_15", name: "Bag", short: "bag" },
+   { id: "16", customId: "UNIT_16", name: "Roll", short: "roll" },
+   { id: "17", customId: "UNIT_17", name: "Sheet", short: "sht" },
+   { id: "18", customId: "UNIT_18", name: "Pair", short: "pr" },
+   { id: "19", customId: "UNIT_19", name: "Set", short: "set" },
+   { id: "20", customId: "UNIT_20", name: "Bundle", short: "bndl" },
 ];
 
 const Unit = () => {
    const theme = useTheme();
-   const [unit, setUnit] = useState<UnitType[]>(productUnits);
+   const [unit, setUnit] = useState<UnitType[]>([]);
+   const [loading, setLoading] = useState(false);
+
+   const loadUnits = React.useCallback(async () => {
+      setLoading(true);
+      try {
+         const res = await fetch("/api/units");
+         if (res.ok) {
+            const data = await res.json();
+            const mapped = data.map((u: any) => ({
+               id: u.id,
+               customId: u.customId,
+               name: u.name,
+               short: u.name.slice(0, 3).toLowerCase(),
+            }));
+            setUnit(mapped);
+         }
+      } catch {
+         // fallback
+      } finally {
+         setLoading(false);
+      }
+   }, []);
+
+   React.useEffect(() => {
+      loadUnits();
+   }, [loadUnits]);
 
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -85,39 +113,41 @@ const Unit = () => {
    };
 
    // Add / Edit submit handler
-   const onSubmit: SubmitHandler<FormValues> = (data) => {
-      const UNId =
-         unit.length >= 10 ? "0" + unit.length + 1 : "00" + unit.length + 1;
-      if (selectedUnit) {
-         // Edit
-         setUnit((prev) =>
-            prev.map((cat) =>
-               cat.id === selectedUnit.id ? { ...cat, name: data.name } : cat,
-            ),
-         );
-      } else {
-         // Add
-         const newUnit: UnitType = {
-            id: `UN${UNId}`, // simple id generator
-            name: data.name,
-            short: data.short,
-         };
-         setUnit((prev) => [...prev, newUnit]);
-      }
+   const onSubmit: SubmitHandler<FormValues> = async (data) => {
+      try {
+         await fetch("/api/units", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: data.name }),
+         });
+         loadUnits();
+      } catch {}
       closeModal();
    };
 
    // Delete handler
-   const handleDelete = () => {
+   const handleDelete = async () => {
       if (selectedUnit) {
-         setUnit((prev) => prev.filter((cat) => cat.id !== selectedUnit.id));
+         try {
+            await fetch(`/api/units/${selectedUnit.id}`, { method: "DELETE" });
+            loadUnits();
+         } catch {}
          setSelectedUnit(null);
          setIsDeleteDialogOpen(false);
       }
    };
 
    const columns: ColumnConfig[] = [
-      { field: "id", headerName: "ID", flex: 0.3 },
+      {
+         field: "customId",
+         headerName: "ID",
+         flex: 0.3,
+         renderCell: (params: any) => (
+            <Typography variant="body2" fontWeight={600} color="primary.main">
+               {params.row.customId || params.row.id}
+            </Typography>
+         ),
+      },
       { field: "name", headerName: "Name", flex: 1 },
       { field: "short", headerName: "Short", flex: 1 },
       {
@@ -149,33 +179,39 @@ const Unit = () => {
             </Stack>
 
             {/* Table */}
-            <CustomTable
-               rows={unit}
-               columns={columns}
-               checkBox
-               menuItems={[
-                  {
-                     label: "edit",
-                     icon: <Icon icon="solar:pen-bold" size="small" />,
-                     onClick: (p) => openModal(p.row),
-                  },
-                  {
-                     label: "delete",
-                     color: "error",
-                     icon: (
-                        <Icon
-                           icon="solar:trash-bin-trash-bold"
-                           size="small"
-                           color="error"
-                        />
-                     ),
-                     onClick: (p) => {
-                        setSelectedUnit(p.row);
-                        setIsDeleteDialogOpen(true);
+            {loading ? (
+               <TableSkeleton rows={5} cols={4} />
+            ) : (
+               <CustomTable
+                  rows={unit}
+                  columns={columns}
+                  checkBox
+                  canPrint={false}
+                  canExport={false}
+                  menuItems={[
+                     {
+                        label: "edit",
+                        icon: <Icon icon="solar:pen-bold" size="small" />,
+                        onClick: (p) => openModal(p.row),
                      },
-                  },
-               ]}
-            />
+                     {
+                        label: "delete",
+                        color: "error",
+                        icon: (
+                           <Icon
+                              icon="solar:trash-bin-trash-bold"
+                              size="small"
+                              color="error"
+                           />
+                        ),
+                        onClick: (p) => {
+                           setSelectedUnit(p.row);
+                           setIsDeleteDialogOpen(true);
+                        },
+                     },
+                  ]}
+               />
+            )}
 
             {/* Modal */}
             <CustomModal

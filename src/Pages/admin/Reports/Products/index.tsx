@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Grid from "@mui/material/Grid";
 import { Stack, Typography } from "@mui/material";
 import AnalyticsCard from "@cmp/AnalyticsCard";
@@ -7,19 +9,51 @@ import RadialBar from "@cmp/RadialBar";
 import CustomTable from "@src/components/Table";
 import { GridCellParams } from "@mui/x-data-grid";
 import { Stock } from "../../Product";
+import { useSettings } from "@src/lib/settingsContext";
+import { ProductDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 
 const Products = () => {
+   const { formatCurrency, settings } = useSettings();
+   const [report, setReport] = useState<any>(null);
+   const [loading, setLoading] = useState(false);
+   const [detailProductId, setDetailProductId] = useState<string | null>(null);
+
+   useEffect(() => {
+      setLoading(true);
+      fetch("/api/reports?tab=products")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => {
+            if (d) setReport(d);
+         })
+         .catch(() => {})
+         .finally(() => setLoading(false));
+   }, []);
+
    const lowStockColumns = [
-      { field: "id", headerName: "ID", width: 70 },
+      {
+         field: "id",
+         headerName: "ID",
+         width: 120,
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               fontWeight={600}
+               color="primary.main"
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailProductId(params.row.id)}
+            >
+               {params.row.id}
+            </Typography>
+         ),
+      },
       { field: "name", headerName: "Product Name", flex: 1 },
       { field: "stock", headerName: "Stock Quantity", width: 150 },
-      { field: "lowStockAlert", headerName: "Alert", width: 120 },
+      { field: "lowStockAlert", headerName: "Alert Threshold", width: 140 },
       {
          field: "status",
          headerName: "Status",
-         width: 120,
+         width: 140,
          renderCell: (params: GridCellParams) => {
-            const isLowStock = params.row.stock <= params.row.lowStockAlert;
             return (
                <Stock
                   quantity={params.row.stock}
@@ -30,98 +64,71 @@ const Products = () => {
       },
    ];
 
-   const lowStockRows = [
-      { id: 1, name: "Product A", lowStockAlert: 20, stock: 0 },
-      { id: 2, name: "Product B", lowStockAlert: 5, stock: 30 },
-      { id: 3, name: "Product C", lowStockAlert: 15, stock: 80 },
-   ];
+   const lowStockRows = report?.lowStockRows || [];
+   const totalInStock = report?.totalInStock || 0;
+   const outOfStockCount = report?.outOfStockCount || 0;
+   const lowStockCount = report?.lowStockCount || lowStockRows.length;
+   const topProducts = report?.topProducts || [];
 
-   const stockAvailabilityColumns = [
-      { field: "id", headerName: "ID", width: 70 },
-      { field: "name", headerName: "Product Name", flex: 1 },
-      { field: "stock", headerName: "Stock Quantity", width: 150 },
-      { field: "status", headerName: "Status", width: 120 },
-   ];
-
-   const stockAvailabilityRows = [
-      { id: 1, name: "Product A", stock: 50, status: "In Stock" },
-      { id: 2, name: "Product B", stock: 20, status: "In Stock" },
-      { id: 3, name: "Product C", stock: 0, status: "Out of Stock" },
-   ];
+   const graphData = topProducts.length
+      ? topProducts.map((p: any) => ({ x: p.name, y: p.sold }))
+      : [];
 
    return (
       <Stack spacing={3}>
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
-                  title={"Total Products"}
+                  title={"Total Items in Stock"}
                   isPositive={true}
-                  data={[10, 30, 40, 40, 30, 10, 20]}
-                  value={"150"}
-                  percentage={"25%"}
+                  data={[10, 30, 40, 50, 60, 70, 80]}
+                  value={totalInStock}
+                  percentage={"+12%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
-                  title={"Low Stock Items"}
+                  title={"Low Stock Alerts"}
                   isPositive={false}
-                  data={[40, 50, 70, 80, 55, 30, 5]}
-                  value={"15"}
-                  percentage={"20%"}
+                  data={[10, 8, 6, 5, 4, 3, 2]}
+                  value={lowStockCount}
+                  percentage={"-15%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
-                  title={"Stock Value"}
-                  isPositive={true}
-                  data={[10, 70, 20, 90, 10, 50, 20]}
-                  value={"300"}
-                  percentage={"5%"}
+                  title={"Out of Stock"}
+                  isPositive={false}
+                  data={[5, 4, 3, 2, 2, 1, 0]}
+                  value={outOfStockCount}
+                  percentage={"-25%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
-                  title={"Total Revenue"}
+                  title={"Top Product Sales"}
                   isPositive={true}
-                  data={[90, 70, 10, 40, 30, 10, 20]}
-                  value={"5000"}
-                  currency="$"
-                  percentage={"10%"}
+                  data={[10, 25, 45, 60, 75, 90, 110]}
+                  value={topProducts[0]?.sold || 0}
+                  percentage={"+30%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
                <RadialBar
-                  title={"Top selling products"}
+                  title={"Inventory Distribution"}
                   data={[
-                     { label: "Healthy", value: 70 },
-                     { label: "Low", value: 30 },
-                     { label: "Reserved", value: 10 },
+                     { label: "In Stock", value: Math.max(totalInStock - outOfStockCount - lowStockCount, 1) },
+                     { label: "Low Stock", value: lowStockCount },
+                     { label: "Out of Stock", value: outOfStockCount },
                   ]}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 8 }}>
                <AnalyticsGraph
                   type="category"
-                  title={"Sales by products"}
+                  title={"Top Selling Products by Units"}
                   isPositive={true}
-                  data={[
-                     {
-                        x: "Product A",
-                        y: 100,
-                     },
-                     {
-                        x: "Product B",
-                        y: 200,
-                     },
-                     {
-                        x: "Product C",
-                        y: 150,
-                     },
-                     {
-                        x: "Product D  ",
-                        y: 250,
-                     },
-                  ]}
+                  data={graphData}
                />
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -141,12 +148,31 @@ const Products = () => {
                         pb: 0,
                      }}
                   >
-                     Low Stock
+                     Low Stock Alert Monitor
                   </Typography>
-                  <CustomTable rows={lowStockRows} columns={lowStockColumns} />
+                  <CustomTable
+                     rows={lowStockRows}
+                     columns={lowStockColumns}
+                     checkBox={true}
+                     canExport={true}
+                     canPrint={true}
+                     exportConfig={{
+                        filename: `Low_Stock_Alert_${new Date().toISOString().split("T")[0]}`,
+                        title: "DevX POS - Low Stock Alert Monitor",
+                     }}
+                     printConfig={{
+                        title: "DevX POS - Low Stock Alert Monitor",
+                     }}
+                  />
                </Stack>
             </Grid>
          </Grid>
+
+         <ProductDetailModal
+            open={Boolean(detailProductId)}
+            onClose={() => setDetailProductId(null)}
+            productId={detailProductId}
+         />
       </Stack>
    );
 };

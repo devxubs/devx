@@ -1,5 +1,5 @@
 "use client";
-import { Stack, Button } from "@mui/material";
+import { Stack, Button, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 
 import { useForm, SubmitHandler } from "react-hook-form";
@@ -24,8 +24,8 @@ const productSchema = z
 
       images: z.array(z.any()).min(2, "At least 2 images are required!"),
 
-      productCode: z.string().min(1, "Product code is required!"),
-      productSku: z.string().min(1, "Product SKU is required!"),
+      productCode: z.string().optional(),
+      productSku: z.string().optional(),
 
       lowStockAlert: z.string().optional(),
 
@@ -79,74 +79,96 @@ const Publish = () => {
       },
    });
 
+   const [submitting, setSubmitting] = useState(false);
+   const [serverError, setServerError] = useState<string | null>(null);
+
    useEffect(() => {
       if (!id) return;
 
-      const findProduct = productsData.find((p) => p.id === id);
+      const fetchExisting = async () => {
+         try {
+            const res = await fetch(`/api/products/${id}`);
+            if (res.ok) {
+               const p = await res.json();
+               const imgs = Array.isArray(p.images)
+                  ? p.images
+                  : typeof p.images === "string"
+                  ? JSON.parse(p.images)
+                  : [];
 
-      if (findProduct) {
-         reset({
-            ...findProduct,
-         });
-      }
+               reset({
+                  productName: p.productName || "",
+                  subDescription: p.subDescription || "",
+                  content: p.content || "",
+                  images: imgs.length > 0 ? imgs : ["https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp", "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-2.webp"],
+                  productCode: p.productCode || "",
+                  productSku: p.productSku || "",
+                  lowStockAlert: String(p.lowStockAlert || "10"),
+                  quantity: p.quantity || 0,
+                  category: p.category?.name || p.category || "",
+                  productType: p.productType || "",
+                  color: Array.isArray(p.colors) ? p.colors : [],
+                  unit: Array.isArray(p.sizes) ? p.sizes : [],
+                  regularPrice: Number(p.regularPrice) || 0,
+                  salePrice: p.salePrice ? Number(p.salePrice) : undefined,
+               });
+            }
+         } catch {
+            // fallback
+         }
+      };
+
+      fetchExisting();
    }, [id, reset]);
 
    // 3. Submit handler
-   const onSubmit: SubmitHandler<ProductSchemaType> = (data) => {
-      const now = new Date();
-      const PDId =
-         productsData.length >= 10
-            ? "0" + (productsData.length + 1)
-            : "00" + (productsData.length + 1);
+   const onSubmit: SubmitHandler<ProductSchemaType> = async (data) => {
+      setSubmitting(true);
+      setServerError(null);
 
-      // 🔥 auto-calculate stock status
-      let stockValue = "In Stock";
-      if (data.quantity === 0) {
-         stockValue = "Out of Stock";
-      } else if (data.quantity <= 10) {
-         stockValue = "Low Stock";
-      }
+      try {
+         // Sanitize images to URLs or fallback URLs
+         const imageUrls = Array.isArray(data.images) && data.images.length > 0
+            ? data.images.map((img: any) => typeof img === "string" ? img : "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp")
+            : ["https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp", "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-2.webp"];
 
-      const newProduct: ProductType = {
-         id: `PD${PDId}`,
+         const payload = {
+            productName: data.productName,
+            subDescription: data.subDescription || null,
+            content: data.content || null,
+            images: imageUrls,
+            productCode: data.productCode,
+            productSku: data.productSku,
+            quantity: data.quantity,
+            lowStockAlert: data.lowStockAlert ? parseInt(data.lowStockAlert) : 10,
+            category: data.category,
+            productType: data.productType,
+            colors: data.color || [],
+            sizes: data.unit || [],
+            regularPrice: data.regularPrice,
+            salePrice: data.salePrice || null,
+         };
 
-         // form fields
-         productName: data.productName,
-         subDescription: data.subDescription ?? "",
-         content: data.content,
-         images: data.images,
-         productCode: data.productCode,
-         productSku: data.productSku,
-         quantity: data.quantity,
-         category: data.category,
-         productType: data.productType,
-         color: data.color ?? [],
-         size: data.unit ?? [],
+         const url = id ? `/api/products/${id}` : "/api/products";
+         const method = id ? "PUT" : "POST";
 
-         regularPrice: data.regularPrice,
-         salePrice: data.salePrice ?? data.regularPrice,
+         const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+         });
 
-         // auto-generated fields
-         stockValue,
-         date: now.toLocaleDateString(),
-         time: now.toLocaleTimeString(),
-      };
-
-      if (id) {
-         // update logic
-         const index = productsData.findIndex((p) => p.id === id);
-
-         if (index !== -1) {
-            productsData[index] = newProduct;
+         if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || "Failed to save product");
          }
-      } else {
-         // add logic
-         // productsData.push(newProduct);
 
-         if (confirm("Add logic is working!")) return;
+         router.push("/admin/product");
+      } catch (err: any) {
+         setServerError(err.message || "Something went wrong while saving product");
+      } finally {
+         setSubmitting(false);
       }
-
-      router.push("/admin/product");
    };
 
    return (
@@ -170,6 +192,11 @@ const Publish = () => {
             </Stack>
          </Stack>
 
+         {serverError && (
+            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+               {serverError}
+            </Typography>
+         )}
          <Stack
             spacing={2}
             direction={"row"}
@@ -180,13 +207,14 @@ const Publish = () => {
             <Button
                variant="text"
                color="inherit"
+               disabled={submitting}
                onClick={() => router.push("/admin/product")}
             >
                Cancel
             </Button>
 
-            <Button variant="contained" color="primary" type="submit">
-               {id ? "Update product" : "Add product"}
+            <Button variant="contained" color="primary" type="submit" disabled={submitting}>
+               {submitting ? "Saving..." : id ? "Update product" : "Add product"}
             </Button>
          </Stack>
       </Stack>

@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-   reactStrictMode: false,
-   allowedDevOrigins: ["192.168.0.105"],
+   reactStrictMode: true,
    transpilePackages: [
       "@mui/x-data-grid",
       "@mui/x-data-grid-pro",

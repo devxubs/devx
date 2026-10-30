@@ -34,6 +34,23 @@ const items = [
 
 const Profile = ({ open, onClose, onOpen }: ProfileProps) => {
    const colorState = useGlobalState.get("color");
+   const [user, setUser] = React.useState<any>(null);
+
+   React.useEffect(() => {
+      fetch("/api/auth/me")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => {
+            if (d?.user) setUser(d.user);
+         })
+         .catch(() => {});
+   }, []);
+
+   const handleLogout = async () => {
+      try {
+         await fetch("/api/auth/logout", { method: "POST" });
+      } catch {}
+      window.location.href = "/auth";
+   };
 
    return (
       <SwipeableDrawer
@@ -96,21 +113,21 @@ const Profile = ({ open, onClose, onOpen }: ProfileProps) => {
                            fontSize="15px!important"
                            textAlign="center"
                         >
-                           Xubayer Ahmed
+                           {user?.name || "jubayer"}
                         </Typography>
                         <Typography
                            variant="body2"
                            color="textSecondary"
                            textAlign="center"
                         >
-                           devxub@gmail.com
+                           {user?.email || "devxub@gmail.com"}
                         </Typography>
                         <Typography
                            variant="subtitle2"
                            color="textDisabled"
                            textAlign="center"
                         >
-                           Admin
+                           {typeof user?.role === "object" ? user?.role?.name || "System Admin" : user?.role || "System Admin"}
                         </Typography>
                      </Stack>
                   </Stack>
@@ -123,6 +140,7 @@ const Profile = ({ open, onClose, onOpen }: ProfileProps) => {
                      variant="text"
                      color={colorState === "error" ? "primary" : "error"}
                      fullWidth
+                     onClick={handleLogout}
                   >
                      Log out
                   </Button>

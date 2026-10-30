@@ -72,10 +72,9 @@ const Properties = ({ formControl, errors }: PricingProps) => {
                               {...field}
                               value={field.value ?? ""}
                               error={!!errors.productCode}
-                              helperText={errors.productCode?.message}
+                              helperText={errors.productCode?.message || "Leave blank for auto sequential ID (e.g. PROD_6)"}
                               label="Product code"
                               variant="outlined"
-                              required
                            />
                         )}
                      />
@@ -96,11 +95,11 @@ const Properties = ({ formControl, errors }: PricingProps) => {
                         render={({ field }) => (
                            <TextField
                               {...field}
+                              value={field.value ?? ""}
                               error={!!errors.productSku}
-                              helperText={errors.productSku?.message}
+                              helperText={errors.productSku?.message || "Leave blank for auto sequential SKU"}
                               label="Product sku"
                               variant="outlined"
-                              required
                            />
                         )}
                      />

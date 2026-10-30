@@ -39,8 +39,7 @@ const RankFilter = () => {
                      limitTags={4}
                      value={orderStatus}
                      onChange={(nv) => {
-                        setOrderStatus([...nv]);
-                        console.log(nv);
+                        setOrderStatus(Array.isArray(nv) ? [...nv] : []);
                      }}
                      options={[
                         "Pending",

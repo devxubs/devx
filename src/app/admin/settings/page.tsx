@@ -1,11 +1,11 @@
 import Settings from "@src/Pages/admin/Settings";
-import React from "react";
+import React, { Suspense } from "react";
 
 const SettingsPage = () => {
    return (
-      <div>
+      <Suspense fallback={<div>Loading...</div>}>
          <Settings />
-      </div>
+      </Suspense>
    );
 };
 

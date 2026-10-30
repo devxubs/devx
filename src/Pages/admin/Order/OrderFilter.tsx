@@ -1,24 +1,27 @@
 import { Box, Tooltip, IconButton } from "@mui/material";
 import CustomModal from "@src/components/Modal";
-import Scrollbar from "react-browser-scrollbar";
 import OrderFilterModal from "./OrderFilterModel";
-import { useState } from "react";
+import React, { useState } from "react";
 import Icon from "@src/components/Icon";
 import {
    FilterData,
    OrderFilter as OrderFilterType,
 } from "@src/components/Table/Filter";
 
-const OrderFilter = (data: FilterData, onChange: Function) => {
+export const OrderFilterComponent = ({
+   data,
+   onChange,
+}: {
+   data: FilterData;
+   onChange: Function;
+}) => {
    const [modalOpen, setModalOpen] = useState(false);
-   const today = new Date();
-   const tenDaysLater = new Date();
-   tenDaysLater.setDate(today.getDate() + 10);
 
    return (
       <Box>
          <Tooltip title="Filter">
             <IconButton
+               data-testid="order-filter-btn"
                sx={{ color: "text.secondary" }}
                onClick={() => setModalOpen(true)}
             >
@@ -28,25 +31,20 @@ const OrderFilter = (data: FilterData, onChange: Function) => {
 
          <CustomModal
             sx={{
-               width: { xs: "100%", md: 900 },
-               height: { xs: "100vh", md: "auto" },
+               width: { xs: "100%", md: 950 },
+               maxHeight: { xs: "100vh", md: "88vh" },
                borderRadius: { xs: 0, md: 2 },
+               display: "flex",
+               flexDirection: "column",
             }}
             open={modalOpen}
             onClose={() => setModalOpen(false)}
             title="Order Filter"
          >
-            <Scrollbar
-               autoHide
-               darkMode
-               thumbSize={6}
-               style={{ height: "100%" }}
-            >
+            <Box sx={{ flex: 1, overflowY: "auto", pr: 1 }}>
                <OrderFilterModal
                   filterValue={{
                      ...data.orderData,
-                     order_created_at: data.orderData?.order_created_at,
-                     status: data.orderData?.status,
                   }}
                   onCloseModal={() => setModalOpen(false)}
                   onChange={(f: OrderFilterType) => {
@@ -55,15 +53,18 @@ const OrderFilter = (data: FilterData, onChange: Function) => {
                         orderData: {
                            ...data.orderData,
                            ...f,
-                           status: f.status !== null ? f.status : "",
                         },
                      });
                   }}
                />
-            </Scrollbar>
+            </Box>
          </CustomModal>
       </Box>
    );
+};
+
+const OrderFilter = (data: FilterData, onChange: Function) => {
+   return <OrderFilterComponent data={data} onChange={onChange} />;
 };
 
 export default OrderFilter;

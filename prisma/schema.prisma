@@ -1,0 +1,531 @@
+// DevX POS — MySQL Prisma Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// AUTH & USERS
+// ─────────────────────────────────────────────
+
+model User {
+  id            String      @id @default(cuid())
+  customId      String?     @unique
+  name          String?
+  email         String      @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?     // bcrypt hash
+  phoneNumber   String?
+  address       String?
+  salary        String?
+  hireDate      DateTime    @default(now())
+  status        UserStatus  @default(ACTIVE)
+  roleId        String?
+  role          Role?       @relation(fields: [roleId], references: [id])
+
+  ordersHandled Order[]     @relation("OrderEmployee")
+  purchases     Purchase[]
+  expenses      Expense[]
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([email])
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// ─────────────────────────────────────────────
+// ROLES & ACCESS CONTROL
+// ─────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(cuid())
+  customId    String?  @unique
+  name        String   @unique
+  description String?
+  permissions Json?
+  users       User[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// PRODUCTS & INVENTORY
+// ─────────────────────────────────────────────
+
+model Category {
+  id        String    @id @default(cuid())
+  customId  String?   @unique
+  name      String    @unique
+  products  Product[]
+  isDeleted Boolean   @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([isDeleted])
+}
+
+model Unit {
+  id        String    @id @default(cuid())
+  customId  String?   @unique
+  name      String    @unique
+  isDeleted Boolean   @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@index([isDeleted])
+}
+
+model Product {
+  id             String          @id @default(cuid())
+  customId       String?         @unique
+  productCode    String          @unique
+  productSku     String          @unique
+  productName    String
+  subDescription String?
+  content        String?         @db.Text
+  images         Json?           // Stored as JSON array in MySQL
+  quantity       Int             @default(0)
+  lowStockAlert  Int             @default(10)
+  categoryId     String?
+  category       Category?       @relation(fields: [categoryId], references: [id])
+  productType    String?
+  colors         Json?           // Stored as JSON array in MySQL
+  sizes          Json?           // Stored as JSON array in MySQL
+  regularPrice   Decimal         @db.Decimal(10, 2)
+  salePrice      Decimal?        @db.Decimal(10, 2)
+  isDeleted      Boolean         @default(false)
+
+  orderItems     OrderItem[]
+  purchaseItems  PurchaseItem[]
+  stockMovements StockMovement[]
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([productName])
+  @@index([productCode])
+  @@index([productSku])
+  @@index([isDeleted])
+  @@index([categoryId])
+}
+
+model StockMovement {
+  id         String            @id @default(cuid())
+  productId  String
+  product    Product           @relation(fields: [productId], references: [id])
+  type       StockMovementType
+  quantity   Int
+  note       String?
+  orderId    String?
+  purchaseId String?
+
+  createdAt  DateTime          @default(now())
+
+  @@index([productId])
+  @@index([type])
+}
+
+enum StockMovementType {
+  SALE
+  PURCHASE
+  ADJUSTMENT
+  RETURN
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMERS
+// ─────────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  customId  String?  @unique
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  orders    Order[]
+  isDeleted Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phone])
+  @@index([name])
+  @@index([email])
+  @@index([isDeleted])
+}
+
+// ─────────────────────────────────────────────
+// POS ORDERS & SALES
+// ─────────────────────────────────────────────
+
+model Order {
+  id                 String      @id @default(cuid())
+  customId           String?     @unique
+  orderId            String      @unique // Human-readable e.g. ORD_1
+  invoiceNo          String      @unique // INV-6012
+  status             OrderStatus @default(PENDING)
+  orderNote          String?
+  orderSource        String?
+  paymentMethod      String?
+  subtotal           Decimal     @db.Decimal(10, 2)
+  deliveryCharge     Decimal     @db.Decimal(10, 2) @default(0)
+  discount           Decimal     @db.Decimal(10, 2) @default(0)
+  total              Decimal     @db.Decimal(10, 2)
+  advancePayment     Decimal     @db.Decimal(10, 2) @default(0)
+  dueAmount          Decimal     @db.Decimal(10, 2) @default(0)
+  cancellationReason String?
+  deliveredAt        DateTime?
+  isDeleted          Boolean     @default(false)
+
+  // Courier & Delivery details
+  courier            String?     // e.g. Steadfast, Pathao, RedX
+  courierStatus      String?     // e.g. Pending, In Courier, Delivered, Cancelled
+  courierCharge      Decimal?    @db.Decimal(10, 2) @default(0)
+  courierSubmittedAt DateTime?
+  printStatus        String?     @default("Not Printed")
+  printedAt          DateTime?
+  orderType          String?     @default("Regular")
+  orderTags          Json?
+  customerTags       Json?
+  utmSource          String?
+  referenceId        String?
+  pathaoCity         String?
+  pathaoZone         String?
+
+  customerId         String?
+  customer           Customer?   @relation(fields: [customerId], references: [id])
+  employeeId         String?
+  employee           User?       @relation("OrderEmployee", fields: [employeeId], references: [id])
+
+  items              OrderItem[]
+
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([status])
+  @@index([customerId])
+  @@index([employeeId])
+  @@index([isDeleted])
+  @@index([createdAt])
+  @@index([orderSource])
+  @@index([courier])
+  @@index([courierStatus])
+  @@index([printStatus])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  COMPLETED
+  HOLD
+  CANCELLED
+  FAILED
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  name      String
+  code      String?
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  subtotal  Decimal  @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ─────────────────────────────────────────────
+// SUPPLIERS & PURCHASES
+// ─────────────────────────────────────────────
+
+model Supplier {
+  id        String     @id @default(cuid())
+  customId  String?    @unique
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  isDeleted Boolean    @default(false)
+  purchases Purchase[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([name])
+  @@index([phone])
+  @@index([isDeleted])
+}
+
+model Purchase {
+  id            String               @id @default(cuid())
+  customId      String?              @unique
+  invoice       String
+  supplierId    String?
+  supplier      Supplier?            @relation(fields: [supplierId], references: [id])
+  productAmount Decimal              @db.Decimal(10, 2)
+  othersCost    Decimal              @db.Decimal(10, 2) @default(0)
+  discount      Decimal              @db.Decimal(10, 2) @default(0)
+  total         Decimal              @db.Decimal(10, 2)
+  paid          Decimal              @db.Decimal(10, 2) @default(0)
+  due           Decimal              @db.Decimal(10, 2) @default(0)
+  note          String?
+  isDeleted     Boolean              @default(false)
+  createdById   String?
+  createdBy     User?                @relation(fields: [createdById], references: [id])
+  items         PurchaseItem[]
+  attachments   PurchaseAttachment[]
+
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([invoice])
+  @@index([supplierId])
+  @@index([isDeleted])
+  @@index([createdAt])
+}
+
+model PurchaseItem {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id])
+  name       String
+  code       String?
+  quantity   Int
+  price      Decimal  @db.Decimal(10, 2)
+  subtotal   Decimal  @db.Decimal(10, 2)
+
+  @@index([purchaseId])
+}
+
+model PurchaseAttachment {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  name       String
+  url        String
+  type       String?
+  size       Int?
+}
+
+// ─────────────────────────────────────────────
+// EXPENSES
+// ─────────────────────────────────────────────
+
+model Expense {
+  id          String   @id @default(cuid())
+  customId    String?  @unique
+  type        String
+  amount      Decimal  @db.Decimal(10, 2)
+  note        String?
+  isDeleted   Boolean  @default(false)
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([createdAt])
+  @@index([isDeleted])
+  @@index([createdById])
+}
+
+// ─────────────────────────────────────────────
+// ASSETS
+// ─────────────────────────────────────────────
+
+model Asset {
+  id          String   @id @default(cuid())
+  customId    String?  @unique
+  name        String
+  category    String?
+  value       Decimal  @db.Decimal(10, 2)
+  description String?
+  isDeleted   Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// STORE SETTINGS & CONFIGURATION
+// ─────────────────────────────────────────────
+
+model StoreSetting {
+  id                    String   @id @default("default")
+  storeName             String   @default("DevX POS")
+  tagline               String?  @default("Smart Retail & Point of Sale")
+  logoUrl               String?  @default("")
+  email                 String?  @default("info@devxpos.com")
+  phone                 String?  @default("+880 1700-000000")
+  address               String?  @default("Dhaka, Bangladesh")
+  currency              String   @default("BDT")
+  currencySymbol        String   @default("৳")
+  timezone              String   @default("Asia/Dhaka")
+  dateFormat            String   @default("DD/MM/YYYY")
+  language              String   @default("en")
+
+  // Sales & POS
+  defaultTaxRate        Decimal  @db.Decimal(5, 2) @default(0)
+  defaultDeliveryCharge Decimal  @db.Decimal(10, 2) @default(60)
+  defaultDiscountRate   Decimal  @db.Decimal(5, 2) @default(0)
+  invoicePrefix         String   @default("INV")
+  orderPrefix           String   @default("#")
+  enableStockValidation Boolean  @default(true)
+  defaultPaymentMethod  String   @default("Cash")
+
+  // Inventory
+  defaultLowStockAlert  Int      @default(10)
+  autoGenerateSku       Boolean  @default(true)
+  autoGenerateBarcode   Boolean  @default(true)
+
+  // Invoice & Printing
+  receiptPaperSize      String   @default("80mm") // 80mm, 58mm, A4
+  invoiceHeader         String?  @default("DevX POS - Retail Invoice")
+  invoiceFooter         String?  @default("Thank you for shopping with us! Please come again.")
+  showLogoOnReceipt     Boolean  @default(true)
+  showBarcodeOnReceipt  Boolean  @default(true)
+
+  // Appearance
+  themeMode             String   @default("dark")
+  themeColor            String   @default("primary")
+
+  // Notifications & System
+  enableLowStockAlert   Boolean  @default(true)
+  notifyEmail           String?  @default("admin@devxpos.com")
+
+  // Entity ID Custom Prefixes
+  prefixEmployee        String   @default("EP_")
+  prefixCustomer        String   @default("CUS_")
+  prefixSupplier        String   @default("SUP_")
+  prefixOrder           String   @default("ORD_")
+  prefixPurchase        String   @default("PUR_")
+  prefixProduct         String   @default("PROD_")
+  prefixCategory        String   @default("CAT_")
+  prefixUnit            String   @default("UNIT_")
+  prefixExpense         String   @default("EXP_")
+  prefixAsset           String   @default("AST_")
+  prefixRole            String   @default("ROLE_")
+  prefixBilling         String   @default("BILL_")
+
+  // Extensible configuration
+  customConfig          Json?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// BILLING & SETTLEMENTS
+// ─────────────────────────────────────────────
+
+model BillingTransaction {
+  id            String   @id @default(cuid())
+  customId      String?  @unique
+  amount        Decimal  @db.Decimal(10, 2)
+  paymentMethod String
+  status        String   @default("COMPLETED")
+  description   String?
+  serviceCharge Decimal  @db.Decimal(10, 2) @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// SEQUENTIAL ENTITY COUNTERS
+// ─────────────────────────────────────────────
+
+model EntitySequence {
+  entityType String   @id
+  currentSeq Int      @default(0)
+  updatedAt  DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String?
+  title      String
+  message    String   @db.Text
+  category   String   @default("System") // System, Order, Inventory, Settlement
+  type       String   @default("info")   // info, warning, success, error
+  link       String?
+  isRead     Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────
+// CHAT & MESSAGING
+// ─────────────────────────────────────────────
+
+model Conversation {
+  id           String        @id @default(cuid())
+  type         String        @default("direct") // "direct" or "group"
+  name         String?
+  avatar       String?
+  description  String?
+  members      Json          // Array of user IDs
+  adminIds     Json?         // Array of user IDs
+  mutedUserIds Json?         // Array of user IDs who have muted this chat
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  messages     ChatMessage[]
+}
+
+model ChatMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  senderName     String?
+  senderAvatar   String?
+  message        String?      @db.Text
+  attachments    Json?
+  reactions      Json?
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+

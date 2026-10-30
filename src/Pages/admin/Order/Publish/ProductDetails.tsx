@@ -84,7 +84,7 @@ const ProductDetails = ({ control, errors, data }: DetailsProps) => {
                                  onChange={(val: string[]) => {
                                     const newProducts = val.map((name) => {
                                        const existing = allProducts.find(
-                                          (p: any) => p.productName === name,
+                                          (p: any) => p.name === name,
                                        );
                                        if (existing) return existing;
 

@@ -1,197 +1,147 @@
-import { Stack, Grid, Avatar, Typography } from "@mui/material";
-import React from "react";
+"use client";
+
+import { Stack, Grid, Typography, Chip } from "@mui/material";
+import React, { useState, useEffect } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import RadialBar from "@cmp/RadialBar";
 import CustomTable from "@src/components/Table";
-import { UserProfile } from "../../User";
 import { SellerProFile } from "../../Dashboard";
-import RankFilter from "./RankFilter";
-import Activity from "./ActivityFilter";
 import { GridCellParams } from "@mui/x-data-grid";
-
-const rankData = [
-   {
-      id: 1,
-      name: "John Doe",
-      calls: 1500,
-      conforms: 1200,
-      cancels: 300,
-      rank: "Top 1",
-   },
-   {
-      id: 2,
-      name: "Jane Smith",
-      calls: 1300,
-      conforms: 1000,
-      cancels: 300,
-      rank: "Top 2",
-   },
-   {
-      id: 3,
-      name: "Mike Johnson",
-      calls: 1100,
-      conforms: 900,
-      cancels: 200,
-      rank: "Top 3",
-   },
-];
-const rankSalesmanColumns = [
-   {
-      field: "seller",
-      headerName: "Seller",
-      width: 200,
-      renderCell: (params: GridCellParams) => (
-         <SellerProFile
-            name={params.row.name}
-            url={
-               "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-" +
-               params.row.id +
-               ".webp"
-            }
-         />
-      ),
-   },
-   { field: "call", headerName: "Call", width: 150 },
-   { field: "conform", headerName: "Conform", width: 150 },
-   { field: "cancel", headerName: "Cancel", width: 150 },
-   { field: "rank", headerName: "Rank", width: 150 },
-   { field: "chip", headerName: "Status", width: 150 },
-];
-
-const employeeActivity = [
-   {
-      id: 1,
-      employee: (
-         <SellerProFile
-            name="John Doe"
-            url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-1.webp"
-         />
-      ),
-      name: "John Doe",
-      date: "2023-09-15",
-      active_time: "09:00 AM",
-      inactive_time: "05:00 PM",
-      activity: "Active",
-      status: "Online",
-      chip: "status",
-      color: "success",
-   },
-   {
-      id: 2,
-      employee: (
-         <SellerProFile
-            name="Jane Smith"
-            url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-2.webp"
-         />
-      ),
-      name: "Jane Smith",
-      date: "2023-09-15",
-      active_time: "08:30 AM",
-      inactive_time: "04:30 PM",
-      activity: "Active",
-      status: "Online",
-      chip: "status",
-      color: "success",
-   },
-   {
-      id: 3,
-      employee: (
-         <SellerProFile
-            name="Mike Johnson"
-            url="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-3.webp"
-         />
-      ),
-      name: "Mike Johnson",
-      date: "2023-09-15",
-      active_time: "10:00 AM",
-      inactive_time: "06:00 PM",
-      activity: "Inactive",
-      status: "Offline",
-      chip: "status",
-      color: "error",
-   },
-];
-
-const employeeActivityColumns = [
-   {
-      field: "employee",
-      headerName: "Employee",
-      width: 200,
-      renderCell: (params: GridCellParams) => (
-         <SellerProFile
-            name={params.row.name}
-            url={
-               "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-" +
-               params.row.id +
-               ".webp"
-            }
-         />
-      ),
-   },
-   { field: "date", headerName: "Date", width: 150 },
-   { field: "active_time", headerName: "Active Time", width: 150 },
-   { field: "inactive_time", headerName: "Inactive Time", width: 150 },
-   { field: "activity", headerName: "Activity", width: 150 },
-   { field: "status", headerName: "Status", width: 150 },
-];
+import { useSettings } from "@src/lib/settingsContext";
+import { EmployeeDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 
 const Employees = () => {
+   const { formatCurrency } = useSettings();
+   const [report, setReport] = useState<any>(null);
+   const [loading, setLoading] = useState(false);
+   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
+
+   useEffect(() => {
+      setLoading(true);
+      fetch("/api/reports?tab=employees")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => {
+            if (d) setReport(d);
+         })
+         .catch(() => {})
+         .finally(() => setLoading(false));
+   }, []);
+
+   const rankSalesmanColumns = [
+      {
+         field: "seller",
+         headerName: "Seller / Employee",
+         width: 250,
+         renderCell: (params: GridCellParams) => (
+            <Stack
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailEmployeeId(params.row.id)}
+            >
+               <SellerProFile
+                  name={params.row.name}
+                  url={
+                     "https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-1.webp"
+                  }
+               />
+            </Stack>
+         ),
+      },
+      { field: "calls", headerName: "Interactions", width: 140 },
+      { field: "conforms", headerName: "Completed Sales", width: 150 },
+      { field: "cancels", headerName: "Cancelled", width: 130 },
+      {
+         field: "revenue",
+         headerName: "Revenue",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(params.row.revenue || 0),
+      },
+      {
+         field: "rank",
+         headerName: "Rank",
+         width: 140,
+         renderCell: (params: any) => {
+            const rank = String(params.row.rank || "Top 1");
+            const colorMap: Record<string, "primary" | "secondary" | "success" | "warning" | "error" | "default"> = {
+               "Top 1": "primary",
+               "Top 2": "secondary",
+               "Top 3": "success",
+               "Top 4": "warning",
+               "Top 5": "error",
+            };
+            const color = colorMap[rank] || "default";
+
+            return (
+               <Chip
+                  label={rank}
+                  size="small"
+                  color={color}
+                  sx={{ fontWeight: 700, borderRadius: 1, minWidth: 62 }}
+               />
+            );
+         },
+      },
+   ];
+
+   const rows = report?.rows || [];
+   const totalEmployees = rows.length;
+   const totalCompletedSales = rows.reduce((s: number, r: any) => s + Number(r.conforms || 0), 0);
+   const totalGeneratedRevenue = rows.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
+
    return (
-      <Stack>
+      <Stack spacing={3}>
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Employees"}
                   isPositive={true}
-                  data={[10, 30, 40, 40, 30, 10, 20]}
-                  value={"1000"}
-                  percentage={"70%"}
+                  data={[1, 2, 3, 4, 5, 6, 8]}
+                  value={totalEmployees}
+                  percentage={"+5%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
-                  title={"Total Roles"}
+                  title={"Completed Sales"}
                   isPositive={true}
-                  data={[10, 30, 40, 40, 30, 10, 20]}
-                  value={"15"}
-                  percentage={"70%"}
+                  data={[5, 10, 15, 20, 25, 30, 35]}
+                  value={totalCompletedSales}
+                  percentage={"+15%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
-                  title={"Total Salary"}
+                  title={"Total Revenue Generated"}
                   isPositive={true}
-                  data={[10, 30, 40, 40, 30, 10, 20]}
-                  value={"190"}
+                  data={[5000, 10000, 15000, 20000, 25000, 30000]}
+                  value={formatCurrency(totalGeneratedRevenue)}
+                  percentage={"+12%"}
                />
             </Grid>
+
             <Grid size={{ xs: 12, md: 8 }}>
                <AnalyticsGraph
-                  title={"Employee by Role"}
+                  title={"Sales by Employee Rank"}
                   isPositive={true}
                   type="category"
-                  data={[
-                     { x: "Admin", y: 40 },
-                     { x: "Manager", y: 25 },
-                     { x: "Sales", y: 20 },
-                     { x: "Support", y: 15 },
-                     { x: "HR", y: 10 },
-                     { x: "Developer", y: 30 },
-                  ]}
+                  data={rows.slice(0, 5).map((r: any) => ({
+                     x: r.name,
+                     y: r.conforms,
+                  }))}
                />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
                <RadialBar
-                  title="Top Active Employee"
+                  title="Team Performance"
                   data={[
-                     { label: "Satisfied", value: 85 },
-                     { label: "Neutral", value: 10 },
-                     { label: "Dissatisfied", value: 5 },
+                     { label: "High Achievers", value: 75 },
+                     { label: "On Track", value: 20 },
+                     { label: "Need Attention", value: 5 },
                   ]}
                />
             </Grid>
-            <Grid size={{ xs: 12, md: 12 }}>
+
+            <Grid size={{ xs: 12 }}>
                <Stack
                   spacing={2}
                   bgcolor={"background.paper"}
@@ -208,43 +158,32 @@ const Employees = () => {
                         pb: 0,
                      }}
                   >
-                     Rank
+                     Employee Performance Ranking
                   </Typography>
 
                   <CustomTable
-                     rows={rankData}
+                     rows={rows}
                      columns={rankSalesmanColumns}
-                     filter={RankFilter}
-                  />
-               </Stack>
-            </Grid>
-            <Grid size={{ xs: 12, md: 12 }}>
-               <Stack
-                  spacing={2}
-                  bgcolor={"background.paper"}
-                  sx={{
-                     borderRadius: 1.5,
-                  }}
-               >
-                  <Typography
-                     variant="h5"
-                     fontWeight={700}
-                     sx={{
-                        px: 3,
-                        pt: 2,
-                        pb: 0,
+                     checkBox={true}
+                     canExport={true}
+                     canPrint={true}
+                     exportConfig={{
+                        filename: `Employees_Ranking_${new Date().toISOString().split("T")[0]}`,
+                        title: "DevX POS - Employee Performance Ranking",
                      }}
-                  >
-                     Active Employees
-                  </Typography>
-                  <CustomTable
-                     rows={employeeActivity}
-                     columns={employeeActivityColumns}
-                     filter={Activity}
+                     printConfig={{
+                        title: "DevX POS - Employee Performance Ranking",
+                     }}
                   />
                </Stack>
             </Grid>
          </Grid>
+
+         <EmployeeDetailModal
+            open={Boolean(detailEmployeeId)}
+            onClose={() => setDetailEmployeeId(null)}
+            employeeId={detailEmployeeId}
+         />
       </Stack>
    );
 };

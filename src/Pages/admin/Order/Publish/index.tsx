@@ -5,6 +5,7 @@ import {
    Container,
    Button,
    CircularProgress,
+   Typography,
    useTheme,
    alpha,
 } from "@mui/material";
@@ -64,38 +65,63 @@ const Publish = () => {
    });
 
    useEffect(() => {
-      if (id && orderData?.length) {
-         const editData = orderData.find((d) => d.orderId === id);
-
-         if (editData) {
-            setOrder({ ...editData });
-
-            reset({
-               ...editData,
-               status: "Pending",
-               orderNote: editData.orderNote == null ? "" : editData.orderNote,
-               customer: {
-                  name: editData.customer.name,
-                  email: editData.customer.email,
-                  address: editData.customer.address,
-                  phone: editData.customer.phone,
-               },
-               products: (editData.products || []).map((p: any) => ({
-                  id: p.id,
-                  name: p.name,
-                  code: p.code,
-                  quantity: p.quantity,
-                  price: p.price,
-                  images: typeof p.images === "string" ? [p.images] : p.images, // remove undefined & ensure string[]
-               })), // ✅ now type-safe
-               pricing: editData.pricing,
-            });
-            setIsEditMode(true);
-         }
-      } else {
+      if (!id) {
          setIsEditMode(false);
+         return;
       }
-   }, []);
+
+      const fetchOrder = async () => {
+         try {
+            const res = await fetch(`/api/orders/${id}`);
+            if (res.ok) {
+               const o = await res.json();
+               reset({
+                  status: o.status ? (o.status.charAt(0) + o.status.slice(1).toLowerCase()) : "Pending",
+                  orderNote: o.orderNote || "",
+                  orderSource: o.orderSource || "",
+                  customer: {
+                     name: o.customer?.name || "",
+                     email: o.customer?.email || "",
+                     address: o.customer?.address || "",
+                     phone: o.customer?.phone || "",
+                  },
+                  products: (o.items || []).map((it: any) => ({
+                     id: it.productId || it.id,
+                     name: it.name,
+                     code: it.code || "",
+                     quantity: it.quantity,
+                     price: Number(it.price),
+                     images: [it.product?.images?.[0] || "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp"],
+                  })),
+                  pricing: {
+                     paymentMethod: o.paymentMethod || "Cash on Delivery",
+                     subtotal: Number(o.subtotal),
+                     deliveryCharge: Number(o.deliveryCharge),
+                     discount: Number(o.discount),
+                     total: Number(o.total),
+                     advancePayment: Number(o.advancePayment),
+                     dueAmount: Number(o.dueAmount),
+                  },
+               });
+               setIsEditMode(true);
+            }
+         } catch {}
+      };
+
+      fetchOrder();
+   }, [id, reset]);
+
+   const watchedProducts = watch("products");
+   useEffect(() => {
+      if (Array.isArray(watchedProducts)) {
+         const calculatedSubtotal = watchedProducts.reduce((sum: number, item: any) => {
+            const qty = Number(item?.quantity) || 0;
+            const price = Number(item?.price) || 0;
+            return sum + qty * price;
+         }, 0);
+         setValue("pricing.subtotal", parseFloat(calculatedSubtotal.toFixed(2)));
+      }
+   }, [watchedProducts, setValue]);
 
    const customerData = order.customer ? order.customer : watch("customer");
    const productsData = order.products ? order.products : watch("products");
@@ -105,50 +131,48 @@ const Publish = () => {
    };
    const pricingData = order.pricing ? order.pricing : watch("pricing");
 
-   const onSubmit: SubmitHandler<OrderFormValues> = (formData) => {
+   const [submitError, setSubmitError] = useState<string | null>(null);
+
+   const onSubmit: SubmitHandler<OrderFormValues> = async (formData) => {
       setLoading(true);
-      const sanitizedProducts = (formData.products || []).map((p: any) => ({
-         id: p.id,
-         name: p.name,
-         code: p.code,
-         quantity: p.quantity,
-         price: p.price,
-         images: (p.images?.filter(Boolean) as string) || "", // remove undefined & ensure string[]
-      }));
+      setSubmitError(null);
 
-      const newOrder: OrderType = {
-         ...formData,
-         id: orderData.length + 1,
-         status: "Pending",
-         orderNote: formData.orderNote == null ? "" : formData.orderNote,
-         orderId: `#${6000 + orderData.length + 1}`,
-         invoiceNo: `INV-${6000 + orderData.length + 1}`,
-         createdAt: new Date().toISOString(),
-         updatedAt: new Date().toISOString(),
-         employee: { id: "EMP001", name: "John Doe" },
-         customer: {
-            id: crypto.randomUUID(),
-            name: formData.customer.name || "",
-            email: formData.customer.email || "",
-            address: formData.customer.address || "",
-            phone: formData.customer.phone || "",
-         },
-         products: sanitizedProducts, // ✅ now type-safe
-         pricing: formData.pricing,
-         timestamps: {
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            deliveryTime: null,
-         },
-      };
+      try {
+         const payload = {
+            customer: formData.customer,
+            products: (formData.products || []).map((p: any) => ({
+               productId: p.id,
+               name: p.name,
+               code: p.code,
+               quantity: p.quantity,
+               price: p.price,
+            })),
+            pricing: formData.pricing,
+            orderNote: formData.orderNote || "",
+            orderSource: formData.orderSource || "Direct",
+            status: formData.status || "Pending",
+         };
 
-      setOrder(newOrder);
+         const url = id ? `/api/orders/${id}` : "/api/orders";
+         const method = id ? "PUT" : "POST";
 
-      setTimeout(() => {
+         const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+         });
+
+         if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Failed to save order");
+         }
+
          router.push("/admin/order");
+      } catch (err: any) {
+         setSubmitError(err.message || "Failed to save order");
+      } finally {
          setLoading(false);
-         reset();
-      }, 3000);
+      }
    };
 
    return (
@@ -178,6 +202,11 @@ const Publish = () => {
                   data={pricingData as any}
                />
             </Stack>
+            {submitError && (
+               <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                  {submitError}
+               </Typography>
+            )}
             <Stack
                spacing={2}
                direction="row"

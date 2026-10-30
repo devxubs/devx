@@ -34,7 +34,7 @@ const Details = ({ control, errors, data }: DetailsProps) => {
    const [expanded, setExpanded] = useState(true);
 
    const supplierName = suppliersData.map((sd) => sd.name);
-   const productName = productsData.map((pd) => pd.product_name);
+   const productName = productsData.map((pd: any) => pd.product_name);
 
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -87,7 +87,7 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                               placeholder="Supplier"
                               arrow
                               label="Supplier"
-                              option={supplierName}
+                              options={supplierName}
                               value={field.value || []} // ✅ always controlled
                               onChange={(val: any, e: any) =>
                                  field.onChange(val)
@@ -125,12 +125,14 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                                     onChange={(val: string[]) => {
                                        const newProducts = val.map((name) => {
                                           const existing = allProducts.find(
-                                             (p: any) => p.product_name === name
+                                             (p: any) =>
+                                                p.product_name === name,
                                           );
                                           if (existing) return existing;
 
-                                          const found = productsData.find(
-                                             (p) => p.product_name === name
+                                          const found: any = productsData.find(
+                                             (p: any) =>
+                                                p.product_name === name,
                                           );
 
                                           return found
@@ -144,7 +146,7 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                                              : null;
                                        });
                                        field.onChange(
-                                          newProducts.filter(Boolean)
+                                          newProducts.filter(Boolean),
                                        ); // remove nulls
                                     }}
                                     error={!!errors.products}
@@ -205,14 +207,14 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                                  scrollbarWidth: "none!important",
                                  backgroundColor: alpha(
                                     theme.palette.grey[400],
-                                    0.1
+                                    0.1,
                                  ),
                                  "&::-webkit-scrollbar": { display: "none" },
                               },
                               theme.applyStyles("dark", {
                                  backgroundColor: alpha(
                                     theme.palette.background.default,
-                                    0.1
+                                    0.1,
                                  ),
                               }),
                            ]}
@@ -250,7 +252,7 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                                                 const newQuantity =
                                                    parseInt(
                                                       e.target.value,
-                                                      10
+                                                      10,
                                                    ) || 1;
                                                 const updated = [
                                                    ...allProducts,
@@ -274,7 +276,7 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                                                    e.target.value === ""
                                                       ? 0
                                                       : parseFloat(
-                                                           e.target.value
+                                                           e.target.value,
                                                         );
                                                 const updated = [
                                                    ...allProducts,
@@ -300,7 +302,7 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                                                 const updated =
                                                    allProducts.filter(
                                                       (_: any, i: number) =>
-                                                         i !== idx
+                                                         i !== idx,
                                                    );
                                                 field.onChange(updated);
                                              }}

@@ -1,8 +1,12 @@
 import Publish from "@src/Pages/admin/Order/Publish";
-import React from "react";
+import React, { Suspense } from "react";
 
 const publish = () => {
-   return <Publish />;
+   return (
+      <Suspense fallback={<div>Loading...</div>}>
+         <Publish />
+      </Suspense>
+   );
 };
 
 export default publish;

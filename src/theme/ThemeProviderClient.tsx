@@ -4,6 +4,8 @@ import { ThemeProvider, CssBaseline } from "@mui/material";
 import React, { useEffect } from "react";
 import { buildAppTheme } from "@src/theme";
 import useGlobalState from "@src/handler/globalState";
+import { SettingsProvider } from "@src/lib/settingsContext";
+import { PrintProvider } from "@src/components/TablePrintDocument/PrintPortal";
 
 export default function ThemeProviderClient({
   children,
@@ -15,9 +17,18 @@ export default function ThemeProviderClient({
   const colorState = globalState.get("color");
 
   useEffect(() => {
-    if (typeof window !== undefined) {
+    if (typeof window !== "undefined") {
       const customize = localStorage.getItem("customize");
-      globalState.setState(JSON.parse(customize as any));
+      if (customize) {
+        try {
+          const parsed = JSON.parse(customize);
+          if (parsed && typeof parsed === "object") {
+            globalState.setState(parsed);
+          }
+        } catch {
+          // ignore corrupted JSON in localStorage
+        }
+      }
     }
   }, []);
 
@@ -26,7 +37,9 @@ export default function ThemeProviderClient({
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {children}
+      <SettingsProvider>
+        <PrintProvider>{children}</PrintProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 }

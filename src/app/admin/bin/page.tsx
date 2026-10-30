@@ -1,11 +1,11 @@
 import Bin from "@src/Pages/admin/Bin";
-import React from "react";
+import React, { Suspense } from "react";
 
 const BinPage = () => {
    return (
-      <div>
+      <Suspense fallback={<div>Loading...</div>}>
          <Bin />
-      </div>
+      </Suspense>
    );
 };
 

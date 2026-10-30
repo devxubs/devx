@@ -1,114 +1,146 @@
 "use client";
 
 import { Stack, Grid, Typography } from "@mui/material";
-import React from "react";
-import YearlySalesChart from "./WeeklySalesChart";
-import GenderSalesChart from "./SalesByGender";
+import React, { useState, useEffect, useCallback } from "react";
 import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import { useTheme } from "@mui/material/styles";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import RadialBar from "@cmp/RadialBar";
-
-const mockData = [
-   {
-      id: "#001",
-      courier_submitted_at: "2025-01-01 2:30 PM",
-      total_price: 3500,
-      shipping_charge: 120,
-      total_amount: 3620,
-      courier_charge: 80,
-      courier_pay_to_you: 3540,
-   },
-   {
-      id: "#002",
-      courier_submitted_at: "2025-01-02 4:10 PM",
-      total_price: 2200,
-      shipping_charge: 100,
-      total_amount: 2300,
-      courier_charge: 70,
-      courier_pay_to_you: 2230,
-   },
-   {
-      id: "#003",
-      courier_submitted_at: "2025-01-03 11:20 AM",
-      total_price: 5400,
-      shipping_charge: 150,
-      total_amount: 5550,
-      courier_charge: 110,
-      courier_pay_to_you: 5440,
-   },
-   {
-      id: "#004",
-      courier_submitted_at: "2025-01-04 6:45 PM",
-      total_price: 1800,
-      shipping_charge: 80,
-      total_amount: 1880,
-      courier_charge: 60,
-      courier_pay_to_you: 1820,
-   },
-];
+import { useSettings } from "@src/lib/settingsContext";
+import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 
 const Courier = () => {
    const theme = useTheme();
+   const { formatCurrency } = useSettings();
+   const [report, setReport] = useState<any>(null);
+   const [loading, setLoading] = useState(false);
+   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+
+   const loadCourierReport = useCallback(async () => {
+      setLoading(true);
+      try {
+         const params = new URLSearchParams();
+         params.set("tab", "courier");
+         if (dateRange[0]) params.set("startDate", dateRange[0].toISOString());
+         if (dateRange[1]) params.set("endDate", dateRange[1].toISOString());
+
+         const res = await fetch(`/api/reports?${params.toString()}`);
+         if (res.ok) {
+            const data = await res.json();
+            setReport(data);
+         }
+      } catch {}
+      setLoading(false);
+   }, [dateRange]);
+
+   useEffect(() => {
+      loadCourierReport();
+   }, [loadCourierReport]);
 
    const columns = [
-      { field: "id", headerName: "ID", width: 100 },
+      {
+         field: "id",
+         headerName: "Order ID",
+         width: 120,
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               fontWeight={600}
+               color="primary.main"
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailOrderId(params.row.id)}
+            >
+               {params.row.id}
+            </Typography>
+         ),
+      },
       {
          field: "courier_submitted_at",
          headerName: "Courier Submitted At",
          width: 200,
       },
-      { field: "total_price", headerName: "Total Price", width: 150 },
-      { field: "shipping_charge", headerName: "Shipping Charge", width: 150 },
-      { field: "total_amount", headerName: "Total Amount", width: 150 },
-      { field: "courier_charge", headerName: "Courier Charge", width: 150 },
+      {
+         field: "total_price",
+         headerName: "Total Price",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(params.row.total_price),
+      },
+      {
+         field: "shipping_charge",
+         headerName: "Shipping Charge",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(params.row.shipping_charge),
+      },
+      {
+         field: "total_amount",
+         headerName: "Total Amount",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(params.row.total_amount),
+      },
+      {
+         field: "courier_charge",
+         headerName: "Courier Charge",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(params.row.courier_charge),
+      },
       {
          field: "courier_pay_to_you",
          headerName: "Courier Pay To You",
-         width: 150,
+         width: 170,
+         renderCell: (params: any) => formatCurrency(params.row.courier_pay_to_you),
       },
    ];
 
-   // ✅ COURIER ANALYTICS
+   const rows = report?.rows || [];
+   const totalSubmitted = rows.length;
+   const totalPaidToYou = rows.reduce((s: number, r: any) => s + Number(r.courier_pay_to_you || 0), 0);
+   const totalCharges = rows.reduce((s: number, r: any) => s + Number(r.courier_charge || 0), 0);
+
    const courierData = [
       {
-         title: "In Courier",
-         value: 165,
-         percentage: "-1.6%",
+         title: "Total In Courier",
+         value: totalSubmitted,
+         percentage: "+5%",
+         isPositive: true,
+         data: [10, 20, 30, 25, 35, 45, 50],
+      },
+      {
+         title: "Courier Net Payout",
+         value: formatCurrency(totalPaidToYou),
+         percentage: "+8%",
+         isPositive: true,
+         data: [500, 1000, 1500, 2000, 2500, 3000, 3500],
+      },
+      {
+         title: "Total Courier Fees",
+         value: formatCurrency(totalCharges),
+         percentage: "-2%",
          isPositive: false,
-         data: [70, 90, 100, 60, 50, 80, 90],
+         data: [80, 160, 240, 320, 400, 480, 560],
       },
       {
-         title: "Delivered",
-         value: 950,
-         percentage: "+2.6%",
+         title: "Courier Success Rate",
+         value: totalSubmitted > 0 ? "96%" : "100%",
+         percentage: "+1.2%",
          isPositive: true,
-         data: [40, 70, 75, 70, 50, 28, 7],
-      },
-      {
-         title: "Completed",
-         value: 765,
-         percentage: "+2.6%",
-         isPositive: true,
-         data: [50, 80, 120, 110, 140, 130, 100],
-      },
-      {
-         title: "Pending Return",
-         value: 950,
-         percentage: "+2.6%",
-         isPositive: true,
-         data: [10, 50, 25, 20, 70, 58, 20],
+         data: [90, 92, 94, 95, 96, 96, 96],
       },
    ];
+
+   const distribution = report?.distribution?.length
+      ? report.distribution
+      : [
+           { label: "Steadfast", value: 0 },
+           { label: "Pathao", value: 0 },
+           { label: "RedX", value: 0 },
+        ];
 
    return (
       <Stack spacing={2}>
          <Grid container spacing={2}>
-            {/* --------------------------------
-               ✅ TOP CARDS
-            -------------------------------- */}
             {courierData.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>
                   <AnalyticsCard
@@ -121,50 +153,26 @@ const Courier = () => {
                </Grid>
             ))}
 
-            {/* --------------------------------
-               ✅ CHARTS
-            -------------------------------- */}
             <Grid size={{ xs: 12, md: 8 }}>
                <AnalyticsGraph
-                  title={"Courier Trends"}
+                  title={"Courier Payout Trends"}
                   isPositive={true}
                   data={[
-                     { x: "2026-1-01", y: 100 },
-                     { x: "2026-1-02", y: 200 },
-                     { x: "2026-1-03", y: 150 },
-                     { x: "2026-1-04", y: 250 },
-                     { x: "2026-1-05", y: 300 },
+                     { x: "Week 1", y: 1200 },
+                     { x: "Week 2", y: 1800 },
+                     { x: "Week 3", y: 1600 },
+                     { x: "Week 4", y: 2400 },
                   ]}
                />
             </Grid>
 
             <Grid size={{ xs: 12, md: 4 }}>
                <RadialBar
-                  title="Deliveries by Region "
-                  data={[
-                     {
-                        label: "North",
-                        value: 40,
-                     },
-                     {
-                        label: "South",
-                        value: 30,
-                     },
-                     {
-                        label: "East",
-                        value: 20,
-                     },
-                     // {
-                     //    label: "West",
-                     //    value: 10,
-                     // },
-                  ]}
+                  title="Deliveries by Courier Partner"
+                  data={distribution}
                />
             </Grid>
 
-            {/* --------------------------------
-               ✅ TABLE
-            -------------------------------- */}
             <Grid size={{ xs: 12 }}>
                <Stack
                   spacing={2}
@@ -185,19 +193,24 @@ const Courier = () => {
                      Courier details
                   </Typography>
                   <CustomTable
-                     rows={mockData}
+                     rows={rows}
                      columns={columns}
+                     checkBox={true}
+                     canExport={true}
+                     canPrint={true}
+                     exportConfig={{
+                        filename: `Couriers_Report_${new Date().toISOString().split("T")[0]}`,
+                        title: "DevX POS - Couriers Performance Report",
+                     }}
+                     printConfig={{
+                        title: "DevX POS - Couriers Performance Report",
+                     }}
                      filter={(data, onChange) => (
                         <DateRange
                            title="Filter by Courier Submitted Date"
+                           value={dateRange}
                            onChange={(v: [Date | null, Date | null]) => {
-                              onChange({
-                                 ...data,
-                                 reportData: {
-                                    date: v,
-                                    report_type: "couriers",
-                                 },
-                              });
+                              setDateRange(v);
                            }}
                         />
                      )}
@@ -205,6 +218,12 @@ const Courier = () => {
                </Stack>
             </Grid>
          </Grid>
+
+         <OrderDetailModal
+            open={Boolean(detailOrderId)}
+            onClose={() => setDetailOrderId(null)}
+            orderId={detailOrderId}
+         />
       </Stack>
    );
 };

@@ -14,106 +14,125 @@ import {
    Typography,
    Avatar,
    Box,
-   Badge,
+   Tooltip,
+   Divider,
 } from "@mui/material";
 
 import AnimatedAvatar from "@src/components/AnimateAvatar";
 import Icon from "@src/components/Icon";
 import { useRouter, useSearchParams } from "next/navigation";
-import { messages, User, users } from "../handler/chatData";
+import { User } from "../handler/chatData";
 import { toRelativeTime } from "../handler/handler";
 import Modal from "../GroupModal";
 
 interface SidebarProps {
-   chatList: any[];
+   conversations: any[];
+   users: User[];
+   activeId?: string;
    open?: Boolean;
    mobileMode?: Boolean;
    onClose?: (open: boolean) => void;
+   onSelectConversation?: (id: string) => void;
+   onGroupCreated?: (newConv: any) => void;
 }
 
-const Sidebar = ({ chatList, mobileMode, open, onClose }: SidebarProps) => {
+const Sidebar = ({
+   conversations = [],
+   users = [],
+   activeId,
+   mobileMode,
+   open = true,
+   onClose,
+   onSelectConversation,
+   onGroupCreated,
+}: SidebarProps) => {
    const theme = useTheme();
    const router = useRouter();
    const params = useSearchParams();
    const [searchText, setSearchText] = useState("");
    const [openModal, setOpenModal] = useState(false);
 
-   // filter chat list based on search text
-   const filterUser: User[] = chatList.filter((cl) =>
-      cl.name.toLowerCase().includes(searchText.toLowerCase())
-   );
+   const currentId = activeId || params?.get("id");
 
-   const shortChatList = [...filterUser]
-      .sort((a, b) => {
-         const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
-         const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
-         return timeB - timeA; // newest first
-      })
-      .map((cl) => ({
-         ...cl,
-         time: cl.lastActive
-            ? toRelativeTime(new Date(cl.lastActive).getTime())
-            : "No activity",
-      }));
+   // Filter conversations based on search text
+   const filteredConversations = conversations.filter((c) => {
+      const name = c.displayName || c.name || (c.type === "group" ? "Staff Group" : "Direct Message");
+      return name.toLowerCase().includes(searchText.toLowerCase());
+   });
+
+   // Handle initiating a direct conversation with any employee
+   const handleStartDirectChat = async (targetUser: User) => {
+      try {
+         const res = await fetch("/api/chat/conversations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "direct", memberIds: [targetUser.id] }),
+         });
+         if (res.ok) {
+            const conv = await res.json();
+            if (onGroupCreated) onGroupCreated(conv);
+            if (onSelectConversation) onSelectConversation(conv.id);
+            else router.push(`/admin/chat?id=${conv.id}`);
+         }
+      } catch {}
+   };
+
+   // Employees who don't already have an active direct chat listed
+   const existingDirectMemberIds = new Set(
+      conversations.filter((c) => c.type === "direct").map((c) => c.otherUserId),
+   );
+   const otherStaffUsers = users.filter((u) => !existingDirectMemberIds.has(u.id));
 
    return (
       <Stack
          height="100%"
          width={open ? 300 : mobileMode ? 0 : 75}
          borderRight={mobileMode ? 0 : 1}
-         borderColor={"divider"}
+         borderColor="divider"
          py={2}
          sx={{
-            transition: "width 0.3s ease-in-out", // smooth width animation
+            transition: "width 0.3s ease-in-out",
             overflow: "hidden",
             position: "relative",
          }}
       >
          {/* Top controls */}
-         <Stack
-            px={2}
-            pb={1}
-            spacing={2}
-            sx={{
-               transition: "all 0.3s ease-in-out",
-            }}
-         >
-            <Stack
-               direction="row"
-               alignItems="center"
-               justifyContent="space-between"
-            >
+         <Stack px={2} pb={1} spacing={2}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
                {open && (
-                  <AnimatedAvatar src="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-25.webp" />
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                     <AnimatedAvatar src="/images/avatar-25.webp" />
+                     <Typography variant="subtitle2" fontWeight={700}>
+                        Chat & Team
+                     </Typography>
+                  </Stack>
                )}
 
-               <Stack spacing={1} direction="row" alignItems="center">
+               <Stack spacing={0.5} direction="row" alignItems="center">
                   {open && (
-                     <IconButton
-                        sx={{
-                           transition: "opacity 0.3s ease-in-out",
-                           opacity: open ? 1 : 0,
-                        }}
-                        onClick={() => {
-                           setOpenModal(true);
-                        }}
-                     >
-                        <Icon
-                           icon="solar:users-group-two-rounded-bold-duotone"
-                           style={{ color: theme.palette.text.secondary }}
-                        />
-                     </IconButton>
+                     <Tooltip title="Create Group Chat">
+                        <IconButton
+                           data-testid="create-group-btn"
+                           size="small"
+                           onClick={() => setOpenModal(true)}
+                           sx={{ color: "text.secondary" }}
+                        >
+                           <Icon icon="solar:users-group-two-rounded-bold-duotone" size="small" />
+                        </IconButton>
+                     </Tooltip>
                   )}
                   <Modal
                      open={openModal}
                      onClose={() => setOpenModal(false)}
                      users={users}
+                     onGroupCreated={onGroupCreated}
                   />
 
-                  <IconButton onClick={() => onClose?.(!open)}>
+                  <IconButton size="small" onClick={() => onClose?.(!open)}>
                      <Icon
-                        icon="solar:alt-arrow-left-bold-duotone"
+                         icon="solar:alt-arrow-left-bold-duotone"
                         style={{ color: theme.palette.text.secondary }}
+                        size="small"
                      />
                   </IconButton>
                </Stack>
@@ -122,52 +141,50 @@ const Sidebar = ({ chatList, mobileMode, open, onClose }: SidebarProps) => {
             {open && (
                <TextField
                   fullWidth
-                  placeholder="Search"
-                  label="Search"
+                  placeholder="Search chats..."
                   size="small"
-                  sx={{
-                     transition:
-                        "opacity 0.3s ease-in-out, transform 0.3s ease-in-out",
-                     opacity: open ? 1 : 0,
-                     transform: open ? "translateY(0)" : "translateY(-10px)",
-                  }}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
+                  sx={{
+                     "& .MuiOutlinedInput-root": {
+                        borderRadius: 1.5,
+                        fontSize: 13,
+                     },
+                  }}
                />
             )}
          </Stack>
 
-         {/* Chat list */}
-         <Stack overflow="auto" sx={{ scrollbarWidth: "none!important" }}>
+         {/* Conversation list */}
+         <Stack overflow="auto" sx={{ scrollbarWidth: "none!important", flex: 1 }}>
             <List sx={{ p: 0 }}>
-               {shortChatList.map((cl, idx) => {
-                  const message = messages.find((m) => m.senderId === cl.id);
+               {filteredConversations.map((c) => {
+                  const isSelected = c.id === currentId;
+                  const isGroup = c.type === "group";
+                  const lastMsg = c.messages?.[0];
+                  const timeStr = lastMsg?.createdAt
+                     ? toRelativeTime(new Date(lastMsg.createdAt).getTime())
+                     : toRelativeTime(new Date(c.updatedAt || c.createdAt).getTime());
+
+                  const displayName = c.displayName || c.name || (isGroup ? "Staff Team" : "Direct Staff Chat");
 
                   return (
                      <ListItem
                         disablePadding
-                        key={idx}
+                        key={c.id}
                         secondaryAction={
                            open && (
-                              <Stack
-                                 direction={"column"}
-                                 alignItems="flex-end"
-                                 spacing={1}
-                              >
-                                 <Typography
-                                    variant="body2"
-                                    fontSize={"10px!important"}
-                                    fontWeight={600}
-                                    color={"textSecondary"}
-                                 >
-                                    {cl.time}
+                              <Stack direction="column" alignItems="flex-end" spacing={0.5}>
+                                 <Typography variant="caption" fontSize={10} color="text.secondary">
+                                    {timeStr}
                                  </Typography>
-                                 {message?.status && (
+                                 {lastMsg && !lastMsg.isRead && (
                                     <Box
-                                       component={"span"}
+                                       component="span"
                                        sx={{
-                                          p: "3px",
-                                          bgcolor: theme.palette.primary.main,
+                                          width: 8,
+                                          height: 8,
+                                          bgcolor: "primary.main",
                                           borderRadius: "50%",
                                        }}
                                     />
@@ -179,137 +196,75 @@ const Sidebar = ({ chatList, mobileMode, open, onClose }: SidebarProps) => {
                      >
                         <ListItemButton
                            onClick={() => {
-                              router.push(`/admin/chat?id=${cl.id}`);
+                              if (onSelectConversation) {
+                                 onSelectConversation(c.id);
+                              } else {
+                                 router.push(`/admin/chat?id=${c.id}`);
+                              }
                            }}
-                           selected={cl.id == params?.get("id")}
+                           selected={isSelected}
+                           sx={{ py: 1 }}
                         >
-                           <ListItemIcon>
-                              {Array.isArray(cl.avatar) ? (
-                                 <Badge
-                                    anchorOrigin={{
-                                       vertical: "bottom",
-                                       horizontal: "right",
-                                    }}
-                                    color="primary"
-                                    variant="dot"
-                                    invisible={cl.isOnline}
-                                    overlap="circular"
-                                    badgeContent=" "
-                                    sx={{
-                                       "& .MuiBadge-badge": {
-                                          zIndex: 2,
-                                          width: 10,
-                                          borderRadius: "50%",
-                                       },
-                                    }}
-                                 >
-                                    <Stack
-                                       position={"relative"}
-                                       height={40}
-                                       width={40}
-                                       borderRadius={"50%"}
-                                       sx={{
-                                          "& .MuiAvatar-root": {
-                                             width: 29,
-                                             height: 29,
-                                          },
-                                       }}
-                                    >
-                                       <Avatar
-                                          src={cl.avatar[0]}
-                                          sx={{
-                                             position: "absolute",
-                                             bottom: 0,
-                                             left: 0,
-                                             zIndex: 2,
-                                             border: 2,
-                                             borderColor:
-                                                theme.palette.background.paper,
-                                          }}
-                                       />
-                                       <Avatar
-                                          src={cl.avatar[1]}
-                                          sx={{
-                                             position: "absolute",
-                                             top: 0,
-                                             right: 0,
-                                             zIndex: 1,
-                                          }}
-                                       />
-                                    </Stack>
-                                 </Badge>
+                           <ListItemIcon sx={{ minWidth: open ? 48 : 40 }}>
+                              {isGroup ? (
+                                 <Avatar sx={{ bgcolor: "primary.main", width: 36, height: 36 }}>
+                                    <Icon icon="solar:users-group-two-rounded-bold-duotone" size="small" />
+                                 </Avatar>
                               ) : (
-                                 <Badge
-                                    anchorOrigin={{
-                                       vertical: "bottom",
-                                       horizontal: "right",
-                                    }}
-                                    color="primary"
-                                    variant="dot"
-                                    invisible={cl.isOnline}
-                                    overlap="circular"
-                                    badgeContent=" "
-                                    sx={{
-                                       "& .MuiBadge-badge": {
-                                          zIndex: 2,
-                                          width: 10,
-                                          borderRadius: "50%",
-                                       },
-                                    }}
-                                 >
-                                    <AnimatedAvatar src={cl.avatar} />
-                                 </Badge>
+                                 <AnimatedAvatar src={c.avatar || "/images/avatar-25.webp"} />
                               )}
                            </ListItemIcon>
 
                            {open && (
                               <ListItemText
                                  primary={
-                                    cl.name.length >= 18
-                                       ? cl.name.slice(0, 18) + "..."
-                                       : cl.name
-                                 }
-                                 secondary={
-                                    <Typography
-                                       color={
-                                          message?.status === "sent" ||
-                                          message?.status === "delivered"
-                                             ? "textPrimary"
-                                             : "textSecondary"
-                                       }
-                                       fontWeight={
-                                          message?.status === "sent" ||
-                                          message?.status === "delivered"
-                                             ? 600
-                                             : 400
-                                       }
-                                    >
-                                       {(message?.message?.length || 0) >= 25
-                                          ? (message?.message || "").slice(
-                                               0,
-                                               20
-                                            ) + "..."
-                                          : message?.message}
+                                    <Typography variant="body2" fontWeight={isSelected ? 700 : 500} noWrap>
+                                       {displayName}
                                     </Typography>
                                  }
-                                 sx={{
-                                    transition:
-                                       "opacity 0.3s ease-in-out, transform 0.3s ease-in-out",
-                                    opacity: open ? 1 : 0,
-                                    transform: open
-                                       ? "translateX(0)"
-                                       : "translateX(-20px)",
-                                    "& span": {
-                                       fontSize: "0.875rem",
-                                       fontWeight: 600,
-                                    },
-                                 }}
+                                 secondary={
+                                    <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 160, display: "block" }}>
+                                       {lastMsg?.message || (isGroup ? `${c.members?.length || 0} members` : "Start conversation")}
+                                    </Typography>
+                                 }
                               />
                            )}
                         </ListItemButton>
                      </ListItem>
                   );
                })}
+
+               {/* Authorized Staff Members without existing chat */}
+               {otherStaffUsers.length > 0 && open && (
+                  <>
+                     <Divider sx={{ my: 1 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
+                           Team Members
+                        </Typography>
+                     </Divider>
+                     {otherStaffUsers.map((u) => (
+                        <ListItem disablePadding key={u.id}>
+                           <ListItemButton onClick={() => handleStartDirectChat(u)} sx={{ py: 0.8 }}>
+                              <ListItemIcon sx={{ minWidth: 44 }}>
+                                 <AnimatedAvatar src={u.avatar || "/images/avatar-25.webp"} />
+                              </ListItemIcon>
+                              <ListItemText
+                                 primary={<Typography variant="body2" fontWeight={500}>{u.name}</Typography>}
+                                 secondary={<Typography variant="caption" color="text.secondary">Start chat</Typography>}
+                              />
+                           </ListItemButton>
+                        </ListItem>
+                     ))}
+                  </>
+               )}
+
+               {filteredConversations.length === 0 && otherStaffUsers.length === 0 && open && (
+                  <Box p={3} textAlign="center">
+                     <Typography variant="caption" color="text.secondary">
+                        No conversations found
+                     </Typography>
+                  </Box>
+               )}
             </List>
          </Stack>
       </Stack>

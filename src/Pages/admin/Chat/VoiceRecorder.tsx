@@ -60,7 +60,7 @@ const VoiceRecorder = () => {
             setProgress(Math.min((elapsed / 60) * 100, 100));
          }, 100);
       } catch {
-         alert("Microphone access denied or unavailable");
+         // Microphone access error handled gracefully
       }
    };
 

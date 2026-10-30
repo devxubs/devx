@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
    Stack,
    Typography,
@@ -8,7 +8,6 @@ import {
    AccordionDetails,
    useTheme,
    alpha,
-   AvatarGroup,
    Avatar,
    Badge,
 } from "@mui/material";
@@ -20,7 +19,6 @@ import {
    AiIcon,
    AudioIcon,
    ExcelIcon,
-   FolderIcon,
    ImageIcon,
    PowerPointIcon,
    PsdIcon,
@@ -30,6 +28,7 @@ import {
    ZipIcon,
 } from "@Icon/files";
 import { User } from "../handler/chatData";
+import { UserProps } from "../../User";
 
 const Profile = ({
    open,
@@ -38,7 +37,7 @@ const Profile = ({
 }: {
    open?: Boolean;
    mobileMode?: Boolean;
-   user: User;
+   user: any;
 }) => {
    const theme = useTheme();
 
@@ -91,7 +90,7 @@ const Profile = ({
                      },
                   }}
                >
-                  {Array.isArray(user.avatar) ? (
+                  {Array.isArray(user.profileUrl) ? (
                      <Stack
                         position={"relative"}
                         height={43}
@@ -105,7 +104,7 @@ const Profile = ({
                         }}
                      >
                         <Avatar
-                           src={user.avatar[0]}
+                           src={user.profileUrl[0]}
                            sx={{
                               position: "absolute",
                               bottom: 0,
@@ -116,7 +115,7 @@ const Profile = ({
                            }}
                         />
                         <Avatar
-                           src={user.avatar[1]}
+                           src={user.profileUrl[1]}
                            sx={{
                               position: "absolute",
                               top: 0,
@@ -126,7 +125,7 @@ const Profile = ({
                         />
                      </Stack>
                   ) : (
-                     <AnimatedAvatar src={user.avatar} size="large" />
+                     <AnimatedAvatar src={user.profileUrl} size="large" />
                   )}
                </Badge>
                <Box textAlign="center">
@@ -180,7 +179,7 @@ const Profile = ({
                            fontSize={13}
                            color="textSecondary"
                         >
-                           {user?.phone || "+8801784123456"}
+                           {user.phoneNumber || "+8801784123456"}
                         </Typography>
                      </Stack>
                      <Stack
@@ -225,117 +224,138 @@ const Profile = ({
                   </AccordionSummary>
                   <AccordionDetails sx={{ bgcolor: "background.paper" }}>
                      <Stack spacing={1}>
-                        {user?.attachmentsDetailed?.map((file, idx) => {
-                           return (
-                              <Stack direction={"row"} spacing={1} key={idx}>
-                                 <Box
-                                    sx={{
-                                       width: 40,
-                                       height: 40,
-                                       borderRadius: 0.84,
-                                       bgcolor: alpha(
-                                          theme.palette.background.default,
-                                          0.3
-                                       ),
-                                       p: 1.2,
-                                       position: "relative",
-                                       overflow: "hidden",
-                                       cursor: "pointer",
-                                       "&:hover #overlay": {
-                                          visibility: "visible",
-                                          opacity: 1,
-                                       },
-                                    }}
-                                 >
+                        {user?.attachmentsDetailed?.map(
+                           (file: any, idx: any) => {
+                              return (
+                                 <Stack direction={"row"} spacing={1} key={idx}>
                                     <Box
-                                       component={"span"}
-                                       id="overlay"
                                        sx={{
-                                          position: "absolute",
-                                          top: 0,
-                                          left: 0,
-                                          width: "100%",
-                                          height: "100%",
-                                          borderRadius: 1,
-                                          backdropFilter: "blur(6px)",
+                                          width: 40,
+                                          height: 40,
+                                          borderRadius: 0.84,
                                           bgcolor: alpha(
                                              theme.palette.background.default,
-                                             0.1
+                                             0.3,
                                           ),
-                                          zIndex: 1,
-                                          flexShrink: 0,
-                                          display: "flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          visibility: "hidden",
-                                          opacity: 0,
-                                          transition:
-                                             "visibility 0.3s, opacity 0.3s ease-in-out",
+                                          p: 1.2,
+                                          position: "relative",
+                                          overflow: "hidden",
+                                          cursor: "pointer",
+                                          "&:hover #overlay": {
+                                             visibility: "visible",
+                                             opacity: 1,
+                                          },
                                        }}
                                     >
-                                       <Icon
-                                          icon="eva:cloud-download-fill"
-                                          size="small"
-                                       />
+                                       <Box
+                                          component={"span"}
+                                          id="overlay"
+                                          sx={{
+                                             position: "absolute",
+                                             top: 0,
+                                             left: 0,
+                                             width: "100%",
+                                             height: "100%",
+                                             borderRadius: 1,
+                                             backdropFilter: "blur(6px)",
+                                             bgcolor: alpha(
+                                                theme.palette.background
+                                                   .default,
+                                                0.1,
+                                             ),
+                                             zIndex: 1,
+                                             flexShrink: 0,
+                                             display: "flex",
+                                             alignItems: "center",
+                                             justifyContent: "center",
+                                             visibility: "hidden",
+                                             opacity: 0,
+                                             transition:
+                                                "visibility 0.3s, opacity 0.3s ease-in-out",
+                                          }}
+                                       >
+                                          <Icon
+                                             icon="eva:cloud-download-fill"
+                                             size="small"
+                                          />
+                                       </Box>
+                                       {file.type === "pdf" ? (
+                                          <PdfIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "doc" ? (
+                                          <WordIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "zip" ? (
+                                          <ZipIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "xls" ? (
+                                          <ExcelIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "ppt" ? (
+                                          <PowerPointIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "psd" ? (
+                                          <PsdIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "image" ? (
+                                          <ImageIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "video" ? (
+                                          <VideoIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "audio" ? (
+                                          <AudioIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : file.type === "ai" ? (
+                                          <AiIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       ) : (
+                                          <UnknownIcon
+                                             width="100%"
+                                             height={"100%"}
+                                          />
+                                       )}
+                                       {/* <PdfIcon width="100%" height={"100%"} /> */}
                                     </Box>
-                                    {file.type === "pdf" ? (
-                                       <PdfIcon width="100%" height={"100%"} />
-                                    ) : file.type === "doc" ? (
-                                       <WordIcon width="100%" height={"100%"} />
-                                    ) : file.type === "zip" ? (
-                                       <ZipIcon width="100%" height={"100%"} />
-                                    ) : file.type === "xls" ? (
-                                       <ExcelIcon
-                                          width="100%"
-                                          height={"100%"}
-                                       />
-                                    ) : file.type === "ppt" ? (
-                                       <PowerPointIcon
-                                          width="100%"
-                                          height={"100%"}
-                                       />
-                                    ) : file.type === "psd" ? (
-                                       <PsdIcon width="100%" height={"100%"} />
-                                    ) : file.type === "image" ? (
-                                       <ImageIcon
-                                          width="100%"
-                                          height={"100%"}
-                                       />
-                                    ) : file.type === "video" ? (
-                                       <VideoIcon
-                                          width="100%"
-                                          height={"100%"}
-                                       />
-                                    ) : file.type === "audio" ? (
-                                       <AudioIcon
-                                          width="100%"
-                                          height={"100%"}
-                                       />
-                                    ) : file.type === "ai" ? (
-                                       <AiIcon width="100%" height={"100%"} />
-                                    ) : (
-                                       <UnknownIcon
-                                          width="100%"
-                                          height={"100%"}
-                                       />
-                                    )}
-                                    {/* <PdfIcon width="100%" height={"100%"} /> */}
-                                 </Box>
-                                 <Stack>
-                                    <Typography variant="body1" fontSize={14}>
-                                       {file.name}
-                                    </Typography>
-                                    <Typography
-                                       variant="body2"
-                                       fontSize={12}
-                                       color="textSecondary"
-                                    >
-                                       {file.time}
-                                    </Typography>
+                                    <Stack>
+                                       <Typography
+                                          variant="body1"
+                                          fontSize={14}
+                                       >
+                                          {file.name}
+                                       </Typography>
+                                       <Typography
+                                          variant="body2"
+                                          fontSize={12}
+                                          color="textSecondary"
+                                       >
+                                          {file.time}
+                                       </Typography>
+                                    </Stack>
                                  </Stack>
-                              </Stack>
-                           );
-                        })}
+                              );
+                           },
+                        )}
                      </Stack>
                   </AccordionDetails>
                </Accordion>

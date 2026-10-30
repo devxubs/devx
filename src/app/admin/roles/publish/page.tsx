@@ -1,11 +1,11 @@
 import Publish from "@src/Pages/admin/Roles/Publish";
-import React from "react";
+import React, { Suspense } from "react";
 
 const PublishPage = () => {
    return (
-      <div>
+      <Suspense fallback={<div>Loading...</div>}>
          <Publish />
-      </div>
+      </Suspense>
    );
 };
 

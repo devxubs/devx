@@ -6,16 +6,19 @@ import {
    LinearProgress,
    linearProgressClasses,
    useTheme,
-   CircularProgress,
-   Fade,
-   Slide,
-   Zoom,
-   Typography,
-   alpha,
 } from "@mui/material";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { usePathname } from "next/navigation";
+import {
+   PageSkeleton,
+   DashboardSkeleton,
+   ProductSkeleton,
+   OrderSkeleton,
+   ReportSkeleton,
+   ChatSkeleton,
+   TableSkeleton,
+} from "@src/components/SkeletonLoader";
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
    const pathname = usePathname();
@@ -32,7 +35,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       if (loading) {
          timer = setInterval(() => {
             setProgress((old) => {
-               if (old >= 95) return old; // stop near 100 until page load finishes
+               if (old >= 95) return old;
                return old + Math.random() * 5;
             });
          }, 200);
@@ -42,108 +45,84 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
    useEffect(() => {
       setLoading(true);
-      setProgress(0);
+      setProgress(30);
 
-      const timer = setTimeout(() => {
+      const t1 = setTimeout(() => setProgress(85), 60);
+      const t2 = setTimeout(() => {
          setProgress(100);
-         setTimeout(() => setLoading(false), 500);
-      }, 800);
+         setTimeout(() => setLoading(false), 120);
+      }, 150);
 
-      return () => clearTimeout(timer);
+      return () => {
+         clearTimeout(t1);
+         clearTimeout(t2);
+      };
    }, [pathname]);
+
+   const renderPageSpecificSkeleton = () => {
+      if (pathname?.includes("/admin/dashboard")) return <DashboardSkeleton />;
+      if (pathname?.includes("/admin/product")) return <ProductSkeleton />;
+      if (pathname?.includes("/admin/order") || pathname?.includes("/admin/purchase")) return <OrderSkeleton />;
+      if (pathname?.includes("/admin/reports")) return <ReportSkeleton />;
+      if (pathname?.includes("/admin/chat")) return <ChatSkeleton />;
+      if (
+         pathname?.includes("/admin/customers") ||
+         pathname?.includes("/admin/suppliers") ||
+         pathname?.includes("/admin/expense") ||
+         pathname?.includes("/admin/assets") ||
+         pathname?.includes("/admin/user") ||
+         pathname?.includes("/admin/bin") ||
+         pathname?.includes("/admin/categories") ||
+         pathname?.includes("/admin/unit")
+      ) {
+         return <TableSkeleton rows={7} cols={6} />;
+      }
+      return <PageSkeleton />;
+   };
 
    return (
       <Stack
          direction={isAuthPage ? "column" : "row"}
-         sx={{
-            height: "100vh",
-            width: "100%",
-            backgroundColor: "background.default",
-            overflow: "hidden",
-         }}
+         height="100vh"
+         overflow="hidden"
       >
-         {/* Top slim progress bar */}
-         {loading && (
-            <LinearProgress
-               variant="determinate"
-               value={progress}
-               color="primary"
-               sx={{
-                  position: "fixed",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  height: 3,
-                  zIndex: 9999,
-                  [`&.${linearProgressClasses.colorPrimary}`]: {
-                     backgroundColor: "transparent",
-                  },
-               }}
-            />
-         )}
-
          {isAuthPage || isErrorPage ? (
             children
          ) : (
             <>
                <Sidebar />
                <Stack
+                  direction="column"
                   sx={{
                      flexGrow: 1,
-                     flex: 1,
-                     minWidth: 0,
+                     height: "100vh",
+                     overflow: "hidden",
                      position: "relative",
                   }}
                >
-                  <Slide
-                     in={loading}
-                     unmountOnExit
-                     direction={loading ? "up" : "down"}
-                  >
-                     <Stack
-                        direction="column"
-                        alignItems="center"
-                        justifyContent="center"
-                        width="100%"
-                        height="100vh"
-                        position={"absolute"}
-                        top={0}
-                        left={0}
-                        zIndex={999}
+                  {/* Top Progress Bar */}
+                  {loading && (
+                     <LinearProgress
+                        variant="determinate"
+                        value={progress}
                         sx={{
-                           backdropFilter: "blur(4px)",
-                           backgroundColor: alpha(
-                              theme.palette.background.default,
-                              0.1,
-                           ),
+                           position: "absolute",
+                           top: 0,
+                           left: 0,
+                           width: "100%",
+                           zIndex: 1400,
+                           height: 3,
+                           [`&.${linearProgressClasses.colorPrimary}`]: {
+                              backgroundColor: "transparent",
+                           },
+                           [`& .${linearProgressClasses.bar}`]: {
+                              backgroundColor: theme.palette.primary.main,
+                           },
                         }}
-                     >
-                        <Stack
-                           alignItems={"center"}
-                           justifyContent={"center"}
-                           width={150}
-                           p={2}
-                           borderRadius={2}
-                           boxShadow={15}
-                           bgcolor={"background.paper"}
-                        >
-                           <CircularProgress
-                              size={60}
-                              thickness={4}
-                              sx={{ color: theme.palette.primary.main }}
-                           />
-                           <Typography
-                              variant="body1"
-                              mt={2}
-                              color="text.secondary"
-                           >
-                              Loading...
-                           </Typography>
-                        </Stack>
-                     </Stack>
-                  </Slide>
+                     />
+                  )}
 
-                  {/* Main Content */}
+                  {/* Main Content with Page-Specific Skeleton */}
                   <>
                      <Header />
                      <Stack
@@ -159,7 +138,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                            maxWidth="lg"
                            sx={{ py: 2, pr: "16px!important" }}
                         >
-                           {children}
+                           {loading ? renderPageSpecificSkeleton() : children}
                         </Container>
                      </Stack>
                   </>

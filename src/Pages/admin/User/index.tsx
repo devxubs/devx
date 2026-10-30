@@ -6,32 +6,48 @@ import {
    Avatar,
    Typography,
    useTheme,
+   useMediaQuery,
    Tooltip,
+   Box,
+   Divider,
+   Grid,
+   Chip,
+   CircularProgress,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Scrollbar from "react-browser-scrollbar";
 import CustomModal from "@src/components/Modal";
 import Modal from "./Modal";
 import AlertDialog from "@src/components/AlertDialog";
 import CustomAutocomplete, { OptionType } from "@src/components/Autocomplete";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 
 export interface UserProps {
    id: string;
+   customId?: string;
    name: string;
    phoneNumber: string;
    email: string;
    address: string;
    role: string;
-   password: string;
-   confirmPassword: string;
+   password?: string;
+   confirmPassword?: string;
    profileUrl?: string;
    salary: string;
    hireDate: Date;
    status: "active" | "inactive" | "suspended";
    file?: File | null;
 }
+
+export const roles: string[] = [
+   "Admin",
+   "Manager",
+   "Cashier",
+   "Staff",
+   "Accountant",
+];
 
 const statusColor: Record<
    string,
@@ -89,8 +105,6 @@ export const UserRows: UserProps[] = [
       salary: "$80,000",
       hireDate: new Date("2021-05-10"),
       status: "active",
-      password: "12345",
-      confirmPassword: "12345",
       profileUrl: "https://avatars.githubusercontent.com/u/22456794?v=4",
    },
    {
@@ -102,8 +116,6 @@ export const UserRows: UserProps[] = [
       salary: "$120,000",
       hireDate: new Date("2019-03-22"),
       status: "active",
-      password: "65432",
-      confirmPassword: "65432",
       profileUrl: "https://avatars.githubusercontent.com/u/22456795?v=4",
       address: "456 Elm St, City, Country",
    },
@@ -116,8 +128,6 @@ export const UserRows: UserProps[] = [
       hireDate: new Date("2020-03-15"),
       salary: "$75,000",
       status: "active",
-      password: "34567",
-      confirmPassword: "34567",
       address: "789 Oak St, City, Country",
       profileUrl: "https://avatars.githubusercontent.com/u/22456796?v=4",
    },
@@ -130,8 +140,6 @@ export const UserRows: UserProps[] = [
       hireDate: new Date("2019-07-22"),
       salary: "$65,000",
       status: "inactive",
-      password: "98765",
-      confirmPassword: "98765",
       profileUrl: "https://avatars.githubusercontent.com/u/22456797?v=4",
       address: "321 Pine St, City, Country",
    },
@@ -144,78 +152,121 @@ export const UserRows: UserProps[] = [
       hireDate: new Date("2021-11-05"),
       salary: "$85,000",
       status: "suspended",
-      password: "23452",
-      confirmPassword: "23452",
       profileUrl: "https://avatars.githubusercontent.com/u/22456793?v=4",
       address: "654 Cedar St, City, Country",
    },
 ];
 
-const UserColumns: ColumnConfig[] = [
-   { field: "id", headerName: "ID", width: 80 },
-   {
-      field: "name",
-      headerName: "Name",
-      width: 250,
-      renderCell: (params) => (
-         <UserProfile
-            name={params.row.name}
-            email={params.row.email}
-            url={params.row.profileUrl}
-         />
-      ),
-   },
-   { field: "phoneNumber", headerName: "Phone", width: 150 },
-   { field: "address", headerName: "Address", width: 200 },
-   {
-      field: "role",
-      headerName: "Role",
-      width: 150,
-   },
-   {
-      field: "hireDate",
-      headerName: "Hire Date",
-      width: 150,
-      valueFormatter: (value: Date) => {
-         const date = new Date(value);
-
-         const month = date.toLocaleString("en-US", { month: "short" });
-         const day = date.getDate();
-         const year = date.getFullYear();
-
-         return `${month} ${day} ${year}`;
-      },
-   },
-   // { field: "salary", headerName: "Salary" },
-   {
-      field: "status",
-      headerName: "Status",
-      chip: true,
-      width: 150,
-      valueFormatter: (v: string) => v.toLocaleUpperCase(),
-      color: (params) => statusColor[params.row.status] || "default",
-   },
-
-   {
-      field: "@actions",
-      headerName: "",
-   },
-];
-
-export const roles = [
-   "CEO",
-   "Manager",
-   "Repeat Sales Exicutive",
-   "Team Leader",
-   "Courier Exicutive",
-   "Reseller",
-];
-
 const Users = () => {
    const theme = useTheme();
-   const [users, setUsers] = useState<UserProps[]>(UserRows);
+   const [users, setUsers] = useState<UserProps[]>([]);
+   const [rolesList, setRolesList] = useState<string[]>(roles);
+   const [loading, setLoading] = useState(false);
    const [modalOpen, setModalOpen] = useState(false);
    const [editableUser, setEditableUser] = useState({} as any);
+   const [detailUser, setDetailUser] = useState<string | null>(null);
+   const [viewUserData, setViewUserData] = useState<any>(null);
+   const [loadingDetail, setLoadingDetail] = useState(false);
+
+   useEffect(() => {
+      if (!detailUser) {
+         setViewUserData(null);
+         return;
+      }
+      setLoadingDetail(true);
+      fetch(`/api/users/${detailUser}`)
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => {
+            if (d) {
+               setViewUserData(d);
+            } else {
+               const found = users.find(
+                  (u) => u.id === detailUser || u.customId === detailUser,
+               );
+               setViewUserData(found || null);
+            }
+         })
+         .catch(() => {
+            const found = users.find(
+               (u) => u.id === detailUser || u.customId === detailUser,
+            );
+            setViewUserData(found || null);
+         })
+         .finally(() => setLoadingDetail(false));
+   }, [detailUser, users]);
+
+   const UserColumns: ColumnConfig[] = [
+      {
+         field: "id",
+         headerName: "ID",
+         width: 100,
+         renderCell: (params: any) => (
+            <Typography
+               variant="body2"
+               fontWeight={600}
+               color="primary.main"
+               sx={{ fontFamily: "monospace", cursor: "pointer" }}
+               onClick={() => setDetailUser(params.row.id)}
+            >
+               {params.row.customId || params.row.id}
+            </Typography>
+         ),
+      },
+      {
+         field: "name",
+         headerName: "Name",
+         width: 250,
+         renderCell: (params) => (
+            <Box
+               onClick={() => setDetailUser(params.row.id)}
+               sx={{ cursor: "pointer" }}
+            >
+               <UserProfile
+                  name={params.row.name}
+                  email={params.row.email}
+                  url={params.row.profileUrl}
+               />
+            </Box>
+         ),
+      },
+      { field: "phoneNumber", headerName: "Phone", width: 150 },
+      { field: "address", headerName: "Address", width: 200 },
+      {
+         field: "role",
+         headerName: "Role",
+         width: 150,
+         renderCell: (params: any) => {
+            const val = params.row.role;
+            return typeof val === "object"
+               ? val?.name || "Staff"
+               : val || "Staff";
+         },
+      },
+      {
+         field: "hireDate",
+         headerName: "Hire Date",
+         width: 150,
+         valueFormatter: (value: Date) => {
+            const date = new Date(value);
+            const month = date.toLocaleString("en-US", { month: "short" });
+            const day = date.getDate();
+            const year = date.getFullYear();
+            return `${month} ${day} ${year}`;
+         },
+      },
+      {
+         field: "status",
+         headerName: "Status",
+         chip: true,
+         width: 150,
+         valueFormatter: (v: string) => v.toLocaleUpperCase(),
+         color: (params) => statusColor[params.row.status] || "default",
+      },
+      {
+         field: "@actions",
+         headerName: "",
+      },
+   ];
 
    const [mode, setMode] = useState<"add" | "edit">("edit");
 
@@ -224,6 +275,80 @@ const Users = () => {
 
    // suspended dialog
    const [suspendedUser, setSuspendedUser] = useState<UserProps | null>(null);
+
+   const loadUsers = React.useCallback(async () => {
+      setLoading(true);
+      try {
+         const res = await fetch("/api/users");
+         if (res.ok) {
+            const data = await res.json();
+            const mapped = (Array.isArray(data) ? data : []).map((u: any) => ({
+               id: u.id,
+               customId: u.customId || u.id,
+               name: u.name || "User",
+               phoneNumber: u.phoneNumber || "-",
+               email: u.email,
+               address: u.address || "-",
+               role: u.role?.name || "Staff",
+               salary: u.salary || "0",
+               hireDate: u.hireDate ? new Date(u.hireDate) : new Date(),
+               status: (u.status ? u.status.toLowerCase() : "active") as any,
+            }));
+            setUsers(mapped);
+         }
+      } catch {
+         // fallback
+      } finally {
+         setLoading(false);
+      }
+   }, []);
+
+   const loadRoles = React.useCallback(async () => {
+      try {
+         const res = await fetch("/api/roles");
+         if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+               setRolesList(data.map((r: any) => r.name));
+            }
+         }
+      } catch {}
+   }, []);
+
+   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+   const { filterQueryData } = useFilterQuery();
+
+   const availableRoles = useMemo(() => {
+      const combined = Array.from(new Set([...roles, ...rolesList]));
+      return combined;
+   }, [rolesList]);
+
+   const filteredUsers = useMemo(() => {
+      return users.filter((u) => {
+         if (filterQueryData?.userRole && filterQueryData.userRole !== "All") {
+            const targetRole = filterQueryData.userRole.toLowerCase();
+            const userRole = (u.role || "").toLowerCase();
+            if (userRole !== targetRole) {
+               return false;
+            }
+         }
+         if (filterQueryData?.searchText) {
+            const q = filterQueryData.searchText.toLowerCase().trim();
+            const match =
+               (u.name || "").toLowerCase().includes(q) ||
+               (u.email || "").toLowerCase().includes(q) ||
+               (u.phoneNumber || "").toLowerCase().includes(q) ||
+               (u.customId || "").toLowerCase().includes(q);
+            if (!match) return false;
+         }
+         return true;
+      });
+   }, [users, filterQueryData?.userRole, filterQueryData?.searchText]);
+
+   React.useEffect(() => {
+      loadUsers();
+      loadRoles();
+   }, [loadUsers, loadRoles]);
 
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
@@ -252,15 +377,17 @@ const Users = () => {
             </Stack>
             <Stack>
                <CustomTable
-                  rows={users}
+                  rows={filteredUsers}
                   columns={UserColumns}
                   checkBox={true}
+                  canPrint={false}
+                  canExport={false}
+                  hideSelectionToolbar={true}
+                  showSelectionIndicators={false}
                   menuItems={[
                      {
                         label: "Edit",
                         onClick: (p) => {
-                           console.log(p);
-
                            setEditableUser(p.row);
                            setMode("edit");
                            setModalOpen(true);
@@ -283,17 +410,24 @@ const Users = () => {
                   ]}
                   filter={(data, onChange) => {
                      return (
-                        <Stack sx={{ width: "30%" }}>
+                        <Stack
+                           sx={{
+                              width: { xs: "100%", sm: 240, md: 260 },
+                              minWidth: { xs: 180, sm: 220, md: 240 },
+                           }}
+                        >
                            <CustomAutocomplete
-                              label="Role"
-                              options={roles.map((r) => ({
-                                 label: r,
-                                 value: r,
-                              }))}
-                              value={data.userRole || ""} // controlled
-                              onChange={(v: OptionType | null) =>
+                              label="Filter by Role"
+                              placeholder="Select Role"
+                              arrow={true}
+                              options={availableRoles}
+                              value={data.userRole || null}
+                              size={isMobile ? "small" : "medium"}
+                              onChange={(v: any) =>
                                  onChange?.({
-                                    userRole: v?.value || "",
+                                    userRole:
+                                       (typeof v === "string" ? v : v?.value) ||
+                                       "",
                                  })
                               }
                            />
@@ -315,29 +449,33 @@ const Users = () => {
                mode={mode}
                onClose={() => setModalOpen(false)}
                editUserData={editableUser || {}}
-               onAddUser={(d) => {
-                  const URId =
-                     users.length >= 10
-                        ? "0" + (users.length + 1)
-                        : "00" + (users.length + 1);
-                  setUsers([
-                     {
-                        ...d,
-                        id: `UR${URId}`,
-                        hireDate: new Date(),
-                        status: "inactive",
-                     },
-                     ...users,
-                  ]);
+               onAddUser={async (d) => {
+                  try {
+                     await fetch("/api/users", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                           name: d.name,
+                           email: d.email,
+                           password: d.password,
+                           phoneNumber: d.phoneNumber,
+                           address: d.address,
+                           salary: d.salary,
+                           status: "ACTIVE",
+                        }),
+                     });
+                     loadUsers();
+                  } catch {}
                }}
-               onEditUser={(newData) => {
-                  setUsers((prev) =>
-                     prev.map((user) =>
-                        user.id === editableUser.id
-                           ? { ...user, ...newData }
-                           : user,
-                     ),
-                  );
+               onEditUser={async (newData) => {
+                  try {
+                     await fetch(`/api/users/${editableUser.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(newData),
+                     });
+                     loadUsers();
+                  } catch {}
                }}
             />
          </CustomModal>
@@ -350,13 +488,16 @@ const Users = () => {
             title={`Are you sure you want to delete <b>${
                deleteUser?.email || "this user"
             }</b>`}
-            onConfirm={() => {
+            onConfirm={async () => {
                if (!deleteUser) return;
-
+               try {
+                  await fetch(`/api/users/${deleteUser.id}`, {
+                     method: "DELETE",
+                  });
+               } catch {}
                setUsers((prev) =>
                   prev.filter((user) => user.id !== deleteUser.id),
                );
-
                setDeleteUser(null);
             }}
          />
@@ -369,9 +510,15 @@ const Users = () => {
             title={`Are you sure you want to suspend <b>${
                suspendedUser?.email || "this user"
             }</b>`}
-            onConfirm={() => {
+            onConfirm={async () => {
                if (!suspendedUser) return;
-
+               try {
+                  await fetch(`/api/users/${suspendedUser.id}`, {
+                     method: "PUT",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({ status: "SUSPENDED" }),
+                  });
+               } catch {}
                setUsers((prev) =>
                   prev.map((user) =>
                      user.id === suspendedUser.id
@@ -379,10 +526,123 @@ const Users = () => {
                         : user,
                   ),
                );
-
                setSuspendedUser(null);
             }}
          />
+
+         {/* User Details View Modal */}
+         <CustomModal
+            open={Boolean(detailUser)}
+            onClose={() => setDetailUser(null)}
+            title="User Details"
+            closeIcon={true}
+            sx={{
+               width: { xs: "92%", sm: 540 },
+               maxHeight: "90vh",
+               display: "flex",
+               flexDirection: "column",
+               p: { xs: 2, sm: 3 },
+               overflowY: "auto",
+            }}
+         >
+            {loadingDetail ? (
+               <Stack alignItems="center" py={5}>
+                  <CircularProgress />
+               </Stack>
+            ) : viewUserData ? (
+               <Stack spacing={2.5}>
+                  <Stack
+                     direction="row"
+                     spacing={2}
+                     alignItems="center"
+                     justifyContent="space-between"
+                  >
+                     <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar
+                           src={viewUserData.image || viewUserData.profileUrl}
+                           sx={{ width: 64, height: 64 }}
+                        />
+                        <Box>
+                           <Typography variant="h6">
+                              {viewUserData.name || "User"}
+                           </Typography>
+                           <Typography variant="body2" color="text.secondary">
+                              {viewUserData.email}
+                           </Typography>
+                           <Chip
+                              label={
+                                 typeof viewUserData.role === "object"
+                                    ? viewUserData.role?.name || "Staff"
+                                    : viewUserData.role || "Staff"
+                              }
+                              size="small"
+                              sx={{ mt: 0.5, fontWeight: 600 }}
+                           />
+                        </Box>
+                     </Stack>
+                     <Chip
+                        label={viewUserData.customId || "USER"}
+                        color="primary"
+                        size="small"
+                        sx={{ fontWeight: 700 }}
+                     />
+                  </Stack>
+                  <Divider />
+                  <Grid container spacing={2}>
+                     <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">
+                           Phone Number
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                           {viewUserData.phoneNumber || "N/A"}
+                        </Typography>
+                     </Grid>
+                     <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">
+                           Account Status
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                           {viewUserData.status || "ACTIVE"}
+                        </Typography>
+                     </Grid>
+                     <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">
+                           Salary
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                           {viewUserData.salary
+                              ? `৳ ${viewUserData.salary}`
+                              : "N/A"}
+                        </Typography>
+                     </Grid>
+                     <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">
+                           Hire Date
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                           {viewUserData.hireDate
+                              ? new Date(
+                                   viewUserData.hireDate,
+                                ).toLocaleDateString()
+                              : "N/A"}
+                        </Typography>
+                     </Grid>
+                     <Grid size={{ xs: 12 }}>
+                        <Typography variant="caption" color="text.secondary">
+                           Address
+                        </Typography>
+                        <Typography variant="body2" fontWeight={500}>
+                           {viewUserData.address || "N/A"}
+                        </Typography>
+                     </Grid>
+                  </Grid>
+               </Stack>
+            ) : (
+               <Typography variant="body2" color="text.secondary">
+                  User not found.
+               </Typography>
+            )}
+         </CustomModal>
       </Scrollbar>
    );
 };

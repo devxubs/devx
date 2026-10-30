@@ -1,11 +1,11 @@
 import Chat from "@src/Pages/admin/Chat";
-import React from "react";
+import React, { Suspense } from "react";
 
 const ChatPage = () => {
    return (
-      <div>
+      <Suspense fallback={<div>Loading...</div>}>
          <Chat />
-      </div>
+      </Suspense>
    );
 };
 

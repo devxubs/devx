@@ -41,7 +41,10 @@ const Modal = ({
          email: editUserData?.email || "",
          phoneNumber: editUserData?.phoneNumber || "",
          address: editUserData?.address || "",
-         role: editUserData?.role || "",
+         role:
+            typeof (editUserData?.role as any) === "object"
+               ? (editUserData?.role as any)?.name || ""
+               : editUserData?.role || "",
          password: "",
          confirmPassword: "",
          profileUrl: editUserData?.profileUrl || "",
@@ -201,7 +204,7 @@ const Modal = ({
                               <>
                                  <CustomAutocomplete
                                     {...field}
-                                    options={roles.map((r) => ({
+                                    options={roles.map((r: string) => ({
                                        label: r,
                                        value: r,
                                     }))}
@@ -230,7 +233,7 @@ const Modal = ({
                            rules={{
                               validate: (value) => {
                                  if (mode === "edit" && !value) return true;
-                                 if (value.length < 6)
+                                 if (!value || value.length < 6)
                                     return "Minimum 6 characters";
                                  return true;
                               },

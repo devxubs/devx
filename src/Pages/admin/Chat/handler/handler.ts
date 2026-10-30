@@ -20,13 +20,13 @@ export const getTimeline = (chat: Message) => {
 
 export const getLastActiveTime = (userId: string): string | undefined => {
    const userMessages = messages.filter(
-      (msg) => msg.senderId === userId || msg.receiverId === userId
+      (msg: any) => msg.senderId === userId || msg.receiverId === userId,
    );
 
    if (!userMessages.length) return undefined;
 
    const lastMessage = userMessages.reduce((latest, msg) =>
-      new Date(msg.time) > new Date(latest.time) ? msg : latest
+      new Date(msg.time) > new Date(latest.time) ? msg : latest,
    );
 
    return lastMessage.time;
@@ -41,10 +41,10 @@ export const toRelativeTime = (ts: number) => {
    return days > 0
       ? `${days} day${days > 1 ? "s" : ""} ago`
       : hrs > 0
-      ? `${hrs} hour${hrs > 1 ? "s" : ""} ago`
-      : mins > 0
-      ? `${mins} minute${mins > 1 ? "s" : ""} ago`
-      : "Just now";
+        ? `${hrs} hour${hrs > 1 ? "s" : ""} ago`
+        : mins > 0
+          ? `${mins} minute${mins > 1 ? "s" : ""} ago`
+          : "Just now";
 };
 
 export const toTimestamp = (timeStr: string) => {

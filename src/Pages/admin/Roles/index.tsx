@@ -1,10 +1,9 @@
 "use client";
 
-import { Button, Stack, useTheme } from "@mui/material";
+import { Button, Stack, Typography, useTheme } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomTable, { MenuItem } from "@src/components/Table";
-import { set } from "date-fns";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
@@ -34,9 +33,14 @@ const roles = [
 
 const columns = [
    {
-      field: "id",
-      headerName: "Id",
-      width: 100,
+      field: "customId",
+      headerName: "ID",
+      width: 120,
+      renderCell: (params: any) => (
+         <Typography variant="body2" fontWeight={600} color="primary.main">
+            {params.row.customId || params.row.id}
+         </Typography>
+      ),
    },
    {
       field: "name",
@@ -54,7 +58,27 @@ const Roles = () => {
    const theme = useTheme();
    const router = useRouter();
 
-   const [rolesData, setRolesData] = useState(roles);
+   const [rolesData, setRolesData] = useState<any[]>([]);
+   const [loading, setLoading] = useState(false);
+
+   const loadRoles = React.useCallback(async () => {
+      setLoading(true);
+      try {
+         const res = await fetch("/api/roles");
+         if (res.ok) {
+            const data = await res.json();
+            setRolesData(data);
+         }
+      } catch {
+         // fallback
+      } finally {
+         setLoading(false);
+      }
+   }, []);
+
+   React.useEffect(() => {
+      loadRoles();
+   }, [loadRoles]);
 
    const [roleToDelete, setRoleToDelete] = useState<any>(null);
 
@@ -117,11 +141,16 @@ const Roles = () => {
                   onClose={() => {
                      setRoleToDelete(null);
                   }}
-                  onConfirm={() => {
-                     setRolesData((prev) =>
-                        prev.filter((role) => role.id !== roleToDelete.id),
-                     );
-                     setRoleToDelete(null);
+                  onConfirm={async () => {
+                     if (roleToDelete) {
+                        try {
+                           await fetch(`/api/roles/${roleToDelete.id}`, { method: "DELETE" });
+                        } catch {}
+                        setRolesData((prev) =>
+                           prev.filter((role) => role.id !== roleToDelete.id),
+                        );
+                        setRoleToDelete(null);
+                     }
                   }}
                   type={"delete"}
                   title={`Are you sure you want to delete the role <b>${roleToDelete?.name}</b>?`}

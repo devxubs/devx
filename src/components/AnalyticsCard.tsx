@@ -97,9 +97,18 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                </Typography>
 
                <Typography variant="h4" fontWeight={700}>
-                  {currency
-                     ? `${currency}${formatCompactNumber(Number(value))}`
-                     : formatCompactNumber(Number(value))}
+                  {(() => {
+                     if (typeof value === "string") {
+                        if (/[^0-9.-]/.test(value.trim())) return value;
+                        const num = Number(value);
+                        if (!isNaN(num)) {
+                           return currency ? `${currency}${formatCompactNumber(num)}` : formatCompactNumber(num);
+                        }
+                        return value;
+                     }
+                     const num = typeof value === "number" && !isNaN(value) ? value : 0;
+                     return currency ? `${currency}${formatCompactNumber(num)}` : formatCompactNumber(num);
+                  })()}
                </Typography>
 
                <Stack direction="row" spacing={0.5} alignItems="center">
@@ -129,7 +138,7 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
             <Box sx={{ height: 66, width: 80 }}>
                <ReactApexChart
                   type="line"
-                  series={[{ name: "Value", data }]}
+                  series={[{ name: "Value", data: Array.isArray(data) && data.length > 0 ? data.map((v) => Number(v) || 0) : [0, 0, 0, 0, 0, 0, 0] }]}
                   options={chartOptions}
                />
             </Box>

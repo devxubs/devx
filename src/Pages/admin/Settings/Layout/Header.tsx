@@ -1,52 +1,39 @@
+"use client";
+
 import {
    Stack,
    IconButton,
    TextField,
    Button,
    useMediaQuery,
-   keyframes,
    useTheme,
    Slide,
    alpha,
+   CircularProgress,
 } from "@mui/material";
 import CustomBox from "@src/components/CustomBox";
 import Icon from "@src/components/Icon";
-import React from "react";
+import React, { useState } from "react";
 
 interface HeaderProps {
    onShowSidebar: () => void;
+   onSave: () => void;
+   isSaving?: boolean;
+   searchQuery?: string;
+   onSearchChange?: (val: string) => void;
 }
 
-const Header = ({ onShowSidebar }: HeaderProps) => {
+const Header = ({
+   onShowSidebar,
+   onSave,
+   isSaving = false,
+   searchQuery = "",
+   onSearchChange,
+}: HeaderProps) => {
    const theme = useTheme();
    const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
-   const rotate = keyframes`
-      0% {
-         transform: translateX(-5px) rotate(0deg);
-      }
+   const [openSearch, setOpenSearch] = useState(false);
 
-      25% {
-         transform: translateX(0px) rotate(90deg);
-      }
-
-      50% {
-         transform: translateX(5px) rotate(180deg);
-      }
-
-      65% {
-         transform: translateX(5px) rotate(200deg);
-      }
-
-      75% {
-         transform: translateX(5px) rotate(180deg);
-      }
-
-      100% {
-         transform: translateX(-5px) rotate(360deg);
-      }
-      `;
-
-   const [openSearch, setOpenSearch] = React.useState(false);
    return (
       <Stack
          px={2}
@@ -72,32 +59,33 @@ const Header = ({ onShowSidebar }: HeaderProps) => {
             <TextField
                variant="outlined"
                size="small"
-               placeholder="Search..."
+               placeholder="Search settings..."
+               value={searchQuery}
+               onChange={(e) => onSearchChange?.(e.target.value)}
                sx={{
                   width: {
-                     sm: 200,
-                     md: 300,
+                     sm: 220,
+                     md: 320,
                   },
                }}
             />
          )}
+
          <Button
             variant="contained"
+            color="primary"
             startIcon={
-               <Icon
-                  icon="solar:settings-bold-duotone"
-                  size={isSmDown ? "small" : "medium"}
-               />
+               isSaving ? (
+                  <CircularProgress size={16} color="inherit" />
+               ) : (
+                  <Icon icon="solar:diskette-bold" size={isSmDown ? "small" : "medium"} />
+               )
             }
             size={isSmDown ? "small" : "medium"}
-            sx={{
-               "& svg": {
-                  color: theme.palette.common.white + "!important",
-                  animation: `${rotate} 4s linear infinite`, // ?  Rotate when changing.
-               },
-            }}
+            onClick={onSave}
+            disabled={isSaving}
          >
-            Save Changes
+            {isSaving ? "Saving..." : "Save Changes"}
          </Button>
 
          {/* Search Slide Sm screen */}
@@ -124,10 +112,11 @@ const Header = ({ onShowSidebar }: HeaderProps) => {
                <TextField
                   variant="outlined"
                   size="small"
-                  placeholder="Search..."
-                  sx={{
-                     width: "100%",
-                  }}
+                  placeholder="Search settings..."
+                  value={searchQuery}
+                  onChange={(e) => onSearchChange?.(e.target.value)}
+                  sx={{ width: "100%" }}
+                  autoFocus
                />
                <IconButton onClick={() => setOpenSearch(false)}>
                   <Icon icon="carbon:close" />

@@ -21,140 +21,81 @@ const Sidebar = ({ onItemClick }: SidebarProps) => {
          setActive(tab);
       } else {
          query.set("tab", "general", false);
+         setActive("general");
       }
    }, []);
 
+   const handleSelectTab = (tabKey: string) => {
+      query.set("tab", tabKey);
+      setActive(tabKey);
+      if (onItemClick) {
+         onItemClick(tabKey);
+      }
+   };
+
    const items: SidebarItem[] = [
       {
-         label: "Profile",
-         icon: "solar:user-circle-bold-duotone",
-         selected: active === "profile",
-         onItemClick() {
-            query.set("tab", "profile");
-            setActive("profile");
-            if (onItemClick) {
-               onItemClick("profile");
-            }
-         },
-      },
-      // {
-      //    label: "Account",
-      //    icon: "solar:user-circle-bold-duotone",
-      //    selected: active === "account",
-      //    onItemClick() {
-      //       query.set("tab", "account");
-      //       setActive("account");
-      //    },
-      // },
-      {
-         label: "Security",
-         icon: "solar:lock-keyhole-bold-duotone",
-         selected: active === "security",
-         onItemClick() {
-            query.set("tab", "security");
-            setActive("security");
-            if (onItemClick) {
-               onItemClick("security");
-            }
-         },
+         label: "General Store",
+         icon: "solar:shop-bold-duotone",
+         selected: active === "general",
+         onItemClick: () => handleSelectTab("general"),
       },
       {
-         label: "Orders",
+         label: "Sales & POS",
          icon: "solar:cart-large-minimalistic-bold-duotone",
-         selected: active === "orders",
-         onItemClick() {
-            query.set("tab", "orders");
-            setActive("orders");
-            if (onItemClick) {
-               onItemClick("orders");
-            }
-         },
+         selected: active === "pos",
+         onItemClick: () => handleSelectTab("pos"),
       },
       {
-         label: "Products",
+         label: "Products & Stock",
          icon: "solar:box-bold-duotone",
          selected: active === "products",
-         onItemClick() {
-            query.set("tab", "products");
-            setActive("products");
-            if (onItemClick) {
-               onItemClick("products");
-            }
-         },
+         onItemClick: () => handleSelectTab("products"),
       },
       {
-         label: "Appearance",
-         icon: "solar:pen-new-square-bold-duotone",
-         selected: active === "appearance",
-         onItemClick() {
-            query.set("tab", "appearance");
-            setActive("appearance");
-            if (onItemClick) {
-               onItemClick("appearance");
-            }
-         },
+         label: "Customers & Suppliers",
+         icon: "solar:users-group-two-rounded-bold-duotone",
+         selected: active === "customers",
+         onItemClick: () => handleSelectTab("customers"),
       },
       {
-         label: "Notifications",
-         icon: "solar:bell-bing-bold-duotone",
-         selected: active === "notifications",
-         onItemClick() {
-            query.set("tab", "notifications");
-            setActive("notifications");
-            if (onItemClick) {
-               onItemClick("notifications");
-            }
-         },
+         label: "Purchases & Expenses",
+         icon: "solar:wallet-money-bold-duotone",
+         selected: active === "expenses",
+         onItemClick: () => handleSelectTab("expenses"),
       },
       {
-         label: "Shipping",
-         icon: "solar:delivery-bold-duotone",
-         selected: active === "shipping",
-         onItemClick() {
-            query.set("tab", "shipping");
-            setActive("shipping");
-            if (onItemClick) {
-               onItemClick("shipping");
-            }
-         },
-      },
-      {
-         label: "Invoices",
+         label: "Invoice & Printing",
          icon: "solar:printer-bold-duotone",
          selected: active === "invoices",
-         onItemClick() {
-            query.set("tab", "invoices");
-            setActive("invoices");
-            if (onItemClick) {
-               onItemClick("invoices");
-            }
-         },
+         onItemClick: () => handleSelectTab("invoices"),
       },
       {
-         label: "Billing",
-         icon: "solar:wallet-money-bold-duotone",
-         selected: active === "billing",
-         onItemClick() {
-            query.set("tab", "billing");
-            setActive("billing");
-            if (onItemClick) {
-               onItemClick("billing");
-            }
-         },
+         label: "Users & Permissions",
+         icon: "solar:shield-user-bold-duotone",
+         selected: active === "permissions",
+         onItemClick: () => handleSelectTab("permissions"),
       },
       {
-         label: "Backups",
-         icon: "solar:database-bold-duotone",
-         selected: active === "backups",
-         onItemClick() {
-            query.set("tab", "backups");
-            setActive("backups");
-            if (onItemClick) {
-               onItemClick("backups");
-            }
-         },
+         label: "Entity ID Formats",
+         icon: "solar:tag-price-bold-duotone",
+         selected: active === "prefixes",
+         onItemClick: () => handleSelectTab("prefixes"),
+      },
+      {
+         label: "Appearance & Theme",
+         icon: "solar:palette-bold-duotone",
+         selected: active === "appearance",
+         onItemClick: () => handleSelectTab("appearance"),
+      },
+      {
+         label: "Notifications & System",
+         icon: "solar:settings-bold-duotone",
+         selected: active === "system",
+         onItemClick: () => handleSelectTab("system"),
       },
    ];
+
    return (
       <Stack flex={1}>
          <CustomList items={items} fullMenu={!isSm} />

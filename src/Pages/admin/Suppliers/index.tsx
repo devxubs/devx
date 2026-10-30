@@ -13,12 +13,14 @@ import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
+import { TableSkeleton } from "@src/components/SkeletonLoader";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
+import { SupplierDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 
 type SuppliersTypes = {
-   id: number;
+   id: number | string;
    name: string;
    email: string;
    number: string; // 11 digit BD phone number
@@ -30,138 +32,7 @@ type SuppliersTypes = {
    pay_return?: number;
    due_return?: number;
 };
-export const suppliersData: SuppliersTypes[] = [
-   {
-      id: 1,
-      name: "Md. Rahim",
-      email: "md.rahim@example.com",
-      number: "01710000001",
-      address: "Dhaka, Bangladesh",
-      total: 500.0,
-      pay: 5000.0,
-      due: 4000.0,
-      advance: 0.0,
-      pay_return: 1500.0,
-      due_return: 1500.0,
-   },
-   {
-      id: 2,
-      name: "Abdul Karim",
-      email: "abdul.karim@example.com",
-      number: "01810000002",
-      address: "Chittagong, Bangladesh",
-      total: 0.0,
-      pay: 3200.0,
-      due: 3200.0,
-      advance: 0.0,
-      pay_return: 0.0,
-      due_return: 0.0,
-   },
-   {
-      id: 3,
-      name: "Jubayer Hosen",
-      email: "jubayer.hosen@example.com",
-      number: "01610000003",
-      address: "Khulna, Bangladesh",
-      total: 200.0,
-      pay: 2500.0,
-      due: 2000.0,
-      advance: 0.0,
-      pay_return: 700.0,
-      due_return: 700.0,
-   },
-   {
-      id: 4,
-      name: "Sakib Hasan",
-      email: "sakib.hasan@example.com",
-      number: "01710000004",
-      address: "Sylhet, Bangladesh",
-      total: 0.0,
-      pay: 1500.0,
-      due: 1000.0,
-      advance: 200.0,
-      pay_return: 300.0,
-      due_return: 300.0,
-   },
-   {
-      id: 5,
-      name: "Hasan Ali",
-      email: "hasan.ali@example.com",
-      number: "01910000005",
-      address: "Barishal, Bangladesh",
-      total: 600.0,
-      pay: 800.0,
-      due: 700.0,
-      advance: 0.0,
-      pay_return: 700.0,
-      due_return: 700.0,
-   },
-   {
-      id: 6,
-      name: "Iqbal Ahmed",
-      email: "iqbal.ahmed@example.com",
-      number: "01710000006",
-      address: "Rajshahi, Bangladesh",
-      total: 200.0,
-      pay: 4000.0,
-      due: 3500.0,
-      advance: 0.0,
-      pay_return: 700.0,
-      due_return: 700.0,
-   },
-   {
-      id: 7,
-      name: "Nazmul Islam",
-      email: "nazmul.islam@example.com",
-      number: "01510000007",
-      address: "Mymensingh, Bangladesh",
-      total: 0.0,
-      pay: 500.0,
-      due: 500.0,
-      advance: 0.0,
-      pay_return: 0.0,
-      due_return: 0.0,
-   },
-   {
-      id: 8,
-      name: "Rafiq",
-      email: "rafiq@example.com",
-      number: "01410000008",
-      address: "Rangpur, Bangladesh",
-      total: 100.0,
-      pay: 1200.0,
-      due: 1000.0,
-      advance: 100.0,
-      pay_return: 200.0,
-      due_return: 200.0,
-   },
-   {
-      id: 9,
-      name: "Imran",
-      email: "imran@example.com",
-      number: "01310000009",
-      address: "Tangail, Bangladesh",
-      total: 250.0,
-      pay: 900.0,
-      due: 850.0,
-      advance: 0.0,
-      pay_return: 300.0,
-      due_return: 300.0,
-   },
-   {
-      id: 10,
-      name: "Shakil",
-      email: "shakil@example.com",
-      number: "01710000010",
-      address: "Jessore, Bangladesh",
-      total: 0.0,
-      pay: 1400.0,
-      due: 1200.0,
-      advance: 50.0,
-      pay_return: 250.0,
-      due_return: 250.0,
-   },
-];
+export const suppliersData: SuppliersTypes[] = [];
 
 export const SuppliersSchema = yup.object({
    name: yup
@@ -210,21 +81,39 @@ export const SuppliersProfile = ({ name, number }: SuppliersProfileProps) => {
 
 const Suppliers = () => {
    const theme = useTheme();
+   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
+
    const columns: ColumnConfig[] = [
       {
          field: "id",
-         headerName: "Id",
-         flex: 0.1,
+         headerName: "ID",
+         flex: 0.2,
+         renderCell: (params) => (
+            <Typography
+               variant="body2"
+               fontWeight={600}
+               color="primary.main"
+               sx={{ fontFamily: "monospace", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailSupplierId(params.row.customId || params.row.id)}
+            >
+               {params.row.customId || params.row.id}
+            </Typography>
+         ),
       },
       {
          field: "name",
          headerName: "Name",
          flex: 1,
          renderCell: (params) => (
-            <SuppliersProfile
-               name={params.row.name}
-               number={params.row.number}
-            />
+            <Stack
+               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+               onClick={() => setDetailSupplierId(params.row.customId || params.row.id)}
+            >
+               <SuppliersProfile
+                  name={params.row.name}
+                  number={params.row.number}
+               />
+            </Stack>
          ),
       },
       {
@@ -262,7 +151,41 @@ const Suppliers = () => {
       },
    ];
 
-   const [suppliers, setSuppliers] = useState<SuppliersTypes[]>(suppliersData);
+   const [suppliers, setSuppliers] = useState<SuppliersTypes[]>([]);
+   const [loading, setLoading] = useState(false);
+
+   const loadSuppliers = React.useCallback(async () => {
+      setLoading(true);
+      try {
+         const res = await fetch("/api/suppliers");
+         if (res.ok) {
+            const data = await res.json();
+            const mapped = (Array.isArray(data) ? data : data.suppliers || []).map((s: any, idx: number) => ({
+               id: s.id,
+               customId: s.customId || `SUP_${idx + 1}`,
+               name: s.name,
+               email: s.email || "-",
+               number: s.phone || "-",
+               address: s.address || "-",
+               total: 0,
+               pay: 0,
+               due: 0,
+               advance: 0,
+               pay_return: 0,
+               due_return: 0,
+            }));
+            setSuppliers(mapped);
+         }
+      } catch {
+         // fallback
+      } finally {
+         setLoading(false);
+      }
+   }, []);
+
+   React.useEffect(() => {
+      loadSuppliers();
+   }, [loadSuppliers]);
 
    // modal
    const [open, setModalOpen] = useState(false);
@@ -288,28 +211,34 @@ const Suppliers = () => {
       },
    });
 
-   const onSubmit: SubmitHandler<SupplierFormValues> = (formData) => {
-      const newSupplier: SuppliersTypes = {
-         id: suppliers.length + 1,
-         ...formData,
-         advance: 0,
-         due: 0,
-         pay: 0,
-         pay_return: 0,
-         due_return: 0,
-         total: 0,
-      };
-
-      if (!edit) {
-         setSuppliers([...suppliers, newSupplier]);
-      } else {
-         setSuppliers(
-            suppliers.map((s) =>
-               s.id === edit.id ? { ...s, ...formData } : s,
-            ),
-         );
-         setEdit(null);
-      }
+   const onSubmit: SubmitHandler<SupplierFormValues> = async (formData) => {
+      try {
+         if (!edit) {
+            await fetch("/api/suppliers", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({
+                  name: formData.name,
+                  email: formData.email,
+                  phone: formData.number,
+                  address: formData.address,
+               }),
+            });
+         } else {
+            await fetch(`/api/suppliers/${edit.id}`, {
+               method: "PUT",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({
+                  name: formData.name,
+                  email: formData.email,
+                  phone: formData.number,
+                  address: formData.address,
+               }),
+            });
+            setEdit(null);
+         }
+         loadSuppliers();
+      } catch {}
 
       setModalOpen(false);
    };
@@ -343,30 +272,78 @@ const Suppliers = () => {
                Add Supplier
             </Button>
          </Stack>
-         <CustomTable
-            rows={suppliers}
-            columns={columns}
-            checkBox={true}
-            menuItems={[
-               {
-                  label: "edit",
-                  onClick: (p) => {
-                     setEdit(p.row);
-                     setModalOpen(true);
+         {loading ? (
+            <TableSkeleton rows={5} cols={6} />
+         ) : (
+            <CustomTable
+               rows={suppliers}
+               columns={columns}
+               checkBox={true}
+               canPrint={true}
+               canExport={true}
+               printConfig={{
+                  title: "DevX POS - Suppliers Directory",
+               }}
+               exportConfig={{
+                  filename: `Suppliers_Directory_${new Date().toISOString().split("T")[0]}`,
+                  title: "DevX POS - Suppliers Directory",
+                  fetchAllData: async () => {
+                     try {
+                        const res = await fetch("/api/suppliers");
+                        if (!res.ok) return [];
+                        const data = await res.json();
+                        return (data || []).map((s: any, idx: number) => ({
+                           id: s.customId || `SUP_${idx + 1}`,
+                           name: s.name,
+                           number: s.phone || "-",
+                           address: s.address || "-",
+                           total: s._count?.purchases || 0,
+                           pay: "-",
+                           due: "-",
+                           advance: "-",
+                        }));
+                     } catch {
+                        return [];
+                     }
                   },
-               },
-               {
-                  label: "print",
-                  onClick: (p) => {},
-               },
-               {
-                  label: "delete",
-                  color: "error",
-                  onClick: (p) => {
-                     setDeleteOpen(p.row);
+                  summaryRows: (data: any[]) => [
+                     { label: "Total Suppliers Count:", value: String(data.length) },
+                  ],
+               }}
+               menuItems={[
+                  {
+                     label: "View Details",
+                     onClick: (p) => {
+                        setDetailSupplierId(p.row.customId || p.row.id);
+                     },
                   },
-               },
-            ]}
+                  {
+                     label: "edit",
+                     onClick: (p) => {
+                        setEdit(p.row);
+                        setModalOpen(true);
+                     },
+                  },
+                  {
+                     label: "print",
+                     onClick: (p) => {
+                        setDetailSupplierId(p.row.customId || p.row.id);
+                     },
+                  },
+                  {
+                     label: "delete",
+                     color: "error",
+                     onClick: (p) => {
+                        setDeleteOpen(p.row);
+                     },
+                  },
+               ]}
+            />
+         )}
+         <SupplierDetailModal
+            open={Boolean(detailSupplierId)}
+            onClose={() => setDetailSupplierId(null)}
+            supplierId={detailSupplierId}
          />
          <CustomModal
             open={open}
@@ -533,9 +510,14 @@ const Suppliers = () => {
             open={Boolean(deleteOpen)}
             type={"error"}
             title={`Are you sure want to delete "${deleteOpen?.name}"?`}
-            onConfirm={() => {
-               setSuppliers(suppliers.filter((s) => s.id !== deleteOpen?.id));
-               setDeleteOpen(null);
+            onConfirm={async () => {
+               if (deleteOpen) {
+                  try {
+                     await fetch(`/api/suppliers/${deleteOpen.id}`, { method: "DELETE" });
+                  } catch {}
+                  setSuppliers(suppliers.filter((s) => s.id !== deleteOpen.id));
+                  setDeleteOpen(null);
+               }
             }}
             onClose={function (): void {
                setDeleteOpen(null);

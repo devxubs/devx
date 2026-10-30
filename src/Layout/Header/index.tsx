@@ -2,6 +2,7 @@
 import {
    alpha,
    Avatar,
+   Badge,
    IconButton,
    keyframes,
    Paper,
@@ -31,10 +32,20 @@ const Header = () => {
    const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
 
    const [openNotification, setOpenNotification] = useState(false);
+   const [unreadCount, setUnreadCount] = useState(0);
    const [openProfile, setOpenProfile] = useState(false);
    const [openSettings, setOpenSettings] = useState(false);
    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
    const [openSearch, setOpenSearch] = useState(false);
+
+   React.useEffect(() => {
+      fetch("/api/notifications")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((data) => {
+            if (data?.unreadCount != null) setUnreadCount(data.unreadCount);
+         })
+         .catch(() => {});
+   }, []);
 
    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
       setAnchorEl(event.currentTarget);
@@ -124,12 +135,16 @@ const Header = () => {
                <NotificationDrawer
                   open={openNotification}
                   onClose={() => setOpenNotification(false)}
+                  onUnreadChange={setUnreadCount}
                />
                <IconButton
+                  data-testid="notification-bell-btn"
                   sx={{ color: "text.secondary" }}
                   onClick={() => setOpenNotification(true)}
                >
-                  <Icon icon="solar:bell-bing-bold-duotone" />
+                  <Badge badgeContent={unreadCount} color="error" max={99}>
+                     <Icon icon="solar:bell-bing-bold-duotone" />
+                  </Badge>
                </IconButton>
 
                {/* User Menu */}

@@ -1,11 +1,11 @@
 import Report from "@src/Pages/admin/Reports";
-import React from "react";
+import React, { Suspense } from "react";
 
 const ReportPage = () => {
    return (
-      <div>
+      <Suspense fallback={<div>Loading...</div>}>
          <Report />
-      </div>
+      </Suspense>
    );
 };
 

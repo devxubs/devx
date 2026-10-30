@@ -1,7 +1,7 @@
 "use client";
 
 import { Stack } from "@mui/material";
-import Filter, { FilterData } from "./Filter";
+import Filter, { FilterData, ExportTableConfig } from "./Filter";
 
 import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
 import {
@@ -9,8 +9,10 @@ import {
    GridColDef,
    GridRenderCellParams,
    GridRowsProp,
+   GridRowSelectionModel,
+   GridRowId,
 } from "@mui/x-data-grid";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Icon from "../Icon";
 import CustomPopover from "../CustomPopover";
 import Menu, { MenuItem as MenuItemProps } from "../Menu";
@@ -29,6 +31,12 @@ export type ColumnConfig = GridColDef & {
    ) => void;
 };
 
+export interface TablePrintConfig {
+   title?: string;
+   isInvoiceModule?: boolean;
+   metadata?: { label: string; value: string }[];
+}
+
 interface DataTableProps {
    rows: GridRowsProp;
    columns: ColumnConfig[];
@@ -42,6 +50,18 @@ interface DataTableProps {
       data: FilterData,
       setData: (f: FilterData) => void,
    ) => void;
+   exportConfig?: ExportTableConfig;
+   canPrint?: boolean;
+   canExport?: boolean;
+   printConfig?: TablePrintConfig;
+   onSelectionChange?: (selectedRows: any[]) => void;
+   hideSelectionToolbar?: boolean;
+   showSelectionIndicators?: boolean;
+   hideFooterSelectedRowCount?: boolean;
+   customSelectionToolbar?: (
+      selectedRows: any[],
+      onClearSelection?: () => void,
+   ) => React.ReactNode;
 }
 
 export default function CustomTable({
@@ -50,6 +70,15 @@ export default function CustomTable({
    checkBox = false,
    menuItems,
    filter,
+   exportConfig,
+   canPrint,
+   canExport,
+   printConfig,
+   onSelectionChange,
+   hideSelectionToolbar = false,
+   showSelectionIndicators = true,
+   hideFooterSelectedRowCount = false,
+   customSelectionToolbar,
 }: DataTableProps) {
    const theme = useTheme();
 
@@ -62,6 +91,58 @@ export default function CustomTable({
    });
    const [selectedRowParams, setSelectedRowParams] =
       useState<GridRenderCellParams | null>(null);
+
+   const [rowSelectionModel, setRowSelectionModel] =
+      useState<GridRowSelectionModel>({
+         type: "include",
+         ids: new Set<GridRowId>(),
+      });
+
+   const selectedRows = useMemo(() => {
+      if (!checkBox || !rowSelectionModel) return [];
+      const rowsList = (rows || []) as any[];
+      if (Array.isArray(rowSelectionModel)) {
+         const idSet = new Set(rowSelectionModel);
+         return rowsList.filter((r) => idSet.has(r.id));
+      }
+      if (rowSelectionModel.type === "include") {
+         return rowsList.filter((r) => rowSelectionModel.ids.has(r.id));
+      } else {
+         return rowsList.filter((r) => !rowSelectionModel.ids.has(r.id));
+      }
+   }, [rows, rowSelectionModel, checkBox]);
+
+   useEffect(() => {
+      onSelectionChange?.(selectedRows);
+   }, [selectedRows, onSelectionChange]);
+
+   useEffect(() => {
+      const currentRowIds = new Set((rows as any[]).map((r) => r.id));
+      if (Array.isArray(rowSelectionModel)) {
+         const validIds = rowSelectionModel.filter((id) =>
+            currentRowIds.has(id),
+         );
+         if (validIds.length !== rowSelectionModel.length) {
+            setRowSelectionModel({
+               type: "include",
+               ids: new Set<GridRowId>(validIds),
+            });
+         }
+      } else if (
+         rowSelectionModel?.type === "include" &&
+         rowSelectionModel?.ids?.size > 0
+      ) {
+         const validIds = new Set<GridRowId>();
+         rowSelectionModel.ids.forEach((id) => {
+            if (currentRowIds.has(id)) {
+               validIds.add(id);
+            }
+         });
+         if (validIds.size !== rowSelectionModel.ids.size) {
+            setRowSelectionModel({ type: "include", ids: validIds });
+         }
+      }
+   }, [rows]);
 
    const handlePaginationChange = useCallback((model: any) => {
       setPaginationModel(model);
@@ -91,7 +172,13 @@ export default function CustomTable({
                               setActionMenuOpen(e.currentTarget);
                            }}
                         >
-                           <Icon size="small" icon="eva:more-vertical-fill" />
+                           <Icon
+                              size="small"
+                              icon="eva:more-vertical-fill"
+                              style={{
+                                 color: theme.palette.text.primary,
+                              }}
+                           />
                         </IconButton>
                      </>
                   );
@@ -108,7 +195,9 @@ export default function CustomTable({
                align: "left",
                renderCell: (params: GridRenderCellParams) => {
                   const row = params.row;
-                  const color = col.color ? col.color(params) : "primary";
+                  const color = col.color
+                     ? col.color(params)
+                     : row.color || "primary";
                   const validChipColors = [
                      "primary",
                      "secondary",
@@ -129,7 +218,7 @@ export default function CustomTable({
                   return (
                      <Chip
                         component="div" // Add this line
-                        label={params.formattedValue}
+                        label={params.formattedValue ?? params.value}
                         size="small"
                         color={colorKey}
                         {...(col.onClick
@@ -163,25 +252,52 @@ export default function CustomTable({
             };
          }
 
+         const isIdColumn =
+            col.field === "id" ||
+            col.field === "customId" ||
+            col.field === "orderId" ||
+            col.field === "invoice" ||
+            Boolean(
+               col.headerName && col.headerName.toLowerCase().endsWith("id"),
+            ) ||
+            col.headerName?.toLowerCase() === "id" ||
+            col.headerName?.toLowerCase() === "order id" ||
+            col.headerName?.toLowerCase() === "purchase id" ||
+            col.headerName?.toLowerCase() === "invoice";
+
          return {
-            // flex: col.flex ? col.flex : 0.5,
-            headerAlign: "left",
-            align: "left",
+            headerAlign: isIdColumn ? "center" : col.headerAlign || "left",
+            align: isIdColumn ? "center" : col.align || "left",
             ...col,
+            ...(isIdColumn ? { headerAlign: "center", align: "center" } : {}),
          };
       });
    }, [columns]);
 
    const [mount, setMount] = useState(false);
+   const tableBoxRef = useRef<HTMLDivElement | null>(null);
 
    useEffect(() => {
       setMount(true);
    }, []);
 
+   useEffect(() => {
+      if (tableBoxRef.current) {
+         tableBoxRef.current.scrollLeft = 0;
+         const scroller = tableBoxRef.current.querySelector(
+            ".MuiDataGrid-virtualScroller",
+         );
+         if (scroller) {
+            scroller.scrollLeft = 0;
+         }
+      }
+   }, [rows]);
+
    if (!mount) return null;
 
    return (
       <Stack
+         ref={tableBoxRef}
          borderRadius={1}
          overflow={"hidden"}
          sx={{
@@ -191,7 +307,41 @@ export default function CustomTable({
             overflow: "auto",
          }}
       >
-         <Filter customFilter={filter} />
+         <Filter
+            customFilter={filter}
+            rows={rows as any[]}
+            columns={processedColumns as any[]}
+            exportConfig={exportConfig}
+            canPrint={canPrint}
+            canExport={canExport}
+            printConfig={printConfig}
+            hideSelectionToolbar={hideSelectionToolbar}
+            showSelectionIndicators={showSelectionIndicators}
+            customSelectionToolbar={customSelectionToolbar}
+            selectedRows={selectedRows}
+            onClearSelection={() =>
+               setRowSelectionModel({
+                  type: "include",
+                  ids: new Set<GridRowId>(),
+               })
+            }
+            onToggleSelectAll={() => {
+               if (selectedRows.length >= rows.length && rows.length > 0) {
+                  setRowSelectionModel({
+                     type: "include",
+                     ids: new Set<GridRowId>(),
+                  });
+               } else {
+                  setRowSelectionModel({
+                     type: "include",
+                     ids: new Set<GridRowId>((rows as any[]).map((r) => r.id)),
+                  });
+               }
+            }}
+            isAllSelected={
+               rows.length > 0 && selectedRows.length === rows.length
+            }
+         />
 
          <Stack
             sx={{
@@ -204,6 +354,11 @@ export default function CustomTable({
                columns={processedColumns as GridColDef[]}
                density="comfortable"
                checkboxSelection={checkBox}
+               hideFooterSelectedRowCount={hideFooterSelectedRowCount}
+               rowSelectionModel={rowSelectionModel}
+               onRowSelectionModelChange={(newModel) =>
+                  setRowSelectionModel(newModel)
+               }
                // autoPageSize //* enable this to make Whichever one you show based on the height of the table
                pageSizeOptions={[10, 25, 50, { value: -1, label: "All" }]}
                paginationModel={paginationModel}
@@ -318,6 +473,7 @@ export default function CustomTable({
                      outline: "none !important",
                      border: 0,
                      alignItems: "center",
+                     display: "flex",
                   },
 
                   // FOOTER STYLES

@@ -1,36 +1,71 @@
+"use client";
+
 import {
    Stack,
    Avatar,
    Typography,
    IconButton,
    useTheme,
-   FormControl,
    FormControlLabel,
-   FormLabel,
    Radio,
    RadioGroup,
    Button,
+   Tooltip,
+   CircularProgress,
 } from "@mui/material";
 import AnimatedAvatar from "@src/components/AnimateAvatar";
 import Icon from "@src/components/Icon";
 import SidebarRightIcon from "@src/SvgIcon/SidebarRightIcon";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { getLastActiveTime, toRelativeTime } from "../handler/handler";
 import { User } from "../handler/chatData";
 import CustomModal from "@src/components/Modal";
+import EditGroupModal from "../EditGroupModal";
 
 interface HeaderProps {
-   user: User;
+   user: User & { isMuted?: boolean; type?: string; description?: string };
+   conversation?: any;
    open?: Boolean;
    mobileMode?: Boolean;
    onClose?: (open: boolean) => void;
+   onConversationUpdated?: (updated: any) => void;
 }
 
-const Header = ({ user, onClose, open }: HeaderProps) => {
+const Header = ({ user, conversation, onClose, open, onConversationUpdated }: HeaderProps) => {
    const theme = useTheme();
    const [openModal, setOpenModal] = useState(false);
+   const [openEditGroup, setOpenEditGroup] = useState(false);
+   const [isMuted, setIsMuted] = useState(Boolean(user.isMuted || conversation?.isMuted));
+   const [muteDuration, setMuteDuration] = useState("Until I change it");
+   const [savingMute, setSavingMute] = useState(false);
 
-   console.log(!user);
+   useEffect(() => {
+      setIsMuted(Boolean(user.isMuted || conversation?.isMuted));
+   }, [user.isMuted, conversation?.isMuted]);
+
+   const handleMuteAction = async (targetMute: boolean) => {
+      setSavingMute(true);
+      try {
+         const convId = conversation?.id || user.id;
+         const res = await fetch("/api/chat/conversations", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+               conversationId: convId,
+               action: targetMute ? "mute" : "unmute",
+               isMuted: targetMute,
+            }),
+         });
+         if (res.ok) {
+            setIsMuted(targetMute);
+            setOpenModal(false);
+            onConversationUpdated?.({ ...(conversation || {}), isMuted: targetMute });
+         }
+      } catch {}
+      setSavingMute(false);
+   };
+
+   const isGroup = user.type === "group" || conversation?.type === "group";
 
    return (
       <Stack
@@ -81,17 +116,33 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
                <AnimatedAvatar src={user.avatar} />
             )}
             <Stack>
-               <Typography
-                  variant="body1"
-                  fontSize={14}
-                  fontWeight={600}
-                  color="textPrimary"
-               >
-                  {user && !user.id ? "Select a user to chat" : user.name}
-               </Typography>
+               <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography
+                     variant="body1"
+                     fontSize={14}
+                     fontWeight={600}
+                     color="textPrimary"
+                     textTransform="capitalize"
+                  >
+                     {user && !user.id ? "Select a user to chat" : user.name}
+                  </Typography>
+                  {isMuted && (
+                     <Tooltip title="Muted">
+                        <span style={{ display: "inline-flex" }}>
+                           <Icon
+                              icon="solar:muted-bold"
+                              size="small"
+                              style={{ color: theme.palette.text.disabled, fontSize: 16 }}
+                           />
+                        </span>
+                     </Tooltip>
+                  )}
+               </Stack>
                <Typography variant="body2" fontSize={12} color="textSecondary">
                   {user && user.id
-                     ? user.isOnline
+                     ? isGroup
+                        ? user.description || "Group Conversation"
+                        : user.isOnline
                         ? "Online"
                         : getLastActiveTime(user.id)
                         ? toRelativeTime(
@@ -105,6 +156,33 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
 
          {user && user.id && (
             <Stack spacing={1} direction="row" alignItems="center">
+               {/* Edit Group Profile Option */}
+               {isGroup && (
+                  <>
+                     <Tooltip title="Edit Group Profile">
+                        <IconButton
+                           size="small"
+                           onClick={() => setOpenEditGroup(true)}
+                           data-testid="edit-group-profile-btn"
+                        >
+                           <Icon
+                              size="small"
+                              icon="solar:pen-new-square-linear"
+                              style={{ color: theme.palette.text.secondary }}
+                           />
+                        </IconButton>
+                     </Tooltip>
+                     <EditGroupModal
+                        open={openEditGroup}
+                        conversation={conversation || user}
+                        onClose={() => setOpenEditGroup(false)}
+                        onUpdated={(updated) => {
+                           onConversationUpdated?.(updated);
+                        }}
+                     />
+                  </>
+               )}
+
                <IconButton size="small" onClick={() => onClose?.(!open)}>
                   <SidebarRightIcon
                      fontSize="small"
@@ -112,10 +190,11 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
                   />
                </IconButton>
 
+               {/* Mute Modal */}
                <CustomModal
                   open={openModal}
                   onClose={() => setOpenModal(false)}
-                  title="Mute this chat?"
+                  title={isMuted ? "Unmute this chat?" : "Mute this chat?"}
                   sx={{
                      width: {
                         xs: 300,
@@ -123,40 +202,25 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
                      },
                   }}
                >
-                  <RadioGroup
-                     aria-labelledby="demo-radio-buttons-group-label"
-                     defaultValue="female"
-                     name="radio-buttons-group"
-                     sx={{
-                        ml: 4,
-                     }}
-                  >
-                     <FormControlLabel
-                        value="For 15 minutes"
-                        control={<Radio />}
-                        label="For 15 minutes"
-                     />
-                     <FormControlLabel
-                        value="For 1 hour"
-                        control={<Radio />}
-                        label="For 1 hour"
-                     />
-                     <FormControlLabel
-                        value="For 8 hour"
-                        control={<Radio />}
-                        label="For 8 hour"
-                     />
-                     <FormControlLabel
-                        value="For 24 hour"
-                        control={<Radio />}
-                        label="For 24 hour"
-                     />
-                     <FormControlLabel
-                        value="Until I change it"
-                        control={<Radio />}
-                        label="Until I change it"
-                     />
-                  </RadioGroup>
+                  {!isMuted ? (
+                     <RadioGroup
+                        aria-labelledby="mute-chat-radio-group"
+                        value={muteDuration}
+                        onChange={(e) => setMuteDuration(e.target.value)}
+                        name="radio-buttons-group"
+                        sx={{ ml: 2, my: 1 }}
+                     >
+                        <FormControlLabel value="For 15 minutes" control={<Radio />} label="For 15 minutes" />
+                        <FormControlLabel value="For 1 hour" control={<Radio />} label="For 1 hour" />
+                        <FormControlLabel value="For 8 hours" control={<Radio />} label="For 8 hours" />
+                        <FormControlLabel value="For 24 hours" control={<Radio />} label="For 24 hours" />
+                        <FormControlLabel value="Until I change it" control={<Radio />} label="Until I change it" />
+                     </RadioGroup>
+                  ) : (
+                     <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                        Unmuting will restore message notifications and alerts for this conversation.
+                     </Typography>
+                  )}
                   <Stack
                      spacing={2}
                      direction={"row"}
@@ -168,22 +232,41 @@ const Header = ({ user, onClose, open }: HeaderProps) => {
                         variant="text"
                         color="inherit"
                         onClick={() => setOpenModal(false)}
+                        disabled={savingMute}
                      >
                         Cancel
                      </Button>
 
-                     <Button variant="text" color="primary">
-                        Ok
+                     <Button
+                        variant="contained"
+                        color="primary"
+                        disabled={savingMute}
+                        data-testid="confirm-mute-btn"
+                        onClick={() => handleMuteAction(!isMuted)}
+                        startIcon={savingMute ? <CircularProgress size={16} /> : undefined}
+                     >
+                        {isMuted ? "Unmute" : "Mute"}
                      </Button>
                   </Stack>
                </CustomModal>
-               <IconButton size="small" onClick={() => setOpenModal(true)}>
-                  <Icon
+
+               {/* Mute Button */}
+               <Tooltip title={isMuted ? "Unmute Chat" : "Mute Chat"}>
+                  <IconButton
                      size="small"
-                     icon="solar:muted-line-duotone" //"eva:more-vertical-fill"
-                     style={{ color: theme.palette.text.secondary }}
-                  />
-               </IconButton>
+                     onClick={() => setOpenModal(true)}
+                     data-testid="mute-chat-btn"
+                     color={isMuted ? "primary" : "default"}
+                  >
+                     <Icon
+                        size="small"
+                        icon={isMuted ? "solar:muted-bold" : "solar:muted-line-duotone"}
+                        style={{
+                           color: isMuted ? theme.palette.primary.main : theme.palette.text.secondary,
+                        }}
+                     />
+                  </IconButton>
+               </Tooltip>
             </Stack>
          )}
       </Stack>

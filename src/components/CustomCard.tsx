@@ -4,10 +4,11 @@ import React, { ReactNode } from "react";
 interface CustomCardProps {
    children: ReactNode;
    title?: string;
+   subtitle?: string;
    sx?: SxProps;
 }
 
-const CustomCard = ({ children, title, sx }: CustomCardProps) => {
+const CustomCard = ({ children, title, subtitle, sx }: CustomCardProps) => {
    return (
       <Stack
          sx={{
@@ -19,9 +20,16 @@ const CustomCard = ({ children, title, sx }: CustomCardProps) => {
             ...sx,
          }}
       >
-         <Typography variant="subtitle1" mb={2}>
-            {title}
-         </Typography>
+         {title && (
+            <Typography variant="subtitle1" mb={subtitle ? 0.5 : 2} fontWeight={600}>
+               {title}
+            </Typography>
+         )}
+         {subtitle && (
+            <Typography variant="caption" color="text.secondary" mb={2}>
+               {subtitle}
+            </Typography>
+         )}
          {children}
       </Stack>
    );

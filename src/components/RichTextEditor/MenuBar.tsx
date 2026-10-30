@@ -41,7 +41,7 @@ const ClearFormatIcon = () => {
   return (
     <svg
       focusable="false"
-      aria-label="true"
+      aria-hidden="true"
       fill="currentcolor"
       width={"1rem"}
       height={"1rem"}
@@ -62,7 +62,6 @@ function MenuBar({
   onFullScreen: Function;
   fullScreen: boolean;
 }) {
-  if (!editor) return null;
   useEditorState(editor);
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -71,6 +70,8 @@ function MenuBar({
   const [headingAnchorEl, setHeadingAnchorEl] = useState<null | HTMLElement>(
     null
   );
+
+  if (!editor) return null;
 
   const handleLinkClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -167,7 +168,6 @@ function MenuBar({
                       editor.chain().focus().setParagraph().run();
                     } else {
                       const level = parseInt(h.replace("Heading ", ""), 10);
-                      console.log(editor.isActive(level));
 
                       editor.chain().focus().toggleHeading({ level }).run();
                     }
