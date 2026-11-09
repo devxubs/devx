@@ -9,7 +9,7 @@ import HardBreak from "@tiptap/extension-hard-break";
 
 import { Box, useTheme, Stack, alpha } from "@mui/material";
 import MenuBar from "./MenuBar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface RichTextEditorProps {
   error?: boolean;
@@ -28,7 +28,7 @@ export default function ReachTextEditor({
   const theme = useTheme();
   const editor = useEditor({
     immediatelyRender: false,
-    content: value || "<p>Hello World 🌍</p>",
+    content: value || "",
     onUpdate: ({ editor }) => {
       onChange?.(editor.getHTML());
     },
@@ -52,6 +52,12 @@ export default function ReachTextEditor({
       Image.configure({ inline: false, allowBase64: true }),
     ],
   });
+
+  useEffect(() => {
+    if (editor && value !== undefined && value !== editor.getHTML()) {
+      editor.commands.setContent(value || "");
+    }
+  }, [value, editor]);
 
   if (!editor) return null; // Don't render until editor is ready
 
@@ -87,8 +93,7 @@ export default function ReachTextEditor({
           minHeight: 240,
           height: "100%",
           width: "100%",
-          transform: fullScreen ? "scale(1)" : "scale(0.99)", // subtle zoom effect
-          transformOrigin: "center center",
+          transform: "none",
         }}
       >
         <style>{`
@@ -102,12 +107,15 @@ export default function ReachTextEditor({
           outline: none;
           font-size: 14px;
           line-height: 1.5;
-          padding: 8px 16px;
+          padding: 12px 16px;
           color: ${theme.palette.text.primary};
           overflow-y: auto;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(0,0,0,0.2) transparent;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
           height: fit-content;
+        }
+        .tiptap::-webkit-scrollbar {
+          display: none !important;
         }
         .custom-link {
           color: ${theme.palette.primary.main};
@@ -123,8 +131,11 @@ export default function ReachTextEditor({
           sx={{
             flex: 1,
             overflowY: "auto",
-            scrollbarWidth: "thin",
-            scrollbarColor: " rgba(0,0,0,0.2) transparent",
+            scrollbarWidth: "none !important",
+            msOverflowStyle: "none !important",
+            "&::-webkit-scrollbar": {
+              display: "none !important",
+            },
             bgcolor: error ? alpha(theme.palette.error.main, 0.08) : "initial",
             p: 0,
           }}

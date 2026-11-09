@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
 
    if (search) {
       where.OR = [
+         { orderCode: { contains: search } },
          { orderId: { contains: search } },
          { customId: { contains: search } },
          { invoiceNo: { contains: search } },
@@ -304,7 +305,7 @@ export async function GET(request: NextRequest) {
             take: limit,
             include: {
                customer: true,
-               employee: { select: { id: true, name: true, email: true, phoneNumber: true } },
+               employee: { select: { id: true, name: true, email: true, phoneNumber: true, customId: true } },
                items: { include: { product: true } },
             },
             orderBy: orderClause,
@@ -416,13 +417,14 @@ export async function POST(request: NextRequest) {
             }
          }
 
-         const { customId, seq } = await generateNextEntityId("ORDER", tx);
-         const orderId = customId;
+         const { customId, orderCode, seq } = await generateNextEntityId("ORDER", tx);
+         const orderId = orderCode || customId;
          const invoiceNo = `INV_${seq}`;
 
          const createdOrder = await tx.order.create({
             data: {
-               customId,
+               customId: orderId,
+               orderCode: orderId,
                orderId,
                invoiceNo,
                status: (status?.toUpperCase() || "PENDING") as any,

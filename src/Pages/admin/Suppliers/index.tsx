@@ -279,6 +279,7 @@ const Suppliers = () => {
                rows={suppliers}
                columns={columns}
                checkBox={true}
+               hideSelectionActions={true}
                canPrint={true}
                canExport={true}
                printConfig={{

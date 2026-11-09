@@ -128,6 +128,7 @@ type FilterProps = {
    isAllSelected?: boolean;
    hideSelectionToolbar?: boolean;
    showSelectionIndicators?: boolean;
+   hideSelectionActions?: boolean;
    customSelectionToolbar?: (
       selectedRows: any[],
       onClearSelection?: () => void,
@@ -148,6 +149,7 @@ const Filter: React.FC<FilterProps> = ({
    isAllSelected = false,
    hideSelectionToolbar = false,
    showSelectionIndicators = true,
+   hideSelectionActions = false,
    customSelectionToolbar,
 }) => {
    const theme = useTheme();
@@ -156,24 +158,50 @@ const Filter: React.FC<FilterProps> = ({
    const { printDocument } = usePrint();
    const { settings } = useSettings();
    const [searchText, setSearchText] = useState("");
-   const [printMenuAnchor, setPrintMenuAnchor] = useState<HTMLElement | null>(null);
+   const [printMenuAnchor, setPrintMenuAnchor] = useState<HTMLElement | null>(
+      null,
+   );
 
-   const showSelection = showSelectionIndicators !== false && !hideSelectionToolbar;
-   const isSelectionActive = showSelection && Boolean(selectedRows && selectedRows.length > 0);
-   const resolvedCanExport = canExport !== false && (Boolean(exportConfig) || canExport === true);
+   const resolvedCanExport =
+      canExport !== false && (Boolean(exportConfig) || canExport === true);
    const resolvedCanPrint = Boolean(canPrint);
 
    const exportColumns: ExportColumn[] = useMemo(() => {
       if (!columns || !Array.isArray(columns)) return [];
       return columns
-         .filter((c: any) => c.field && !c.field.startsWith("@") && c.field !== "__check__" && c.field !== "__quick_edit__")
+         .filter(
+            (c: any) =>
+               c.field &&
+               !c.field.startsWith("@") &&
+               c.field !== "__check__" &&
+               c.field !== "__quick_edit__",
+         )
          .map((c: any) => ({
             field: c.field,
             headerName: c.headerName || c.field,
             width: c.width || 20,
-            type: (typeof c.field === "string" && (c.field.toLowerCase().includes("total") || c.field.toLowerCase().includes("price") || c.field.toLowerCase().includes("amount") || c.field.toLowerCase().includes("salary") || c.field.toLowerCase().includes("subtotal") || c.field.toLowerCase().includes("charge") || c.field.toLowerCase().includes("cost"))) ? "currency" : undefined,
+            type:
+               typeof c.field === "string" &&
+               (c.field.toLowerCase().includes("total") ||
+                  c.field.toLowerCase().includes("price") ||
+                  c.field.toLowerCase().includes("amount") ||
+                  c.field.toLowerCase().includes("salary") ||
+                  c.field.toLowerCase().includes("subtotal") ||
+                  c.field.toLowerCase().includes("charge") ||
+                  c.field.toLowerCase().includes("cost"))
+                  ? "currency"
+                  : undefined,
          }));
    }, [columns]);
+
+   const hasBulkActions =
+      (resolvedCanExport && exportColumns.length > 0) || resolvedCanPrint;
+   const showSelection =
+      showSelectionIndicators !== false &&
+      !hideSelectionToolbar &&
+      (!hideSelectionActions || hasBulkActions || Boolean(customSelectionToolbar));
+   const isSelectionActive =
+      showSelection && Boolean(selectedRows && selectedRows.length > 0);
 
    const handlePrintSelected = (mode?: "invoices" | "register") => {
       if (!selectedRows || selectedRows.length === 0) return;
@@ -191,26 +219,37 @@ const Filter: React.FC<FilterProps> = ({
             return {
                id: String(r.id || ""),
                orderId: String(r.orderId || r.customId || r.id || ""),
-               createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
-               customerName: r.customer?.name || r.customerName || "Walk-in Customer",
+               createdAt: r.createdAt
+                  ? new Date(r.createdAt).toISOString()
+                  : new Date().toISOString(),
+               customerName:
+                  r.customer?.name || r.customerName || "Walk-in Customer",
                customerPhone: r.customer?.phone || r.customerPhone || "-",
                customerEmail: r.customer?.email || r.customerEmail || "",
                customerAddress: r.customer?.address || r.customerAddress || "-",
-               items: prods.length > 0 ? prods.map((p: any) => ({
-                  name: p.title || p.name || p.productName || "Product Item",
-                  sku: p.sku || p.productSku || "-",
-                  quantity: Number(p.quantity || 1),
-                  price: Number(p.price || 0),
-                  subtotal: Number(p.price || 0) * Number(p.quantity || 1),
-               })) : [
-                  {
-                     name: `Order #${r.orderId || r.customId || r.id}`,
-                     sku: "-",
-                     quantity: 1,
-                     price: Number(r.subtotal || r.total || 0),
-                     subtotal: Number(r.subtotal || r.total || 0),
-                  }
-               ],
+               items:
+                  prods.length > 0
+                     ? prods.map((p: any) => ({
+                          name:
+                             p.title ||
+                             p.name ||
+                             p.productName ||
+                             "Product Item",
+                          sku: p.sku || p.productSku || "-",
+                          quantity: Number(p.quantity || 1),
+                          price: Number(p.price || 0),
+                          subtotal:
+                             Number(p.price || 0) * Number(p.quantity || 1),
+                       }))
+                     : [
+                          {
+                             name: `Order #${r.orderId || r.customId || r.id}`,
+                             sku: "-",
+                             quantity: 1,
+                             price: Number(r.subtotal || r.total || 0),
+                             subtotal: Number(r.subtotal || r.total || 0),
+                          },
+                       ],
                subtotal: Number(r.subtotal || 0),
                deliveryCharge: Number(r.deliveryCharge || 0),
                discount: Number(r.discount || 0),
@@ -236,7 +275,10 @@ const Filter: React.FC<FilterProps> = ({
       } else {
          // Tabular Register Mode
          printDocument({
-            title: printConfig?.title || (exportConfig?.title || "DevX POS - Selected Records Report"),
+            title:
+               printConfig?.title ||
+               exportConfig?.title ||
+               "DevX POS - Selected Records Report",
             selectedRecords: selectedRows,
             columns: exportColumns,
             settings,
@@ -303,15 +345,17 @@ const Filter: React.FC<FilterProps> = ({
             sx={{ flexWrap: "wrap", gap: 1 }}
          >
             {/* Selection State Badge */}
-            <Chip
-               size="small"
-               color="primary"
-               label={`${selectedRows.length} selected`}
-               sx={{ fontWeight: 700, borderRadius: 1 }}
-            />
+            {!hideSelectionActions && (
+               <Chip
+                  size="small"
+                  color="primary"
+                  label={`${selectedRows.length} selected`}
+                  sx={{ fontWeight: 700, borderRadius: 1 }}
+               />
+            )}
 
             {/* Deselect All Action */}
-            {onClearSelection && (
+            {!hideSelectionActions && onClearSelection && (
                <Button
                   size="small"
                   variant="text"
@@ -364,7 +408,10 @@ const Filter: React.FC<FilterProps> = ({
                      variant="outlined"
                      color="primary"
                      startIcon={
-                        <Icon icon="solar:printer-minimalistic-bold" size="small" />
+                        <Icon
+                           icon="solar:printer-minimalistic-bold"
+                           size="small"
+                        />
                      }
                      endIcon={
                         printConfig?.isInvoiceModule ? (
@@ -426,9 +473,13 @@ const Filter: React.FC<FilterProps> = ({
             )}
 
             {/* Clear Selection Button */}
-            {onClearSelection && (
+            {!hideSelectionActions && onClearSelection && (
                <Tooltip title="Clear selection">
-                  <IconButton size="small" onClick={onClearSelection} color="default">
+                  <IconButton
+                     size="small"
+                     onClick={onClearSelection}
+                     color="default"
+                  >
                      <Icon icon="solar:close-circle-bold" size="small" />
                   </IconButton>
                </Tooltip>
@@ -455,7 +506,11 @@ const Filter: React.FC<FilterProps> = ({
                {/* Search Box */}
                <FormControl
                   variant="outlined"
-                  sx={{ flex: !isMobile ? 0.35 : 1 }}
+                  sx={{
+                     flex: isMobile ? "1 1 100%" : "1 1 320px",
+                     minWidth: isMobile ? 0 : 240,
+                     maxWidth: isMobile ? "100%" : 420,
+                  }}
                >
                   <TextField
                      fullWidth
@@ -477,7 +532,6 @@ const Filter: React.FC<FilterProps> = ({
                      }}
                   />
                </FormControl>
-
                {/* Right Side: Compact Selection Toolbar when selected, OR Normal Actions when none selected */}
                {isSelectionActive ? (
                   renderSelectionToolbar()
@@ -488,22 +542,27 @@ const Filter: React.FC<FilterProps> = ({
                         (customFilter(filterQueryData, (updated) => {
                            setFilterQueryData(updated);
                         }) as React.ReactElement)}
-                     {resolvedCanExport && rows && rows.length > 0 && exportColumns.length > 0 && (
-                        <ExportButton
-                           variant="button"
-                           size="small"
-                           label="Export"
-                           tooltip="Export Table (Excel, Word, CSV)"
-                           filename={exportConfig?.filename || "DevX_Export"}
-                           title={exportConfig?.title || "DevX POS - Export"}
-                           columns={exportColumns}
-                           currentPageData={rows}
-                           fetchAllData={exportConfig?.fetchAllData}
-                           totalMatchingCount={exportConfig?.totalMatchingCount}
-                           summaryRows={exportConfig?.summaryRows}
-                           sx={{ textTransform: "none", fontWeight: 600 }}
-                        />
-                     )}
+                     {resolvedCanExport &&
+                        rows &&
+                        rows.length > 0 &&
+                        exportColumns.length > 0 && (
+                           <ExportButton
+                              variant="button"
+                              size="small"
+                              label="Export"
+                              tooltip="Export Table (Excel, Word, CSV)"
+                              filename={exportConfig?.filename || "DevX_Export"}
+                              title={exportConfig?.title || "DevX POS - Export"}
+                              columns={exportColumns}
+                              currentPageData={rows}
+                              fetchAllData={exportConfig?.fetchAllData}
+                              totalMatchingCount={
+                                 exportConfig?.totalMatchingCount
+                              }
+                              summaryRows={exportConfig?.summaryRows}
+                              sx={{ textTransform: "none", fontWeight: 600 }}
+                           />
+                        )}
                   </Stack>
                )}
             </Stack>

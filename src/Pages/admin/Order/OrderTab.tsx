@@ -141,6 +141,7 @@ const OrderTab = ({ value, onChange, status }: OrderTabProps) => {
                            ...theme.applyStyles("light", {
                               color: theme.palette.common.black,
                            }),
+                           fontWeight: 700,
                         },
                      }}
                   />

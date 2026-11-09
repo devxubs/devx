@@ -81,6 +81,7 @@ async function backfill() {
          where: { id: orders[i].id },
          data: {
             customId,
+            orderCode: customId,
             orderId: customId,
             invoiceNo,
          },

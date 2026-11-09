@@ -12,6 +12,7 @@ import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { GridRenderCellParams } from "@mui/x-data-grid";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 
 const productSchema = z.object({
    name: z.string().min(1, "Name is required!"),
@@ -37,6 +38,7 @@ export const categoriesData: CategoryType[] = [
 
 const Categories = () => {
    const theme = useTheme();
+   const { filterQueryData } = useFilterQuery();
    const [categories, setCategories] = useState<CategoryType[]>([]);
    const [loading, setLoading] = useState(false);
 
@@ -58,6 +60,17 @@ const Categories = () => {
    React.useEffect(() => {
       loadCategories();
    }, [loadCategories]);
+
+   const filteredCategories = React.useMemo(() => {
+      if (!filterQueryData.searchText) return categories;
+      const search = filterQueryData.searchText.toLowerCase().trim();
+      return categories.filter(
+         (cat) =>
+            cat.name?.toLowerCase().includes(search) ||
+            cat.customId?.toLowerCase().includes(search) ||
+            cat.id?.toLowerCase().includes(search),
+      );
+   }, [categories, filterQueryData.searchText]);
 
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -171,11 +184,14 @@ const Categories = () => {
             <TableSkeleton rows={5} cols={3} />
          ) : (
             <CustomTable
-               rows={categories}
+               rows={filteredCategories}
                columns={columns}
                checkBox
                canPrint={false}
                canExport={false}
+               hideSelectionToolbar={true}
+               showSelectionIndicators={false}
+               hideSelectionActions={true}
                menuItems={[
                   {
                      label: "edit",

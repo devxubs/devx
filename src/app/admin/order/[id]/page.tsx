@@ -1,12 +1,11 @@
-import Preview from "@src/Pages/admin/Order/Preview";
+import OrderDetailsPage from "@src/Pages/admin/Order/Details";
 import React from "react";
 
-const PreviewPage = () => {
-   return (
-      <div>
-         <Preview />
-      </div>
-   );
-};
+interface PageProps {
+   params: Promise<{ id: string }>;
+}
 
-export default PreviewPage;
+export default async function PreviewPage({ params }: PageProps) {
+   const { id } = await params;
+   return <OrderDetailsPage orderId={id} />;
+}

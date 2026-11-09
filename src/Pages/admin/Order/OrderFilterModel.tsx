@@ -128,7 +128,7 @@ const OrderFilterModal = ({
       <Stack height={"100%"} spacing={2.5} p={1}>
          {/* SECTION 1: TIMELINES & DATES */}
          <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="primary.main" gutterBottom>
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
                Date & Timeline Filters
             </Typography>
             <Grid container spacing={2}>
@@ -177,7 +177,7 @@ const OrderFilterModal = ({
 
          {/* SECTION 2: STATUS & SOURCE */}
          <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="primary.main" gutterBottom>
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
                Order Status & Identification
             </Typography>
             <Grid container spacing={2}>
@@ -295,7 +295,7 @@ const OrderFilterModal = ({
 
          {/* SECTION 3: CUSTOMER & LOCATION */}
          <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="primary.main" gutterBottom>
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
                Customer & District
             </Typography>
             <Grid container spacing={2}>
@@ -388,7 +388,7 @@ const OrderFilterModal = ({
 
          {/* SECTION 4: COURIER & LOGISTICS */}
          <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="primary.main" gutterBottom>
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
                Courier & Fulfillment
             </Typography>
             <Grid container spacing={2}>
@@ -548,7 +548,7 @@ const OrderFilterModal = ({
 
          {/* SECTION 5: PRODUCTS & INVENTORY */}
          <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="primary.main" gutterBottom>
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
                Products & Inventory
             </Typography>
             <Grid container spacing={2}>
@@ -651,7 +651,7 @@ const OrderFilterModal = ({
 
          {/* SECTION 6: FINANCIAL, EMPLOYEE & CAMPAIGN */}
          <Box>
-            <Typography variant="subtitle2" fontWeight={700} color="primary.main" gutterBottom>
+            <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
                Financial, Employee & Campaign Filters
             </Typography>
             <Grid container spacing={2}>

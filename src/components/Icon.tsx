@@ -13,7 +13,8 @@ interface IconProps extends Omit<IconifyProps, "icon"> {
       | "success"
       | "warning"
       | "error"
-      | "default";
+      | "default"
+      | string;
    style?: CSSProperties;
 }
 

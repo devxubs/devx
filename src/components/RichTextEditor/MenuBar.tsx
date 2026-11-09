@@ -196,7 +196,7 @@ function MenuBar({
       />
 
       <Stack direction={"row"} spacing={0.5} py={0.5}>
-        <Tooltip title="Bold (Ctrl + B)">
+        <Tooltip disableInteractive title="Bold (Ctrl + B)">
           <Button
             size="small"
             onClick={() => editor.chain().focus().toggleBold().run()}

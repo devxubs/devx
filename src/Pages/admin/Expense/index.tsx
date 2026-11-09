@@ -187,6 +187,7 @@ const Expense = () => {
                rows={expenses}
                columns={columns}
                checkBox={true}
+               hideSelectionActions={true}
                canPrint={true}
                canExport={true}
                printConfig={{

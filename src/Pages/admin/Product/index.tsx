@@ -640,16 +640,6 @@ const Product = () => {
                         </Typography>
                      </Grid>
                   </Grid>
-                  {viewProduct.content && (
-                     <Box>
-                        <Typography variant="caption" color="text.secondary">
-                           Description
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>
-                           {viewProduct.content}
-                        </Typography>
-                     </Box>
-                  )}
                </Stack>
             ) : (
                <Typography variant="body2" color="text.secondary">

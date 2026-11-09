@@ -58,6 +58,7 @@ interface DataTableProps {
    hideSelectionToolbar?: boolean;
    showSelectionIndicators?: boolean;
    hideFooterSelectedRowCount?: boolean;
+   hideSelectionActions?: boolean;
    customSelectionToolbar?: (
       selectedRows: any[],
       onClearSelection?: () => void,
@@ -78,6 +79,7 @@ export default function CustomTable({
    hideSelectionToolbar = false,
    showSelectionIndicators = true,
    hideFooterSelectedRowCount = false,
+   hideSelectionActions = false,
    customSelectionToolbar,
 }: DataTableProps) {
    const theme = useTheme();
@@ -317,6 +319,7 @@ export default function CustomTable({
             printConfig={printConfig}
             hideSelectionToolbar={hideSelectionToolbar}
             showSelectionIndicators={showSelectionIndicators}
+            hideSelectionActions={hideSelectionActions}
             customSelectionToolbar={customSelectionToolbar}
             selectedRows={selectedRows}
             onClearSelection={() =>

@@ -169,6 +169,7 @@ const Header = () => {
                      size="large"
                   />
                </CustomPopover>
+               {/* User Menu for Active user */}
                <IconButton
                   sx={{ color: "text.secondary" }}
                   onClick={(e) => handleMenuOpen(e)}

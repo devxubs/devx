@@ -116,10 +116,10 @@ export default function FullWidthSuggestions() {
 
       results.orders.forEach((o) => {
          items.push({
-            title: o.orderId || o.customId,
+            title: o.orderCode || o.orderId || o.customId,
             subtitle: `${o.customer?.name || "Customer"} • ৳${o.total} • ${o.status}`,
             tag: "Order",
-            url: `/admin/order`,
+            url: `/admin/order/${o.orderCode || o.orderId || o.id}`,
          });
       });
 

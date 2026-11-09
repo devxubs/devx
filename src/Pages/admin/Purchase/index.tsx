@@ -280,6 +280,7 @@ const Purchase = () => {
                rows={purchases}
                columns={columns}
                checkBox
+               hideSelectionActions={true}
                canPrint={true}
                canExport={true}
                printConfig={{

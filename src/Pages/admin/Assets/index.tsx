@@ -199,6 +199,7 @@ const Asset = () => {
                rows={assets}
                columns={columns}
                checkBox
+               hideSelectionActions={true}
                canPrint={true}
                canExport={true}
                printConfig={{

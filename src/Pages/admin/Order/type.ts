@@ -18,12 +18,15 @@ export interface CustomerType {
 // ✅ Product type
 export interface ProductType {
    id: string;
+   productId?: string | null;
+   orderItemId?: string | null;
    name: string;
    code: string;
    quantity: number;
    price: number;
    subtotal?: number;
    images: string;
+   isDeleted?: boolean;
 }
 
 // ✅ Pricing type
@@ -49,6 +52,8 @@ export interface OrderType {
    id: number | string; // Added id field for unique identification
    color?: string;
 
+   orderCode?: string;
+   customId?: string;
    orderId: string;
    invoiceNo: string;
    status: string;

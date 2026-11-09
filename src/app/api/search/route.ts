@@ -102,6 +102,7 @@ export async function GET(request: NextRequest) {
             where: {
                isDeleted: false,
                OR: [
+                  { orderCode: { contains: q } },
                   { orderId: { contains: q } },
                   { customId: { contains: q } },
                   { invoiceNo: { contains: q } },
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest) {
             take: 5,
             select: {
                id: true,
+               orderCode: true,
                customId: true,
                orderId: true,
                invoiceNo: true,

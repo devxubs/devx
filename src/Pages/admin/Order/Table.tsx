@@ -1,7 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Stack, IconButton, Tooltip, TextField, Button, Typography } from "@mui/material";
+import {
+   Stack,
+   IconButton,
+   Tooltip,
+   TextField,
+   Button,
+   Typography,
+   Chip,
+   Snackbar,
+   Alert,
+} from "@mui/material";
 import { GridRenderCellParams } from "@mui/x-data-grid";
 import { useRouter } from "next/navigation";
 
@@ -12,6 +22,7 @@ import Menu from "@src/components/Menu";
 import CustomModal from "@src/components/Modal";
 import AlertDialog from "@src/components/AlertDialog";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { usePrint } from "@src/components/TablePrintDocument/PrintPortal";
 
 import { orders, orderStatuses } from "./data";
 import CreateAt from "./CreateAt";
@@ -20,8 +31,10 @@ import OrderFilter from "./OrderFilter";
 import OrderTab, { StatusProps } from "./OrderTab";
 import { OrderType } from "./type";
 import QuickEditModal from "./QuickEditModal";
+import ExportOrderModal from "./Export/ExportOrderModal";
+import { mapOrderToInvoiceData } from "./Details/helpers";
 import { useSettings } from "@src/lib/settingsContext";
-import { OrderDetailModal, CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { OrderDetailModal, CustomerProfileModal } from "./components";
 
 const statusColor: Record<
    string,
@@ -49,7 +62,8 @@ const orderStatus: StatusProps[] = [
 
 const OrderTable = () => {
    const router = useRouter();
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
+   const { printDocument } = usePrint();
    const [status, setStatus] = useState<{
       orderRow: OrderType;
       anchorEl: HTMLElement | null;
@@ -62,7 +76,50 @@ const OrderTable = () => {
    const [orderRows, setOrderRows] = useState<OrderType[]>([]);
    const [loading, setLoading] = useState(false);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null);
+   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(
+      null,
+   );
+   const [selectedOrders, setSelectedOrders] = useState<any[]>([]);
+   const [exportModalOpen, setExportModalOpen] = useState(false);
+   const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
+   const [feedback, setFeedback] = useState<{
+      type: "success" | "error";
+      message: string;
+   } | null>(null);
+
+   const handleSingleInvoicePrint = React.useCallback(
+      (orderRow: any) => {
+         if (!orderRow) return;
+         const invoiceData = mapOrderToInvoiceData(orderRow);
+         printDocument({
+            title: `Invoice - ${invoiceData.invoiceNo || invoiceData.orderId}`,
+            selectedRecords: [orderRow],
+            columns: [],
+            settings,
+            isInvoiceBatch: true,
+            invoiceOrders: [invoiceData],
+         });
+      },
+      [printDocument, settings],
+   );
+
+   const handleBatchInvoicePrint = React.useCallback(
+      (ordersToPrint: any[]) => {
+         if (!ordersToPrint || ordersToPrint.length === 0) return;
+         const invoiceOrders = ordersToPrint.map((o) =>
+            mapOrderToInvoiceData(o),
+         );
+         printDocument({
+            title: "DevX POS - Customer Invoices",
+            selectedRecords: ordersToPrint,
+            columns: [],
+            settings,
+            isInvoiceBatch: true,
+            invoiceOrders,
+         });
+      },
+      [printDocument, settings],
+   );
 
    // order tab
    const { filterQueryData, setFilterQueryData } = useFilterQuery();
@@ -88,31 +145,44 @@ const OrderTable = () => {
          }
 
          if (f.excludeStatus) params.set("excludeStatus", "true");
-         if (f.order_source && f.order_source !== "All") params.set("orderSource", f.order_source);
+         if (f.order_source && f.order_source !== "All")
+            params.set("orderSource", f.order_source);
          if (f.excludeOrderSource) params.set("excludeOrderSource", "true");
-         if (f.district && f.district !== "All") params.set("district", f.district);
+         if (f.district && f.district !== "All")
+            params.set("district", f.district);
          if (f.excludeDistrict) params.set("excludeDistrict", "true");
          if (f.courier && f.courier !== "All") params.set("courier", f.courier);
          if (f.excludeCourier) params.set("excludeCourier", "true");
-         if (f.courierStatus && f.courierStatus !== "All") params.set("courierStatus", f.courierStatus);
+         if (f.courierStatus && f.courierStatus !== "All")
+            params.set("courierStatus", f.courierStatus);
          if (f.excludeCourierStatus) params.set("excludeCourierStatus", "true");
-         if (f.print_status && f.print_status !== "All") params.set("printStatus", f.print_status);
-         if (f.orderType && f.orderType !== "All") params.set("orderType", f.orderType);
-         if (f.employee && f.employee !== "All") params.set("employee", f.employee);
-         if (f.products && f.products !== "All") params.set("product", f.products);
+         if (f.print_status && f.print_status !== "All")
+            params.set("printStatus", f.print_status);
+         if (f.orderType && f.orderType !== "All")
+            params.set("orderType", f.orderType);
+         if (f.employee && f.employee !== "All")
+            params.set("employee", f.employee);
+         if (f.products && f.products !== "All")
+            params.set("product", f.products);
          if (f.excludeProduct) params.set("excludeProduct", "true");
-         if (f.category && f.category !== "All") params.set("category", f.category);
+         if (f.category && f.category !== "All")
+            params.set("category", f.category);
          if (f.excludeCategory) params.set("excludeCategory", "true");
          if (f.note) params.set("note", f.note);
-         if (f.utmSource && f.utmSource !== "All") params.set("utmSource", f.utmSource);
+         if (f.utmSource && f.utmSource !== "All")
+            params.set("utmSource", f.utmSource);
          if (f.excludeUtmSource) params.set("excludeUtmSource", "true");
          if (f.referenceId) params.set("referenceId", f.referenceId);
          if (f.pathaoCity) params.set("pathaoCity", f.pathaoCity);
          if (f.pathaoZone) params.set("pathaoZone", f.pathaoZone);
-         if (f.cancelReason && f.cancelReason !== "All") params.set("cancelReason", f.cancelReason);
-         if (f.bdMobileNumber && f.bdMobileNumber !== "Any") params.set("bdMobileNumber", f.bdMobileNumber);
-         if (f.paymentStatus && f.paymentStatus !== "All") params.set("paymentStatus", f.paymentStatus);
-         if (f.deliveryCharge && f.deliveryCharge !== "All") params.set("deliveryCharge", f.deliveryCharge);
+         if (f.cancelReason && f.cancelReason !== "All")
+            params.set("cancelReason", f.cancelReason);
+         if (f.bdMobileNumber && f.bdMobileNumber !== "Any")
+            params.set("bdMobileNumber", f.bdMobileNumber);
+         if (f.paymentStatus && f.paymentStatus !== "All")
+            params.set("paymentStatus", f.paymentStatus);
+         if (f.deliveryCharge && f.deliveryCharge !== "All")
+            params.set("deliveryCharge", f.deliveryCharge);
          if (f.discountAmount) {
             params.set("discountAmount", String(f.discountAmount));
             if (f.discountOp) params.set("discountOp", f.discountOp);
@@ -120,20 +190,39 @@ const OrderTable = () => {
          if (f.orderTag) params.set("orderTag", f.orderTag);
          if (f.customerTag) params.set("customerTag", f.customerTag);
          if (f.duplicateOrders) params.set("duplicateOrders", "true");
-         if (f.customerType && f.customerType !== "All") params.set("customerType", f.customerType);
+         if (f.customerType && f.customerType !== "All")
+            params.set("customerType", f.customerType);
          if (f.minPrice) params.set("minPrice", String(f.minPrice));
          if (f.maxPrice) params.set("maxPrice", String(f.maxPrice));
          if (f.order_created_at?.[0] && f.order_created_at?.[1]) {
-            params.set("startDate", new Date(f.order_created_at[0]).toISOString());
-            params.set("endDate", new Date(f.order_created_at[1]).toISOString());
+            params.set(
+               "startDate",
+               new Date(f.order_created_at[0]).toISOString(),
+            );
+            params.set(
+               "endDate",
+               new Date(f.order_created_at[1]).toISOString(),
+            );
          }
          if (f.courier_submitted_at?.[0] && f.courier_submitted_at?.[1]) {
-            params.set("courierStartDate", new Date(f.courier_submitted_at[0]).toISOString());
-            params.set("courierEndDate", new Date(f.courier_submitted_at[1]).toISOString());
+            params.set(
+               "courierStartDate",
+               new Date(f.courier_submitted_at[0]).toISOString(),
+            );
+            params.set(
+               "courierEndDate",
+               new Date(f.courier_submitted_at[1]).toISOString(),
+            );
          }
          if (f.status_added_at?.[0] && f.status_added_at?.[1]) {
-            params.set("statusStartDate", new Date(f.status_added_at[0]).toISOString());
-            params.set("statusEndDate", new Date(f.status_added_at[1]).toISOString());
+            params.set(
+               "statusStartDate",
+               new Date(f.status_added_at[0]).toISOString(),
+            );
+            params.set(
+               "statusEndDate",
+               new Date(f.status_added_at[1]).toISOString(),
+            );
          }
 
          const res = await fetch(`/api/orders?${params.toString()}`);
@@ -141,9 +230,13 @@ const OrderTable = () => {
             const data = await res.json();
             const mapped: OrderType[] = (data.orders || []).map((o: any) => ({
                id: o.id,
-               orderId: o.customId || o.orderId || o.id,
+               orderCode: o.orderCode || o.customId || o.orderId,
+               customId: o.customId || o.orderCode || o.orderId,
+               orderId: o.orderCode || o.customId || o.orderId || o.id,
                invoiceNo: o.invoiceNo,
-               status: o.status ? (o.status.charAt(0) + o.status.slice(1).toLowerCase()) : "Pending",
+               status: o.status
+                  ? o.status.charAt(0) + o.status.slice(1).toLowerCase()
+                  : "Pending",
                orderNote: o.orderNote || "",
                orderSource: o.orderSource || "Direct",
                createdAt: o.createdAt,
@@ -165,13 +258,18 @@ const OrderTable = () => {
                   phone: o.customer?.phone || "",
                },
                products: (o.items || []).map((it: any) => ({
-                  id: it.id,
+                  id: it.product?.id || it.productId || it.id,
+                  productId: it.product?.id || it.productId || null,
+                  orderItemId: it.id,
                   name: it.name,
-                  code: it.code || "",
+                  code: it.code || it.product?.productCode || "",
                   quantity: it.quantity,
                   price: Number(it.price),
                   subtotal: Number(it.subtotal),
-                  images: it.product?.images?.[0] || "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp",
+                  images:
+                     it.product?.images?.[0] ||
+                     "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp",
+                  isDeleted: Boolean(it.product?.isDeleted),
                })),
                pricing: {
                   paymentMethod: o.paymentMethod || "Cash on Delivery",
@@ -238,10 +336,20 @@ const OrderTable = () => {
                variant="body2"
                fontWeight={600}
                color="primary.main"
-               sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
-               onClick={() => setDetailOrderId(params.row.orderId || params.row.customId || params.row.id)}
+               sx={{
+                  cursor: "pointer",
+                  "&:hover": { textDecoration: "underline" },
+               }}
+               onClick={() => {
+                  const targetId =
+                     params.row.orderCode ||
+                     params.row.customId ||
+                     params.row.orderId ||
+                     params.row.id;
+                  router.push(`/admin/order/${targetId}`);
+               }}
             >
-               {params.row.orderId || params.row.customId || params.row.id}
+               {params.row.orderCode || params.row.orderId || params.row.customId || params.row.id}
             </Typography>
          ),
       },
@@ -272,8 +380,12 @@ const OrderTable = () => {
          renderCell: (params) => {
             return (
                <Stack
-                  sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
-                  onClick={() => setDetailCustomerId(params.row.customer?.id || params.row.customer?.name)}
+                  sx={{ cursor: "pointer" }}
+                  onClick={() =>
+                     setDetailCustomerId(
+                        params.row.customer?.id || params.row.customer?.name,
+                     )
+                  }
                >
                   <User {...params.row.customer} />
                </Stack>
@@ -374,47 +486,42 @@ const OrderTable = () => {
                })
             }
             checkBox
-            canPrint={true}
-            canExport={true}
-            printConfig={{
-               title: "DevX POS - Orders Register",
-               isInvoiceModule: true,
-            }}
-            exportConfig={{
-               filename: `Orders_Export_${new Date().toISOString().split("T")[0]}`,
-               title: "DevX POS - Orders Report",
-               fetchAllData: async () => {
-                  try {
-                     const res = await fetch("/api/orders?all=true");
-                     if (!res.ok) return [];
-                     const data = await res.json();
-                     return (data.orders || []).map((o: any) => ({
-                        orderId: o.customId || o.orderId || o.id,
-                        customerName: o.customer?.name || "Walk-in",
-                        customerPhone: o.customer?.phone || "-",
-                        date: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : "-",
-                        orderSource: o.orderSource || "Direct",
-                        subtotal: Number(o.subtotal || 0),
-                        deliveryCharge: Number(o.deliveryCharge || 0),
-                        discount: Number(o.discount || 0),
-                        total: Number(o.total || 0),
-                        status: o.status || "Pending",
-                     }));
-                  } catch {
-                     return [];
-                  }
-               },
-               summaryRows: (data: any[]) => {
-                  const totalSum = data.reduce((acc, row) => acc + (Number(row.total) || 0), 0);
-                  return [
-                     { label: "Total Orders Count:", value: String(data.length) },
-                     { label: "Grand Total Revenue:", value: `৳ ${totalSum.toFixed(2)}`, isTotal: true },
-                  ];
-               },
-            }}
+            hideSelectionActions={true}
+            canPrint={false}
+            canExport={false}
+            onSelectionChange={(selected) => setSelectedOrders(selected)}
+            customSelectionToolbar={(selectedRows) => (
+               <Stack direction="row" spacing={1} alignItems="center">
+                  <Tooltip title="Export selected orders" disableInteractive>
+                     <IconButton
+                        aria-label="Export selected orders"
+                        onClick={() => {
+                           setSelectedOrders(selectedRows);
+                           setExportModalOpen(true);
+                        }}
+                     >
+                        <Icon
+                           icon="solar:download-square-bold-duotone"
+                           size="small"
+                        />
+                     </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Print selected invoices" disableInteractive>
+                     <IconButton
+                        aria-label="Print selected invoices"
+                        onClick={() => handleBatchInvoicePrint(selectedRows)}
+                     >
+                        <Icon
+                           icon="solar:printer-minimalistic-bold"
+                           size="small"
+                        />
+                     </IconButton>
+                  </Tooltip>
+               </Stack>
+            )}
             menuItems={[
                {
-                  label: "View & Print",
+                  label: "Print",
                   icon: (
                      <Icon
                         icon="solar:printer-minimalistic-bold"
@@ -422,7 +529,19 @@ const OrderTable = () => {
                      />
                   ),
                   onClick: (params: GridRenderCellParams) => {
-                     router.push(`/admin/order/${params.row.id}`);
+                     handleSingleInvoicePrint(params.row);
+                  },
+               },
+               {
+                  label: "View Details",
+                  icon: <Icon icon="solar:eye-bold" size="small" />,
+                  onClick: (params: GridRenderCellParams) => {
+                     const targetId =
+                        params.row.orderCode ||
+                        params.row.customId ||
+                        params.row.orderId ||
+                        params.row.id;
+                     router.push(`/admin/order/${targetId}`);
                   },
                },
                {
@@ -562,24 +681,100 @@ const OrderTable = () => {
             sx={{
                width: {
                   xs: "100%",
-                  sm: 700,
+                  sm: 750,
+                  md: 850,
                },
             }}
-            title="Quick Edit"
+            title="Quick Edit Order"
          >
             <QuickEditModal
+               order={editModal}
                products={editModal?.products || []}
+               isLoading={isUpdatingQuickEdit}
                onClose={() => setEditModal(null)}
-               onUpdate={(p) => {
+               onUpdate={async (p, extraFields) => {
                   if (!editModal) return;
+                  setIsUpdatingQuickEdit(true);
+                  try {
+                     const targetId = editModal.id;
+                     const newSubtotal = p.reduce(
+                        (acc, it) =>
+                           acc + Number(it.price) * Number(it.quantity),
+                        0,
+                     );
+                     const deliveryCharge =
+                        extraFields?.pricing?.deliveryCharge !== undefined
+                           ? extraFields.pricing.deliveryCharge
+                           : Number(editModal.pricing?.deliveryCharge || 0);
+                     const discount =
+                        extraFields?.pricing?.discount !== undefined
+                           ? extraFields.pricing.discount
+                           : Number(editModal.pricing?.discount || 0);
+                     const total = Math.max(0, newSubtotal + deliveryCharge - discount);
+                     const advancePayment =
+                        extraFields?.pricing?.advancePayment !== undefined
+                           ? extraFields.pricing.advancePayment
+                           : Number(editModal.pricing?.advancePayment || 0);
+                     const dueAmount = Math.max(0, total - advancePayment);
 
-                  setOrderRows((prev) =>
-                     prev.map((or) =>
-                        or.orderId === editModal.orderId
-                           ? { ...or, products: p }
-                           : or,
-                     ),
-                  );
+                     setOrderRows((prev) =>
+                        prev.map((or) => {
+                           if (or.id === targetId) {
+                              return {
+                                 ...or,
+                                 status: extraFields?.status || or.status,
+                                 orderSource:
+                                    extraFields?.orderSource || or.orderSource,
+                                 orderNote:
+                                    extraFields?.orderNote !== undefined
+                                       ? extraFields.orderNote
+                                       : or.orderNote,
+                                 customer: extraFields?.customer
+                                    ? {
+                                         ...or.customer,
+                                         name: extraFields.customer.name,
+                                         phone: extraFields.customer.phone,
+                                         address: extraFields.customer.address,
+                                         email:
+                                            extraFields.customer.email ||
+                                            or.customer?.email ||
+                                            "",
+                                      }
+                                    : or.customer,
+                                 products: p.map((prod) => ({
+                                    ...prod,
+                                    subtotal:
+                                       Number(prod.price) *
+                                       Number(prod.quantity),
+                                 })),
+                                 pricing: {
+                                    ...or.pricing,
+                                    subtotal: newSubtotal,
+                                    deliveryCharge,
+                                    discount,
+                                    advancePayment,
+                                    total,
+                                    dueAmount,
+                                 },
+                              };
+                           }
+                           return or;
+                        }),
+                     );
+                     setEditModal(null);
+                     setFeedback({
+                        type: "success",
+                        message: "Order updated successfully",
+                     });
+                  } catch (err: any) {
+                     setFeedback({
+                        type: "error",
+                        message: err?.message || "Failed to update order",
+                     });
+                     throw err;
+                  } finally {
+                     setIsUpdatingQuickEdit(false);
+                  }
                }}
             />
          </CustomModal>
@@ -587,16 +782,14 @@ const OrderTable = () => {
          <AlertDialog
             open={deleteDialog.open}
             type={"delete"}
-            title={`Are you sure you want to delete <b>${deleteDialog.orderRow?.orderId || "this"}</b> order?`}
+            title={`Are you sure you want to delete <b>${deleteDialog.orderRow?.orderCode || deleteDialog.orderRow?.orderId || "this"}</b> order?`}
             onClose={() => {
                setDeleteDialog((prev) => ({ ...prev, open: false }));
             }}
             onConfirm={async () => {
                if (!deleteDialog.orderRow) return;
                const targetId = deleteDialog.orderRow.id;
-               setOrderRows((prev) =>
-                  prev.filter((or) => or.id !== targetId),
-               );
+               setOrderRows((prev) => prev.filter((or) => or.id !== targetId));
                setDeleteDialog({
                   open: false,
                   orderRow: {} as OrderType,
@@ -607,17 +800,40 @@ const OrderTable = () => {
             }}
          />
          <OrderDetailModal
-             open={Boolean(detailOrderId)}
-             onClose={() => setDetailOrderId(null)}
-             orderId={detailOrderId}
-          />
+            open={Boolean(detailOrderId)}
+            onClose={() => setDetailOrderId(null)}
+            orderId={detailOrderId}
+         />
 
-          <CustomerDetailModal
-             open={Boolean(detailCustomerId)}
-             onClose={() => setDetailCustomerId(null)}
-             customerId={detailCustomerId}
-          />
-       </Stack>
+         <CustomerProfileModal
+            open={Boolean(detailCustomerId)}
+            onClose={() => setDetailCustomerId(null)}
+            customerId={detailCustomerId}
+         />
+
+         <ExportOrderModal
+            open={exportModalOpen}
+            onClose={() => setExportModalOpen(false)}
+            selectedOrders={selectedOrders}
+         />
+
+
+
+         <Snackbar
+            open={Boolean(feedback)}
+            autoHideDuration={4000}
+            onClose={() => setFeedback(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+         >
+            <Alert
+               severity={feedback?.type || "info"}
+               onClose={() => setFeedback(null)}
+               variant="filled"
+            >
+               {feedback?.message}
+            </Alert>
+         </Snackbar>
+      </Stack>
    );
 };
 

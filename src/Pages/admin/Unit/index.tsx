@@ -1,32 +1,16 @@
 "use client";
 
-import { Stack, Button, TextField, Typography, useTheme } from "@mui/material";
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { Stack, Button, Typography, useTheme } from "@mui/material";
 import Scrollbar from "react-browser-scrollbar";
-import { Controller, useForm, SubmitHandler } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
-import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { UnitType } from "./types";
+import { UnitFormModal, UnitDeleteDialog } from "./components";
 
-const productSchema = z.object({
-   name: z.string().min(1, "Name is required!"),
-   short: z.string().min(1, "Name is required!"),
-});
-
-type UnitType = {
-   id: string;
-   customId?: string;
-   name: string;
-   short: string;
-};
-
-type FormValues = z.infer<typeof productSchema>;
-
+// Preserved for backward compatibility
 export const productUnits = [
    { id: "1", customId: "UNIT_1", name: "Piece", short: "pc" },
    { id: "2", customId: "UNIT_2", name: "Kilogram", short: "kg" },
@@ -52,56 +36,63 @@ export const productUnits = [
 
 const Unit = () => {
    const theme = useTheme();
-   const [unit, setUnit] = useState<UnitType[]>([]);
+   const { filterQueryData } = useFilterQuery();
+   const [units, setUnits] = useState<UnitType[]>([]);
    const [loading, setLoading] = useState(false);
 
-   const loadUnits = React.useCallback(async () => {
+   // Modal & Dialog state
+   const [isModalOpen, setIsModalOpen] = useState(false);
+   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
+   const [isDeleting, setIsDeleting] = useState(false);
+
+   const loadUnits = useCallback(async () => {
       setLoading(true);
       try {
          const res = await fetch("/api/units");
          if (res.ok) {
             const data = await res.json();
-            const mapped = data.map((u: any) => ({
+            const mapped: UnitType[] = data.map((u: any) => ({
                id: u.id,
                customId: u.customId,
                name: u.name,
-               short: u.name.slice(0, 3).toLowerCase(),
+               short: u.short || (u.name ? u.name.slice(0, 3).toLowerCase() : ""),
+               productCount: u.productCount ?? 0,
+               createdAt: u.createdAt,
+               updatedAt: u.updatedAt,
             }));
-            setUnit(mapped);
+            setUnits(mapped);
          }
-      } catch {
-         // fallback
+      } catch (err) {
+         console.error("Failed to load units:", err);
       } finally {
          setLoading(false);
       }
    }, []);
 
-   React.useEffect(() => {
+   useEffect(() => {
       loadUnits();
    }, [loadUnits]);
 
-   const [isModalOpen, setIsModalOpen] = useState(false);
-   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
-
-   const {
-      control,
-      handleSubmit,
-      reset,
-      formState: { errors },
-   } = useForm<FormValues>({
-      resolver: zodResolver(productSchema),
-      defaultValues: { name: "", short: "" },
-   });
+   // Filter units based on global filter / search query
+   const filteredUnits = useMemo(() => {
+      if (!filterQueryData.searchText) return units;
+      const search = filterQueryData.searchText.toLowerCase().trim();
+      return units.filter(
+         (u) =>
+            u.name?.toLowerCase().includes(search) ||
+            u.short?.toLowerCase().includes(search) ||
+            u.customId?.toLowerCase().includes(search) ||
+            u.id?.toLowerCase().includes(search),
+      );
+   }, [units, filterQueryData.searchText]);
 
    // Open modal for Add or Edit
-   const openModal = (unit?: UnitType) => {
-      if (unit) {
-         setSelectedUnit(unit);
-         reset({ name: unit.name, short: unit.short });
+   const openModal = (unitToEdit?: UnitType) => {
+      if (unitToEdit) {
+         setSelectedUnit(unitToEdit);
       } else {
          setSelectedUnit(null);
-         reset({ name: "", short: "" });
       }
       setIsModalOpen(true);
    };
@@ -109,31 +100,25 @@ const Unit = () => {
    const closeModal = () => {
       setIsModalOpen(false);
       setSelectedUnit(null);
-      reset({ name: "", short: "" });
-   };
-
-   // Add / Edit submit handler
-   const onSubmit: SubmitHandler<FormValues> = async (data) => {
-      try {
-         await fetch("/api/units", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: data.name }),
-         });
-         loadUnits();
-      } catch {}
-      closeModal();
    };
 
    // Delete handler
    const handleDelete = async () => {
-      if (selectedUnit) {
-         try {
-            await fetch(`/api/units/${selectedUnit.id}`, { method: "DELETE" });
-            loadUnits();
-         } catch {}
-         setSelectedUnit(null);
+      if (!selectedUnit) return;
+      setIsDeleting(true);
+      try {
+         const res = await fetch(`/api/units/${selectedUnit.id}`, {
+            method: "DELETE",
+         });
+         if (res.ok) {
+            await loadUnits();
+         }
+      } catch (err) {
+         console.error("Failed to delete unit:", err);
+      } finally {
+         setIsDeleting(false);
          setIsDeleteDialogOpen(false);
+         setSelectedUnit(null);
       }
    };
 
@@ -157,9 +142,17 @@ const Unit = () => {
    ];
 
    return (
-      <Scrollbar autoHide thumbSize={6} darkMode>
+      <Scrollbar
+         autoHide
+         thumbSize={6}
+         darkMode
+         style={{
+            maxHeight: "calc(100vh - 100px)",
+            ...({ scrollbarWidth: "none !important" } as unknown as React.CSSProperties),
+         }}
+      >
          <Stack spacing={2} py={2}>
-            {/* Header */}
+            {/* Header with Add Unit action */}
             <Stack direction="row" justifyContent="flex-end" spacing={2}>
                <Button
                   variant="contained"
@@ -173,26 +166,30 @@ const Unit = () => {
                      />
                   }
                   onClick={() => openModal()}
+                  data-testid="add-unit-button"
                >
                   Add Unit
                </Button>
             </Stack>
 
-            {/* Table */}
+            {/* Units Data Table */}
             {loading ? (
                <TableSkeleton rows={5} cols={4} />
             ) : (
                <CustomTable
-                  rows={unit}
+                  rows={filteredUnits}
                   columns={columns}
                   checkBox
                   canPrint={false}
                   canExport={false}
+                  hideSelectionToolbar={true}
+                  showSelectionIndicators={false}
+                  hideSelectionActions={true}
                   menuItems={[
                      {
                         label: "edit",
                         icon: <Icon icon="solar:pen-bold" size="small" />,
-                        onClick: (p) => openModal(p.row),
+                        onClick: (p: any) => openModal(p.row as UnitType),
                      },
                      {
                         label: "delete",
@@ -204,8 +201,8 @@ const Unit = () => {
                               color="error"
                            />
                         ),
-                        onClick: (p) => {
-                           setSelectedUnit(p.row);
+                        onClick: (p: any) => {
+                           setSelectedUnit(p.row as UnitType);
                            setIsDeleteDialogOpen(true);
                         },
                      },
@@ -213,83 +210,26 @@ const Unit = () => {
                />
             )}
 
-            {/* Modal */}
-            <CustomModal
-               sx={{ width: { xs: "90%", sm: 500 }, borderRadius: 1 }}
+            {/* Add / Edit Unit Modal */}
+            <UnitFormModal
                open={isModalOpen}
                onClose={closeModal}
-               title={selectedUnit ? "Update Unit" : "Create Unit"}
-            >
-               <Stack spacing={2}>
-                  <Stack spacing={1.5}>
-                     <Typography
-                        variant="h6"
-                        fontSize={"13px!important"}
-                        fontWeight={500}
-                     >
-                        Unit name
-                     </Typography>
-                     <Controller
-                        name="name"
-                        control={control}
-                        render={({ field }) => (
-                           <TextField
-                              {...field}
-                              value={field.value ?? ""}
-                              type="text"
-                              label="Unit name"
-                              variant="outlined"
-                              error={!!errors.name}
-                              helperText={errors.name?.message}
-                           />
-                        )}
-                     />
-                  </Stack>
-                  <Stack spacing={1.5}>
-                     <Typography
-                        variant="h6"
-                        fontSize={"13px!important"}
-                        fontWeight={500}
-                     >
-                        Unit short name
-                     </Typography>
-                     <Controller
-                        name="short"
-                        control={control}
-                        render={({ field }) => (
-                           <TextField
-                              {...field}
-                              value={field.value ?? ""}
-                              type="text"
-                              label="Unit short name"
-                              variant="outlined"
-                              error={!!errors.short}
-                              helperText={errors.short?.message}
-                           />
-                        )}
-                     />
-                  </Stack>
-                  <Stack direction="row" justifyContent="flex-end" spacing={2}>
-                     <Button color="inherit" onClick={closeModal}>
-                        Cancel
-                     </Button>
-                     <Button
-                        variant="contained"
-                        onClick={handleSubmit(onSubmit)}
-                     >
-                        {selectedUnit ? "Update Unit" : "Add Unit"}
-                     </Button>
-                  </Stack>
-               </Stack>
-            </CustomModal>
+               selectedUnit={selectedUnit}
+               onSuccess={loadUnits}
+            />
 
-            {/* Delete Dialog */}
-            <AlertDialog
-               type="delete"
+            {/* Delete Confirmation Dialog */}
+            <UnitDeleteDialog
                open={isDeleteDialogOpen}
-               onClose={() => setIsDeleteDialogOpen(false)}
-               title={`Are you sure want to delete "${selectedUnit?.name}"?`}
+               onClose={() => {
+                  if (!isDeleting) {
+                     setIsDeleteDialogOpen(false);
+                     setSelectedUnit(null);
+                  }
+               }}
+               unit={selectedUnit}
                onConfirm={handleDelete}
+               isDeleting={isDeleting}
             />
          </Stack>
       </Scrollbar>

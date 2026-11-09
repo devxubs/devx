@@ -13,6 +13,7 @@ export const DEFAULT_PREFIXES: Record<string, string> = {
    ASSET: "AST_",
    ROLE: "ROLE_",
    BILLING: "BILL_",
+   WAREHOUSE: "WH_",
 };
 
 export type EntityType =
@@ -27,7 +28,8 @@ export type EntityType =
    | "EXPENSE"
    | "ASSET"
    | "ROLE"
-   | "BILLING";
+   | "BILLING"
+   | "WAREHOUSE";
 
 /**
  * Retrieve the configured prefix for an entity type from StoreSetting
@@ -51,6 +53,7 @@ export async function getEntityPrefix(entityType: EntityType, client?: any): Pro
          ASSET: setting.prefixAsset || DEFAULT_PREFIXES.ASSET,
          ROLE: setting.prefixRole || DEFAULT_PREFIXES.ROLE,
          BILLING: setting.prefixBilling || DEFAULT_PREFIXES.BILLING,
+         WAREHOUSE: setting.prefixWarehouse || DEFAULT_PREFIXES.WAREHOUSE,
       };
 
       return map[entityType] || DEFAULT_PREFIXES[entityType] || `${entityType}_`;
@@ -66,7 +69,7 @@ export async function getEntityPrefix(entityType: EntityType, client?: any): Pro
 export async function generateNextEntityId(
    entityType: EntityType,
    client?: any,
-): Promise<{ customId: string; seq: number; prefix: string }> {
+): Promise<{ customId: string; orderCode: string; seq: number; prefix: string }> {
    const db = client || prisma;
 
    const prefix = await getEntityPrefix(entityType, db);
@@ -84,6 +87,7 @@ export async function generateNextEntityId(
       ASSET: db.asset,
       ROLE: db.role,
       BILLING: db.billingHistory,
+      WAREHOUSE: db.warehouse,
    };
 
    const sequence = await db.entitySequence.upsert({
@@ -101,7 +105,9 @@ export async function generateNextEntityId(
          where: {
             OR: [
                { customId: candidateId },
-               ...(entityType === "ORDER" ? [{ orderId: candidateId }] : []),
+               ...(entityType === "ORDER"
+                  ? [{ orderId: candidateId }, { orderCode: candidateId }]
+                  : []),
             ],
          },
       });
@@ -113,7 +119,9 @@ export async function generateNextEntityId(
             where: {
                OR: [
                   { customId: candidateId },
-                  ...(entityType === "ORDER" ? [{ orderId: candidateId }] : []),
+                  ...(entityType === "ORDER"
+                     ? [{ orderId: candidateId }, { orderCode: candidateId }]
+                     : []),
                ],
             },
          });
@@ -129,6 +137,7 @@ export async function generateNextEntityId(
 
    return {
       customId: candidateId,
+      orderCode: candidateId,
       seq: candidateSeq,
       prefix,
    };

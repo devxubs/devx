@@ -22,6 +22,7 @@ import {
    CircularProgress,
    Divider,
    Paper,
+   useTheme,
 } from "@mui/material";
 import Icon from "./Icon";
 import CustomModal from "./Modal";
@@ -75,18 +76,25 @@ export default function ExportButton({
    summaryRows,
    sx,
 }: ExportButtonProps) {
+   const theme = useTheme();
    const { settings } = useSettings();
    const [modalOpen, setModalOpen] = useState(false);
    const [format, setFormat] = useState<"xlsx" | "docx" | "csv">("xlsx");
-   const initialScope = defaultScope || (selectedData && selectedData.length > 0 ? "selected" : "page");
-   const [scope, setScope] = useState<"selected" | "page" | "all">(initialScope);
+   const initialScope =
+      defaultScope ||
+      (selectedData && selectedData.length > 0 ? "selected" : "page");
+   const [scope, setScope] = useState<"selected" | "page" | "all">(
+      initialScope,
+   );
    const [isExporting, setIsExporting] = useState(false);
    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-   const currentPageRows = currentPageData || (getCurrentPageData ? getCurrentPageData() : []);
+   const currentPageRows =
+      currentPageData || (getCurrentPageData ? getCurrentPageData() : []);
    const canExportAll = Boolean(fetchAllData);
    const hasSelectedData = Boolean(selectedData && selectedData.length > 0);
-   const resolvedEntityName = entityName || customFilename || customTitle || "Data";
+   const resolvedEntityName =
+      entityName || customFilename || customTitle || "Data";
 
    const handleOpenModal = () => {
       setErrorMsg(null);
@@ -105,7 +113,9 @@ export default function ExportButton({
          let dataset: any[] = [];
          if (scope === "selected") {
             if (!selectedData || selectedData.length === 0) {
-               setErrorMsg("Please select records from the table to export selected.");
+               setErrorMsg(
+                  "Please select records from the table to export selected.",
+               );
                setIsExporting(false);
                return;
             }
@@ -117,18 +127,37 @@ export default function ExportButton({
          }
 
          if (!dataset || dataset.length === 0) {
-            setErrorMsg("No records available to export for the selected scope.");
+            setErrorMsg(
+               "No records available to export for the selected scope.",
+            );
             setIsExporting(false);
             return;
          }
 
          const dateStr = new Date().toISOString().split("T")[0];
-         const scopeTag = scope === "selected" ? "Selected" : scope === "all" ? "All" : "Page";
-         const filename = customFilename ? `${customFilename}_${scopeTag}` : `${resolvedEntityName}_${scopeTag}_${dateStr}`;
+         const scopeTag =
+            scope === "selected"
+               ? "Selected"
+               : scope === "all"
+                 ? "All"
+                 : "Page";
+         const filename = customFilename
+            ? `${customFilename}_${scopeTag}`
+            : `${resolvedEntityName}_${scopeTag}_${dateStr}`;
          const exportTitle = customTitle || `${resolvedEntityName} Data Export`;
-         const scopeDesc = scope === "selected" ? `Selected Records (${dataset.length} records)` : scope === "all" ? `All Matching Records (${dataset.length} records)` : `Current Page (${dataset.length} records)`;
-         const exportSubtitle = subtitle || `Generated on ${new Date().toLocaleString()} | Scope: ${scopeDesc}`;
-         const evaluatedSummary = typeof summaryRows === "function" ? summaryRows(dataset) : summaryRows;
+         const scopeDesc =
+            scope === "selected"
+               ? `Selected Records (${dataset.length} records)`
+               : scope === "all"
+                 ? `All Matching Records (${dataset.length} records)`
+                 : `Current Page (${dataset.length} records)`;
+         const exportSubtitle =
+            subtitle ||
+            `Generated on ${new Date().toLocaleString()} | Scope: ${scopeDesc}`;
+         const evaluatedSummary =
+            typeof summaryRows === "function"
+               ? summaryRows(dataset)
+               : summaryRows;
 
          const companyInfo = {
             name: settings?.storeName,
@@ -182,9 +211,17 @@ export default function ExportButton({
                   size={size}
                   color={color as any}
                   onClick={handleOpenModal}
-                  sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, ...sx }}
+                  sx={{
+                     border: "1px solid",
+                     borderColor: "divider",
+                     borderRadius: 1,
+                     ...sx,
+                  }}
                >
-                  <Icon icon="solar:download-square-bold-duotone" size={size === "small" ? "small" : "medium"} />
+                  <Icon
+                     icon="solar:download-square-bold-duotone"
+                     size={size === "small" ? "small" : "medium"}
+                  />
                </IconButton>
             </Tooltip>
          ) : (
@@ -192,7 +229,13 @@ export default function ExportButton({
                variant={variant === "button" ? "outlined" : variant}
                color={color as any}
                size={size}
-               startIcon={<Icon icon="solar:download-square-bold-duotone" size="small" />}
+               startIcon={
+                  <Icon
+                     icon="solar:download-square-bold-duotone"
+                     size="small"
+                     style={{ color: theme.palette.text.primary }}
+                  />
+               }
                onClick={handleOpenModal}
                sx={{ whiteSpace: "nowrap", ...sx }}
             >
@@ -248,13 +291,23 @@ export default function ExportButton({
                               textAlign: "center",
                               borderRadius: 2,
                               transition: "all 0.2s",
-                              borderColor: format === fmt.type ? "primary.main" : "divider",
-                              bgcolor: format === fmt.type ? "action.selected" : "background.paper",
+                              borderColor:
+                                 format === fmt.type
+                                    ? "primary.main"
+                                    : "divider",
+                              bgcolor:
+                                 format === fmt.type
+                                    ? "action.selected"
+                                    : "background.paper",
                               borderWidth: format === fmt.type ? 2 : 1,
                            }}
                         >
                            <Icon icon={fmt.icon} size="large" />
-                           <Typography variant="body2" fontWeight={700} mt={0.5}>
+                           <Typography
+                              variant="body2"
+                              fontWeight={700}
+                              mt={0.5}
+                           >
                               {fmt.title}
                            </Typography>
                            <Typography variant="caption" color="text.secondary">
@@ -272,7 +325,10 @@ export default function ExportButton({
                   <Typography variant="subtitle2" fontWeight={700} gutterBottom>
                      2. Select Records Scope:
                   </Typography>
-                  <RadioGroup value={scope} onChange={(e) => setScope(e.target.value as any)}>
+                  <RadioGroup
+                     value={scope}
+                     onChange={(e) => setScope(e.target.value as any)}
+                  >
                      {hasSelectedData && (
                         <Paper
                            variant="outlined"
@@ -280,8 +336,14 @@ export default function ExportButton({
                               p: 1.5,
                               mb: 1,
                               borderRadius: 1.5,
-                              borderColor: scope === "selected" ? "primary.main" : "divider",
-                              bgcolor: scope === "selected" ? "action.hover" : "transparent",
+                              borderColor:
+                                 scope === "selected"
+                                    ? "primary.main"
+                                    : "divider",
+                              bgcolor:
+                                 scope === "selected"
+                                    ? "action.hover"
+                                    : "transparent",
                            }}
                         >
                            <FormControlLabel
@@ -289,11 +351,21 @@ export default function ExportButton({
                               control={<Radio size="small" />}
                               label={
                                  <Box>
-                                    <Typography variant="body2" fontWeight={600} color="primary.main">
-                                       Export Selected Records Only ({selectedData?.length} selected)
+                                    <Typography
+                                       variant="body2"
+                                       fontWeight={600}
+                                       color="primary.main"
+                                    >
+                                       Export Selected Records Only (
+                                       {selectedData?.length} selected)
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                       Downloads strictly the {selectedData?.length} checked rows from the table
+                                    <Typography
+                                       variant="caption"
+                                       color="text.secondary"
+                                    >
+                                       Downloads strictly the{" "}
+                                       {selectedData?.length} checked rows from
+                                       the table
                                     </Typography>
                                  </Box>
                               }
@@ -307,7 +379,8 @@ export default function ExportButton({
                            p: 1.5,
                            mb: 1,
                            borderRadius: 1.5,
-                           borderColor: scope === "page" ? "primary.main" : "divider",
+                           borderColor:
+                              scope === "page" ? "primary.main" : "divider",
                         }}
                      >
                         <FormControlLabel
@@ -318,8 +391,12 @@ export default function ExportButton({
                                  <Typography variant="body2" fontWeight={600}>
                                     Export Current Page Only
                                  </Typography>
-                                 <Typography variant="caption" color="text.secondary">
-                                    Downloads the currently visible {currentPageRows.length} records
+                                 <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                 >
+                                    Downloads the currently visible{" "}
+                                    {currentPageRows.length} records
                                  </Typography>
                               </Box>
                            }
@@ -332,7 +409,8 @@ export default function ExportButton({
                            sx={{
                               p: 1.5,
                               borderRadius: 1.5,
-                              borderColor: scope === "all" ? "primary.main" : "divider",
+                              borderColor:
+                                 scope === "all" ? "primary.main" : "divider",
                            }}
                         >
                            <FormControlLabel
@@ -340,11 +418,21 @@ export default function ExportButton({
                               control={<Radio size="small" />}
                               label={
                                  <Box>
-                                    <Typography variant="body2" fontWeight={600}>
+                                    <Typography
+                                       variant="body2"
+                                       fontWeight={600}
+                                    >
                                        Export All Matching Records
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                       Downloads all authorized records matching active filters {totalMatchingCount ? `(approx ${totalMatchingCount.toLocaleString()} total)` : ""}
+                                    <Typography
+                                       variant="caption"
+                                       color="text.secondary"
+                                    >
+                                       Downloads all authorized records matching
+                                       active filters{" "}
+                                       {totalMatchingCount
+                                          ? `(approx ${totalMatchingCount.toLocaleString()} total)`
+                                          : ""}
                                     </Typography>
                                  </Box>
                               }
@@ -363,8 +451,16 @@ export default function ExportButton({
                <Divider />
 
                {/* Actions */}
-               <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Button onClick={() => setModalOpen(false)} disabled={isExporting} color="inherit">
+               <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+               >
+                  <Button
+                     onClick={() => setModalOpen(false)}
+                     disabled={isExporting}
+                     color="inherit"
+                  >
                      Cancel
                   </Button>
                   <Button
@@ -372,9 +468,20 @@ export default function ExportButton({
                      color="primary"
                      onClick={handleExecuteExport}
                      disabled={isExporting}
-                     startIcon={isExporting ? <CircularProgress size={16} color="inherit" /> : <Icon icon="solar:download-square-bold-duotone" size="small" />}
+                     startIcon={
+                        isExporting ? (
+                           <CircularProgress size={16} color="inherit" />
+                        ) : (
+                           <Icon
+                              icon="solar:download-square-bold-duotone"
+                              size="small"
+                           />
+                        )
+                     }
                   >
-                     {isExporting ? "Generating..." : `Download .${format.toUpperCase()}`}
+                     {isExporting
+                        ? "Generating..."
+                        : `Download .${format.toUpperCase()}`}
                   </Button>
                </Stack>
             </Stack>

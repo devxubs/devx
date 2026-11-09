@@ -18,7 +18,13 @@ const CustomerInfo = ({
    return (
       <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
          <Stack>
-            <Typography variant="body2" color="textPrimary">
+            <Typography
+               variant="body2"
+               color="textPrimary"
+               sx={{
+                  "&:hover": { textDecoration: "underline", cursor: "pointer" },
+               }}
+            >
                {name}
             </Typography>
             <Typography variant="body2" fontSize={14} color="textSecondary">

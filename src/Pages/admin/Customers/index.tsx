@@ -102,6 +102,7 @@ const Customers = () => {
                rows={customers}
                columns={columns}
                checkBox={true}
+               hideSelectionActions={true}
                canPrint={true}
                canExport={true}
                printConfig={{
