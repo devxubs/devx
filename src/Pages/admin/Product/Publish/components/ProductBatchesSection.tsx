@@ -93,16 +93,16 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
                         fontWeight={700}
                         sx={{ letterSpacing: "-0.01em" }}
                      >
-                        8. Batch & Expiry Management
+                        8. Batch & Expiry Details
                      </Typography>
                   </Stack>
 
                   <Typography variant="caption" color="text.secondary">
-                     Manage batch identification, manufacturing dates,
-                     expiration dates, and stock rotation.
+                     Track product batches, quantities, and expiry dates.
                   </Typography>
                </Stack>
 
+               {/* Batch Tracking Switch */}
                <Controller
                   name="hasBatchTracking"
                   control={formControl}
@@ -135,11 +135,11 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
 
             {hasBatch ? (
                <Grid container spacing={2.5}>
-                  {/* Batch / Lot Number */}
+                  {/* Batch Number */}
                   <Grid size={{ xs: 12, sm: 6 }}>
-                     <Stack spacing={0.75}>
+                     <Stack spacing={1}>
                         <Typography variant="caption" sx={labelSx}>
-                           Batch / Lot Number
+                           Batch Number
                         </Typography>
 
                         <Controller
@@ -148,15 +148,15 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
                            render={({ field }) => (
                               <TextField
                                  {...field}
-                                 label="Batch / Lot Number"
-                                 placeholder="e.g. LOT-2026-X80"
+                                 label="Enter batch number"
+                                 placeholder="e.g. BATCH-001"
                                  value={field.value ?? ""}
                                  size="small"
                                  fullWidth
                                  error={Boolean(errors.batchNumber)}
                                  helperText={
                                     errors.batchNumber?.message ||
-                                    "Enter the unique batch or lot identification number."
+                                    "Enter the batch number for this product."
                                  }
                               />
                            )}
@@ -164,11 +164,11 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
                      </Stack>
                   </Grid>
 
-                  {/* Initial Batch Quantity */}
+                  {/* Batch Quantity */}
                   <Grid size={{ xs: 12, sm: 6 }}>
-                     <Stack spacing={0.75}>
+                     <Stack spacing={1}>
                         <Typography variant="caption" sx={labelSx}>
-                           Initial Batch Quantity
+                           Batch Quantity
                         </Typography>
 
                         <Controller
@@ -177,13 +177,17 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
                            render={({ field }) => (
                               <TextField
                                  {...field}
-                                 label="Batch Quantity"
-                                 placeholder="Enter batch quantity"
+                                 label="Enter quantity"
+                                 placeholder="e.g. 100"
                                  type="number"
                                  value={field.value ?? ""}
                                  size="small"
                                  fullWidth
-                                 helperText="Enter the available quantity in this batch."
+                                 error={Boolean(errors.batchQuantity)}
+                                 helperText={
+                                    errors.batchQuantity?.message ||
+                                    "Enter the available stock in this batch."
+                                 }
                                  sx={fieldSx}
                               />
                            )}
@@ -193,7 +197,7 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
 
                   {/* Manufacturing Date */}
                   <Grid size={{ xs: 12, sm: 6 }}>
-                     <Stack spacing={0.75}>
+                     <Stack spacing={1}>
                         <Typography variant="caption" sx={labelSx}>
                            Manufacturing Date
                         </Typography>
@@ -204,13 +208,17 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
                            render={({ field }) => (
                               <TextField
                                  {...field}
-                                 label="Manufacturing Date"
+                                 label="Select manufacturing date"
                                  type="date"
                                  value={field.value ?? ""}
                                  size="small"
                                  fullWidth
                                  InputLabelProps={{ shrink: true }}
-                                 helperText="Select the product manufacturing date."
+                                 error={Boolean(errors.mfgDate)}
+                                 helperText={
+                                    errors.mfgDate?.message ||
+                                    "When was this product made?"
+                                 }
                               />
                            )}
                         />
@@ -219,7 +227,7 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
 
                   {/* Expiration Date */}
                   <Grid size={{ xs: 12, sm: 6 }}>
-                     <Stack spacing={0.75}>
+                     <Stack spacing={1}>
                         <Typography variant="caption" sx={labelSx}>
                            Expiration Date
                         </Typography>
@@ -230,17 +238,18 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
                            render={({ field }) => (
                               <TextField
                                  {...field}
-                                 label="Expiration Date"
+                                 label="Select expiry date"
                                  type="date"
                                  value={field.value ?? ""}
                                  size="small"
                                  fullWidth
                                  InputLabelProps={{ shrink: true }}
-                                 error={isNearExpiry}
+                                 error={Boolean(errors.expDate) || isNearExpiry}
                                  helperText={
-                                    isNearExpiry
-                                       ? "Warning: Product is expired or expires within 30 days."
-                                       : "Select the product expiration date."
+                                    errors.expDate?.message ||
+                                    (isNearExpiry
+                                       ? "This product is expired or expires within 30 days."
+                                       : "When will this product expire?")
                                  }
                               />
                            )}
@@ -254,9 +263,8 @@ export const ProductBatchesSection: React.FC<ProductBatchesSectionProps> = ({
                   color="text.secondary"
                   sx={{ py: 1 }}
                >
-                  Batch and expiration tracking is currently disabled for this
-                  product. Enable batch tracking for perishable, food, or
-                  lot-controlled inventory.
+                  Batch tracking is disabled. Enable it to track batch numbers,
+                  quantities, and expiry dates.
                </Typography>
             )}
          </Stack>

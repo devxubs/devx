@@ -144,7 +144,7 @@ export const ProductInventorySection: React.FC<
             <Grid container spacing={2.5}>
                {/* Assigned Warehouse */}
                <Grid size={{ xs: 12 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Assigned Warehouse
                      </Typography>
@@ -185,7 +185,7 @@ export const ProductInventorySection: React.FC<
 
                {/* Opening Stock */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Opening Stock
                      </Typography>
@@ -216,7 +216,7 @@ export const ProductInventorySection: React.FC<
 
                {/* Low Stock Threshold */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Low Stock Threshold
                      </Typography>
@@ -247,7 +247,7 @@ export const ProductInventorySection: React.FC<
 
                {/* Minimum Stock Level */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Minimum Stock Level
                      </Typography>
@@ -274,7 +274,7 @@ export const ProductInventorySection: React.FC<
 
                {/* Maximum Stock Level */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Maximum Stock Level
                      </Typography>
@@ -301,7 +301,7 @@ export const ProductInventorySection: React.FC<
 
                {/* Rack / Aisle */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Rack / Aisle
                      </Typography>
@@ -326,7 +326,7 @@ export const ProductInventorySection: React.FC<
 
                {/* Shelf / Bin Location */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Shelf / Bin Location
                      </Typography>

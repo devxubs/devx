@@ -99,13 +99,13 @@ export const ProductSuppliersSection: React.FC<
                      fontWeight={700}
                      sx={{ letterSpacing: "-0.01em" }}
                   >
-                     9. Supplier & Procurement Management
+                     9. Supplier Details
                   </Typography>
                </Stack>
 
                <Typography variant="caption" color="text.secondary">
-                  Manage supplier assignments, product reference codes,
-                  purchasing costs, and procurement lead times.
+                  Add supplier information and purchase details for this
+                  product.
                </Typography>
             </Stack>
 
@@ -113,8 +113,8 @@ export const ProductSuppliersSection: React.FC<
 
             <Grid container spacing={2.5}>
                {/* Primary Supplier */}
-               <Grid size={{ xs: 12 }}>
-                  <Stack spacing={0.75}>
+               <Grid size={{ xs: 12, sm: 6 }}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Primary Supplier
                      </Typography>
@@ -139,8 +139,8 @@ export const ProductSuppliersSection: React.FC<
                                     field.onChange(match ? match.id : "");
                                  }}
                                  arrow
-                                 label="Select Primary Supplier"
-                                 placeholder="Search or select a supplier"
+                                 label="Select supplier"
+                                 placeholder="Search supplier"
                                  options={suppliers.map(
                                     (supplier) => supplier.name,
                                  )}
@@ -151,12 +151,16 @@ export const ProductSuppliersSection: React.FC<
                            );
                         }}
                      />
+
+                     <Typography variant="caption" color="text.secondary">
+                        Select the main supplier for this product.
+                     </Typography>
                   </Stack>
                </Grid>
 
                {/* Supplier Product Code */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
                         Supplier Product Code
                      </Typography>
@@ -167,12 +171,16 @@ export const ProductSuppliersSection: React.FC<
                         render={({ field }) => (
                            <TextField
                               {...field}
-                              label="Supplier Product Code"
-                              placeholder="e.g. SUP-PROD-001"
+                              label="Enter product code"
+                              placeholder="e.g. SUP-001"
                               value={field.value ?? ""}
                               size="small"
                               fullWidth
-                              helperText="Enter the supplier's product or catalog reference code."
+                              error={Boolean(errors.supplierProductCode)}
+                              helperText={
+                                 errors.supplierProductCode?.message ||
+                                 "Product code provided by the supplier."
+                              }
                            />
                         )}
                      />
@@ -181,9 +189,9 @@ export const ProductSuppliersSection: React.FC<
 
                {/* Supplier Purchase Price */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
-                        Supplier Purchase Price (৳)
+                        Purchase Price (৳)
                      </Typography>
 
                      <Controller
@@ -192,13 +200,17 @@ export const ProductSuppliersSection: React.FC<
                         render={({ field }) => (
                            <TextField
                               {...field}
-                              label="Purchase Price (৳)"
-                              placeholder="Enter supplier purchase price"
+                              label="Enter purchase price"
+                              placeholder="e.g. 250"
                               type="number"
                               value={field.value ?? ""}
                               size="small"
                               fullWidth
-                              helperText="Enter the agreed purchase cost per unit."
+                              error={Boolean(errors.supplierPrice)}
+                              helperText={
+                                 errors.supplierPrice?.message ||
+                                 "Price you pay the supplier per purchase unit."
+                              }
                               sx={fieldSx}
                            />
                         )}
@@ -206,11 +218,11 @@ export const ProductSuppliersSection: React.FC<
                   </Stack>
                </Grid>
 
-               {/* Procurement Lead Time */}
+               {/* Delivery Time */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography variant="caption" sx={labelSx}>
-                        Procurement Lead Time
+                        Delivery Time (Days)
                      </Typography>
 
                      <Controller
@@ -219,13 +231,17 @@ export const ProductSuppliersSection: React.FC<
                         render={({ field }) => (
                            <TextField
                               {...field}
-                              label="Lead Time (Days)"
+                              label="Enter delivery time"
                               placeholder="e.g. 7"
                               type="number"
                               value={field.value ?? ""}
                               size="small"
                               fullWidth
-                              helperText="Expected number of days for supplier delivery."
+                              error={Boolean(errors.leadTimeDays)}
+                              helperText={
+                                 errors.leadTimeDays?.message ||
+                                 "How many days the supplier takes to deliver."
+                              }
                               sx={fieldSx}
                            />
                         )}

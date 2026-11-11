@@ -1,5 +1,4 @@
-export * from "./ProductBreadcrumbs";
-export * from "./ProductBreadcrumb";
+export * from "../../../../../components/Breadcrumbs";
 export * from "./ProductBasicInfoSection";
 export * from "./ProductIdentificationSection";
 export * from "./ProductMediaSection";
@@ -11,6 +10,5 @@ export * from "./ProductInventorySection";
 export * from "./ProductBatchesSection";
 export * from "./ProductSuppliersSection";
 export * from "./ProductSpecificationsSection";
-export * from "./ProductPOSSettingsSection";
 export * from "./ProductRightSummaryPanel";
 export * from "./ProductStickyFooter";

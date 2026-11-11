@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import Icon from "@src/components/Icon";
+import Breadcrumbs from "@src/components/Breadcrumbs";
 
 interface OrderHeaderProps {
    displayOrderId: string;
@@ -78,37 +79,12 @@ export default function OrderHeader({
       <Box sx={{ "@media print": { display: "none" } }}>
          {/* Top Navigation Row */}
          <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
-            <Button
-               variant="text"
-               color="inherit"
-               size="small"
-               startIcon={<Icon icon="solar:arrow-left-linear" size="16px" />}
-               onClick={() => router.push("/admin/order")}
-               sx={{
-                  p: 0.5,
-                  px: 1,
-                  textTransform: "none",
-                  fontSize: "0.825rem",
-                  color: "text.secondary",
-                  borderRadius: 1,
-                  "&:hover": {
-                     color: "text.primary",
-                     bgcolor: "action.hover",
-                  },
-               }}
-            >
-               Back to Orders
-            </Button>
-            <Typography variant="caption" color="text.disabled">
-               /
-            </Typography>
-            <Typography
-               variant="caption"
-               fontWeight={600}
-               color="text.secondary"
-            >
-               {displayOrderId}
-            </Typography>
+            <Breadcrumbs
+               href="/admin/order"
+               label={displayOrderId}
+               parentLabel="Back to Orders"
+               parentHref="/admin/order"
+            />
          </Stack>
 
          {/* Main Header Row */}

@@ -10,7 +10,6 @@ import {
    Typography,
    useTheme,
 } from "@mui/material";
-import Icon from "@src/components/Icon";
 import AlertDialog from "@src/components/AlertDialog";
 
 interface ProductStickyFooterProps {
@@ -22,7 +21,6 @@ interface ProductStickyFooterProps {
    totalRequiredCount: number;
    isDirty: boolean;
    onSaveDraft: () => void;
-   onSaveAndAddAnother?: () => void;
    onPublish: () => void;
 }
 
@@ -35,7 +33,6 @@ export const ProductStickyFooter: React.FC<ProductStickyFooterProps> = ({
    totalRequiredCount,
    isDirty,
    onSaveDraft,
-   onSaveAndAddAnother,
    onPublish,
 }) => {
    const theme = useTheme();
@@ -57,9 +54,13 @@ export const ProductStickyFooter: React.FC<ProductStickyFooterProps> = ({
             mb: 2,
          }}
       >
-         <Stack spacing={2}>
+         <Stack spacing={1}>
             {serverError && (
-               <Typography color="error" variant="body2" sx={{ px: 1, fontWeight: 600 }}>
+               <Typography
+                  color="error"
+                  variant="body2"
+                  sx={{ px: 1, fontWeight: 600 }}
+               >
                   {serverError}
                </Typography>
             )}
@@ -68,28 +69,41 @@ export const ProductStickyFooter: React.FC<ProductStickyFooterProps> = ({
                direction={{ xs: "column", md: "row" }}
                justifyContent="space-between"
                alignItems={{ xs: "stretch", md: "center" }}
-               gap={2}
+               gap={1}
             >
                {/* Left Side: Subtle form status and unsaved edits indicator */}
                <Stack
                   direction="row"
-                  spacing={1.5}
+                  spacing={0.5}
                   alignItems="center"
                   flexWrap="wrap"
                   useFlexGap
+                  sx={{
+                     flex: 0.5,
+                  }}
                >
-                  <Stack direction="row" spacing={1} alignItems="center">
-                     <Box
-                        sx={{
-                           width: 8,
-                           height: 8,
-                           borderRadius: "50%",
-                           bgcolor: isReady ? "success.main" : "warning.main",
-                        }}
-                     />
-                     <Typography variant="body2" fontWeight={600} color="text.primary">
-                        {isReady ? "Ready to publish" : "Complete required fields"}
-                     </Typography>
+                  <Stack justifyContent="center">
+                     <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Box
+                           sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              bgcolor: isReady
+                                 ? "success.main"
+                                 : "warning.main",
+                           }}
+                        />
+                        <Typography
+                           variant="body2"
+                           fontWeight={600}
+                           color="text.primary"
+                        >
+                           {isReady
+                              ? "Ready to publish"
+                              : "Complete required fields"}
+                        </Typography>
+                     </Stack>
                      <Typography variant="caption" color="text.secondary">
                         ({completedRequiredCount}/{totalRequiredCount} required)
                      </Typography>
@@ -109,8 +123,12 @@ export const ProductStickyFooter: React.FC<ProductStickyFooterProps> = ({
                {/* Right Side: Secondary Actions & Primary Submit */}
                <Stack
                   direction={{ xs: "column", sm: "row" }}
-                  spacing={1.25}
+                  spacing={1}
                   alignItems="center"
+                  justifyContent={"flex-end"}
+                  sx={{
+                     flex: 0.8,
+                  }}
                >
                   <Button
                      variant="outlined"
@@ -151,27 +169,6 @@ export const ProductStickyFooter: React.FC<ProductStickyFooterProps> = ({
                         >
                            Save as Draft
                         </Button>
-
-                        {onSaveAndAddAnother && (
-                           <Button
-                              variant="outlined"
-                              color="inherit"
-                              disabled={isSubmitting}
-                              onClick={onSaveAndAddAnother}
-                              sx={{
-                                 height: 42,
-                                 textTransform: "none",
-                                 fontWeight: 600,
-                                 borderColor: "divider",
-                                 width: { xs: "100%", sm: "auto" },
-                                 "&:hover": {
-                                    borderColor: "text.primary",
-                                 },
-                              }}
-                           >
-                              Save & Add Another
-                           </Button>
-                        )}
                      </>
                   )}
 
@@ -188,7 +185,11 @@ export const ProductStickyFooter: React.FC<ProductStickyFooterProps> = ({
                         width: { xs: "100%", sm: "auto" },
                      }}
                   >
-                     {isSubmitting ? "Saving..." : isEdit ? "Update Product" : "Publish Product"}
+                     {isSubmitting
+                        ? "Saving..."
+                        : isEdit
+                          ? "Update Product"
+                          : "Publish Product"}
                   </Button>
                </Stack>
             </Stack>

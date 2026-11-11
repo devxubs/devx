@@ -17,9 +17,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
-import { productSchema, ProductSchemaType, hideNumberSpinnerSx, ProductBundleComponent } from "./types";
 import {
-   ProductBreadcrumbs,
+   productSchema,
+   ProductSchemaType,
+   hideNumberSpinnerSx,
+   ProductBundleComponent,
+} from "./types";
+import {
    ProductBasicInfoSection,
    ProductIdentificationSection,
    ProductMediaSection,
@@ -31,12 +35,12 @@ import {
    ProductBatchesSection,
    ProductSuppliersSection,
    ProductSpecificationsSection,
-   ProductPOSSettingsSection,
    ProductRightSummaryPanel,
    ProductStickyFooter,
 } from "./components";
 import { useProductVariants } from "./hooks/useProductVariants";
 import { useProductDraft } from "./hooks/useProductDraft";
+import Breadcrumbs from "@src/components/Breadcrumbs";
 
 const DEFAULT_FORM_VALUES: ProductSchemaType = {
    productName: "",
@@ -163,7 +167,12 @@ export const Publish: React.FC = () => {
       removeVariant,
       addManualVariant,
       totalVariantQuantity,
-   } = useProductVariants([], watchSku || "PROD", Number(watchPrice) || 0, Number(watchCost) || 0);
+   } = useProductVariants(
+      [],
+      watchSku || "PROD",
+      Number(watchPrice) || 0,
+      Number(watchCost) || 0,
+   );
 
    // Sync variant quantity with main form quantity if Variable product
    useEffect(() => {
@@ -224,7 +233,8 @@ export const Publish: React.FC = () => {
          }
       };
       window.addEventListener("beforeunload", handleBeforeUnload);
-      return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+      return () =>
+         window.removeEventListener("beforeunload", handleBeforeUnload);
    }, [isDirty, submitting]);
 
    // Load existing product if editing
@@ -244,10 +254,12 @@ export const Publish: React.FC = () => {
                const imgs = Array.isArray(p.images)
                   ? p.images
                   : typeof p.images === "string"
-                  ? JSON.parse(p.images)
-                  : [];
+                    ? JSON.parse(p.images)
+                    : [];
 
-               const loadedVariants = Array.isArray(p.variants) ? p.variants : [];
+               const loadedVariants = Array.isArray(p.variants)
+                  ? p.variants
+                  : [];
                setVariants(loadedVariants);
 
                if (Array.isArray(p.bundleItems)) {
@@ -307,20 +319,28 @@ export const Publish: React.FC = () => {
                   hasBatchTracking: Boolean(p.hasBatchTracking),
                   hasSerialTracking: Boolean(p.hasSerialTracking),
                   batchNumber: p.batches?.[0]?.batchNumber || "",
-                  mfgDate: p.batches?.[0]?.mfgDate ? p.batches[0].mfgDate.split("T")[0] : "",
-                  expDate: p.batches?.[0]?.expDate ? p.batches[0].expDate.split("T")[0] : "",
+                  mfgDate: p.batches?.[0]?.mfgDate
+                     ? p.batches[0].mfgDate.split("T")[0]
+                     : "",
+                  expDate: p.batches?.[0]?.expDate
+                     ? p.batches[0].expDate.split("T")[0]
+                     : "",
                   batchQuantity: p.batches?.[0]?.quantity,
 
                   primarySupplierId: p.primarySupplierId || "",
                   supplierProductCode: p.supplierProductCode || "",
-                  supplierPrice: p.supplierPrice ? Number(p.supplierPrice) : undefined,
+                  supplierPrice: p.supplierPrice
+                     ? Number(p.supplierPrice)
+                     : undefined,
                   leadTimeDays: p.leadTimeDays ?? undefined,
 
                   warrantyPeriod: p.warrantyPeriod || "",
                   warrantyType: p.warrantyType || "",
                   modelNumber: p.modelNumber || "",
                   originCountry: p.originCountry || "",
-                  specifications: Array.isArray(p.specifications) ? p.specifications : [],
+                  specifications: Array.isArray(p.specifications)
+                     ? p.specifications
+                     : [],
                   tags: Array.isArray(p.tags) ? p.tags : [],
 
                   salesAccount: p.salesAccount || "",
@@ -353,7 +373,10 @@ export const Publish: React.FC = () => {
    }, [id, reset, setVariants]);
 
    // Core submission handler
-   const submitProductData = async (data: ProductSchemaType, overrideStatus?: "ACTIVE" | "DRAFT") => {
+   const submitProductData = async (
+      data: ProductSchemaType,
+      overrideStatus?: "ACTIVE" | "DRAFT",
+   ) => {
       setSubmitting(true);
       setServerError(null);
 
@@ -389,13 +412,17 @@ export const Publish: React.FC = () => {
 
          if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || errData.message || "Failed to save product");
+            throw new Error(
+               errData.error || errData.message || "Failed to save product",
+            );
          }
 
          clearDraftOnSubmit();
          return true;
       } catch (err: any) {
-         setServerError(err.message || "Something went wrong while saving product.");
+         setServerError(
+            err.message || "Something went wrong while saving product.",
+         );
          return false;
       } finally {
          setSubmitting(false);
@@ -413,18 +440,6 @@ export const Publish: React.FC = () => {
       const currentValues = getValues();
       const ok = await submitProductData(currentValues, "DRAFT");
       if (ok) router.push("/admin/product");
-   };
-
-   // Save & Add Another
-   const handleSaveAndAddAnother = async () => {
-      const currentValues = getValues();
-      const ok = await submitProductData(currentValues);
-      if (ok) {
-         reset(DEFAULT_FORM_VALUES);
-         setVariants([]);
-         setBundleItems([]);
-         window.scrollTo({ top: 0, behavior: "smooth" });
-      }
    };
 
    // Publish Directly
@@ -460,27 +475,36 @@ export const Publish: React.FC = () => {
          onSubmit={handleSubmit(onSubmit)}
          sx={{
             width: "100%",
-            pb: 4,
             ...hideNumberSpinnerSx,
          }}
       >
-         <Container maxWidth={false} sx={{ maxWidth: 1680, px: { xs: 2, sm: 3, md: 4 } }}>
+         <Container
+            maxWidth={false}
+            sx={{ maxWidth: 1680, px: { xs: 2, sm: 3, md: 4 } }}
+         >
             <Stack spacing={2.5}>
                {/* Breadcrumbs Navigation */}
                <Box sx={{ pt: 1 }}>
-                  <ProductBreadcrumbs
+                  <Breadcrumbs
+                     href="/admin/products"
+                     label="New Product"
                      isEdit={isEdit}
                      onNavigateProducts={handleCancel}
                   />
                </Box>
 
                {/* Page Title & Context Header */}
-               <Stack spacing={0.5}>
-                  <Typography variant="h5" fontWeight={700} sx={{ letterSpacing: "-0.02em" }}>
+               <Stack spacing={1}>
+                  <Typography
+                     variant="h5"
+                     fontWeight={700}
+                     sx={{ letterSpacing: "-0.02em" }}
+                  >
                      {isEdit ? "Edit Product" : "Create a New Product"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                     Configure complete inventory details, multi-tier pricing, dynamic variants, batches and sales channel controls.
+                     Configure complete inventory details, multi-tier pricing,
+                     dynamic variants, batches and sales channel controls.
                   </Typography>
                </Stack>
 
@@ -490,10 +514,19 @@ export const Publish: React.FC = () => {
                      severity="info"
                      action={
                         <Stack direction="row" spacing={1}>
-                           <Button size="small" color="inherit" onClick={restoreDraft} sx={{ fontWeight: 600 }}>
+                           <Button
+                              size="small"
+                              color="inherit"
+                              onClick={restoreDraft}
+                              sx={{ fontWeight: 600 }}
+                           >
                               Restore
                            </Button>
-                           <Button size="small" color="inherit" onClick={discardDraft}>
+                           <Button
+                              size="small"
+                              color="inherit"
+                              onClick={discardDraft}
+                           >
                               Dismiss
                            </Button>
                         </Stack>
@@ -505,7 +538,8 @@ export const Publish: React.FC = () => {
                         border: "1px solid",
                      }}
                   >
-                     You have an auto-saved draft from {savedDraftTime}. Would you like to restore your progress?
+                     You have an auto-saved draft from {savedDraftTime}. Would
+                     you like to restore your progress?
                   </Alert>
                )}
 
@@ -533,7 +567,9 @@ export const Publish: React.FC = () => {
                         {/* 3. Product Images & Media */}
                         <ProductMediaSection
                            images={watchImages}
-                           onChangeImages={(imgs) => setValue("images", imgs, { shouldDirty: true })}
+                           onChangeImages={(imgs) =>
+                              setValue("images", imgs, { shouldDirty: true })
+                           }
                            error={errors.images?.message as string}
                         />
 
@@ -570,28 +606,53 @@ export const Publish: React.FC = () => {
                         </Stack>
 
                         {/* 5. Pricing & Profit Analysis */}
-                        <ProductPricingSection formControl={control} errors={errors} />
+                        <ProductPricingSection
+                           formControl={control}
+                           errors={errors}
+                        />
 
                         {/* 6. Units & Measurement Conversion (Non-service) */}
                         {watchType !== "Service" && (
-                           <ProductUnitsSection formControl={control} errors={errors} />
+                           <ProductUnitsSection
+                              formControl={control}
+                              errors={errors}
+                           />
                         )}
 
                         {/* 7. Inventory & Warehouse Management (Non-service) */}
                         {watchType !== "Service" && (
-                           <ProductInventorySection formControl={control} errors={errors} />
+                           <ProductInventorySection
+                              formControl={control}
+                              errors={errors}
+                           />
                         )}
 
                         {/* 8. Stock & Supply Data (Non-service) */}
                         {watchType !== "Service" && (
-                           <ProductBatchesSection formControl={control} errors={errors} />
+                           <ProductBatchesSection
+                              formControl={control}
+                              errors={errors}
+                           />
                         )}
 
                         {/* 9. Supplier & Procurement Information */}
-                        <ProductSuppliersSection formControl={control} errors={errors} />
+                        <ProductSuppliersSection
+                           formControl={control}
+                           errors={errors}
+                        />
 
-                        {/* 10. SEO & Extra Product Settings */}
-                        <ProductPOSSettingsSection formControl={control} errors={errors} />
+                        {/* Sticky Footer */}
+                        <ProductStickyFooter
+                           isEdit={isEdit}
+                           isSubmitting={submitting}
+                           onCancel={handleCancel}
+                           serverError={serverError}
+                           completedRequiredCount={completedRequiredCount}
+                           totalRequiredCount={4}
+                           isDirty={isDirty}
+                           onSaveDraft={handleSaveDraft}
+                           onPublish={handlePublish}
+                        />
                      </Stack>
                   </Grid>
 
@@ -606,20 +667,6 @@ export const Publish: React.FC = () => {
                      />
                   </Grid>
                </Grid>
-
-               {/* Sticky Footer */}
-               <ProductStickyFooter
-                  isEdit={isEdit}
-                  isSubmitting={submitting}
-                  onCancel={handleCancel}
-                  serverError={serverError}
-                  completedRequiredCount={completedRequiredCount}
-                  totalRequiredCount={4}
-                  isDirty={isDirty}
-                  onSaveDraft={handleSaveDraft}
-                  onSaveAndAddAnother={handleSaveAndAddAnother}
-                  onPublish={handlePublish}
-               />
             </Stack>
          </Container>
 

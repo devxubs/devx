@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
    Box,
-   Button,
    Chip,
    Divider,
    FormControlLabel,
@@ -184,7 +183,7 @@ export const ProductSpecificationsSection: React.FC<
             <Grid container spacing={2}>
                {/* Warranty Period */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography
                         variant="caption"
                         fontWeight={600}
@@ -217,7 +216,7 @@ export const ProductSpecificationsSection: React.FC<
 
                {/* Warranty Coverage */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography
                         variant="caption"
                         fontWeight={600}
@@ -254,7 +253,7 @@ export const ProductSpecificationsSection: React.FC<
 
                {/* Manufacturer Model Number */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography
                         variant="caption"
                         fontWeight={600}
@@ -287,7 +286,7 @@ export const ProductSpecificationsSection: React.FC<
 
                {/* Country of Origin */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      <Typography
                         variant="caption"
                         fontWeight={600}
@@ -375,7 +374,7 @@ export const ProductSpecificationsSection: React.FC<
 
                {/* Specification List */}
                {specs.length > 0 && (
-                  <Stack spacing={0.75}>
+                  <Stack spacing={1}>
                      {specs.map((item, idx) => (
                         <Paper
                            key={idx}

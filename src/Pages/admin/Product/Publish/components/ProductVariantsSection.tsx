@@ -49,7 +49,6 @@ export const ProductVariantsSection: React.FC<ProductVariantsSectionProps> = ({
    onGenerateCombinations,
    onUpdateVariant,
    onRemoveVariant,
-   onAddManualVariant,
 }) => {
    const theme = useTheme();
    const [newAttrName, setNewAttrName] = useState("");

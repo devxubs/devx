@@ -43,21 +43,36 @@ export const ProductUnitsSection: React.FC<ProductUnitsSectionProps> = ({
 
    useEffect(() => {
       let isMounted = true;
+
       fetch("/api/units")
-         .then((r) => (r.ok ? r.json() : []))
+         .then((res) => (res.ok ? res.json() : []))
          .then((data) => {
             if (!isMounted) return;
+
             const fetched = Array.isArray(data) ? data : data.units || [];
-            const names = fetched.map((u: any) => u.name || u.unitName).filter(Boolean);
+            const names = fetched
+               .map((unit: any) => unit.name || unit.unitName)
+               .filter(Boolean);
+
             if (names.length > 0) {
-               setUnitOptions(Array.from(new Set([...STANDARD_UNITS, ...names])));
+               setUnitOptions(
+                  Array.from(new Set([...STANDARD_UNITS, ...names])),
+               );
             }
          })
          .catch(() => {});
+
       return () => {
          isMounted = false;
       };
    }, []);
+
+   const labelSx = {
+      textTransform: "uppercase",
+      letterSpacing: "0.5px",
+      fontSize: "0.72rem",
+      fontWeight: 600,
+   };
 
    return (
       <Paper
@@ -71,15 +86,20 @@ export const ProductUnitsSection: React.FC<ProductUnitsSectionProps> = ({
          }}
       >
          <Stack spacing={2.5}>
-            {/* Header */}
+            {/* Section Header */}
             <Stack direction="row" spacing={1} alignItems="center">
                <Icon
                   icon="solar:scale-linear"
                   size="18px"
                   style={{ color: theme.palette.text.secondary }}
                />
-               <Typography variant="subtitle1" fontWeight={700} sx={{ letterSpacing: "-0.01em" }}>
-                  6. Units & Measurement Conversion
+
+               <Typography
+                  variant="subtitle1"
+                  fontWeight={700}
+                  sx={{ letterSpacing: "-0.01em" }}
+               >
+                  6. Units & Conversion
                </Typography>
             </Stack>
 
@@ -88,15 +108,9 @@ export const ProductUnitsSection: React.FC<ProductUnitsSectionProps> = ({
             <Grid container spacing={2}>
                {/* Base Unit */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
-                     <Typography
-                        variant="caption"
-                        fontWeight={600}
-                        color="text.primary"
-                        sx={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: "0.72rem" }}
-                     >
-                        Base / Inventory Unit
-                     </Typography>
+                  <Stack spacing={1}>
+                     <Typography sx={labelSx}>Base Unit</Typography>
+
                      <Controller
                         name="baseUnit"
                         control={formControl}
@@ -104,28 +118,30 @@ export const ProductUnitsSection: React.FC<ProductUnitsSectionProps> = ({
                            <CustomAutocomplete
                               size="small"
                               value={field.value || "Piece"}
-                              onChange={(val: any) => field.onChange(val || "Piece")}
+                              onChange={(val: any) =>
+                                 field.onChange(val || "Piece")
+                              }
                               arrow
-                              label="Base Unit"
+                              label="Select base unit"
                               options={unitOptions}
-                              getOptionLabel={(option) => option?.toString() || ""}
+                              getOptionLabel={(option) =>
+                                 option?.toString() || ""
+                              }
                            />
                         )}
                      />
+
+                     <Typography variant="caption" color="text.secondary">
+                        Main unit for stock (e.g. Piece, Kg).
+                     </Typography>
                   </Stack>
                </Grid>
 
                {/* Purchase Unit */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
-                     <Typography
-                        variant="caption"
-                        fontWeight={600}
-                        color="text.primary"
-                        sx={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: "0.72rem" }}
-                     >
-                        Purchase / Procurement Unit
-                     </Typography>
+                  <Stack spacing={1}>
+                     <Typography sx={labelSx}>Purchase Unit</Typography>
+
                      <Controller
                         name="purchaseUnit"
                         control={formControl}
@@ -135,26 +151,26 @@ export const ProductUnitsSection: React.FC<ProductUnitsSectionProps> = ({
                               value={field.value || ""}
                               onChange={(val: any) => field.onChange(val || "")}
                               arrow
-                              label="Purchase Unit (e.g. Carton, Box)"
+                              label="Select purchase unit"
                               options={unitOptions}
-                              getOptionLabel={(option) => option?.toString() || ""}
+                              getOptionLabel={(option) =>
+                                 option?.toString() || ""
+                              }
                            />
                         )}
                      />
+
+                     <Typography variant="caption" color="text.secondary">
+                        Unit used to buy this product.
+                     </Typography>
                   </Stack>
                </Grid>
 
                {/* Sales Unit */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
-                     <Typography
-                        variant="caption"
-                        fontWeight={600}
-                        color="text.primary"
-                        sx={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: "0.72rem" }}
-                     >
-                        POS Sales Unit
-                     </Typography>
+                  <Stack spacing={1}>
+                     <Typography sx={labelSx}>Sales Unit</Typography>
+
                      <Controller
                         name="salesUnit"
                         control={formControl}
@@ -162,28 +178,30 @@ export const ProductUnitsSection: React.FC<ProductUnitsSectionProps> = ({
                            <CustomAutocomplete
                               size="small"
                               value={field.value || "Piece"}
-                              onChange={(val: any) => field.onChange(val || "Piece")}
+                              onChange={(val: any) =>
+                                 field.onChange(val || "Piece")
+                              }
                               arrow
-                              label="Sales Unit"
+                              label="Select sales unit"
                               options={unitOptions}
-                              getOptionLabel={(option) => option?.toString() || ""}
+                              getOptionLabel={(option) =>
+                                 option?.toString() || ""
+                              }
                            />
                         )}
                      />
+
+                     <Typography variant="caption" color="text.secondary">
+                        Unit used to sell this product.
+                     </Typography>
                   </Stack>
                </Grid>
 
                {/* Conversion Rate */}
                <Grid size={{ xs: 12, sm: 6 }}>
-                  <Stack spacing={0.75}>
-                     <Typography
-                        variant="caption"
-                        fontWeight={600}
-                        color="text.primary"
-                        sx={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: "0.72rem" }}
-                     >
-                        Unit Conversion Ratio
-                     </Typography>
+                  <Stack spacing={1}>
+                     <Typography sx={labelSx}>Conversion Rate</Typography>
+
                      <Controller
                         name="unitConversionRate"
                         control={formControl}
@@ -194,12 +212,22 @@ export const ProductUnitsSection: React.FC<ProductUnitsSectionProps> = ({
                               value={field.value ?? 1}
                               size="small"
                               fullWidth
-                              placeholder="e.g. 1 Carton = 12 Pieces"
-                              helperText="Conversion factor: 1 Purchase Unit = N Base Units"
+                              label="Conversion Rate"
+                              placeholder="Enter quantity (e.g. 12)"
+                              error={!!errors.unitConversionRate}
+                              helperText={
+                                 errors.unitConversionRate?.message ||
+                                 "1 Purchase Unit = N Base Units."
+                              }
+                              inputProps={{
+                                 min: 0.000001,
+                                 step: "any",
+                              }}
                               sx={{
-                                 "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": {
-                                    display: "none",
-                                 },
+                                 "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button":
+                                    {
+                                       display: "none",
+                                    },
                               }}
                            />
                         )}
