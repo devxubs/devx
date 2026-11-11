@@ -9,13 +9,22 @@ export async function GET(request: NextRequest) {
    }
 
    try {
+      // NOTIF-01 fix: notifications are per-user. A user sees their own
+      // notifications plus broadcasts (userId = null, e.g. low-stock
+      // alerts) — never other users' private notifications. The unread
+      // count uses the same scope so the badge can stay in sync.
+      const visibilityScope = {
+         OR: [{ userId: session.id }, { userId: null }],
+      };
+
       const [notifications, unreadCount] = await Promise.all([
          prisma.notification.findMany({
+            where: visibilityScope,
             orderBy: { createdAt: "desc" },
             take: 50,
          }),
          prisma.notification.count({
-            where: { isRead: false, isArchived: false },
+            where: { ...visibilityScope, isRead: false, isArchived: false },
          }),
       ]);
 
@@ -38,16 +47,24 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       const { action, id, title, message, category, type, link } = body;
 
+      // NOTIF-01 fix: every mutation is scoped to notifications the
+      // caller may see (their own or broadcasts).
+      const visibilityScope = {
+         OR: [{ userId: session.id }, { userId: null }],
+      };
+
       if (action === "mark_all_read") {
          await prisma.notification.updateMany({
-            where: { isRead: false },
+            where: { ...visibilityScope, isRead: false },
             data: { isRead: true },
          });
          return NextResponse.json({ message: "All notifications marked as read" });
       }
 
       if (action === "toggle_read" && id) {
-         const notif = await prisma.notification.findUnique({ where: { id } });
+         const notif = await prisma.notification.findFirst({
+            where: { id, ...visibilityScope },
+         });
          if (!notif) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
          const updated = await prisma.notification.update({
             where: { id },
@@ -57,7 +74,9 @@ export async function POST(request: NextRequest) {
       }
 
       if (action === "toggle_archive" && id) {
-         const notif = await prisma.notification.findUnique({ where: { id } });
+         const notif = await prisma.notification.findFirst({
+            where: { id, ...visibilityScope },
+         });
          if (!notif) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
          const updated = await prisma.notification.update({
             where: { id },
@@ -67,6 +86,10 @@ export async function POST(request: NextRequest) {
       }
 
       if (action === "delete" && id) {
+         const notif = await prisma.notification.findFirst({
+            where: { id, ...visibilityScope },
+         });
+         if (!notif) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
          await prisma.notification.delete({ where: { id } });
          return NextResponse.json({ message: "Notification deleted" });
       }

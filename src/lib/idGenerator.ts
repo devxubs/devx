@@ -86,7 +86,10 @@ export async function generateNextEntityId(
       EXPENSE: db.expense,
       ASSET: db.asset,
       ROLE: db.role,
-      BILLING: db.billingHistory,
+      // ID-01 fix: the Prisma model is BillingTransaction — the previous
+      // `db.billingHistory` accessor did not exist, silently disabling
+      // the collision check for billing IDs.
+      BILLING: db.billingTransaction,
       WAREHOUSE: db.warehouse,
    };
 
@@ -101,21 +104,8 @@ export async function generateNextEntityId(
    const model = modelMap[entityType];
 
    if (model && typeof model.findFirst === "function") {
-      let exists = await model.findFirst({
-         where: {
-            OR: [
-               { customId: candidateId },
-               ...(entityType === "ORDER"
-                  ? [{ orderId: candidateId }, { orderCode: candidateId }]
-                  : []),
-            ],
-         },
-      });
-
-      while (exists) {
-         candidateSeq++;
-         candidateId = `${prefix}${candidateSeq}`;
-         exists = await model.findFirst({
+      const findCollision = () =>
+         model.findFirst({
             where: {
                OR: [
                   { customId: candidateId },
@@ -125,13 +115,22 @@ export async function generateNextEntityId(
                ],
             },
          });
-      }
 
-      if (candidateSeq !== sequence.currentSeq) {
-         await db.entitySequence.update({
+      let exists = await findCollision();
+
+      while (exists) {
+         // ID-01 race fix: bump the shared counter with the same atomic
+         // upsert-increment instead of a local increment + non-atomic
+         // write-back, so two concurrent generators can never observe
+         // and claim the same candidate sequence.
+         const bumped = await db.entitySequence.upsert({
             where: { entityType },
-            data: { currentSeq: candidateSeq },
+            update: { currentSeq: { increment: 1 } },
+            create: { entityType, currentSeq: candidateSeq + 1 },
          });
+         candidateSeq = bumped.currentSeq;
+         candidateId = `${prefix}${candidateSeq}`;
+         exists = await findCollision();
       }
    }
 

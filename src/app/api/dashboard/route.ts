@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { calculateNetProfit } from "@src/lib/finance";
 
 export async function GET(request: NextRequest) {
    const session = getSessionUser(request);
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
          holdOrders,
          revenueSum,
          expenseSum,
+         purchaseSum,
          refundSum,
          payoutSum,
          lowStockCount,
@@ -40,6 +42,10 @@ export async function GET(request: NextRequest) {
          prisma.expense.aggregate({
             where: { isDeleted: false },
             _sum: { amount: true },
+         }),
+         prisma.purchase.aggregate({
+            where: { isDeleted: false },
+            _sum: { total: true },
          }),
          prisma.order.aggregate({
             where: { isDeleted: false, status: "CANCELLED" },
@@ -106,9 +112,13 @@ export async function GET(request: NextRequest) {
 
       const totalRevenue = Number(revenueSum._sum.total || 0);
       const totalExpenses = Number(expenseSum._sum.amount || 0);
+      const totalPurchases = Number(purchaseSum._sum.total || 0);
       const refunded = Number(refundSum._sum.total || 0);
       const settledPayouts = Number(payoutSum._sum.amount || 0);
-      const netProfit = totalRevenue - totalExpenses;
+      // DB/API-07 fix: Dashboard now uses the same shared profit
+      // definition as Reports (revenue − expenses − purchases)
+      // instead of its own revenue − expenses formula.
+      const netProfit = calculateNetProfit(totalRevenue, totalExpenses, totalPurchases);
       const currentBalance = Math.max(totalRevenue - totalExpenses - settledPayouts, 0);
 
       // Monthly sales vs expenses array (12 months)

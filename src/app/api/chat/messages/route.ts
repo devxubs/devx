@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
+/**
+ * CHAT-01 fix: every handler verifies the caller is a member of the
+ * conversation before reading or writing. Membership lives in the
+ * Conversation.members JSON array (DB-07), so it is checked in code.
+ */
+async function requireMembership(conversationId: string, userId: string) {
+   const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+   });
+   if (!conversation) return { error: "Conversation not found", status: 404 as const };
+   const memberIds: string[] = Array.isArray(conversation.members)
+      ? (conversation.members as string[])
+      : [];
+   if (!memberIds.includes(userId)) {
+      return { error: "Forbidden: not a conversation member", status: 403 as const };
+   }
+   return { conversation };
+}
+
 export async function GET(request: NextRequest) {
    const session = getSessionUser(request);
    if (!session) {
@@ -16,19 +35,17 @@ export async function GET(request: NextRequest) {
    }
 
    try {
+      const gate = await requireMembership(conversationId, session.id);
+      if ("error" in gate) {
+         return NextResponse.json({ error: gate.error }, { status: gate.status });
+      }
+
+      // Fix instruction #18: GET is a pure read — it no longer marks
+      // messages as read as a side effect. Read state changes go
+      // through the explicit POST { action: "mark_read" } operation.
       const messages = await prisma.chatMessage.findMany({
          where: { conversationId },
          orderBy: { createdAt: "asc" },
-      });
-
-      // Mark unread messages in this conversation as read
-      await prisma.chatMessage.updateMany({
-         where: {
-            conversationId,
-            senderId: { not: session.id },
-            isRead: false,
-         },
-         data: { isRead: true },
       });
 
       return NextResponse.json(messages);
@@ -46,9 +63,33 @@ export async function POST(request: NextRequest) {
    try {
       const body = await request.json();
       const message = body.message || body.content;
-      const { conversationId, attachments } = body;
+      const { conversationId, attachments, action } = body;
 
-      if (!conversationId || (!message && (!attachments || attachments.length === 0))) {
+      if (!conversationId) {
+         return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
+      }
+
+      const gate = await requireMembership(conversationId, session.id);
+      if ("error" in gate) {
+         return NextResponse.json({ error: gate.error }, { status: gate.status });
+      }
+
+      // Explicit read-marking operation (replaces the old GET side
+      // effect). Only a member can mark, and only other members'
+      // messages are affected.
+      if (action === "mark_read") {
+         await prisma.chatMessage.updateMany({
+            where: {
+               conversationId,
+               senderId: { not: session.id },
+               isRead: false,
+            },
+            data: { isRead: true },
+         });
+         return NextResponse.json({ message: "Messages marked as read" });
+      }
+
+      if (!message && (!attachments || attachments.length === 0)) {
          return NextResponse.json({ error: "Message content or attachment is required" }, { status: 400 });
       }
 

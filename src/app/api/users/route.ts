@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, hashPassword } from "@src/lib/auth";
+import { getSessionUser, hashPassword, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 
@@ -54,10 +54,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   // SEC-01 fix: creating accounts (incl. assigning roles) is an
+   // administrator / user-management operation, not something any
+   // signed-in account may do.
+   const gate = await requirePermission(request, [
+      "users",
+      "user",
+      "user_create",
+   ]);
+   if (gate instanceof NextResponse) return gate;
 
    try {
       const body = await request.json();

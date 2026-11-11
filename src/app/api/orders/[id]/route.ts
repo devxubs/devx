@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import {
+   loadStockSettings,
+   applyStockDifference,
+   deductStockForItems,
+   restoreStockForItems,
+   orderHoldsStock,
+   InsufficientStockError,
+} from "@src/lib/stock";
 
 export async function GET(
-   _request: NextRequest,
+   request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
+   const session = getSessionUser(request);
+   if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   }
+
    try {
       const order = await prisma.order.findFirst({
          where: {
@@ -400,8 +413,13 @@ export async function PUT(
          for (const it of rawItems) {
             const qty = Math.max(1, Number(it.quantity) || 1);
             const pr = Math.max(0, Number(it.price) || 0);
-            const sub =
-               Number(it.subtotal) != null ? Number(it.subtotal) : qty * pr;
+            // ORD-03 fix: the old expression `Number(it.subtotal) != null`
+            // is true even when subtotal is missing (Number(undefined)
+            // is NaN, and NaN != null), letting NaN flow into totals.
+            // Subtotals are always recomputed server-side from the
+            // validated quantity × price — client-sent subtotals are
+            // never trusted (fix instruction #10).
+            const sub = qty * pr;
             const name = String(it.name || it.title || "Product Item").trim();
             const code = it.code || it.sku || null;
 
@@ -535,25 +553,40 @@ export async function PUT(
             });
          }
 
-         // Step 4: Calculate net stock difference per product
+         // Step 4: Calculate net stock difference per product.
+         // ORD-02 fix: the difference is computed between the stock
+         // the order EFFECTIVELY held before and after this update.
+         // An order only holds stock while it is neither CANCELLED nor
+         // deleted — so transitioning into CANCELLED releases the full
+         // item quantities, and un-cancelling re-deducts them, instead
+         // of stock leaking on every status change.
+         const wasHoldingStock = orderHoldsStock(existingOrder);
+         const nextStatus =
+            body.status !== undefined ? body.status : existingOrder.status;
+         const willHoldStock = nextStatus !== "CANCELLED";
+
          const stockDiffMap = new Map<string, number>();
 
-         for (const existingIt of existingOrder.items) {
-            if (existingIt.productId) {
-               stockDiffMap.set(
-                  existingIt.productId,
-                  (stockDiffMap.get(existingIt.productId) || 0) -
-                     existingIt.quantity,
-               );
+         if (wasHoldingStock) {
+            for (const existingIt of existingOrder.items) {
+               if (existingIt.productId) {
+                  stockDiffMap.set(
+                     existingIt.productId,
+                     (stockDiffMap.get(existingIt.productId) || 0) -
+                        existingIt.quantity,
+                  );
+               }
             }
          }
 
-         for (const newIt of finalItemsData) {
-            if (newIt.productId) {
-               stockDiffMap.set(
-                  newIt.productId,
-                  (stockDiffMap.get(newIt.productId) || 0) + newIt.quantity,
-               );
+         if (willHoldStock) {
+            for (const newIt of finalItemsData) {
+               if (newIt.productId) {
+                  stockDiffMap.set(
+                     newIt.productId,
+                     (stockDiffMap.get(newIt.productId) || 0) + newIt.quantity,
+                  );
+               }
             }
          }
 
@@ -588,20 +621,29 @@ export async function PUT(
             (sum: number, it) => sum + it.subtotal,
             0,
          );
-         const delivery = Number(
+         // Validate monetary inputs: non-finite client values fall back
+         // to the stored values instead of poisoning totals with NaN.
+         const safeMoney = (value: any, fallback: number) => {
+            const n = Number(value);
+            return Number.isFinite(n) ? Math.max(0, n) : fallback;
+         };
+         const delivery = safeMoney(
             body.deliveryCharge !== undefined
                ? body.deliveryCharge
                : existingOrder.deliveryCharge,
+            Number(existingOrder.deliveryCharge || 0),
          );
-         const discount = Number(
+         const discount = safeMoney(
             body.discount !== undefined
                ? body.discount
                : existingOrder.discount,
+            Number(existingOrder.discount || 0),
          );
-         const advance = Number(
+         const advance = safeMoney(
             body.advancePayment !== undefined
                ? body.advancePayment
                : existingOrder.advancePayment,
+            Number(existingOrder.advancePayment || 0),
          );
          const calculatedTotal = Math.max(
             0,
@@ -675,44 +717,21 @@ export async function PUT(
                });
             }
 
-            // 4. Update inventory and record stock movements
+            // 4. Update inventory and record stock movements via the
+            // shared stock engine: positive differences are validated
+            // against available stock (ORD-01), warehouse stock is
+            // mirrored (INV-01), and movements match the net change.
+            const stockSettings = await loadStockSettings(tx);
             for (const [productId, diff] of stockDiffMap.entries()) {
                if (diff === 0) continue;
-
-               if (diff > 0) {
-                  // Net increase in order qty: decrement available inventory
-                  await tx.product.update({
-                     where: { id: productId },
-                     data: { quantity: { decrement: diff } },
-                  });
-
-                  await tx.stockMovement.create({
-                     data: {
-                        productId,
-                        type: "SALE",
-                        quantity: -diff,
-                        orderId: existingOrder.id,
-                        note: `Order ${existingOrder.orderId || existingOrder.orderCode} items updated (+${diff} ordered)`,
-                     },
-                  });
-               } else {
-                  // Net decrease in order qty: increment available inventory back
-                  const returnedQty = -diff;
-                  await tx.product.update({
-                     where: { id: productId },
-                     data: { quantity: { increment: returnedQty } },
-                  });
-
-                  await tx.stockMovement.create({
-                     data: {
-                        productId,
-                        type: "RETURN",
-                        quantity: returnedQty,
-                        orderId: existingOrder.id,
-                        note: `Order ${existingOrder.orderId || existingOrder.orderCode} items reduced/returned (-${returnedQty})`,
-                     },
-                  });
-               }
+               await applyStockDifference(tx, productId, diff, {
+                  settings: stockSettings,
+                  orderId: existingOrder.id,
+                  increaseNote: (qty) =>
+                     `Order ${existingOrder.orderId || existingOrder.orderCode} items updated (+${qty} ordered)`,
+                  decreaseNote: (qty) =>
+                     `Order ${existingOrder.orderId || existingOrder.orderCode} items reduced/returned (-${qty})`,
+               });
             }
 
             // 4b. Update customer info if provided
@@ -746,13 +765,9 @@ export async function PUT(
                data: {
                   subtotal: calculatedSubtotal,
                   deliveryCharge:
-                     body.deliveryCharge !== undefined
-                        ? parseFloat(body.deliveryCharge)
-                        : undefined,
+                     body.deliveryCharge !== undefined ? delivery : undefined,
                   discount:
-                     body.discount !== undefined
-                        ? parseFloat(body.discount)
-                        : undefined,
+                     body.discount !== undefined ? discount : undefined,
                   total: calculatedTotal,
                   dueAmount: calculatedDue,
                   status: body.status !== undefined ? body.status : undefined,
@@ -773,9 +788,7 @@ export async function PUT(
                         ? body.courierStatus
                         : undefined,
                   advancePayment:
-                     body.advancePayment !== undefined
-                        ? parseFloat(body.advancePayment)
-                        : undefined,
+                     body.advancePayment !== undefined ? advance : undefined,
                   cancellationReason:
                      body.cancellationReason !== undefined
                         ? body.cancellationReason
@@ -806,95 +819,146 @@ export async function PUT(
          return NextResponse.json(updated);
       }
 
-      if (body.customer && existingOrder.customerId) {
-         await prisma.customer.update({
-            where: { id: existingOrder.customerId },
+      // Non-item update path.
+      // ORD-04 fix: financial totals are ALWAYS recomputed server-side
+      // from the stored subtotal and the effective delivery charge /
+      // discount / advance payment. A client-sent dueAmount (or total)
+      // is never trusted — previously it was stored verbatim and could
+      // desynchronise totals from dues.
+      // ORD-02 fix: a status transition into CANCELLED releases the
+      // order's stock; a transition out of CANCELLED re-deducts it
+      // (validated). Both happen in the same transaction as the update.
+      const effectiveDelivery =
+         body.deliveryCharge !== undefined
+            ? Math.max(0, Number(body.deliveryCharge) || 0)
+            : Number(existingOrder.deliveryCharge || 0);
+      const effectiveDiscount =
+         body.discount !== undefined
+            ? Math.max(0, Number(body.discount) || 0)
+            : Number(existingOrder.discount || 0);
+      const effectiveAdvance =
+         body.advancePayment !== undefined
+            ? Math.max(0, Number(body.advancePayment) || 0)
+            : Number(existingOrder.advancePayment || 0);
+      const recomputedTotal = Math.max(
+         0,
+         Number(existingOrder.subtotal || 0) + effectiveDelivery - effectiveDiscount,
+      );
+      const recomputedDue = Math.max(0, recomputedTotal - effectiveAdvance);
+
+      const nextStatus =
+         body.status !== undefined ? body.status : existingOrder.status;
+      const wasHoldingStock = orderHoldsStock(existingOrder);
+      const willHoldStock = nextStatus !== "CANCELLED";
+
+      const updated = await prisma.$transaction(async (tx) => {
+         if (body.customer && existingOrder.customerId) {
+            await tx.customer.update({
+               where: { id: existingOrder.customerId },
+               data: {
+                  name:
+                     body.customer.name !== undefined
+                        ? String(body.customer.name).trim()
+                        : undefined,
+                  phone:
+                     body.customer.phone !== undefined
+                        ? String(body.customer.phone).trim()
+                        : undefined,
+                  address:
+                     body.customer.address !== undefined
+                        ? String(body.customer.address).trim()
+                        : undefined,
+                  email:
+                     body.customer.email !== undefined
+                        ? String(body.customer.email).trim()
+                        : undefined,
+               },
+            });
+         }
+
+         const itemLines = existingOrder.items
+            .filter((it) => it.productId)
+            .map((it) => ({
+               productId: it.productId as string,
+               quantity: it.quantity,
+            }));
+
+         if (wasHoldingStock && !willHoldStock) {
+            await restoreStockForItems(tx, itemLines, {
+               orderId: existingOrder.id,
+               note: `Order ${existingOrder.orderId || existingOrder.orderCode} cancelled — stock restored`,
+            });
+         } else if (!wasHoldingStock && willHoldStock) {
+            const stockSettings = await loadStockSettings(tx);
+            await deductStockForItems(tx, itemLines, {
+               settings: stockSettings,
+               orderId: existingOrder.id,
+               note: `Order ${existingOrder.orderId || existingOrder.orderCode} reactivated — stock deducted`,
+            });
+         }
+
+         return tx.order.update({
+            where: { id: existingOrder.id },
             data: {
-               name:
-                  body.customer.name !== undefined
-                     ? String(body.customer.name).trim()
+               status: body.status !== undefined ? body.status : undefined,
+               orderNote: updatedOrderNote,
+               orderTags: updatedOrderTags,
+               orderSource:
+                  body.orderSource !== undefined ? body.orderSource : undefined,
+               paymentMethod:
+                  body.paymentMethod !== undefined
+                     ? body.paymentMethod
                      : undefined,
-               phone:
-                  body.customer.phone !== undefined
-                     ? String(body.customer.phone).trim()
+               courier: body.courier !== undefined ? body.courier : undefined,
+               courierStatus:
+                  body.courierStatus !== undefined
+                     ? body.courierStatus
                      : undefined,
-               address:
-                  body.customer.address !== undefined
-                     ? String(body.customer.address).trim()
+               deliveryCharge:
+                  body.deliveryCharge !== undefined ? effectiveDelivery : undefined,
+               discount:
+                  body.discount !== undefined ? effectiveDiscount : undefined,
+               advancePayment:
+                  body.advancePayment !== undefined ? effectiveAdvance : undefined,
+               total: recomputedTotal,
+               dueAmount: recomputedDue,
+               cancellationReason:
+                  body.cancellationReason !== undefined
+                     ? body.cancellationReason
                      : undefined,
-               email:
-                  body.customer.email !== undefined
-                     ? String(body.customer.email).trim()
-                     : undefined,
+               deliveredAt: body.deliveredAt
+                  ? new Date(body.deliveredAt)
+                  : undefined,
+            },
+            include: {
+               customer: true,
+               employee: {
+                  select: {
+                     id: true,
+                     name: true,
+                     email: true,
+                     phoneNumber: true,
+                     customId: true,
+                     role: { select: { name: true } },
+                  },
+               },
+               items: { include: { product: true } },
             },
          });
-      }
-
-      const updated = await prisma.order.update({
-         where: { id: existingOrder.id },
-         data: {
-            status: body.status !== undefined ? body.status : undefined,
-            orderNote: updatedOrderNote,
-            orderTags: updatedOrderTags,
-            orderSource:
-               body.orderSource !== undefined ? body.orderSource : undefined,
-            paymentMethod:
-               body.paymentMethod !== undefined
-                  ? body.paymentMethod
-                  : undefined,
-            courier: body.courier !== undefined ? body.courier : undefined,
-            courierStatus:
-               body.courierStatus !== undefined
-                  ? body.courierStatus
-                  : undefined,
-            deliveryCharge:
-               body.deliveryCharge !== undefined
-                  ? parseFloat(body.deliveryCharge)
-                  : undefined,
-            discount:
-               body.discount !== undefined
-                  ? parseFloat(body.discount)
-                  : undefined,
-            advancePayment:
-               body.advancePayment !== undefined
-                  ? parseFloat(body.advancePayment)
-                  : undefined,
-            dueAmount:
-               body.dueAmount !== undefined
-                  ? parseFloat(body.dueAmount)
-                  : undefined,
-            cancellationReason:
-               body.cancellationReason !== undefined
-                  ? body.cancellationReason
-                  : undefined,
-            deliveredAt: body.deliveredAt
-               ? new Date(body.deliveredAt)
-               : undefined,
-         },
-         include: {
-            customer: true,
-            employee: {
-               select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  phoneNumber: true,
-                  customId: true,
-                  role: { select: { name: true } },
-               },
-            },
-            items: { include: { product: true } },
-         },
       });
 
       return NextResponse.json(updated);
    } catch (err: any) {
       console.error("PUT /api/orders/[id] error:", err);
+      if (err instanceof InsufficientStockError) {
+         return NextResponse.json(
+            { error: "Insufficient stock", message: err.message },
+            { status: 400 },
+         );
+      }
+      // ORD-06 fix: do not leak raw internal error messages to clients.
       return NextResponse.json(
-         {
-            error: "Failed to update order",
-            message: err?.message || "Failed to update order",
-         },
+         { error: "Failed to update order" },
          { status: 500 },
       );
    }
@@ -912,9 +976,45 @@ export async function DELETE(
    const { id } = await params;
 
    try {
-      const order = await prisma.order.update({
-         where: { id },
-         data: { isDeleted: true },
+      // ORD-02 fix: soft-deleting an order releases the stock it was
+      // holding, exactly once — the transaction checks the order's
+      // current state first, so a repeated delete (or deleting an
+      // already-cancelled order, whose stock was released at cancel
+      // time) never restores stock twice.
+      const order = await prisma.$transaction(async (tx) => {
+         const existing = await tx.order.findUnique({
+            where: { id },
+            include: { items: true },
+         });
+
+         if (!existing) {
+            throw new Error("Order not found");
+         }
+
+         if (!existing.isDeleted) {
+            if (orderHoldsStock(existing)) {
+               await restoreStockForItems(
+                  tx,
+                  existing.items
+                     .filter((it) => it.productId)
+                     .map((it) => ({
+                        productId: it.productId as string,
+                        quantity: it.quantity,
+                     })),
+                  {
+                     orderId: existing.id,
+                     note: `Order ${existing.orderId || existing.orderCode} deleted — stock restored`,
+                  },
+               );
+            }
+
+            return tx.order.update({
+               where: { id },
+               data: { isDeleted: true },
+            });
+         }
+
+         return existing;
       });
 
       return NextResponse.json({ message: "Order moved to bin", order });

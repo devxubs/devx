@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
    }
 
    try {
-      const [conversations, users] = await Promise.all([
+      const [allConversations, users] = await Promise.all([
          prisma.conversation.findMany({
             orderBy: { updatedAt: "desc" },
             include: {
@@ -32,6 +32,15 @@ export async function GET(request: NextRequest) {
             },
          }),
       ]);
+
+      // CHAT-01 fix (list side): a user only ever sees conversations
+      // they are a member of — previously every conversation in the
+      // system was returned to every signed-in user. Membership is a
+      // JSON array (DB-07), so filtering happens here.
+      const conversations = allConversations.filter((c: any) => {
+         const memberIds: string[] = Array.isArray(c.members) ? c.members : [];
+         return memberIds.includes(session.id);
+      });
 
       // Enrich conversations with other member's identity if direct
       const enrichedConversations = conversations.map((c: any) => {
@@ -85,6 +94,17 @@ export async function PUT(request: NextRequest) {
 
       if (!conv) {
          return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      }
+
+      // CHAT-01 fix: mute/profile actions require membership too.
+      const convMemberIds: string[] = Array.isArray(conv.members)
+         ? (conv.members as string[])
+         : [];
+      if (!convMemberIds.includes(session.id)) {
+         return NextResponse.json(
+            { error: "Forbidden: not a conversation member" },
+            { status: 403 },
+         );
       }
 
       const currentMuted = Array.isArray(conv.mutedUserIds) ? (conv.mutedUserIds as string[]) : [];

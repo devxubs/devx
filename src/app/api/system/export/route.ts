@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireAdmin } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   // SEC-07 fix: a full-database export is administrator-only.
+   const gate = await requireAdmin(request);
+   if (gate instanceof NextResponse) return gate;
+   const session = gate.session;
 
    try {
       const [

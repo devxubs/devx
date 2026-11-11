@@ -1,16 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { getSessionUser, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
+const ROLE_UPDATE_KEYS = ["roles", "role", "role_update_role", "role_update"];
+const ROLE_DELETE_KEYS = ["roles", "role", "role_delete_role", "role_delete"];
+
 export async function GET(
-   _request: NextRequest,
+   request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
+   const session = getSessionUser(request);
+   if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   }
+
    const { id } = await params;
    try {
       const role = await prisma.role.findUnique({
          where: { id },
-         include: { users: true },
+         include: {
+            // Never leak password hashes through the role detail view.
+            users: {
+               select: {
+                  id: true,
+                  customId: true,
+                  name: true,
+                  email: true,
+                  phoneNumber: true,
+                  image: true,
+                  status: true,
+               },
+            },
+         },
       });
 
       if (!role) {
@@ -27,10 +48,8 @@ export async function PUT(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ROLE_UPDATE_KEYS);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
 
@@ -55,10 +74,8 @@ export async function DELETE(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ROLE_DELETE_KEYS);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
 

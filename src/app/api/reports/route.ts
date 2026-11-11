@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { calculateNetProfit } from "@src/lib/finance";
 
 export async function GET(request: NextRequest) {
    const session = getSessionUser(request);
@@ -12,6 +13,17 @@ export async function GET(request: NextRequest) {
    const tab = searchParams.get("tab")?.toLowerCase() || "summary";
    const startDateStr = searchParams.get("startDate");
    const endDateStr = searchParams.get("endDate");
+
+   // RPT-03 fix: row lists are paginated via ?page=&limit= instead of
+   // a silent hard cap. Defaults preserve the historical page size
+   // (100 rows) so existing screens are unchanged; totals/counts in
+   // every tab are computed from the COMPLETE filtered dataset.
+   const page = Math.max(parseInt(searchParams.get("page") || "1", 10) || 1, 1);
+   const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "100", 10) || 100, 1),
+      1000,
+   );
+   const skip = (page - 1) * limit;
 
    const dateFilter: any = {};
    if (startDateStr) dateFilter.gte = new Date(startDateStr);
@@ -28,13 +40,31 @@ export async function GET(request: NextRequest) {
          const whereOrder: any = { isDeleted: false };
          if (hasDate) whereOrder.createdAt = dateFilter;
 
-         const [orders, totalRevenueAgg, completedCount, returnedCount] = await Promise.all([
+         // RPT-01 fix: totalOrders is a real COUNT over the complete
+         // filtered dataset (previously orders.length of a take:100
+         // fetch), and the 7-day trend is computed from a dedicated
+         // query over the last 7 days — not from the paginated rows.
+         const sevenDaysAgo = new Date();
+         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+         sevenDaysAgo.setHours(0, 0, 0, 0);
+         const trendWhere: any = { ...whereOrder };
+         trendWhere.createdAt = {
+            ...(hasDate ? dateFilter : {}),
+            gte:
+               hasDate && dateFilter.gte && dateFilter.gte > sevenDaysAgo
+                  ? dateFilter.gte
+                  : sevenDaysAgo,
+         };
+
+         const [orders, totalOrders, totalRevenueAgg, completedCount, returnedCount, trendOrders] = await Promise.all([
             prisma.order.findMany({
                where: whereOrder,
                include: { customer: true, items: true },
                orderBy: { createdAt: "desc" },
-               take: 100,
+               skip,
+               take: limit,
             }),
+            prisma.order.count({ where: whereOrder }),
             prisma.order.aggregate({
                where: { ...whereOrder, status: { in: ["COMPLETED", "DELIVERED"] } },
                _sum: { total: true },
@@ -45,12 +75,15 @@ export async function GET(request: NextRequest) {
             prisma.order.count({
                where: { ...whereOrder, status: { in: ["CANCELLED", "FAILED"] } },
             }),
+            prisma.order.findMany({
+               where: trendWhere,
+               select: { total: true, createdAt: true },
+            }),
          ]);
 
-         const totalOrders = orders.length;
          const totalRevenue = Number(totalRevenueAgg._sum.total || 0);
 
-         // Generate 7-day revenue trend
+         // Generate 7-day revenue trend from the full trend population
          const now = new Date();
          const trendDays = Array.from({ length: 7 }, (_, i) => {
             const d = new Date(now);
@@ -58,7 +91,7 @@ export async function GET(request: NextRequest) {
             return d.toISOString().split("T")[0];
          });
          const trendData = trendDays.map((day) => {
-            const dayOrders = orders.filter((o) => o.createdAt.toISOString().startsWith(day));
+            const dayOrders = trendOrders.filter((o) => o.createdAt.toISOString().startsWith(day));
             const sum = dayOrders.reduce((acc, o) => acc + Number(o.total || 0), 0);
             return sum;
          });
@@ -69,6 +102,8 @@ export async function GET(request: NextRequest) {
             completedCount,
             returnedCount,
             trendData,
+            page,
+            limit,
             orders: orders.map((o) => ({
                id: o.orderId || o.customId || o.id,
                customer: {
@@ -106,7 +141,8 @@ export async function GET(request: NextRequest) {
                   orderSource: true,
                },
                orderBy: { createdAt: "desc" },
-               take: 100,
+               skip,
+               take: limit,
             }),
             prisma.order.groupBy({
                by: ["courier"],
@@ -157,8 +193,23 @@ export async function GET(request: NextRequest) {
                _count: { select: { orders: true } },
             },
             orderBy: { createdAt: "desc" },
-            take: 100,
+            skip,
+            take: limit,
          });
+
+         // Headline counts describe ALL customers, not just this page.
+         const [totalCustomersAll, orderGroups] = await Promise.all([
+            prisma.customer.count(),
+            prisma.order.groupBy({
+               by: ["customerId"],
+               where: { isDeleted: false, customerId: { not: null } },
+               _count: { id: true },
+            }),
+         ]);
+         const activeCustomersAll = orderGroups.length;
+         const returningCustomersAll = orderGroups.filter(
+            (g) => g._count.id > 1,
+         ).length;
 
          const rows = customers.map((c, idx) => {
             const totalOrders = c.orders.length;
@@ -185,14 +236,12 @@ export async function GET(request: NextRequest) {
             };
          });
 
-         const totalCustomers = customers.length;
-         const activeCustomers = customers.filter((c) => c.orders.length > 0).length;
-         const returningCustomers = customers.filter((c) => c.orders.length > 1).length;
-
          return NextResponse.json({
-            totalCustomers,
-            activeCustomers,
-            returningCustomers,
+            totalCustomers: totalCustomersAll,
+            activeCustomers: activeCustomersAll,
+            returningCustomers: returningCustomersAll,
+            page,
+            limit,
             rows,
          });
       }
@@ -202,22 +251,26 @@ export async function GET(request: NextRequest) {
          const wherePurchase: any = { isDeleted: false };
          if (hasDate) wherePurchase.createdAt = dateFilter;
 
-         const [purchases, totalAgg] = await Promise.all([
+         const [purchases, totalAgg, totalCountAll] = await Promise.all([
             prisma.purchase.findMany({
                where: wherePurchase,
                include: { supplier: true },
                orderBy: { createdAt: "desc" },
-               take: 100,
+               skip,
+               take: limit,
             }),
             prisma.purchase.aggregate({
                where: wherePurchase,
                _sum: { total: true },
             }),
+            prisma.purchase.count({ where: wherePurchase }),
          ]);
 
          return NextResponse.json({
             totalAmount: Number(totalAgg._sum.total || 0),
-            totalCount: purchases.length,
+            totalCount: totalCountAll,
+            page,
+            limit,
             rows: purchases.map((p) => ({
                id: p.customId || p.invoice || p.id,
                supplier: p.supplier?.name || "Direct Supplier",
@@ -258,7 +311,11 @@ export async function GET(request: NextRequest) {
                   name: u.name || "Employee",
                   email: u.email,
                   role: u.role?.name || "Staff",
-                  calls: ordersHandled * 3 + completedSales * 2,
+                  // RPT-02 fix: "calls" was fabricated
+                  // (ordersHandled * 3 + completedSales * 2) — no call
+                  // data exists anywhere in the system. Report null
+                  // (unavailable) instead of invented statistics.
+                  calls: null,
                   conforms: completedSales,
                   cancels: cancelledCount,
                   revenue,
@@ -279,12 +336,13 @@ export async function GET(request: NextRequest) {
 
       // 6. PRODUCTS REPORT
       if (tab === "products") {
-         const [allProducts, lowStockProducts, topSold] = await Promise.all([
+         const [allProducts, lowStockProducts, topSold, stockAgg, outOfStockAll] = await Promise.all([
             prisma.product.findMany({
                where: { isDeleted: false },
                select: { id: true, customId: true, productName: true, quantity: true, regularPrice: true, lowStockAlert: true },
                orderBy: { quantity: "asc" },
-               take: 100,
+               skip,
+               take: limit,
             }),
             prisma.product.findMany({
                where: { isDeleted: false, quantity: { lte: 10 } },
@@ -297,10 +355,18 @@ export async function GET(request: NextRequest) {
                orderBy: { _sum: { quantity: "desc" } },
                take: 5,
             }),
+            // Headline figures cover the complete catalogue, not the page.
+            prisma.product.aggregate({
+               where: { isDeleted: false },
+               _sum: { quantity: true },
+            }),
+            prisma.product.count({
+               where: { isDeleted: false, quantity: 0 },
+            }),
          ]);
 
-         const totalInStock = allProducts.reduce((sum, p) => sum + p.quantity, 0);
-         const outOfStockCount = allProducts.filter((p) => p.quantity === 0).length;
+         const totalInStock = Number(stockAgg._sum.quantity || 0);
+         const outOfStockCount = outOfStockAll;
          const lowStockCount = lowStockProducts.length;
 
          return NextResponse.json({
@@ -338,7 +404,8 @@ export async function GET(request: NextRequest) {
             prisma.expense.findMany({
                where: whereExpense,
                orderBy: { createdAt: "desc" },
-               take: 100,
+               skip,
+               take: limit,
             }),
             prisma.expense.aggregate({
                where: whereExpense,
@@ -415,7 +482,8 @@ export async function GET(request: NextRequest) {
       const totalRevenue = Number(totalRevenueAgg._sum.total || 0);
       const totalExpenses = Number(totalExpensesAgg._sum.amount || 0);
       const totalPurchases = Number(totalPurchasesAgg._sum.total || 0);
-      const netProfit = totalRevenue - totalExpenses - totalPurchases;
+      // DB/API-07 fix: single shared profit definition (see lib/finance).
+      const netProfit = calculateNetProfit(totalRevenue, totalExpenses, totalPurchases);
 
       return NextResponse.json({
          totalRevenue,

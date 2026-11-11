@@ -1,44 +1,77 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { getSessionUser, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
+/**
+ * Default settings, mirroring the Prisma schema defaults exactly
+ * (SET-02 fix). Returned by GET when the singleton row has not been
+ * created yet — a read must never write to the database, and the
+ * previous route-created copy disagreed with the schema
+ * (e.g. defaultTaxRate 5.0 here vs @default(0) in schema.prisma).
+ * The row is first persisted by an authorised PUT (which upserts).
+ */
+const DEFAULT_SETTINGS = {
+   id: "default",
+   storeName: "DevX POS",
+   tagline: "Smart Retail & Point of Sale",
+   logoUrl: "",
+   email: "info@devxpos.com",
+   phone: "+880 1700-000000",
+   address: "Dhaka, Bangladesh",
+   currency: "BDT",
+   currencySymbol: "৳",
+   timezone: "Asia/Dhaka",
+   dateFormat: "DD/MM/YYYY",
+   language: "en",
+   defaultTaxRate: 0,
+   defaultDeliveryCharge: 60,
+   defaultDiscountRate: 0,
+   invoicePrefix: "INV",
+   orderPrefix: "#",
+   enableStockValidation: true,
+   defaultPaymentMethod: "Cash",
+   defaultLowStockAlert: 10,
+   autoGenerateSku: true,
+   autoGenerateBarcode: true,
+   receiptPaperSize: "80mm",
+   invoiceHeader: "DevX POS - Retail Invoice",
+   invoiceFooter: "Thank you for shopping with us! Please come again.",
+   showLogoOnReceipt: true,
+   showBarcodeOnReceipt: true,
+   themeMode: "dark",
+   themeColor: "primary",
+   enableLowStockAlert: true,
+   notifyEmail: "admin@devxpos.com",
+   prefixEmployee: "EP_",
+   prefixCustomer: "CUS_",
+   prefixSupplier: "SUP_",
+   prefixOrder: "ORD_",
+   prefixPurchase: "PUR_",
+   prefixProduct: "PROD_",
+   prefixCategory: "CAT_",
+   prefixUnit: "UNIT_",
+   prefixExpense: "EXP_",
+   prefixAsset: "AST_",
+   prefixRole: "ROLE_",
+   prefixBilling: "BILL_",
+   prefixWarehouse: "WH_",
+   customConfig: null,
+};
+
 export async function GET(request: NextRequest) {
+   // SET-02 fix: settings are business configuration — authentication
+   // required (previously any anonymous caller could read them).
+   const session = getSessionUser(request);
+   if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   }
+
    try {
-      let settings = await prisma.storeSetting.findUnique({
+      const settings = await prisma.storeSetting.findUnique({
          where: { id: "default" },
       });
 
-      if (!settings) {
-         settings = await prisma.storeSetting.create({
-            data: {
-               id: "default",
-               storeName: "DevX POS",
-               tagline: "Smart Retail & Point of Sale",
-               currency: "BDT",
-               currencySymbol: "৳",
-               timezone: "Asia/Dhaka",
-               dateFormat: "DD/MM/YYYY",
-               language: "en",
-               defaultTaxRate: 5.0,
-               defaultDeliveryCharge: 60.0,
-               defaultDiscountRate: 0.0,
-               invoicePrefix: "INV",
-               orderPrefix: "#",
-               enableStockValidation: true,
-               defaultPaymentMethod: "Cash",
-               defaultLowStockAlert: 10,
-               receiptPaperSize: "80mm",
-               invoiceHeader: "DevX POS - Retail Invoice",
-               invoiceFooter: "Thank you for shopping with us! Please come again.",
-               themeMode: "dark",
-               themeColor: "primary",
-               enableLowStockAlert: true,
-               notifyEmail: "admin@devxpos.com",
-            },
-         });
-      }
-
-      return NextResponse.json(settings);
+      return NextResponse.json(settings ?? DEFAULT_SETTINGS);
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch settings" },
@@ -48,10 +81,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   // SEC-01 fix: changing store settings requires the settings
+   // permission (or admin).
+   const gate = await requirePermission(request, [
+      "settings",
+      "setting",
+      "setting_update_setting",
+      "setting_update",
+   ]);
+   if (gate instanceof NextResponse) return gate;
 
    try {
       const body = await request.json();

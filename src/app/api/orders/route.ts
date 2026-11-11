@@ -3,6 +3,11 @@ import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { calculateOrderTotals } from "@src/lib/utils";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   loadStockSettings,
+   deductStockForItems,
+   InsufficientStockError,
+} from "@src/lib/stock";
 
 export async function GET(request: NextRequest) {
    const session = getSessionUser(request);
@@ -130,11 +135,19 @@ export async function GET(request: NextRequest) {
    }
 
    // 6. Employee filter
+   // ORD-05 fix: this used to append into the same top-level OR array
+   // as the text search, turning "search AND employee" into
+   // "search OR employee". Keep each filter dimension in its own
+   // AND-ed OR group so filters always combine restrictively.
    if (employee && employee !== "All") {
-      where.OR = [
-         ...(where.OR || []),
-         { employeeId: employee },
-         { employee: { name: { contains: employee } } },
+      where.AND = [
+         ...(where.AND || []),
+         {
+            OR: [
+               { employeeId: employee },
+               { employee: { name: { contains: employee } } },
+            ],
+         },
       ];
    }
 
@@ -403,17 +416,33 @@ export async function POST(request: NextRequest) {
             if (customer.id) {
                customerId = customer.id;
             } else {
-               const { customId: cusId } = await generateNextEntityId("CUSTOMER", tx);
-               const newCustomer = await tx.customer.create({
-                  data: {
-                     customId: cusId,
-                     name: customer.name,
-                     email: customer.email || null,
-                     phone: customer.phone || null,
-                     address: customer.address || null,
-                  },
-               });
-               customerId = newCustomer.id;
+               // CUS-01 fix: reuse an existing customer with the same
+               // phone number instead of minting a duplicate record on
+               // every order.
+               const normalizedPhone = customer.phone
+                  ? String(customer.phone).replace(/[\s-]/g, "")
+                  : null;
+               const existingByPhone = normalizedPhone
+                  ? await tx.customer.findFirst({
+                       where: { phone: normalizedPhone, isDeleted: false },
+                    })
+                  : null;
+
+               if (existingByPhone) {
+                  customerId = existingByPhone.id;
+               } else {
+                  const { customId: cusId } = await generateNextEntityId("CUSTOMER", tx);
+                  const newCustomer = await tx.customer.create({
+                     data: {
+                        customId: cusId,
+                        name: customer.name,
+                        email: customer.email || null,
+                        phone: normalizedPhone,
+                        address: customer.address || null,
+                     },
+                  });
+                  customerId = newCustomer.id;
+               }
             }
          }
 
@@ -456,33 +485,42 @@ export async function POST(request: NextRequest) {
             },
          });
 
-         // Decrement inventory and record stock movements
-         for (const item of products) {
-            if (item.id) {
-               await tx.product.update({
-                  where: { id: item.id },
-                  data: {
-                     quantity: { decrement: Number(item.quantity) || 1 },
-                  },
-               });
-
-               await tx.stockMovement.create({
-                  data: {
-                     productId: item.id,
-                     type: "SALE",
-                     quantity: -(Number(item.quantity) || 1),
-                     orderId: createdOrder.id,
-                     note: `POS Order ${orderId}`,
-                  },
-               });
-            }
+         // Decrement inventory and record stock movements.
+         // ORD-01/SET-01 fix: availability is validated inside this
+         // transaction via the shared stock engine, honouring
+         // StoreSetting.enableStockValidation and per-product
+         // allowNegativeStock; warehouse stock is mirrored (INV-01).
+         // An order created directly in CANCELLED status never holds
+         // stock, so no deduction happens for it.
+         if ((status?.toUpperCase() || "PENDING") !== "CANCELLED") {
+            const stockSettings = await loadStockSettings(tx);
+            await deductStockForItems(
+               tx,
+               createdOrder.items
+                  .filter((it) => it.productId)
+                  .map((it) => ({
+                     productId: it.productId as string,
+                     quantity: it.quantity,
+                  })),
+               {
+                  settings: stockSettings,
+                  orderId: createdOrder.id,
+                  note: `POS Order ${orderId}`,
+               },
+            );
          }
 
          return createdOrder;
       });
 
       return NextResponse.json(order, { status: 201 });
-   } catch {
+   } catch (err) {
+      if (err instanceof InsufficientStockError) {
+         return NextResponse.json(
+            { error: "Insufficient stock", message: err.message },
+            { status: 400 },
+         );
+      }
       return NextResponse.json(
          { error: "Failed to create order" },
          { status: 500 },

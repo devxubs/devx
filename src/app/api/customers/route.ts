@@ -67,6 +67,34 @@ export async function POST(request: NextRequest) {
          );
       }
 
+      // CUS-01 fix: validate phone format and prevent duplicate
+      // customer records for the same phone number. Existing records
+      // are never merged or deleted automatically — the caller gets
+      // the existing record's identity back and can use it instead.
+      const normalizedPhone = phone ? String(phone).replace(/[\s-]/g, "") : null;
+      if (normalizedPhone && !/^\+?[0-9]{7,15}$/.test(normalizedPhone)) {
+         return NextResponse.json(
+            { error: "Invalid phone number format" },
+            { status: 400 },
+         );
+      }
+
+      if (normalizedPhone) {
+         const duplicate = await prisma.customer.findFirst({
+            where: { phone: normalizedPhone, isDeleted: false },
+            select: { id: true, customId: true, name: true },
+         });
+         if (duplicate) {
+            return NextResponse.json(
+               {
+                  error: "A customer with this phone number already exists",
+                  existingCustomer: duplicate,
+               },
+               { status: 409 },
+            );
+         }
+      }
+
       const { customId } = await generateNextEntityId("CUSTOMER");
 
       const customer = await prisma.customer.create({
@@ -74,7 +102,7 @@ export async function POST(request: NextRequest) {
             customId,
             name,
             email: email || null,
-            phone: phone || null,
+            phone: normalizedPhone,
             address: address || null,
          },
       });

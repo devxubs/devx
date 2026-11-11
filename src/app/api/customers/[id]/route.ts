@@ -3,10 +3,15 @@ import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 export async function GET(
-   _request: NextRequest,
+   request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
+   const session = getSessionUser(request);
+   if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   }
+
    try {
       const customer = await prisma.customer.findFirst({
          where: {
@@ -199,12 +204,46 @@ export async function PUT(
 
    try {
       const body = await request.json();
+
+      // CUS-01 fix: same phone validation / duplicate guard as create.
+      let normalizedPhone: string | undefined;
+      if (body.phone !== undefined) {
+         normalizedPhone = body.phone
+            ? String(body.phone).replace(/[\s-]/g, "")
+            : "";
+         if (normalizedPhone && !/^\+?[0-9]{7,15}$/.test(normalizedPhone)) {
+            return NextResponse.json(
+               { error: "Invalid phone number format" },
+               { status: 400 },
+            );
+         }
+         if (normalizedPhone) {
+            const duplicate = await prisma.customer.findFirst({
+               where: {
+                  phone: normalizedPhone,
+                  isDeleted: false,
+                  id: { not: id },
+               },
+               select: { id: true, customId: true, name: true },
+            });
+            if (duplicate) {
+               return NextResponse.json(
+                  {
+                     error: "A customer with this phone number already exists",
+                     existingCustomer: duplicate,
+                  },
+                  { status: 409 },
+               );
+            }
+         }
+      }
+
       const updated = await prisma.customer.update({
          where: { id },
          data: {
             name: body.name !== undefined ? body.name.trim() : undefined,
             email: body.email !== undefined ? body.email.trim() : undefined,
-            phone: body.phone !== undefined ? body.phone.trim() : undefined,
+            phone: normalizedPhone,
             address: body.address !== undefined ? body.address : undefined,
          },
       });

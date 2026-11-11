@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
    return NextResponse.json({
       user: {
          ...user,
-         role: user.role?.name || "System Admin",
+         // AUTH-UI-01 fix: never present a role-less account as an
+         // administrator. Fall back to the neutral "Staff" label used
+         // by the users API.
+         role: user.role?.name || "Staff",
          roleDetails: user.role,
       },
    });

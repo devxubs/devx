@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { getSessionUser, requireAdmin } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import {
+   loadStockSettings,
+   deductStockForItems,
+   addStockForPurchaseItems,
+   InsufficientStockError,
+} from "@src/lib/stock";
 
 export async function GET(request: NextRequest) {
    const session = getSessionUser(request);
@@ -16,7 +22,6 @@ export async function GET(request: NextRequest) {
          purchases,
          expenses,
          assets,
-         users,
          customers,
          categories,
          units,
@@ -44,10 +49,6 @@ export async function GET(request: NextRequest) {
          prisma.asset.findMany({
             where: { isDeleted: true },
             select: { id: true, customId: true, name: true, value: true, updatedAt: true },
-         }),
-         prisma.user.findMany({
-            where: { status: { in: ["INACTIVE", "SUSPENDED"] } },
-            select: { id: true, customId: true, name: true, email: true, updatedAt: true },
          }),
          prisma.customer.findMany({
             where: { isDeleted: true },
@@ -127,13 +128,11 @@ export async function GET(request: NextRequest) {
             name: `Unit: ${u.name}`,
             deletedAt: u.updatedAt || new Date(),
          })),
-         ...users.map((u) => ({
-            id: u.id,
-            customId: u.customId || "EP",
-            type: "user",
-            name: u.name || u.email,
-            deletedAt: u.updatedAt,
-         })),
+         // BIN-01 fix: INACTIVE/SUSPENDED users are NOT deleted
+         // records and no longer appear in the Recycle Bin. The User
+         // model has no soft-delete flag; account status is managed
+         // from User Management. Previously, "restoring" a suspended
+         // employee from the bin silently reactivated them as ACTIVE.
       ];
 
       return NextResponse.json(items);
@@ -143,10 +142,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   // SEC-01 fix: restore and (especially) permanent deletion from the
+   // recycle bin are administrator-only operations.
+   const gate = await requireAdmin(request);
+   if (gate instanceof NextResponse) return gate;
 
    try {
       const body = await request.json();
@@ -161,11 +160,17 @@ export async function POST(request: NextRequest) {
       // 1. USER HANDLING
       if (type === "user") {
          if (action === "restore") {
-            await prisma.user.update({
-               where: { id },
-               data: { status: "ACTIVE" },
-            });
-            return NextResponse.json({ message: "Employee restored successfully" });
+            // BIN-01 fix: users are never soft-deleted, so there is
+            // nothing to "restore" — and blindly setting ACTIVE here
+            // used to reactivate accounts that had been suspended on
+            // purpose. Status changes belong to User Management.
+            return NextResponse.json(
+               {
+                  error:
+                     "Users are not deleted records. Manage account status (Active / Inactive / Suspended) from User Management.",
+               },
+               { status: 400 },
+            );
          } else if (action === "delete") {
             await prisma.$transaction([
                prisma.order.updateMany({ where: { employeeId: id }, data: { employeeId: null } }),
@@ -180,9 +185,37 @@ export async function POST(request: NextRequest) {
       // 2. ORDER HANDLING
       if (type === "order") {
          if (action === "restore") {
-            await prisma.order.update({
-               where: { id },
-               data: { isDeleted: false },
+            // BIN-02/ORD-02 fix: soft-deleting the order released its
+            // stock, so restoring must deduct it again (validated,
+            // same transaction) — unless the order is CANCELLED, in
+            // which case it holds no stock either way.
+            await prisma.$transaction(async (tx) => {
+               const order = await tx.order.findUnique({
+                  where: { id },
+                  include: { items: true },
+               });
+               if (!order) throw new Error("Order not found");
+               if (order.isDeleted && order.status !== "CANCELLED") {
+                  const stockSettings = await loadStockSettings(tx);
+                  await deductStockForItems(
+                     tx,
+                     order.items
+                        .filter((it) => it.productId)
+                        .map((it) => ({
+                           productId: it.productId as string,
+                           quantity: it.quantity,
+                        })),
+                     {
+                        settings: stockSettings,
+                        orderId: order.id,
+                        note: `Order ${order.orderId || order.customId} restored from bin — stock deducted`,
+                     },
+                  );
+               }
+               await tx.order.update({
+                  where: { id },
+                  data: { isDeleted: false },
+               });
             });
             return NextResponse.json({ message: "Order restored successfully" });
          } else if (action === "delete") {
@@ -197,9 +230,33 @@ export async function POST(request: NextRequest) {
       // 3. PURCHASE HANDLING
       if (type === "purchase") {
          if (action === "restore") {
-            await prisma.purchase.update({
-               where: { id },
-               data: { isDeleted: false },
+            // PUR-03 mirror: soft-deleting reversed the purchase's
+            // stock, so restoring re-adds it in the same transaction.
+            await prisma.$transaction(async (tx) => {
+               const purchase = await tx.purchase.findUnique({
+                  where: { id },
+                  include: { items: true },
+               });
+               if (!purchase) throw new Error("Purchase not found");
+               if (purchase.isDeleted) {
+                  await addStockForPurchaseItems(
+                     tx,
+                     purchase.items
+                        .filter((it) => it.productId)
+                        .map((it) => ({
+                           productId: it.productId as string,
+                           quantity: it.quantity,
+                        })),
+                     {
+                        purchaseId: purchase.id,
+                        note: `Purchase ${purchase.customId} restored from bin — stock re-added`,
+                     },
+                  );
+               }
+               await tx.purchase.update({
+                  where: { id },
+                  data: { isDeleted: false },
+               });
             });
             return NextResponse.json({ message: "Purchase restored successfully" });
          } else if (action === "delete") {
@@ -238,8 +295,29 @@ export async function POST(request: NextRequest) {
             });
             return NextResponse.json({ message: "Product restored successfully" });
          } else if (action === "delete") {
+            // Fix instruction #31 / DB-01 / DB-04: permanent product
+            // deletion must not destroy the StockMovement audit trail.
+            // StockMovement.product is a required FK, so a product
+            // with movement history cannot be removed without erasing
+            // that history — reject safely instead. Bundle-component
+            // links (configuration, not history) are cleaned up first
+            // so they no longer block deletion with a raw FK error.
+            const movementCount = await prisma.stockMovement.count({
+               where: { productId: id },
+            });
+            if (movementCount > 0) {
+               return NextResponse.json(
+                  {
+                     error:
+                        "This product has stock movement history and cannot be permanently deleted without destroying the inventory audit trail. Keep it in the Recycle Bin (soft-deleted) instead.",
+                  },
+                  { status: 409 },
+               );
+            }
             await prisma.$transaction([
-               prisma.stockMovement.deleteMany({ where: { productId: id } }),
+               prisma.productBundleItem.deleteMany({
+                  where: { componentProductId: id },
+               }),
                prisma.product.delete({ where: { id } }),
             ]);
             return NextResponse.json({ message: "Product permanently deleted" });
@@ -324,6 +402,13 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ error: "Unsupported entity type or action" }, { status: 400 });
    } catch (error: any) {
-      return NextResponse.json({ error: error.message || "Failed to process bin item" }, { status: 500 });
+      if (error instanceof InsufficientStockError) {
+         return NextResponse.json(
+            { error: "Insufficient stock", message: error.message },
+            { status: 400 },
+         );
+      }
+      console.error("POST /api/bin error:", error);
+      return NextResponse.json({ error: "Failed to process bin item" }, { status: 500 });
    }
 }

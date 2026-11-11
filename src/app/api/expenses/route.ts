@@ -58,13 +58,23 @@ export async function POST(request: NextRequest) {
          );
       }
 
+      // EXP-01 fix: reject non-numeric amounts with 400 instead of
+      // persisting NaN / throwing a 500.
+      const parsedAmount = parseFloat(amount);
+      if (!Number.isFinite(parsedAmount)) {
+         return NextResponse.json(
+            { error: "Expense amount must be a valid number" },
+            { status: 400 },
+         );
+      }
+
       const { customId } = await generateNextEntityId("EXPENSE");
 
       const expense = await prisma.expense.create({
          data: {
             customId,
             type,
-            amount: parseFloat(amount),
+            amount: parsedAmount,
             note: note || null,
             createdById: session.id,
          },

@@ -3,10 +3,15 @@ import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 export async function GET(
-   _request: NextRequest,
+   request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
+   const session = getSessionUser(request);
+   if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   }
+
    try {
       const category = await prisma.category.findUnique({
          where: { id },

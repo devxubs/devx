@@ -83,7 +83,18 @@ async function main() {
          },
       });
    } else {
-      const hashedPassword = await bcrypt.hash("admin123456", 12);
+      // SEC-06 fix: never seed a publicly-known default password.
+      // Set SEED_ADMIN_PASSWORD in the environment before running the
+      // seed; the old hard-coded value must be considered compromised
+      // (it was committed to a public repository) and rotated anywhere
+      // it was ever used.
+      const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+      if (!adminPassword) {
+         throw new Error(
+            "SEED_ADMIN_PASSWORD environment variable is required to seed the admin account.",
+         );
+      }
+      const hashedPassword = await bcrypt.hash(adminPassword, 12);
       adminUser = await prisma.user.create({
          data: {
             email: "devxub@gmail.com",
@@ -97,8 +108,14 @@ async function main() {
       });
    }
 
-   // Create secondary staff user
-   const cashierHashedPassword = await bcrypt.hash("cashier123", 12);
+   // Create secondary staff user (SEC-06 fix: password from env only)
+   const cashierPassword = process.env.SEED_CASHIER_PASSWORD;
+   if (!cashierPassword) {
+      throw new Error(
+         "SEED_CASHIER_PASSWORD environment variable is required to seed the cashier account.",
+      );
+   }
+   const cashierHashedPassword = await bcrypt.hash(cashierPassword, 12);
    await prisma.user.upsert({
       where: { email: "cashier@devxpos.com" },
       update: {},

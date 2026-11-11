@@ -9,6 +9,7 @@ import {
    useMediaQuery,
 } from "@mui/material";
 import Icon from "./Icon";
+import { sanitizeHtml } from "@src/lib/sanitizeHtml";
 
 type DialogType = "delete" | "confirm" | "success" | "error" | "warning";
 
@@ -72,7 +73,13 @@ const AlertDialog: React.FC<AlertDialogProps> = ({
          <Stack spacing={2} py={2}>
             <Typography
                variant="body2"
-               dangerouslySetInnerHTML={{ __html: title }}
+               // SEC-05 fix: titles interpolate entity names (products,
+               // invoices, customers...) — sanitize before rendering as
+               // HTML so a crafted name cannot execute markup in
+               // another user's browser. Legitimate formatting tags
+               // used by callers (e.g. <b>) survive sanitizeHtml, so
+               // the rendered output is unchanged.
+               dangerouslySetInnerHTML={{ __html: sanitizeHtml(title) }}
             />
             <Stack
                direction={isMobile ? "column" : "row"}

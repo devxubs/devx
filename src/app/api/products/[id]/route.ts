@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { adjustWarehouseStock } from "@src/lib/stock";
 
 export async function GET(
-   _request: NextRequest,
+   request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
+   const session = getSessionUser(request);
+   if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   }
+
    const product = await prisma.product.findFirst({
       where: {
          OR: [{ id }, { customId: id }, { productCode: id }, { productSku: id }],
@@ -196,6 +202,8 @@ export async function PUT(
                   note: qtyDiff > 0 ? `Stock manual increment (+${qtyDiff})` : `Stock manual decrement (${qtyDiff})`,
                },
             });
+            // INV-01: keep warehouse stock in step with direct edits.
+            await adjustWarehouseStock(tx, p.id, qtyDiff);
          }
 
          // Update Variants (if Variable product)

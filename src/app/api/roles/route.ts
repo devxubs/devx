@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { getSessionUser, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 
@@ -24,10 +24,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   // SEC-01 fix: role creation defines the permission model itself —
+   // administrator / role-management permission required.
+   const gate = await requirePermission(request, [
+      "roles",
+      "role",
+      "role_create_role",
+      "role_create",
+   ]);
+   if (gate instanceof NextResponse) return gate;
 
    try {
       const body = await request.json();

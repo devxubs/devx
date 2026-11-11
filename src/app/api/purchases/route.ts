@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import { addStockForPurchaseItems } from "@src/lib/stock";
 
 export async function GET(request: NextRequest) {
    const session = getSessionUser(request);
@@ -60,21 +61,97 @@ export async function POST(request: NextRequest) {
          supplierId,
          invoice,
          items = [],
-         productAmount = 0,
          othersCost = 0,
          discount = 0,
          paid = 0,
          note,
       } = body;
 
-      const total = Number(productAmount) + Number(othersCost) - Number(discount);
-      const due = Math.max(0, total - Number(paid));
+      if (!Array.isArray(items)) {
+         return NextResponse.json(
+            { error: "Purchase items must be an array" },
+            { status: 400 },
+         );
+      }
+
+      // Validate + normalise items, then recompute every total on the
+      // server (PUR-02 fix: the client-sent productAmount is never
+      // trusted — totals derive from validated items × prices).
+      const safeMoney = (value: any) => {
+         const n = Number(value);
+         return Number.isFinite(n) ? Math.max(0, n) : 0;
+      };
+
+      const normalizedItems = items.map((item: any) => {
+         const quantity = Math.max(1, parseInt(item.quantity) || 1);
+         const price = safeMoney(item.price);
+         return {
+            productId: item.productId || null,
+            name: item.name || "Unknown Item",
+            code: item.code || null,
+            quantity,
+            price,
+            subtotal: parseFloat((quantity * price).toFixed(2)),
+         };
+      });
+
+      const productAmount = parseFloat(
+         normalizedItems.reduce((sum, it) => sum + it.subtotal, 0).toFixed(2),
+      );
+      const others = safeMoney(othersCost);
+      const disc = safeMoney(discount);
+      const paidAmount = safeMoney(paid);
+      const total = Math.max(0, productAmount + others - disc);
+      const due = Math.max(0, total - paidAmount);
+
+      // Validate references before writing anything (fix instruction
+      // #14): supplier and every item product must exist.
+      if (supplierId) {
+         const supplier = await prisma.supplier.findUnique({
+            where: { id: supplierId },
+         });
+         if (!supplier) {
+            return NextResponse.json(
+               { error: "Supplier not found" },
+               { status: 400 },
+            );
+         }
+      }
+
+      const itemProductIds = Array.from(
+         new Set(
+            normalizedItems
+               .map((it) => it.productId)
+               .filter((id): id is string => Boolean(id)),
+         ),
+      );
+      if (itemProductIds.length > 0) {
+         const found = await prisma.product.findMany({
+            where: { id: { in: itemProductIds } },
+            select: { id: true },
+         });
+         const foundIds = new Set(found.map((p) => p.id));
+         const invalid = itemProductIds.filter((id) => !foundIds.has(id));
+         if (invalid.length > 0) {
+            return NextResponse.json(
+               {
+                  error: "Invalid product reference",
+                  message: `Product(s) not found: ${invalid.join(", ")}`,
+               },
+               { status: 400 },
+            );
+         }
+      }
 
       const purchase = await prisma.$transaction(async (tx) => {
          const { customId } = await generateNextEntityId("PURCHASE", tx);
-         const invoiceNumber = (invoice && String(invoice).trim())
+         // PUR-01 fix: never fabricate a supplier invoice number. The
+         // column is non-nullable, so an absent supplier invoice is
+         // stored as an empty string — visibly "not provided" instead
+         // of a fake INV-<timestamp> that looks like a real invoice.
+         const invoiceNumber = invoice && String(invoice).trim()
             ? String(invoice).trim()
-            : `INV-${Date.now().toString().slice(-6)}`;
+            : "";
 
          const newPurchase = await tx.purchase.create({
             data: {
@@ -82,22 +159,15 @@ export async function POST(request: NextRequest) {
                invoice: invoiceNumber,
                supplierId: supplierId || null,
                productAmount,
-               othersCost,
-               discount,
+               othersCost: others,
+               discount: disc,
                total,
-               paid,
+               paid: paidAmount,
                due,
                note: note || undefined,
                createdById: session.id || undefined,
                items: {
-                  create: items.map((item: any) => ({
-                     productId: item.productId || null,
-                     name: item.name || "Unknown Item",
-                     code: item.code || null,
-                     quantity: parseInt(item.quantity) || 1,
-                     price: parseFloat(item.price) || 0,
-                     subtotal: (parseInt(item.quantity) || 1) * (parseFloat(item.price) || 0),
-                  })),
+                  create: normalizedItems,
                },
             },
             include: {
@@ -106,32 +176,29 @@ export async function POST(request: NextRequest) {
             },
          });
 
-         // Increase inventory & create stock movement for matched products
-         for (const item of items) {
-            if (item.productId) {
-               const qty = parseInt(item.quantity) || 1;
-               await tx.product.update({
-                  where: { id: item.productId },
-                  data: { quantity: { increment: qty } },
-               });
-
-               await tx.stockMovement.create({
-                  data: {
-                     productId: item.productId,
-                     type: "PURCHASE",
-                     quantity: qty,
-                     note: `Purchase ${newPurchase.customId} (Invoice: ${invoiceNumber})`,
-                     purchaseId: newPurchase.id,
-                  },
-               });
-            }
-         }
+         // Increase inventory & record stock movements (shared engine —
+         // also mirrors warehouse stock, INV-01).
+         await addStockForPurchaseItems(
+            tx,
+            normalizedItems
+               .filter((it) => it.productId)
+               .map((it) => ({
+                  productId: it.productId as string,
+                  quantity: it.quantity,
+               })),
+            {
+               purchaseId: newPurchase.id,
+               note: `Purchase ${newPurchase.customId} (Invoice: ${invoiceNumber || "—"})`,
+            },
+         );
 
          return newPurchase;
       });
 
       return NextResponse.json(purchase, { status: 201 });
    } catch (error: any) {
-      return NextResponse.json({ error: error.message || "Failed to create purchase" }, { status: 500 });
+      console.error("POST /api/purchases error:", error);
+      // ORD-06 pattern: never leak raw internal error messages.
+      return NextResponse.json({ error: "Failed to create purchase" }, { status: 500 });
    }
 }
