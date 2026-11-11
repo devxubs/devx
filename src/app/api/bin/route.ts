@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, requireAdmin } from "@src/lib/auth";
+import { requireAdmin } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import {
    loadStockSettings,
@@ -9,10 +9,12 @@ import {
 } from "@src/lib/stock";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   // R-2 fix (Final Review): Recycle Bin contents are deleted business
+   // records — reading them requires the same administrator
+   // authorization as the bin mutations in POST below, not just any
+   // login. Unauthenticated requests still receive 401 from the guard.
+   const gate = await requireAdmin(request);
+   if (gate instanceof NextResponse) return gate;
 
    try {
       const [

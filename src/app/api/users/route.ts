@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, hashPassword, requirePermission } from "@src/lib/auth";
+import { hashPassword, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   // R-1 fix (Final Review): the staff list exposes every employee's
+   // email, phone, salary and status, so a bare login is not enough —
+   // require the same `users` permission family as user management
+   // (POST below, users/[id]). Roles without it receive 403;
+   // unauthenticated requests still receive 401 from the guard.
+   const gate = await requirePermission(request, [
+      "users",
+      "user",
+      "user_view",
+      "user_view_user",
+   ]);
+   if (gate instanceof NextResponse) return gate;
 
    const { searchParams } = new URL(request.url);
    const search = searchParams.get("search")?.trim() || "";
