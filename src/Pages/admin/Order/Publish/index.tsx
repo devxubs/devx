@@ -35,7 +35,6 @@ import PaymentSection from "../create/PaymentSection";
 import ChargesSection from "../create/ChargesSection";
 import OrderSummaryPanel from "../create/OrderSummaryPanel";
 import NotesSection from "../create/NotesSection";
-import InvoicePrint from "../create/InvoicePrint";
 
 const toTitleStatus = (s?: string | null) =>
    s
@@ -52,10 +51,6 @@ const Publish = () => {
    const oc = useOrderCreate();
    const { form, patch, totals } = oc;
 
-   const [editOrderMeta, setEditOrderMeta] = useState<{
-      orderId: string;
-      invoiceNo: string;
-   } | null>(null);
    const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
    const [snackbar, setSnackbar] = useState<{
       type: "success" | "error" | "info";
@@ -87,10 +82,6 @@ const Publish = () => {
             const o = await res.json();
             if (cancelled) return;
             const tags = (o.orderTags || {}) as any;
-            setEditOrderMeta({
-               orderId: o.orderId || o.customId || "",
-               invoiceNo: o.invoiceNo || "",
-            });
             oc.hydrate({
                customer: {
                   id: o.customerId || o.customer?.id || null,
@@ -346,22 +337,6 @@ const Publish = () => {
                   </Button>
                )}
                <Button
-                  type="button"
-                  variant="outlined"
-                  color="primary"
-                  onClick={() => window.print()}
-                  startIcon={<Icon icon="solar:printer-bold" size="16px" />}
-                  sx={{
-                     textTransform: "none",
-                     whiteSpace: "nowrap",
-                     flexShrink: 0,
-                     height: 42,
-                     px: 2,
-                  }}
-               >
-                  Print Invoice
-               </Button>
-               <Button
                   variant="contained"
                   color="primary"
                   onClick={handleSubmit}
@@ -389,26 +364,6 @@ const Publish = () => {
                </Button>
             </Stack>
          </Stack>
-
-         {/* Print-only invoice (hidden on screen) */}
-         <InvoicePrint
-            storeName={settings.storeName || "DevX POS"}
-            tagline={settings.tagline}
-            logoUrl={settings.showLogoOnReceipt ? settings.logoUrl : undefined}
-            storeAddress={settings.address}
-            storePhone={settings.phone}
-            storeEmail={settings.email}
-            invoiceFooter={settings.invoiceFooter}
-            isPreview={!editId}
-            orderIdLabel={editId ? editOrderMeta?.orderId : undefined}
-            invoiceLabel={editId ? editOrderMeta?.invoiceNo : undefined}
-            customer={form.customer}
-            lines={form.lines}
-            totals={totals}
-            paymentMethod={form.paymentMethod}
-            courier={form.courier}
-            currencySymbol={currencySymbol}
-         />
 
          <Dialog
             open={cancelConfirmOpen}

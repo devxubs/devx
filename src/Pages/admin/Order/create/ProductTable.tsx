@@ -30,7 +30,6 @@ import Icon from "@src/components/Icon";
 import {
    formatBDT,
    lineDiscountAmount,
-   lineGross,
    lineTotal,
 } from "./orderCalculations";
 import type { OrderLine } from "./types";
@@ -41,6 +40,12 @@ interface ProductTableProps {
    onRemove: (productId: string) => void;
    currencySymbol?: string;
 }
+
+/** Compact input styling shared by Qty / Unit Price / Product Discount. */
+const compactFieldSx = {
+   "& .MuiInputBase-input": { py: "5.5px", px: "8px", fontSize: 13.5 },
+   "& .MuiInputAdornment-root": { ml: 0, mr: 0 },
+} as const;
 
 const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: ProductTableProps) => {
    const theme = useTheme();
@@ -89,7 +94,6 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                <TableRow>
                   <TableCell>Product</TableCell>
                   <TableCell>SKU</TableCell>
-                  <TableCell align="center">Stock</TableCell>
                   <TableCell align="center">Qty</TableCell>
                   <TableCell align="right">Unit Price</TableCell>
                   <TableCell align="right">Product Discount</TableCell>
@@ -117,8 +121,11 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                        {line.name}
                                     </Typography>
                                  </Tooltip>
-                                 <Typography variant="caption" color="textSecondary">
-                                    Gross {formatBDT(lineGross(line), currencySymbol)}
+                                 <Typography
+                                    variant="caption"
+                                    color={line.stock <= 5 ? "warning.main" : "textSecondary"}
+                                 >
+                                    Stock: {line.stock} {line.unit}
                                     {lineDiscountAmount(line) > 0
                                        ? ` · Disc −${formatBDT(lineDiscountAmount(line), currencySymbol)}`
                                        : ""}
@@ -132,11 +139,6 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                            </Typography>
                         </TableCell>
                         <TableCell align="center">
-                           <Typography variant="body2" color={line.stock <= 5 ? "warning.main" : "textPrimary"}>
-                              {line.stock} {line.unit}
-                           </Typography>
-                        </TableCell>
-                        <TableCell align="center">
                            <TextField
                               type="number"
                               size="small"
@@ -147,7 +149,7 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                  onUpdate(line.productId, { quantity: Number(e.target.value) })
                               }
                               inputProps={{ min: 1, max: line.stock, style: { textAlign: "center" } }}
-                              sx={{ width: 68 }}
+                              sx={{ width: 58, ...compactFieldSx }}
                            />
                         </TableCell>
                         <TableCell align="right">
@@ -166,23 +168,11 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                     </InputAdornment>
                                  ),
                               }}
-                              sx={{ width: 102 }}
+                              sx={{ width: 92, ...compactFieldSx }}
                            />
                         </TableCell>
                         <TableCell align="right">
                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
-                              <ToggleButtonGroup
-                                 size="small"
-                                 exclusive
-                                 value={line.discountType}
-                                 onChange={(_, v) => {
-                                    if (v) onUpdate(line.productId, { discountType: v });
-                                 }}
-                                 sx={{ "& .MuiToggleButton-root": { px: 0.75, py: 0.3, fontSize: 12 }, flexShrink: 0 }}
-                              >
-                                 <ToggleButton value="amount">{currencySymbol}</ToggleButton>
-                                 <ToggleButton value="percent">%</ToggleButton>
-                              </ToggleButtonGroup>
                               <TextField
                                  type="number"
                                  size="small"
@@ -191,17 +181,30 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                     onUpdate(line.productId, { discountValue: Number(e.target.value) })
                                  }
                                  inputProps={{ min: 0, step: "0.01", style: { textAlign: "right" } }}
-                                 InputProps={{
-                                    endAdornment: (
-                                       <InputAdornment position="end" sx={{ ml: 0 }}>
-                                          <Typography variant="caption" color="textSecondary">
-                                             {line.discountType === "percent" ? "%" : currencySymbol}
-                                          </Typography>
-                                       </InputAdornment>
-                                    ),
-                                 }}
-                                 sx={{ width: 90 }}
+                                 sx={{ width: 72, ...compactFieldSx }}
                               />
+                              <ToggleButtonGroup
+                                 size="small"
+                                 exclusive
+                                 value={line.discountType}
+                                 onChange={(_, v) => {
+                                    if (v) onUpdate(line.productId, { discountType: v });
+                                 }}
+                                 sx={{
+                                    "& .MuiToggleButton-root": {
+                                       px: 0.7,
+                                       py: 0.45,
+                                       fontSize: 11.5,
+                                       lineHeight: 1.3,
+                                       whiteSpace: "nowrap",
+                                       textTransform: "none",
+                                    },
+                                    flexShrink: 0,
+                                 }}
+                              >
+                                 <ToggleButton value="amount">{currencySymbol} Amount</ToggleButton>
+                                 <ToggleButton value="percent">% Percent</ToggleButton>
+                              </ToggleButtonGroup>
                            </Stack>
                         </TableCell>
                         <TableCell align="right">
