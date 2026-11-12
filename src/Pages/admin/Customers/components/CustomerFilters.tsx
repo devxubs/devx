@@ -15,8 +15,6 @@ import {
    Stack,
    TextField,
    Typography,
-   useMediaQuery,
-   useTheme,
 } from "@mui/material";
 import React from "react";
 import CustomAutocomplete from "@src/components/Autocomplete";
@@ -98,7 +96,7 @@ const RangeFilterField = ({
    <Stack spacing={1}>
       <FieldLabel>{label}</FieldLabel>
       <Stack direction="row" spacing={1}>
-         <Box sx={{ width: range.op === "between" ? "46%" : "55%" }}>
+         <Box sx={{ width: range.op === "between" ? "44%" : "52%" }}>
             <CustomAutocomplete
                size={inputSize}
                options={OP_OPTIONS.map((o) => o.label)}
@@ -120,7 +118,7 @@ const RangeFilterField = ({
             onChange={(e) => onChange({ ...range, value: e.target.value })}
             error={Boolean(error)}
             inputProps={{ min: 0, step: integer ? 1 : "0.01" }}
-            sx={{ width: range.op === "between" ? "27%" : "45%" }}
+            sx={{ width: range.op === "between" ? "28%" : "48%" }}
          />
          {range.op === "between" && (
             <TextField
@@ -133,7 +131,7 @@ const RangeFilterField = ({
                }
                error={Boolean(error)}
                inputProps={{ min: 0, step: integer ? 1 : "0.01" }}
-               sx={{ width: "27%" }}
+               sx={{ width: "28%" }}
             />
          )}
       </Stack>
@@ -193,9 +191,8 @@ const CustomerFilters = ({
    errors = {},
    showErrors = false,
 }: CustomerFiltersProps) => {
-   const theme = useTheme();
-   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-   const inputSize = isMobile ? "small" : "medium";
+   // Compact controls throughout the modal (small size on every screen).
+   const inputSize = "small" as const;
    const set = (partial: Partial<CustomerFilterState>) =>
       onChange({ ...value, ...partial });
    const err = (key: keyof CustomerFilterErrors) =>
