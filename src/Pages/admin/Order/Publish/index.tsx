@@ -38,7 +38,9 @@ import NotesSection from "../create/NotesSection";
 import InvoicePrint from "../create/InvoicePrint";
 
 const toTitleStatus = (s?: string | null) =>
-   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().replace(/_/g, " ") : "Pending";
+   s
+      ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase().replace(/_/g, " ")
+      : "Pending";
 
 const Publish = () => {
    const router = useRouter();
@@ -50,9 +52,15 @@ const Publish = () => {
    const oc = useOrderCreate();
    const { form, patch, totals } = oc;
 
-   const [editOrderMeta, setEditOrderMeta] = useState<{ orderId: string; invoiceNo: string } | null>(null);
+   const [editOrderMeta, setEditOrderMeta] = useState<{
+      orderId: string;
+      invoiceNo: string;
+   } | null>(null);
    const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
-   const [snackbar, setSnackbar] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+   const [snackbar, setSnackbar] = useState<{
+      type: "success" | "error" | "info";
+      message: string;
+   } | null>(null);
    const settingsApplied = useRef(false);
 
    // Apply store defaults once (create mode only, pristine form only).
@@ -79,7 +87,10 @@ const Publish = () => {
             const o = await res.json();
             if (cancelled) return;
             const tags = (o.orderTags || {}) as any;
-            setEditOrderMeta({ orderId: o.orderId || o.customId || "", invoiceNo: o.invoiceNo || "" });
+            setEditOrderMeta({
+               orderId: o.orderId || o.customId || "",
+               invoiceNo: o.invoiceNo || "",
+            });
             oc.hydrate({
                customer: {
                   id: o.customerId || o.customer?.id || null,
@@ -93,8 +104,11 @@ const Publish = () => {
                   name: it.name,
                   code: it.code || "",
                   image: it.product?.images?.[0] || null,
-                  stock: (Number(it.product?.quantity) || 0) + (Number(it.quantity) || 0),
-                  unit: it.product?.salesUnit || it.product?.baseUnit || "Piece",
+                  stock:
+                     (Number(it.product?.quantity) || 0) +
+                     (Number(it.quantity) || 0),
+                  unit:
+                     it.product?.salesUnit || it.product?.baseUnit || "Piece",
                   listPrice: Number(it.price) || 0,
                   quantity: Number(it.quantity) || 1,
                   discountType: "amount",
@@ -117,7 +131,9 @@ const Publish = () => {
                   employee: tags.employeeNote ?? "",
                },
             });
-         } catch { /* keep the blank form on load failure */ }
+         } catch {
+            /* keep the blank form on load failure */
+         }
       })();
       return () => {
          cancelled = true;
@@ -145,7 +161,9 @@ const Publish = () => {
       if (created) {
          setSnackbar({
             type: "success",
-            message: editId ? "Order updated successfully" : `Order ${created.orderId || ""} created successfully`,
+            message: editId
+               ? "Order updated successfully"
+               : `Order ${created.orderId || ""} created successfully`,
          });
          setTimeout(() => router.push("/admin/order"), 900);
       }
@@ -159,13 +177,21 @@ const Publish = () => {
    return (
       <Container maxWidth="xl" sx={{ py: 2, px: { xs: 1, sm: 2 } }}>
          <Stack spacing={2.5}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+            <Stack
+               direction="row"
+               justifyContent="space-between"
+               alignItems="center"
+               flexWrap="wrap"
+               gap={1}
+            >
                <Typography variant="h5" fontWeight={700}>
                   {editId ? "Edit Order" : "Create Order"}
                </Typography>
                {oc.draftMeta && !editId && (
                   <Typography variant="caption" color="textSecondary">
-                     Draft saved {new Date(oc.draftMeta.savedAt).toLocaleString()} (this device only)
+                     Draft saved{" "}
+                     {new Date(oc.draftMeta.savedAt).toLocaleString()} (this
+                     device only)
                   </Typography>
                )}
             </Stack>
@@ -175,16 +201,26 @@ const Publish = () => {
                   severity="info"
                   action={
                      <Stack direction="row" spacing={1}>
-                        <Button size="small" color="inherit" onClick={oc.restoreDraft}>
+                        <Button
+                           size="small"
+                           color="inherit"
+                           onClick={oc.restoreDraft}
+                        >
                            Restore
                         </Button>
-                        <Button size="small" color="inherit" onClick={oc.clearDraft}>
+                        <Button
+                           size="small"
+                           color="inherit"
+                           onClick={oc.clearDraft}
+                        >
                            Discard
                         </Button>
                      </Stack>
                   }
                >
-                  You have a saved draft from {new Date(oc.restorableDraft.savedAt).toLocaleString()}. Restore it?
+                  You have a saved draft from{" "}
+                  {new Date(oc.restorableDraft.savedAt).toLocaleString()}.
+                  Restore it?
                </Alert>
             )}
 
@@ -203,8 +239,15 @@ const Publish = () => {
                         onChange={(customer) => patch({ customer })}
                         searchCustomers={oc.searchCustomers}
                      />
-                     <SectionCard title="Products" subtitle="Search by name or SKU — quantities are checked against stock">
-                        <ProductSearch searchProducts={oc.searchProducts} onAdd={handleAddProduct} currencySymbol={currencySymbol} />
+                     <SectionCard
+                        title="Products"
+                        subtitle="Search by name or SKU — quantities are checked against stock"
+                     >
+                        <ProductSearch
+                           searchProducts={oc.searchProducts}
+                           onAdd={handleAddProduct}
+                           currencySymbol={currencySymbol}
+                        />
                         <ProductTable
                            lines={form.lines}
                            onUpdate={oc.updateLine}
@@ -212,7 +255,10 @@ const Publish = () => {
                            currencySymbol={currencySymbol}
                         />
                      </SectionCard>
-                     <NotesSection notes={form.notes} onChange={(notes) => patch({ notes })} />
+                     <NotesSection
+                        notes={form.notes}
+                        onChange={(notes) => patch({ notes })}
+                     />
                   </Stack>
                </Grid>
 
@@ -242,7 +288,10 @@ const Publish = () => {
                         onChange={(p) => patch(p)}
                         currencySymbol={currencySymbol}
                      />
-                     <OrderSummaryPanel totals={totals} currencySymbol={currencySymbol} />
+                     <OrderSummaryPanel
+                        totals={totals}
+                        currencySymbol={currencySymbol}
+                     />
                   </Stack>
                </Grid>
             </Grid>
@@ -259,7 +308,12 @@ const Publish = () => {
                   color="inherit"
                   onClick={handleCancel}
                   disabled={oc.submitting}
-                  sx={{ whiteSpace: "nowrap", flexShrink: 0, height: 42, px: 2 }}
+                  sx={{
+                     whiteSpace: "nowrap",
+                     flexShrink: 0,
+                     height: 42,
+                     px: 2,
+                  }}
                >
                   Cancel
                </Button>
@@ -269,8 +323,24 @@ const Publish = () => {
                      color="inherit"
                      onClick={oc.saveDraft}
                      disabled={oc.savingDraft || oc.submitting}
-                     startIcon={oc.savingDraft ? <CircularProgress size={15} color="inherit" /> : <Icon icon="solar:diskette-bold" size="16px" />}
-                     sx={{ textTransform: "none", whiteSpace: "nowrap", flexShrink: 0, height: 42, px: 2 }}
+                     startIcon={
+                        oc.savingDraft ? (
+                           <CircularProgress size={15} color="inherit" />
+                        ) : (
+                           <Icon
+                              icon="solar:diskette-bold"
+                              size="16px"
+                              color="white"
+                           />
+                        )
+                     }
+                     // sx={{
+                     //    textTransform: "none",
+                     //    whiteSpace: "nowrap",
+                     //    flexShrink: 0,
+                     //    height: 42,
+                     //    px: 2,
+                     // }}
                   >
                      Save as Draft
                   </Button>
@@ -281,7 +351,13 @@ const Publish = () => {
                   color="primary"
                   onClick={() => window.print()}
                   startIcon={<Icon icon="solar:printer-bold" size="16px" />}
-                  sx={{ textTransform: "none", whiteSpace: "nowrap", flexShrink: 0, height: 42, px: 2 }}
+                  sx={{
+                     textTransform: "none",
+                     whiteSpace: "nowrap",
+                     flexShrink: 0,
+                     height: 42,
+                     px: 2,
+                  }}
                >
                   Print Invoice
                </Button>
@@ -290,10 +366,26 @@ const Publish = () => {
                   color="primary"
                   onClick={handleSubmit}
                   disabled={oc.submitting}
-                  startIcon={oc.submitting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                  sx={{ textTransform: "none", whiteSpace: "nowrap", flexShrink: 0, height: 42, minWidth: 160, px: 2.5, fontWeight: 700 }}
+                  startIcon={
+                     oc.submitting ? (
+                        <CircularProgress size={16} color="inherit" />
+                     ) : undefined
+                  }
+                  sx={{
+                     textTransform: "none",
+                     whiteSpace: "nowrap",
+                     flexShrink: 0,
+                     height: 42,
+                     minWidth: 160,
+                     px: 2.5,
+                     fontWeight: 700,
+                  }}
                >
-                  {oc.submitting ? "Saving…" : editId ? "Update Order" : "Create Order"}
+                  {oc.submitting
+                     ? "Saving…"
+                     : editId
+                       ? "Update Order"
+                       : "Create Order"}
                </Button>
             </Stack>
          </Stack>
@@ -318,15 +410,21 @@ const Publish = () => {
             currencySymbol={currencySymbol}
          />
 
-         <Dialog open={cancelConfirmOpen} onClose={() => setCancelConfirmOpen(false)}>
+         <Dialog
+            open={cancelConfirmOpen}
+            onClose={() => setCancelConfirmOpen(false)}
+         >
             <DialogTitle>Discard changes?</DialogTitle>
             <DialogContent>
                <DialogContentText>
-                  You have unsaved changes on this order form. Leaving now will lose them (unless you save a draft first).
+                  You have unsaved changes on this order form. Leaving now will
+                  lose them (unless you save a draft first).
                </DialogContentText>
             </DialogContent>
             <DialogActions>
-               <Button onClick={() => setCancelConfirmOpen(false)}>Keep editing</Button>
+               <Button onClick={() => setCancelConfirmOpen(false)}>
+                  Keep editing
+               </Button>
                <Button
                   color="error"
                   onClick={() => {
@@ -346,7 +444,11 @@ const Publish = () => {
             anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
          >
             {snackbar ? (
-               <Alert severity={snackbar.type} onClose={() => setSnackbar(null)} sx={{ width: "100%" }}>
+               <Alert
+                  severity={snackbar.type}
+                  onClose={() => setSnackbar(null)}
+                  sx={{ width: "100%" }}
+               >
                   {snackbar.message}
                </Alert>
             ) : undefined}

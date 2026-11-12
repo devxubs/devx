@@ -26,7 +26,11 @@ interface CustomerSectionProps {
    searchCustomers: (query: string) => Promise<ApiCustomer[]>;
 }
 
-const CustomerSection = ({ customer, onChange, searchCustomers }: CustomerSectionProps) => {
+const CustomerSection = ({
+   customer,
+   onChange,
+   searchCustomers,
+}: CustomerSectionProps) => {
    const [options, setOptions] = useState<ApiCustomer[]>([]);
    const [loading, setLoading] = useState(false);
    const [inputValue, setInputValue] = useState("");
@@ -68,8 +72,13 @@ const CustomerSection = ({ customer, onChange, searchCustomers }: CustomerSectio
 
    /** Editing identity fields manually detaches the picked customer id. */
    const patchManual = (partial: Partial<CustomerFormState>) => {
-      const identityTouched = "name" in partial || "phone" in partial || "email" in partial;
-      onChange({ ...customer, ...partial, id: identityTouched ? null : customer.id });
+      const identityTouched =
+         "name" in partial || "phone" in partial || "email" in partial;
+      onChange({
+         ...customer,
+         ...partial,
+         id: identityTouched ? null : customer.id,
+      });
    };
 
    return (
@@ -81,7 +90,13 @@ const CustomerSection = ({ customer, onChange, searchCustomers }: CustomerSectio
                size="small"
                variant="outlined"
                color="primary"
-               startIcon={<Icon icon="solar:user-plus-bold" size="16px" />}
+               startIcon={
+                  <Icon
+                     icon="solar:user-plus-bold"
+                     size="16px"
+                     color="primary"
+                  />
+               }
                onClick={() => setModalOpen(true)}
                sx={{
                   textTransform: "none",
@@ -114,20 +129,30 @@ const CustomerSection = ({ customer, onChange, searchCustomers }: CustomerSectio
             }}
             getOptionLabel={(o) => o.name || ""}
             isOptionEqualToValue={(o, v) => o.id === v.id}
-            noOptionsText={loading ? "Searching…" : "No customer found — type details below or use Add Customer"}
+            noOptionsText={
+               loading
+                  ? "Searching…"
+                  : "No customer found — type details below or use Add Customer"
+            }
             renderOption={(props, option) => (
                <li {...props} key={option.id}>
                   <Stack spacing={0} sx={{ py: 0.25 }}>
                      <Typography variant="body2" fontWeight={600}>
                         {option.name}
                         {option.customId ? (
-                           <Typography component="span" variant="caption" color="textSecondary">
+                           <Typography
+                              component="span"
+                              variant="caption"
+                              color="textSecondary"
+                           >
                               {"  "}({option.customId})
                            </Typography>
                         ) : null}
                      </Typography>
                      <Typography variant="caption" color="textSecondary">
-                        {[option.phone, option.email].filter(Boolean).join(" · ") || "No phone / email on record"}
+                        {[option.phone, option.email]
+                           .filter(Boolean)
+                           .join(" · ") || "No phone / email on record"}
                      </Typography>
                   </Stack>
                </li>
@@ -152,15 +177,28 @@ const CustomerSection = ({ customer, onChange, searchCustomers }: CustomerSectio
          />
          {customer.id && (
             <Stack direction="row" alignItems="center" spacing={1}>
-               <Icon icon="solar:check-circle-bold" size="15px" style={{ color: "#00A76F" }} />
+               <Icon
+                  icon="solar:check-circle-bold"
+                  size="15px"
+                  style={{ color: "#00A76F" }}
+               />
                <Typography variant="caption" color="textSecondary">
-                  Linked to an existing customer record. Clearing name/phone/email switches back to manual entry.
+                  Linked to an existing customer record. Clearing
+                  name/phone/email switches back to manual entry.
                </Typography>
                <Button
                   size="small"
                   variant="text"
                   sx={{ textTransform: "none", minWidth: 0, p: 0.25 }}
-                  onClick={() => onChange({ id: null, name: "", email: "", phone: "", address: "" })}
+                  onClick={() =>
+                     onChange({
+                        id: null,
+                        name: "",
+                        email: "",
+                        phone: "",
+                        address: "",
+                     })
+                  }
                >
                   Clear selection
                </Button>
