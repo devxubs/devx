@@ -1,12 +1,14 @@
 "use client";
 
-// Order Create (upgrade) — compact product table.
-// Columns: Product, SKU, Available Stock, Quantity, Unit Price, Product
-// Discount (fixed amount or %), Line Total, Actions. The table scrolls
-// horizontally inside its own container; the page never overflows.
+// Order Create — compact product table.
+// Discount type selector is integrated inside the discount input.
+// Number input spinner arrows are removed from all numeric fields.
+
+import React from "react";
 import {
    Avatar,
    Box,
+   Button,
    IconButton,
    InputAdornment,
    Paper,
@@ -25,13 +27,9 @@ import {
    alpha,
    useTheme,
 } from "@mui/material";
-import React from "react";
+
 import Icon from "@src/components/Icon";
-import {
-   formatBDT,
-   lineDiscountAmount,
-   lineTotal,
-} from "./orderCalculations";
+import { formatBDT, lineDiscountAmount, lineTotal } from "./orderCalculations";
 import type { OrderLine } from "./types";
 
 interface ProductTableProps {
@@ -42,12 +40,44 @@ interface ProductTableProps {
 }
 
 /** Compact input styling shared by Qty / Unit Price / Product Discount. */
+
 const compactFieldSx = {
-   "& .MuiInputBase-input": { py: "5.5px", px: "8px", fontSize: 13.5 },
-   "& .MuiInputAdornment-root": { ml: 0, mr: 0 },
+   "& .MuiInputBase-root": {
+      minHeight: 30,
+      height: 30,
+   },
+   "& .MuiInputBase-input": {
+      py: "3px",
+      px: "6px",
+      fontSize: 13,
+      lineHeight: 1.2,
+   },
+   "& .MuiInputAdornment-root": {
+      ml: 0,
+      mr: 0,
+      maxHeight: "100%",
+   },
+
+   // Remove number input spinner arrows
+   "& input[type=number]": {
+      MozAppearance: "textfield",
+   },
+   "& input[type=number]::-webkit-inner-spin-button": {
+      WebkitAppearance: "none",
+      margin: 0,
+   },
+   "& input[type=number]::-webkit-outer-spin-button": {
+      WebkitAppearance: "none",
+      margin: 0,
+   },
 } as const;
 
-const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: ProductTableProps) => {
+const ProductTable = ({
+   lines,
+   onUpdate,
+   onRemove,
+   currencySymbol = "৳",
+}: ProductTableProps) => {
    const theme = useTheme();
 
    if (!lines.length) {
@@ -64,7 +94,10 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
             }}
          >
             <Icon icon="solar:cart-large-linear" size="26px" />
-            <Typography variant="body2">No products added yet — search above to add items.</Typography>
+
+            <Typography variant="body2">
+               No products added yet — search above to add items.
+            </Typography>
          </Stack>
       );
    }
@@ -86,8 +119,16 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
             size="small"
             sx={{
                minWidth: 720,
-               "& .MuiTableCell-root": { verticalAlign: "middle", px: 1, py: 0.875 },
-               "& .MuiTableCell-head": { backgroundColor: alpha(theme.palette.grey[400], 0.12), fontWeight: 700, whiteSpace: "nowrap" },
+               "& .MuiTableCell-root": {
+                  verticalAlign: "middle",
+                  px: 1,
+                  py: 0.875,
+               },
+               "& .MuiTableCell-head": {
+                  backgroundColor: alpha(theme.palette.grey[400], 0.12),
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+               },
             }}
          >
             <TableHead>
@@ -101,121 +142,287 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                   <TableCell align="center"></TableCell>
                </TableRow>
             </TableHead>
+
             <TableBody>
                {lines.map((line) => {
                   const overStock = line.quantity > line.stock;
+
                   return (
-                     <TableRow key={line.productId} hover>
+                     <TableRow key={line.productId}>
+                        {/* Product */}
                         <TableCell>
-                           <Stack direction="row" spacing={1} alignItems="center">
+                           <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                           >
                               {line.image ? (
-                                 <Avatar src={line.image} variant="rounded" sx={{ width: 30, height: 30, flexShrink: 0 }} />
+                                 <Avatar
+                                    src={line.image}
+                                    variant="rounded"
+                                    sx={{
+                                       width: 30,
+                                       height: 30,
+                                       flexShrink: 0,
+                                    }}
+                                 />
                               ) : (
-                                 <Avatar variant="rounded" sx={{ width: 30, height: 30, flexShrink: 0 }}>
+                                 <Avatar
+                                    variant="rounded"
+                                    sx={{
+                                       width: 30,
+                                       height: 30,
+                                       flexShrink: 0,
+                                    }}
+                                 >
                                     <Icon icon="solar:box-linear" size="15px" />
                                  </Avatar>
                               )}
+
                               <Box sx={{ minWidth: 0 }}>
                                  <Tooltip title={line.name} disableInteractive>
-                                    <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 138 }}>
+                                    <Typography
+                                       variant="body2"
+                                       fontWeight={600}
+                                       noWrap
+                                       sx={{ maxWidth: 138 }}
+                                    >
                                        {line.name}
                                     </Typography>
                                  </Tooltip>
+
                                  <Typography
                                     variant="caption"
-                                    color={line.stock <= 5 ? "warning.main" : "textSecondary"}
+                                    color={
+                                       line.stock <= 5
+                                          ? "warning.main"
+                                          : "textSecondary"
+                                    }
                                  >
                                     Stock: {line.stock} {line.unit}
                                     {lineDiscountAmount(line) > 0
-                                       ? ` · Disc −${formatBDT(lineDiscountAmount(line), currencySymbol)}`
+                                       ? ` · Disc −${formatBDT(
+                                            lineDiscountAmount(line),
+                                            currencySymbol,
+                                         )}`
                                        : ""}
                                  </Typography>
                               </Box>
                            </Stack>
                         </TableCell>
+
+                        {/* SKU */}
                         <TableCell>
-                           <Typography variant="body2" color="textSecondary" noWrap>
+                           <Typography
+                              variant="body2"
+                              color="textSecondary"
+                              noWrap
+                           >
                               {line.code || "—"}
                            </Typography>
                         </TableCell>
+
+                        {/* Quantity */}
                         <TableCell align="center">
                            <TextField
                               type="number"
                               size="small"
                               value={line.quantity}
                               error={overStock}
-                              helperText={overStock ? `Max ${line.stock}` : undefined}
-                              onChange={(e) =>
-                                 onUpdate(line.productId, { quantity: Number(e.target.value) })
+                              helperText={
+                                 overStock ? `Max ${line.stock}` : undefined
                               }
-                              inputProps={{ min: 1, max: line.stock, style: { textAlign: "center" } }}
-                              sx={{ width: 58, ...compactFieldSx }}
+                              onChange={(e) =>
+                                 onUpdate(line.productId, {
+                                    quantity: Number(e.target.value),
+                                 })
+                              }
+                              inputProps={{
+                                 min: 1,
+                                 max: line.stock,
+                                 style: { textAlign: "center" },
+                              }}
+                              sx={{
+                                 width: 58,
+                                 ...compactFieldSx,
+                              }}
                            />
                         </TableCell>
+
+                        {/* Unit Price */}
                         <TableCell align="right">
                            <TextField
                               type="number"
                               size="small"
                               value={line.listPrice}
                               onChange={(e) =>
-                                 onUpdate(line.productId, { listPrice: Number(e.target.value) })
+                                 onUpdate(line.productId, {
+                                    listPrice: Number(e.target.value),
+                                 })
                               }
-                              inputProps={{ min: 0, step: "0.01", style: { textAlign: "right" } }}
+                              inputProps={{
+                                 min: 0,
+                                 step: "0.01",
+                                 style: { textAlign: "right" },
+                              }}
                               InputProps={{
                                  startAdornment: (
-                                    <InputAdornment position="start" sx={{ mr: 0 }}>
-                                       <Typography variant="caption" color="textSecondary">{currencySymbol}</Typography>
+                                    <InputAdornment
+                                       position="start"
+                                       sx={{ mr: 0 }}
+                                    >
+                                       <Typography
+                                          variant="caption"
+                                          color="textSecondary"
+                                       >
+                                          {currencySymbol}
+                                       </Typography>
                                     </InputAdornment>
                                  ),
                               }}
-                              sx={{ width: 92, ...compactFieldSx }}
+                              sx={{
+                                 width: 92,
+                                 ...compactFieldSx,
+                              }}
                            />
                         </TableCell>
+
+                        {/* Product Discount — Button Start, Value End */}
+
                         <TableCell align="right">
-                           <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
-                              <TextField
-                                 type="number"
-                                 size="small"
-                                 value={line.discountValue}
-                                 onChange={(e) =>
-                                    onUpdate(line.productId, { discountValue: Number(e.target.value) })
-                                 }
-                                 inputProps={{ min: 0, step: "0.01", style: { textAlign: "right" } }}
-                                 sx={{ width: 72, ...compactFieldSx }}
-                              />
-                              <ToggleButtonGroup
-                                 size="small"
-                                 exclusive
-                                 value={line.discountType}
-                                 onChange={(_, v) => {
-                                    if (v) onUpdate(line.productId, { discountType: v });
-                                 }}
-                                 sx={{
-                                    "& .MuiToggleButton-root": {
-                                       px: 0.7,
-                                       py: 0.45,
-                                       fontSize: 11.5,
-                                       lineHeight: 1.3,
-                                       whiteSpace: "nowrap",
-                                       textTransform: "none",
+                           <TextField
+                              type="number"
+                              size="small"
+                              value={line.discountValue}
+                              onChange={(e) =>
+                                 onUpdate(line.productId, {
+                                    discountValue: Number(e.target.value),
+                                 })
+                              }
+                              inputProps={{
+                                 min: 0,
+                                 step: "0.01",
+                                 style: { textAlign: "right" },
+                              }}
+                              InputProps={{
+                                 startAdornment: (
+                                    <InputAdornment
+                                       position="start"
+                                       sx={{
+                                          ml: 0,
+                                          mr: 0,
+                                          width: 26,
+                                          height: "100%",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                       }}
+                                    >
+                                       <Button
+                                          disableRipple
+                                          size="small"
+                                          color="inherit"
+                                          onClick={() =>
+                                             onUpdate(line.productId, {
+                                                discountType:
+                                                   line.discountType ===
+                                                   "amount"
+                                                      ? "percent"
+                                                      : "amount",
+                                             })
+                                          }
+                                          sx={{
+                                             minWidth: 26,
+                                             width: 26,
+                                             height: 26,
+                                             p: 0,
+                                             fontSize: 12,
+                                             fontWeight: 700,
+                                             lineHeight: 1,
+                                             borderRadius: 1,
+                                             textTransform: "none",
+                                          }}
+                                       >
+                                          {line.discountType === "amount"
+                                             ? currencySymbol
+                                             : "%"}
+                                       </Button>
+                                    </InputAdornment>
+                                 ),
+                              }}
+                              sx={{
+                                 width: 100,
+                                 ...compactFieldSx,
+
+                                 "& .MuiOutlinedInput-root": {
+                                    height: 32,
+                                    minHeight: 32,
+                                    pl: 0.5,
+                                    pr: 0.5,
+                                 },
+
+                                 "& .MuiInputAdornment-positionStart": {
+                                    mr: 0,
+                                    ml: 0,
+                                    height: "100%",
+                                    maxHeight: "100%",
+                                 },
+
+                                 "& .MuiInputBase-input": {
+                                    minWidth: 0,
+                                    width: "100%",
+                                    px: 0.3,
+                                    py: "2px",
+                                    fontSize: 13,
+                                    lineHeight: 1.2,
+                                    textAlign: "right",
+                                 },
+
+                                 "& .MuiInputAdornment-root .MuiButton-root": {
+                                    minWidth: 24,
+                                    width: 24,
+                                    height: 22,
+                                    minHeight: 22,
+                                    p: 0,
+                                    fontSize: 11,
+                                 },
+
+                                 "& input[type=number]": {
+                                    MozAppearance: "textfield",
+                                 },
+                                 "& input[type=number]::-webkit-inner-spin-button":
+                                    {
+                                       WebkitAppearance: "none",
+                                       margin: 0,
                                     },
-                                    flexShrink: 0,
-                                 }}
-                              >
-                                 <ToggleButton value="amount">{currencySymbol} Amount</ToggleButton>
-                                 <ToggleButton value="percent">% Percent</ToggleButton>
-                              </ToggleButtonGroup>
-                           </Stack>
+                                 "& input[type=number]::-webkit-outer-spin-button":
+                                    {
+                                       WebkitAppearance: "none",
+                                       margin: 0,
+                                    },
+                              }}
+                           />
                         </TableCell>
+
+                        {/* Line Total */}
                         <TableCell align="right">
                            <Typography variant="body2" fontWeight={700} noWrap>
                               {formatBDT(lineTotal(line), currencySymbol)}
                            </Typography>
                         </TableCell>
+
+                        {/* Actions */}
                         <TableCell align="center">
                            <Tooltip title="Remove product" disableInteractive>
-                              <IconButton size="small" color="error" onClick={() => onRemove(line.productId)}>
-                                 <Icon icon="solar:trash-bin-trash-bold" size="17px" />
+                              <IconButton
+                                 size="small"
+                                 color="error"
+                                 onClick={() => onRemove(line.productId)}
+                              >
+                                 <Icon
+                                    icon="solar:trash-bin-trash-bold"
+                                    size="17px"
+                                 />
                               </IconButton>
                            </Tooltip>
                         </TableCell>
