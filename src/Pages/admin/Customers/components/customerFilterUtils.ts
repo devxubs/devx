@@ -25,7 +25,6 @@ export type RegPreset =
 export type LastOrderPreset =
    | "all"
    | "today"
-   | "yesterday"
    | "last7"
    | "last30"
    | "thisMonth"
@@ -101,13 +100,12 @@ export const REG_PRESET_OPTIONS: { value: RegPreset; label: string }[] = [
 export const LAST_ORDER_PRESET_OPTIONS: { value: LastOrderPreset; label: string }[] = [
    { value: "all", label: "Any Time" },
    { value: "today", label: "Today" },
-   { value: "yesterday", label: "Yesterday" },
    { value: "last7", label: "Last 7 Days" },
    { value: "last30", label: "Last 30 Days" },
    { value: "thisMonth", label: "This Month" },
    { value: "lastMonth", label: "Last Month" },
-   { value: "custom", label: "Custom Range" },
    { value: "never", label: "Never Ordered" },
+   { value: "custom", label: "Custom Range" },
 ];
 
 /** Resolve a preset (or a custom range) to an inclusive [start, end] pair. */

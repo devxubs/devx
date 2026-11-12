@@ -12,7 +12,6 @@ import {
    Box,
    Button,
    Chip,
-   Divider,
    FormControl,
    InputLabel,
    MenuItem,
@@ -63,8 +62,7 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
 type SnackState = { severity: "success" | "error"; message: string } | null;
 
 const Customers = () => {
-   const { formatCurrency, settings } = useSettings();
-   const currencySymbol = settings.currencySymbol || "৳";
+   const { formatCurrency } = useSettings();
    const { filterQueryData, setFilterQueryData } = useFilterQuery();
    const searchText = filterQueryData.searchText || "";
 
@@ -567,65 +565,58 @@ const Customers = () => {
             />
          )}
 
-         {/* Advanced filters — shared CustomModal shell. Draft edits are
-             only applied on "Apply Filters"; closing discards them. The
-             fields scroll; the footer stays visible. */}
+         {/* Advanced filters — shared CustomModal shell, hosted exactly
+             like the Order Filter modal (OrderFilter.tsx): same width,
+             max-height, radius and scroll structure. Buttons mirror the
+             Order filter: Reset (inherit, applies immediately), Cancel
+             (error, discards the draft), Apply (contained primary). */}
          <CustomModal
             open={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
             title="Customer Filters"
-            closeIcon
             sx={{
-               width: { xs: "94vw", md: 880 },
-               maxWidth: 880,
-               maxHeight: "92vh",
-               borderRadius: 4,
+               width: { xs: "100%", md: 950 },
+               maxHeight: { xs: "100vh", md: "88vh" },
+               borderRadius: { xs: 0, md: 2 },
                display: "flex",
                flexDirection: "column",
             }}
          >
-            <Box
-               sx={{
-                  overflowY: "auto",
-                  maxHeight: { xs: "56vh", md: "60vh" },
-                  pr: 0.5,
-                  pb: 1,
-               }}
-            >
-               <CustomerFilters
-                  value={draftFilters}
-                  onChange={setDraftFilters}
-                  currencySymbol={currencySymbol}
-                  errors={draftErrors}
-                  showErrors={showFilterErrors}
-               />
+            <Box sx={{ flex: 1, overflowY: "auto", pr: 1 }}>
+               <Stack height={"100%"} spacing={2.5} p={1}>
+                  <CustomerFilters
+                     value={draftFilters}
+                     onChange={setDraftFilters}
+                     errors={draftErrors}
+                     showErrors={showFilterErrors}
+                  />
+                  <Stack
+                     direction={{ xs: "column", sm: "row" }}
+                     justifyContent={{ xs: "flex-start", sm: "flex-end" }}
+                     spacing={2}
+                     pt={2}
+                     pb={{ xs: 6, sm: 0 }}
+                     flexWrap="wrap"
+                  >
+                     <Button color="inherit" onClick={handleResetFilters}>
+                        Reset
+                     </Button>
+                     <Button
+                        color="error"
+                        onClick={() => setFilterModalOpen(false)}
+                     >
+                        Cancel
+                     </Button>
+                     <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleApplyFilters}
+                     >
+                        Apply
+                     </Button>
+                  </Stack>
+               </Stack>
             </Box>
-            <Divider sx={{ mt: 1 }} />
-            <Stack
-               direction="row"
-               spacing={1.5}
-               justifyContent="flex-end"
-               flexWrap="wrap"
-               sx={{ pt: 2 }}
-            >
-               <Button
-                  variant="outlined"
-                  color="inherit"
-                  onClick={handleResetFilters}
-                  startIcon={<Icon icon="solar:restart-bold" size="small" />}
-                  sx={{ textTransform: "none", fontWeight: 600 }}
-               >
-                  Reset Filters
-               </Button>
-               <Button
-                  variant="contained"
-                  onClick={handleApplyFilters}
-                  startIcon={<Icon icon="solar:filter-bold" size="small" />}
-                  sx={{ textTransform: "none", fontWeight: 600 }}
-               >
-                  Apply Filters
-               </Button>
-            </Stack>
          </CustomModal>
 
          <CustomerDetailModal
