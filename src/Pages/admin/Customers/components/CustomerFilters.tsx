@@ -1,11 +1,10 @@
 "use client";
 
-// Customer Page upgrade — advanced filter panel (draft state; the page
-// applies it on "Apply Filters"). Groups: status, registration date,
-// total orders / purchase / paid / due ranges, last-order date.
+// Customer Page upgrade — advanced filter fields (draft state; rendered
+// inside the shared CustomModal by the page, which owns Apply/Reset).
+// Groups: status, registration date, total orders / purchase / paid / due
+// ranges, last-order date.
 import {
-   Box,
-   Button,
    FormControl,
    Grid,
    InputLabel,
@@ -19,7 +18,6 @@ import {
 } from "@mui/material";
 import React from "react";
 import DateRangePickerCustom from "@src/components/DateRange";
-import Icon from "@src/components/Icon";
 import {
    CustomerFilterState,
    LAST_ORDER_PRESET_OPTIONS,
@@ -34,8 +32,6 @@ import {
 interface CustomerFiltersProps {
    value: CustomerFilterState;
    onChange: (next: CustomerFilterState) => void;
-   onApply: () => void;
-   onReset: () => void;
    currencySymbol?: string;
 }
 
@@ -104,23 +100,15 @@ const RangeFilterField = ({
 const CustomerFilters = ({
    value,
    onChange,
-   onApply,
-   onReset,
    currencySymbol = "৳",
 }: CustomerFiltersProps) => {
    const set = (partial: Partial<CustomerFilterState>) =>
       onChange({ ...value, ...partial });
 
+   // Fields only — the page renders this inside the shared CustomModal
+   // (src/components/Modal.tsx), which provides the chrome and the
+   // Apply / Reset actions.
    return (
-      <Box
-         sx={{
-            border: 1,
-            borderColor: "divider",
-            borderRadius: 1,
-            p: 2,
-            bgcolor: "background.paper",
-         }}
-      >
          <Grid container spacing={2.5}>
             {/* Status */}
             <Grid size={{ xs: 12, md: 4 }}>
@@ -265,36 +253,7 @@ const CustomerFilters = ({
                </Stack>
             </Grid>
 
-            {/* Actions */}
-            <Grid size={{ xs: 12, md: 4 }}>
-               <Stack
-                  direction="row"
-                  spacing={1.5}
-                  justifyContent={{ xs: "flex-start", md: "flex-end" }}
-                  alignItems="flex-end"
-                  sx={{ height: "100%" }}
-               >
-                  <Button
-                     variant="outlined"
-                     color="inherit"
-                     onClick={onReset}
-                     startIcon={<Icon icon="solar:restart-bold" size="small" />}
-                     sx={{ textTransform: "none", fontWeight: 600 }}
-                  >
-                     Reset
-                  </Button>
-                  <Button
-                     variant="contained"
-                     onClick={onApply}
-                     startIcon={<Icon icon="solar:filter-bold" size="small" />}
-                     sx={{ textTransform: "none", fontWeight: 600 }}
-                  >
-                     Apply Filters
-                  </Button>
-               </Stack>
-            </Grid>
          </Grid>
-      </Box>
    );
 };
 

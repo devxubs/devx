@@ -12,7 +12,6 @@ import {
    Box,
    Button,
    Chip,
-   Collapse,
    FormControl,
    InputLabel,
    MenuItem,
@@ -22,6 +21,7 @@ import {
    Tooltip,
    Typography,
 } from "@mui/material";
+import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -74,7 +74,7 @@ const Customers = () => {
    const [snack, setSnack] = useState<SnackState>(null);
    const [exporting, setExporting] = useState(false);
 
-   const [panelOpen, setPanelOpen] = useState(false);
+   const [filterModalOpen, setFilterModalOpen] = useState(false);
    const [draftFilters, setDraftFilters] = useState<CustomerFilterState>(DEFAULT_FILTERS);
    const [appliedFilters, setAppliedFilters] = useState<CustomerFilterState>(DEFAULT_FILTERS);
    const [sortBy, setSortBy] = useState("createdAt");
@@ -150,6 +150,12 @@ const Customers = () => {
       setSortDir("desc");
       if (searchText) setFilterQueryData({ searchText: "" });
    }, [searchText, setFilterQueryData]);
+
+   /** Modal Reset: clear only the advanced filters (search/sort stay). */
+   const handleResetFilters = useCallback(() => {
+      setDraftFilters(DEFAULT_FILTERS);
+      setAppliedFilters(DEFAULT_FILTERS);
+   }, []);
 
    const handleChipDelete = (key: FilterChipKey) => {
       const next = clearFilterGroup(appliedFilters, key);
@@ -305,84 +311,72 @@ const Customers = () => {
       { field: "@actions", headerName: "", width: 50 },
    ];
 
-   return (
-      <Stack spacing={2}>
-         {/* Header: title + count, sort controls, filters toggle */}
+   // ── Table toolbar content (rendered inside the shared table toolbar
+   // via CustomTable's `filter` slot, next to the toolbar's own search):
+   // Sort By + direction, the Filters button (opens the shared CustomModal),
+   // and the active-filter chips. ─────────────────────────────────────────
+   const toolbarContent = (
+      <Stack spacing={1} alignItems={{ xs: "stretch", sm: "flex-end" }}>
          <Stack
             direction="row"
-            justifyContent="space-between"
+            spacing={1.5}
             alignItems="center"
             flexWrap="wrap"
-            gap={1.5}
          >
-            <Stack>
-               <Typography variant="h5" fontWeight={700}>
-                  Customers
-               </Typography>
-               <Typography variant="body2" color="textSecondary">
-                  {total} customer{total === 1 ? "" : "s"} found
-               </Typography>
-            </Stack>
-            <Stack
-               direction="row"
-               spacing={1.5}
-               alignItems="center"
-               flexWrap="wrap"
-            >
-               <FormControl size="small" sx={{ minWidth: 180 }}>
-                  <InputLabel>Sort By</InputLabel>
-                  <Select
-                     label="Sort By"
-                     value={sortBy}
-                     onChange={(e) => setSortBy(e.target.value)}
-                  >
-                     {SORT_OPTIONS.map((o) => (
-                        <MenuItem key={o.value} value={o.value}>
-                           {o.label}
-                        </MenuItem>
-                     ))}
-                  </Select>
-               </FormControl>
-               <Tooltip
-                  title={sortDir === "desc" ? "Descending — click for ascending" : "Ascending — click for descending"}
-                  disableInteractive
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+               <InputLabel>Sort By</InputLabel>
+               <Select
+                  label="Sort By"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
                >
-                  <Button
-                     size="small"
-                     variant="outlined"
-                     color="inherit"
-                     onClick={() =>
-                        setSortDir((d) => (d === "desc" ? "asc" : "desc"))
-                     }
-                     startIcon={
-                        <Icon
-                           icon={
-                              sortDir === "desc"
-                                 ? "eva:arrow-downward-fill"
-                                 : "eva:arrow-upward-fill"
-                           }
-                           size="small"
-                        />
-                     }
-                     sx={{ textTransform: "none", fontWeight: 600, height: 40 }}
-                  >
-                     {sortDir === "desc" ? "Desc" : "Asc"}
-                  </Button>
-               </Tooltip>
-               <Badge badgeContent={activeCount} color="primary">
-                  <Button
-                     variant={panelOpen ? "contained" : "outlined"}
-                     onClick={() => setPanelOpen((o) => !o)}
-                     startIcon={<Icon icon="solar:filter-bold" size="small" />}
-                     sx={{ textTransform: "none", fontWeight: 600, height: 40 }}
-                  >
-                     Filters
-                  </Button>
-               </Badge>
-            </Stack>
+                  {SORT_OPTIONS.map((o) => (
+                     <MenuItem key={o.value} value={o.value}>
+                        {o.label}
+                     </MenuItem>
+                  ))}
+               </Select>
+            </FormControl>
+            <Tooltip
+               title={sortDir === "desc" ? "Descending — click for ascending" : "Ascending — click for descending"}
+               disableInteractive
+            >
+               <Button
+                  size="small"
+                  variant="outlined"
+                  color="inherit"
+                  onClick={() =>
+                     setSortDir((d) => (d === "desc" ? "asc" : "desc"))
+                  }
+                  startIcon={
+                     <Icon
+                        icon={
+                           sortDir === "desc"
+                              ? "eva:arrow-downward-fill"
+                              : "eva:arrow-upward-fill"
+                        }
+                        size="small"
+                     />
+                  }
+                  sx={{ textTransform: "none", fontWeight: 600, height: 40 }}
+               >
+                  {sortDir === "desc" ? "Desc" : "Asc"}
+               </Button>
+            </Tooltip>
+            <Badge badgeContent={activeCount} color="primary">
+               <Button
+                  variant="outlined"
+                  onClick={() => {
+                     setDraftFilters(appliedFilters);
+                     setFilterModalOpen(true);
+                  }}
+                  startIcon={<Icon icon="solar:filter-bold" size="small" />}
+                  sx={{ textTransform: "none", fontWeight: 600, height: 40 }}
+               >
+                  Filters
+               </Button>
+            </Badge>
          </Stack>
-
-         {/* Active filter chips */}
          {chips.length > 0 && (
             <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
                {chips.map((chip) => (
@@ -405,17 +399,21 @@ const Customers = () => {
                </Button>
             </Stack>
          )}
+      </Stack>
+   );
 
-         {/* Advanced filter panel */}
-         <Collapse in={panelOpen} unmountOnExit>
-            <CustomerFilters
-               value={draftFilters}
-               onChange={setDraftFilters}
-               onApply={() => setAppliedFilters(draftFilters)}
-               onReset={handleReset}
-               currencySymbol={currencySymbol}
-            />
-         </Collapse>
+   return (
+      <Stack spacing={2}>
+         {/* Page title only — search, sort, filters and chips all live in
+             the table toolbar below. */}
+         <Stack>
+            <Typography variant="h5" fontWeight={700}>
+               Customers
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+               {total} customer{total === 1 ? "" : "s"} found
+            </Typography>
+         </Stack>
 
          {/* Empty-result guidance (the grid also shows its No Data overlay) */}
          {loadedOnce && !loading && rows.length === 0 && (
@@ -461,6 +459,7 @@ const Customers = () => {
                checkBox={true}
                canPrint={false}
                canExport={false}
+               filter={() => toolbarContent}
                customSelectionToolbar={(selectedRows, onClearSelection) => (
                   <Stack
                      direction="row"
@@ -546,6 +545,56 @@ const Customers = () => {
                ]}
             />
          )}
+
+         {/* Advanced filters — shared CustomModal shell. Draft edits are
+             only applied on "Apply Filters"; closing discards them. */}
+         <CustomModal
+            open={filterModalOpen}
+            onClose={() => setFilterModalOpen(false)}
+            title="Customer Filters"
+            closeIcon
+            sx={{
+               width: { xs: "94vw", md: 880 },
+               maxWidth: 880,
+               maxHeight: "90vh",
+               overflowY: "auto",
+            }}
+         >
+            <Stack spacing={2.5}>
+               <CustomerFilters
+                  value={draftFilters}
+                  onChange={setDraftFilters}
+                  currencySymbol={currencySymbol}
+               />
+               <Stack
+                  direction="row"
+                  spacing={1.5}
+                  justifyContent="flex-end"
+                  flexWrap="wrap"
+               >
+                  <Button
+                     variant="outlined"
+                     color="inherit"
+                     onClick={handleResetFilters}
+                     startIcon={<Icon icon="solar:restart-bold" size="small" />}
+                     sx={{ textTransform: "none", fontWeight: 600 }}
+                  >
+                     Reset Filters
+                  </Button>
+                  <Button
+                     variant="contained"
+                     onClick={() => {
+                        setAppliedFilters(draftFilters);
+                        setFilterModalOpen(false);
+                     }}
+                     startIcon={<Icon icon="solar:filter-bold" size="small" />}
+                     sx={{ textTransform: "none", fontWeight: 600 }}
+                  >
+                     Apply Filters
+                  </Button>
+               </Stack>
+            </Stack>
+         </CustomModal>
 
          <CustomerDetailModal
             open={Boolean(selectedCustomerId)}
