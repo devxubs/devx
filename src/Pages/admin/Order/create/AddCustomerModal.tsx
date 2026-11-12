@@ -1,24 +1,20 @@
 "use client";
 
-// Order Create (upgrade) — "Add Customer" modal local to Order Create.
+// Order Create — "Add Customer" modal.
+// The shell is the project's shared CustomModal (src/components/Modal.tsx),
+// the same modal wrapper the rest of the app uses (e.g. CustomerDetailModal).
+// No create-capable shared customer form exists in src/components, so the
+// form fields live here, but all presentation chrome comes from the shared
+// component — its source and defaults are untouched.
+//
 // Uses the real POST /api/customers. The API validates the phone format and
 // returns 409 with the existing customer's identity on a duplicate phone —
 // in that case the user can select that existing customer instead.
-// Customer Management pages/components are not touched.
-import {
-   Alert,
-   Button,
-   CircularProgress,
-   Dialog,
-   DialogActions,
-   DialogContent,
-   DialogTitle,
-   Grid,
-   Stack,
-   TextField,
-   Typography,
-} from "@mui/material";
+// On success the created customer is handed back via onCreated and the
+// Order Create page selects it automatically.
+import { Alert, Button, CircularProgress, Grid, Stack, TextField, Typography } from "@mui/material";
 import React, { useState } from "react";
+import CustomModal from "@src/components/Modal";
 import type { ApiCustomer } from "./types";
 
 interface AddCustomerModalProps {
@@ -108,44 +104,53 @@ const AddCustomerModal = ({ open, onClose, onCreated }: AddCustomerModalProps) =
    };
 
    return (
-      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-         <DialogTitle>Add New Customer</DialogTitle>
-         <DialogContent>
-            <Stack spacing={2} pt={1}>
-               {error && <Alert severity={duplicate ? "warning" : "error"}>{error}</Alert>}
-               <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <TextField label="Full Name *" fullWidth value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <TextField label="Phone Number *" fullWidth value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" type="tel" />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <TextField label="E-mail" fullWidth value={email} onChange={(e) => setEmail(e.target.value)} placeholder="customer@mail.com" />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <TextField label="Billing Address" fullWidth value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, City" />
-                  </Grid>
+      <CustomModal
+         open={open}
+         onClose={handleClose}
+         title="Add New Customer"
+         closeIcon
+         sx={{ width: { xs: "92vw", sm: 560 }, maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}
+      >
+         <Stack spacing={2}>
+            {error && <Alert severity={duplicate ? "warning" : "error"}>{error}</Alert>}
+            <Grid container spacing={2}>
+               <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField label="Full Name *" fullWidth value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" />
                </Grid>
-               <Typography variant="caption" color="textSecondary">
-                  The new customer is saved through the Customer API and selected automatically.
-               </Typography>
-            </Stack>
-         </DialogContent>
-         <DialogActions>
-            <Button variant="text" color="inherit" onClick={handleClose} disabled={saving}>
-               Cancel
-            </Button>
-            {duplicate && (
-               <Button variant="outlined" onClick={handleUseExisting} disabled={saving}>
-                  Use existing: {duplicate.name}
+               <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField label="Phone Number *" fullWidth value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" type="tel" />
+               </Grid>
+               <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField label="E-mail" fullWidth value={email} onChange={(e) => setEmail(e.target.value)} placeholder="customer@mail.com" />
+               </Grid>
+               <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField label="Billing Address" fullWidth value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, City" />
+               </Grid>
+            </Grid>
+            <Typography variant="caption" color="textSecondary">
+               The new customer is saved through the Customer API and selected automatically.
+            </Typography>
+            <Stack direction="row" spacing={1.5} justifyContent="flex-end" flexWrap="wrap">
+               <Button variant="text" color="inherit" onClick={handleClose} disabled={saving} sx={{ textTransform: "none" }}>
+                  Cancel
                </Button>
-            )}
-            <Button variant="contained" onClick={handleSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
-               Save Customer
-            </Button>
-         </DialogActions>
-      </Dialog>
+               {duplicate && (
+                  <Button variant="outlined" onClick={handleUseExisting} disabled={saving} sx={{ textTransform: "none" }}>
+                     Use existing: {duplicate.name}
+                  </Button>
+               )}
+               <Button
+                  variant="contained"
+                  onClick={handleSave}
+                  disabled={saving}
+                  startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
+                  sx={{ textTransform: "none" }}
+               >
+                  Save Customer
+               </Button>
+            </Stack>
+         </Stack>
+      </CustomModal>
    );
 };
 

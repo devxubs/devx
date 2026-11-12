@@ -250,7 +250,12 @@ const CustomerSection = ({
          <AddCustomerModal
             open={modalOpen}
             onClose={() => setModalOpen(false)}
-            onCreated={applyCustomer}
+            onCreated={(created) => {
+               // Select the new customer immediately and refresh the
+               // autocomplete options so it appears in future searches.
+               applyCustomer(created);
+               runSearch("");
+            }}
          />
       </SectionCard>
    );
