@@ -69,14 +69,22 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
          component={Paper}
          elevation={0}
          sx={{
-            maxHeight: 380,
+            maxHeight: 460,
             overflow: "auto",
             backgroundColor: alpha(theme.palette.grey[400], 0.08),
             border: `1px solid ${theme.palette.divider}`,
             borderRadius: 1.5,
          }}
       >
-         <Table stickyHeader size="small" sx={{ minWidth: 860 }}>
+         <Table
+            stickyHeader
+            size="small"
+            sx={{
+               minWidth: 720,
+               "& .MuiTableCell-root": { verticalAlign: "middle", px: 1, py: 0.875 },
+               "& .MuiTableCell-head": { backgroundColor: alpha(theme.palette.grey[400], 0.12), fontWeight: 700, whiteSpace: "nowrap" },
+            }}
+         >
             <TableHead>
                <TableRow>
                   <TableCell>Product</TableCell>
@@ -95,18 +103,20 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                   return (
                      <TableRow key={line.productId} hover>
                         <TableCell>
-                           <Stack direction="row" spacing={1.25} alignItems="center">
+                           <Stack direction="row" spacing={1} alignItems="center">
                               {line.image ? (
-                                 <Avatar src={line.image} variant="rounded" sx={{ width: 32, height: 32 }} />
+                                 <Avatar src={line.image} variant="rounded" sx={{ width: 30, height: 30, flexShrink: 0 }} />
                               ) : (
-                                 <Avatar variant="rounded" sx={{ width: 32, height: 32 }}>
-                                    <Icon icon="solar:box-linear" size="16px" />
+                                 <Avatar variant="rounded" sx={{ width: 30, height: 30, flexShrink: 0 }}>
+                                    <Icon icon="solar:box-linear" size="15px" />
                                  </Avatar>
                               )}
                               <Box sx={{ minWidth: 0 }}>
-                                 <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 220 }}>
-                                    {line.name}
-                                 </Typography>
+                                 <Tooltip title={line.name} disableInteractive>
+                                    <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 138 }}>
+                                       {line.name}
+                                    </Typography>
+                                 </Tooltip>
                                  <Typography variant="caption" color="textSecondary">
                                     Gross {formatBDT(lineGross(line), currencySymbol)}
                                     {lineDiscountAmount(line) > 0
@@ -117,7 +127,9 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                            </Stack>
                         </TableCell>
                         <TableCell>
-                           <Typography variant="body2">{line.code || "—"}</Typography>
+                           <Typography variant="body2" color="textSecondary" noWrap>
+                              {line.code || "—"}
+                           </Typography>
                         </TableCell>
                         <TableCell align="center">
                            <Typography variant="body2" color={line.stock <= 5 ? "warning.main" : "textPrimary"}>
@@ -135,7 +147,7 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                  onUpdate(line.productId, { quantity: Number(e.target.value) })
                               }
                               inputProps={{ min: 1, max: line.stock, style: { textAlign: "center" } }}
-                              sx={{ width: 74 }}
+                              sx={{ width: 68 }}
                            />
                         </TableCell>
                         <TableCell align="right">
@@ -147,11 +159,18 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                  onUpdate(line.productId, { listPrice: Number(e.target.value) })
                               }
                               inputProps={{ min: 0, step: "0.01", style: { textAlign: "right" } }}
-                              sx={{ width: 104 }}
+                              InputProps={{
+                                 startAdornment: (
+                                    <InputAdornment position="start" sx={{ mr: 0 }}>
+                                       <Typography variant="caption" color="textSecondary">{currencySymbol}</Typography>
+                                    </InputAdornment>
+                                 ),
+                              }}
+                              sx={{ width: 102 }}
                            />
                         </TableCell>
                         <TableCell align="right">
-                           <Stack direction="row" spacing={0.75} justifyContent="flex-end" alignItems="center">
+                           <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="nowrap">
                               <ToggleButtonGroup
                                  size="small"
                                  exclusive
@@ -159,7 +178,7 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                  onChange={(_, v) => {
                                     if (v) onUpdate(line.productId, { discountType: v });
                                  }}
-                                 sx={{ "& .MuiToggleButton-root": { px: 0.9, py: 0.3, fontSize: 12 } }}
+                                 sx={{ "& .MuiToggleButton-root": { px: 0.75, py: 0.3, fontSize: 12 }, flexShrink: 0 }}
                               >
                                  <ToggleButton value="amount">{currencySymbol}</ToggleButton>
                                  <ToggleButton value="percent">%</ToggleButton>
@@ -174,17 +193,19 @@ const ProductTable = ({ lines, onUpdate, onRemove, currencySymbol = "৳" }: Pro
                                  inputProps={{ min: 0, step: "0.01", style: { textAlign: "right" } }}
                                  InputProps={{
                                     endAdornment: (
-                                       <InputAdornment position="end">
-                                          {line.discountType === "percent" ? "%" : currencySymbol}
+                                       <InputAdornment position="end" sx={{ ml: 0 }}>
+                                          <Typography variant="caption" color="textSecondary">
+                                             {line.discountType === "percent" ? "%" : currencySymbol}
+                                          </Typography>
                                        </InputAdornment>
                                     ),
                                  }}
-                                 sx={{ width: 108 }}
+                                 sx={{ width: 90 }}
                               />
                            </Stack>
                         </TableCell>
                         <TableCell align="right">
-                           <Typography variant="body2" fontWeight={700}>
+                           <Typography variant="body2" fontWeight={700} noWrap>
                               {formatBDT(lineTotal(line), currencySymbol)}
                            </Typography>
                         </TableCell>

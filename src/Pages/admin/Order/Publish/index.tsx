@@ -254,7 +254,13 @@ const Publish = () => {
                justifyContent="flex-end"
                alignItems={{ xs: "stretch", sm: "center" }}
             >
-               <Button variant="text" color="inherit" onClick={handleCancel} disabled={oc.submitting}>
+               <Button
+                  variant="text"
+                  color="inherit"
+                  onClick={handleCancel}
+                  disabled={oc.submitting}
+                  sx={{ whiteSpace: "nowrap", flexShrink: 0, height: 42, px: 2 }}
+               >
                   Cancel
                </Button>
                {!editId && (
@@ -264,7 +270,7 @@ const Publish = () => {
                      onClick={oc.saveDraft}
                      disabled={oc.savingDraft || oc.submitting}
                      startIcon={oc.savingDraft ? <CircularProgress size={15} color="inherit" /> : <Icon icon="solar:diskette-bold" size="16px" />}
-                     sx={{ textTransform: "none" }}
+                     sx={{ textTransform: "none", whiteSpace: "nowrap", flexShrink: 0, height: 42, px: 2 }}
                   >
                      Save as Draft
                   </Button>
@@ -272,9 +278,10 @@ const Publish = () => {
                <Button
                   type="button"
                   variant="outlined"
+                  color="primary"
                   onClick={() => window.print()}
                   startIcon={<Icon icon="solar:printer-bold" size="16px" />}
-                  sx={{ textTransform: "none" }}
+                  sx={{ textTransform: "none", whiteSpace: "nowrap", flexShrink: 0, height: 42, px: 2 }}
                >
                   Print Invoice
                </Button>
@@ -284,7 +291,7 @@ const Publish = () => {
                   onClick={handleSubmit}
                   disabled={oc.submitting}
                   startIcon={oc.submitting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                  sx={{ textTransform: "none", minWidth: 150 }}
+                  sx={{ textTransform: "none", whiteSpace: "nowrap", flexShrink: 0, height: 42, minWidth: 160, px: 2.5, fontWeight: 700 }}
                >
                   {oc.submitting ? "Saving…" : editId ? "Update Order" : "Create Order"}
                </Button>

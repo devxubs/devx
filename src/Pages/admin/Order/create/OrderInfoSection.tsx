@@ -29,7 +29,7 @@ function nextPreviewId(latest: string | null | undefined, prefix: string): strin
    if (!latest) return "Assigned on save";
    const match = String(latest).match(/(\d+)\s*$/);
    if (!match) return "Assigned on save";
-   return `${prefix}${parseInt(match[1], 10) + 1} (assigned on save)`;
+   return `${prefix}${parseInt(match[1], 10) + 1}`;
 }
 
 const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoSectionProps) => {
@@ -70,7 +70,13 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                   <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
                      Order ID <Typography component="span" variant="caption" color="textSecondary">(auto)</Typography>
                   </Typography>
-                  <TextField fullWidth size="small" value={orderPreview} disabled />
+                  <TextField
+                     fullWidth
+                     size="small"
+                     value={orderPreview}
+                     disabled
+                     helperText="Preview — assigned by the server on save"
+                  />
                </Stack>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
@@ -78,7 +84,13 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                   <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
                      Invoice No. <Typography component="span" variant="caption" color="textSecondary">(auto)</Typography>
                   </Typography>
-                  <TextField fullWidth size="small" value={invoicePreview} disabled />
+                  <TextField
+                     fullWidth
+                     size="small"
+                     value={invoicePreview}
+                     disabled
+                     helperText="Preview — assigned by the server on save"
+                  />
                </Stack>
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
@@ -99,7 +111,7 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                      value={courier}
                      onChange={(_, v) => onChange({ courier: v ?? "" })}
                      getOptionLabel={(o) => (o === "" ? "Not assigned" : o)}
-                     renderInput={(params) => <TextField {...params} size="small" label="Delivery method" placeholder="Select courier" />}
+                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select courier" />}
                   />
                </Stack>
             </Grid>
@@ -112,7 +124,7 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                      options={orderSources}
                      value={orderSource || null}
                      onChange={(_, v) => onChange({ orderSource: v ?? "" })}
-                     renderInput={(params) => <TextField {...params} size="small" label="Source" placeholder="Select source" />}
+                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select source" />}
                   />
                </Stack>
             </Grid>
@@ -125,7 +137,7 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                      options={orderStatuses}
                      value={status || null}
                      onChange={(_, v) => onChange({ status: v ?? "Pending" })}
-                     renderInput={(params) => <TextField {...params} size="small" label="Status" placeholder="Select status" />}
+                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select status" />}
                   />
                </Stack>
             </Grid>

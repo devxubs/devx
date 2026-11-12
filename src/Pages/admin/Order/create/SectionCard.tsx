@@ -18,8 +18,8 @@ const SectionCard = ({ title, subtitle, children, defaultExpanded = true, action
    const [expanded, setExpanded] = useState(defaultExpanded);
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
-         <Stack direction="row" justifyContent="space-between" alignItems="center" px={2.5} py={2}>
-            <Stack spacing={0.25}>
+         <Stack direction="row" justifyContent="space-between" alignItems="center" px={2.5} py={2} spacing={1.5}>
+            <Stack spacing={0.25} sx={{ minWidth: 0 }}>
                <Typography variant="body1" fontSize={17} color="textPrimary">
                   {title}
                </Typography>
@@ -29,7 +29,7 @@ const SectionCard = ({ title, subtitle, children, defaultExpanded = true, action
                   </Typography>
                )}
             </Stack>
-            <Stack direction="row" alignItems="center" spacing={1}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
                {action}
                <IconButton size="small" onClick={() => setExpanded(!expanded)} aria-label={expanded ? "Collapse section" : "Expand section"}>
                   <Icon

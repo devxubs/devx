@@ -12,11 +12,11 @@ interface OrderSummaryPanelProps {
 }
 
 const Row = ({ label, value, bold, color }: { label: string; value: string; bold?: boolean; color?: string }) => (
-   <Stack direction="row" justifyContent="space-between" alignItems="center">
+   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
       <Typography variant="body2" color="textSecondary" fontWeight={bold ? 700 : 400}>
          {label}
       </Typography>
-      <Typography variant="body2" fontWeight={bold ? 800 : 600} color={color || "textPrimary"}>
+      <Typography variant="body2" fontWeight={bold ? 800 : 600} color={color || "textPrimary"} noWrap>
          {value}
       </Typography>
    </Stack>
@@ -46,7 +46,7 @@ const OrderSummaryPanel = ({ totals, currencySymbol = "৳" }: OrderSummaryPanel
                <Typography variant="subtitle1" fontWeight={800}>
                   Grand Total
                </Typography>
-               <Typography variant="subtitle1" fontWeight={800} color="primary.main">
+               <Typography variant="subtitle1" fontWeight={800} color="primary.main" noWrap>
                   {formatBDT(totals.grandTotal, currencySymbol)}
                </Typography>
             </Stack>

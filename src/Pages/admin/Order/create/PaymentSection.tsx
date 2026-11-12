@@ -56,7 +56,7 @@ const PaymentSection = ({ paymentMethod, advancePayment, totals, onChange, curre
                      options={PAYMENT_METHODS}
                      value={paymentMethod || null}
                      onChange={(_, v) => onChange({ paymentMethod: v ?? "" })}
-                     renderInput={(params) => <TextField {...params} size="small" label="Payment method" placeholder="Select method" />}
+                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select method" />}
                   />
                </Stack>
             </Grid>

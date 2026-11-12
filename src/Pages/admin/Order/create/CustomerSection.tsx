@@ -80,9 +80,18 @@ const CustomerSection = ({ customer, onChange, searchCustomers }: CustomerSectio
             <Button
                size="small"
                variant="outlined"
-               startIcon={<Icon icon="solar:user-plus-bold" size="15px" />}
+               color="primary"
+               startIcon={<Icon icon="solar:user-plus-bold" size="16px" />}
                onClick={() => setModalOpen(true)}
-               sx={{ textTransform: "none" }}
+               sx={{
+                  textTransform: "none",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  px: 1.75,
+                  py: 0.75,
+                  fontWeight: 600,
+                  "& .MuiButton-startIcon": { mr: 0.75 },
+               }}
             >
                Add Customer
             </Button>
