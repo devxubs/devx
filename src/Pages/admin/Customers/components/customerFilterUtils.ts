@@ -25,6 +25,7 @@ export type RegPreset =
 export type LastOrderPreset =
    | "all"
    | "today"
+   | "yesterday"
    | "last7"
    | "last30"
    | "thisMonth"
@@ -100,12 +101,13 @@ export const REG_PRESET_OPTIONS: { value: RegPreset; label: string }[] = [
 export const LAST_ORDER_PRESET_OPTIONS: { value: LastOrderPreset; label: string }[] = [
    { value: "all", label: "Any Time" },
    { value: "today", label: "Today" },
+   { value: "yesterday", label: "Yesterday" },
    { value: "last7", label: "Last 7 Days" },
    { value: "last30", label: "Last 30 Days" },
    { value: "thisMonth", label: "This Month" },
    { value: "lastMonth", label: "Last Month" },
-   { value: "never", label: "Never Ordered" },
    { value: "custom", label: "Custom Range" },
+   { value: "never", label: "Never Ordered" },
 ];
 
 /** Resolve a preset (or a custom range) to an inclusive [start, end] pair. */
@@ -205,6 +207,65 @@ export function buildCustomerQuery(
    q.set("sortBy", sortBy);
    q.set("sortDir", sortDir);
    return q;
+}
+
+export type CustomerFilterErrors = Partial<
+   Record<"orders" | "purchase" | "paid" | "due" | "reg" | "last", string>
+>;
+
+function validateRange(
+   r: NumericRange,
+   integer: boolean,
+): string | undefined {
+   const v1 = r.value.trim();
+   const v2 = r.value2.trim();
+   if (v1 === "" && v2 === "") return undefined; // inactive — no condition
+   if (v1 === "") return "Enter a value.";
+   const n1 = Number(v1);
+   if (Number.isNaN(n1) || n1 < 0)
+      return "Enter a valid non-negative number.";
+   if (integer && !Number.isInteger(n1)) return "Enter a whole number.";
+   if (r.op === "between") {
+      if (v2 === "") return "Enter both minimum and maximum values.";
+      const n2 = Number(v2);
+      if (Number.isNaN(n2) || n2 < 0)
+         return "Enter a valid non-negative number.";
+      if (integer && !Number.isInteger(n2)) return "Enter a whole number.";
+      if (n1 > n2) return "Minimum cannot be greater than maximum.";
+   }
+   return undefined;
+}
+
+function validateCustomRange(
+   preset: RegPreset | LastOrderPreset,
+   range: [Date | null, Date | null],
+): string | undefined {
+   if (preset !== "custom") return undefined;
+   const [s, e] = range;
+   if (!s || !e) return "Select both start and end dates.";
+   if (dayjs(s).isAfter(dayjs(e)))
+      return "Start date cannot be after end date.";
+   return undefined;
+}
+
+/** Validate a draft filter state; empty result = valid. */
+export function validateCustomerFilters(
+   f: CustomerFilterState,
+): CustomerFilterErrors {
+   const errors: CustomerFilterErrors = {};
+   const orders = validateRange(f.orders, true);
+   if (orders) errors.orders = orders;
+   const purchase = validateRange(f.purchase, false);
+   if (purchase) errors.purchase = purchase;
+   const paid = validateRange(f.paid, false);
+   if (paid) errors.paid = paid;
+   const due = validateRange(f.due, false);
+   if (due) errors.due = due;
+   const reg = validateCustomRange(f.regPreset, f.regRange);
+   if (reg) errors.reg = reg;
+   const last = validateCustomRange(f.lastPreset, f.lastRange);
+   if (last) errors.last = last;
+   return errors;
 }
 
 /** Number of active advanced-filter groups (for the Filters button badge). */

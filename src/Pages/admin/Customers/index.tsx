@@ -12,6 +12,7 @@ import {
    Box,
    Button,
    Chip,
+   Divider,
    FormControl,
    InputLabel,
    MenuItem,
@@ -41,6 +42,7 @@ import {
    DEFAULT_FILTERS,
    describeFilters,
    FilterChipKey,
+   validateCustomerFilters,
 } from "./components/customerFilterUtils";
 import {
    exportCustomersToCsv,
@@ -75,8 +77,14 @@ const Customers = () => {
    const [exporting, setExporting] = useState(false);
 
    const [filterModalOpen, setFilterModalOpen] = useState(false);
+   const [showFilterErrors, setShowFilterErrors] = useState(false);
    const [draftFilters, setDraftFilters] = useState<CustomerFilterState>(DEFAULT_FILTERS);
    const [appliedFilters, setAppliedFilters] = useState<CustomerFilterState>(DEFAULT_FILTERS);
+   const draftErrors = useMemo(
+      () => validateCustomerFilters(draftFilters),
+      [draftFilters],
+   );
+   const draftValid = Object.keys(draftErrors).length === 0;
    const [sortBy, setSortBy] = useState("createdAt");
    const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -155,7 +163,19 @@ const Customers = () => {
    const handleResetFilters = useCallback(() => {
       setDraftFilters(DEFAULT_FILTERS);
       setAppliedFilters(DEFAULT_FILTERS);
+      setShowFilterErrors(false);
    }, []);
+
+   /** Modal Apply: validate the draft first; invalid drafts stay open. */
+   const handleApplyFilters = useCallback(() => {
+      if (!draftValid) {
+         setShowFilterErrors(true);
+         return;
+      }
+      setAppliedFilters(draftFilters);
+      setShowFilterErrors(false);
+      setFilterModalOpen(false);
+   }, [draftValid, draftFilters]);
 
    const handleChipDelete = (key: FilterChipKey) => {
       const next = clearFilterGroup(appliedFilters, key);
@@ -368,6 +388,7 @@ const Customers = () => {
                   variant="outlined"
                   onClick={() => {
                      setDraftFilters(appliedFilters);
+                     setShowFilterErrors(false);
                      setFilterModalOpen(true);
                   }}
                   startIcon={<Icon icon="solar:filter-bold" size="small" />}
@@ -547,7 +568,8 @@ const Customers = () => {
          )}
 
          {/* Advanced filters — shared CustomModal shell. Draft edits are
-             only applied on "Apply Filters"; closing discards them. */}
+             only applied on "Apply Filters"; closing discards them. The
+             fields scroll; the footer stays visible. */}
          <CustomModal
             open={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
@@ -556,43 +578,53 @@ const Customers = () => {
             sx={{
                width: { xs: "94vw", md: 880 },
                maxWidth: 880,
-               maxHeight: "90vh",
-               overflowY: "auto",
+               maxHeight: "92vh",
+               borderRadius: 4,
+               display: "flex",
+               flexDirection: "column",
             }}
          >
-            <Stack spacing={2.5}>
+            <Box
+               sx={{
+                  overflowY: "auto",
+                  maxHeight: { xs: "56vh", md: "60vh" },
+                  pr: 0.5,
+                  pb: 1,
+               }}
+            >
                <CustomerFilters
                   value={draftFilters}
                   onChange={setDraftFilters}
                   currencySymbol={currencySymbol}
+                  errors={draftErrors}
+                  showErrors={showFilterErrors}
                />
-               <Stack
-                  direction="row"
-                  spacing={1.5}
-                  justifyContent="flex-end"
-                  flexWrap="wrap"
+            </Box>
+            <Divider sx={{ mt: 1 }} />
+            <Stack
+               direction="row"
+               spacing={1.5}
+               justifyContent="flex-end"
+               flexWrap="wrap"
+               sx={{ pt: 2 }}
+            >
+               <Button
+                  variant="outlined"
+                  color="inherit"
+                  onClick={handleResetFilters}
+                  startIcon={<Icon icon="solar:restart-bold" size="small" />}
+                  sx={{ textTransform: "none", fontWeight: 600 }}
                >
-                  <Button
-                     variant="outlined"
-                     color="inherit"
-                     onClick={handleResetFilters}
-                     startIcon={<Icon icon="solar:restart-bold" size="small" />}
-                     sx={{ textTransform: "none", fontWeight: 600 }}
-                  >
-                     Reset Filters
-                  </Button>
-                  <Button
-                     variant="contained"
-                     onClick={() => {
-                        setAppliedFilters(draftFilters);
-                        setFilterModalOpen(false);
-                     }}
-                     startIcon={<Icon icon="solar:filter-bold" size="small" />}
-                     sx={{ textTransform: "none", fontWeight: 600 }}
-                  >
-                     Apply Filters
-                  </Button>
-               </Stack>
+                  Reset Filters
+               </Button>
+               <Button
+                  variant="contained"
+                  onClick={handleApplyFilters}
+                  startIcon={<Icon icon="solar:filter-bold" size="small" />}
+                  sx={{ textTransform: "none", fontWeight: 600 }}
+               >
+                  Apply Filters
+               </Button>
             </Stack>
          </CustomModal>
 
