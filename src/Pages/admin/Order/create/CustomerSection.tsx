@@ -90,7 +90,7 @@ const CustomerSection = ({ customer, onChange, searchCustomers }: CustomerSectio
                   px: 1.75,
                   py: 0.75,
                   fontWeight: 600,
-                  "& .MuiButton-startIcon": { mr: 0.75 },
+                  "& .MuiButton-startIcon": { mr: 0.75, color: "primary.main" },
                }}
             >
                Add Customer

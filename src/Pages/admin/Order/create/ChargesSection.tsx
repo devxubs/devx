@@ -65,7 +65,15 @@ const ChargesSection = ({
                         onChange={(_, v) => {
                            if (v) onChange({ discountType: v });
                         }}
-                        sx={{ "& .MuiToggleButton-root": { px: 1.4 } }}
+                        sx={{
+                           "& .MuiToggleButton-root": {
+                              px: 0.9,
+                              py: 0.3,
+                              fontSize: 12.5,
+                              lineHeight: 1.35,
+                              whiteSpace: "nowrap",
+                           },
+                        }}
                      >
                         <ToggleButton value="amount">{currencySymbol} Amount</ToggleButton>
                         <ToggleButton value="percent">% Percent</ToggleButton>
