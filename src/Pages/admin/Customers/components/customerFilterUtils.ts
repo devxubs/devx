@@ -2,7 +2,21 @@
 // query-string building and active-filter descriptions (chips).
 import dayjs from "dayjs";
 
-export type RangeOp = "eq" | "gt" | "lt" | "between";
+export type RangeOp = "eq" | "gt" | "gte" | "lt" | "lte" | "between";
+
+/** All order statuses in the Prisma OrderStatus enum. */
+export const ORDER_STATUS_OPTIONS: string[] = [
+   "PENDING",
+   "CONFIRMED",
+   "PROCESSING",
+   "SHIPPED",
+   "OUT_FOR_DELIVERY",
+   "DELIVERED",
+   "COMPLETED",
+   "HOLD",
+   "CANCELLED",
+   "FAILED",
+];
 
 export interface NumericRange {
    op: RangeOp;
@@ -42,6 +56,20 @@ export interface CustomerFilterState {
    due: NumericRange;
    lastPreset: LastOrderPreset;
    lastRange: [Date | null, Date | null];
+   // Additional filters (all backed by real schema data — see API route)
+   delivered: NumericRange;
+   itemQty: NumericRange;
+   orderStatuses: string[];
+   orderStatusExclude: boolean;
+   orderSources: string[];
+   orderSourceExclude: boolean;
+   productId: string;
+   productLabel: string;
+   categoryId: string;
+   categoryLabel: string;
+   employeeId: string;
+   employeeLabel: string;
+   phoneNumber: string;
 }
 
 export const emptyRange: NumericRange = { op: "gt", value: "", value2: "" };
@@ -56,6 +84,19 @@ export const DEFAULT_FILTERS: CustomerFilterState = {
    due: { ...emptyRange },
    lastPreset: "all",
    lastRange: [null, null],
+   delivered: { ...emptyRange },
+   itemQty: { ...emptyRange },
+   orderStatuses: [],
+   orderStatusExclude: false,
+   orderSources: [],
+   orderSourceExclude: false,
+   productId: "",
+   productLabel: "",
+   categoryId: "",
+   categoryLabel: "",
+   employeeId: "",
+   employeeLabel: "",
+   phoneNumber: "",
 };
 
 export type CustomerStatus = "New" | "Returning";
@@ -191,6 +232,22 @@ export function buildCustomerQuery(
    addRangeParams(q, "purchase", f.purchase);
    addRangeParams(q, "paid", f.paid);
    addRangeParams(q, "due", f.due);
+   addRangeParams(q, "delivered", f.delivered);
+   addRangeParams(q, "itemQty", f.itemQty);
+
+   if (f.orderStatuses.length > 0) {
+      q.set("orderStatuses", f.orderStatuses.join(","));
+      if (f.orderStatusExclude) q.set("orderStatusMode", "exclude");
+   }
+   if (f.orderSources.length > 0) {
+      q.set("orderSources", f.orderSources.join(","));
+      if (f.orderSourceExclude) q.set("orderSourceMode", "exclude");
+   }
+   if (f.productId) q.set("productId", f.productId);
+   if (f.categoryId) q.set("categoryId", f.categoryId);
+   if (f.employeeId) q.set("employeeId", f.employeeId);
+   const phone = f.phoneNumber.replace(/[\s-]/g, "");
+   if (phone) q.set("phoneFilter", phone);
 
    if (f.lastPreset === "never") {
       q.set("neverOrdered", "1");
@@ -208,7 +265,18 @@ export function buildCustomerQuery(
 }
 
 export type CustomerFilterErrors = Partial<
-   Record<"orders" | "purchase" | "paid" | "due" | "reg" | "last", string>
+   Record<
+      | "orders"
+      | "purchase"
+      | "paid"
+      | "due"
+      | "reg"
+      | "last"
+      | "delivered"
+      | "itemQty"
+      | "phone",
+      string
+   >
 >;
 
 function validateRange(
@@ -263,6 +331,18 @@ export function validateCustomerFilters(
    if (reg) errors.reg = reg;
    const last = validateCustomRange(f.lastPreset, f.lastRange);
    if (last) errors.last = last;
+   const delivered = validateRange(f.delivered, true);
+   if (delivered) errors.delivered = delivered;
+   const itemQty = validateRange(f.itemQty, true);
+   if (itemQty) errors.itemQty = itemQty;
+   const phone = f.phoneNumber.trim();
+   if (phone !== "") {
+      // Same format rule as the project's customer API: strip spaces and
+      // dashes, then /^\+?[0-9]{7,15}$/.
+      const normalized = phone.replace(/[\s-]/g, "");
+      if (!/^\+?[0-9]{7,15}$/.test(normalized))
+         errors.phone = "Enter a valid phone number format.";
+   }
    return errors;
 }
 
@@ -280,6 +360,14 @@ export function countActiveFilters(f: CustomerFilterState): number {
       resolveDateRange(f.lastPreset, f.lastRange)
    )
       n++;
+   if (isRangeActive(f.delivered)) n++;
+   if (isRangeActive(f.itemQty)) n++;
+   if (f.orderStatuses.length > 0) n++;
+   if (f.orderSources.length > 0) n++;
+   if (f.productId) n++;
+   if (f.categoryId) n++;
+   if (f.employeeId) n++;
+   if (f.phoneNumber.trim() !== "") n++;
    return n;
 }
 
@@ -290,7 +378,15 @@ export type FilterChipKey =
    | "purchase"
    | "paid"
    | "due"
-   | "last";
+   | "last"
+   | "delivered"
+   | "itemQty"
+   | "orderStatuses"
+   | "orderSources"
+   | "product"
+   | "category"
+   | "employee"
+   | "phone";
 
 export interface FilterChipDescriptor {
    key: FilterChipKey;
@@ -300,7 +396,9 @@ export interface FilterChipDescriptor {
 const OP_SYMBOL: Record<RangeOp, string> = {
    eq: "=",
    gt: ">",
+   gte: "≥",
    lt: "<",
+   lte: "≤",
    between: "",
 };
 
@@ -362,6 +460,40 @@ export function describeFilters(
       );
       if (last) chips.push({ key: "last", label: last });
    }
+   if (isRangeActive(f.delivered))
+      chips.push({
+         key: "delivered",
+         label: rangeLabel("Delivered Orders", f.delivered),
+      });
+   if (isRangeActive(f.itemQty))
+      chips.push({ key: "itemQty", label: rangeLabel("Item Qty", f.itemQty) });
+   if (f.orderStatuses.length > 0)
+      chips.push({
+         key: "orderStatuses",
+         label: `Order Status${f.orderStatusExclude ? " (excl.)" : ""}: ${f.orderStatuses.join(", ")}`,
+      });
+   if (f.orderSources.length > 0)
+      chips.push({
+         key: "orderSources",
+         label: `Order Source${f.orderSourceExclude ? " (excl.)" : ""}: ${f.orderSources.join(", ")}`,
+      });
+   if (f.productId)
+      chips.push({
+         key: "product",
+         label: `Product: ${f.productLabel || f.productId}`,
+      });
+   if (f.categoryId)
+      chips.push({
+         key: "category",
+         label: `Category: ${f.categoryLabel || f.categoryId}`,
+      });
+   if (f.employeeId)
+      chips.push({
+         key: "employee",
+         label: `Employee: ${f.employeeLabel || f.employeeId}`,
+      });
+   if (f.phoneNumber.trim() !== "")
+      chips.push({ key: "phone", label: `Phone: ${f.phoneNumber.trim()}` });
    return chips;
 }
 
@@ -385,6 +517,22 @@ export function clearFilterGroup(
          return { ...f, due: { ...emptyRange } };
       case "last":
          return { ...f, lastPreset: "all", lastRange: [null, null] };
+      case "delivered":
+         return { ...f, delivered: { ...emptyRange } };
+      case "itemQty":
+         return { ...f, itemQty: { ...emptyRange } };
+      case "orderStatuses":
+         return { ...f, orderStatuses: [], orderStatusExclude: false };
+      case "orderSources":
+         return { ...f, orderSources: [], orderSourceExclude: false };
+      case "product":
+         return { ...f, productId: "", productLabel: "" };
+      case "category":
+         return { ...f, categoryId: "", categoryLabel: "" };
+      case "employee":
+         return { ...f, employeeId: "", employeeLabel: "" };
+      case "phone":
+         return { ...f, phoneNumber: "" };
       default:
          return f;
    }

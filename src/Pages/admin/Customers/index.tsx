@@ -12,6 +12,7 @@ import {
    Box,
    Button,
    Chip,
+   CircularProgress,
    FormControl,
    InputLabel,
    MenuItem,
@@ -62,7 +63,8 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
 type SnackState = { severity: "success" | "error"; message: string } | null;
 
 const Customers = () => {
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
+   const currencySymbol = settings.currencySymbol || "৳";
    const { filterQueryData, setFilterQueryData } = useFilterQuery();
    const searchText = filterQueryData.searchText || "";
 
@@ -122,8 +124,10 @@ const Customers = () => {
          });
          setRows(mapped);
          setTotal(Number(data.total ?? mapped.length));
+         lastLoadOkRef.current = true;
       } catch {
          if (req !== requestRef.current) return;
+         lastLoadOkRef.current = false;
          setRows([]);
          setTotal(0);
          setSnack({
@@ -157,23 +161,33 @@ const Customers = () => {
       if (searchText) setFilterQueryData({ searchText: "" });
    }, [searchText, setFilterQueryData]);
 
-   /** Modal Reset: clear only the advanced filters (search/sort stay). */
+   /** Modal Reset: reset the DRAFT only — nothing is applied until the
+       user presses Apply Filters; the modal stays open for review. */
    const handleResetFilters = useCallback(() => {
       setDraftFilters(DEFAULT_FILTERS);
-      setAppliedFilters(DEFAULT_FILTERS);
       setShowFilterErrors(false);
    }, []);
 
-   /** Modal Apply: validate the draft first; invalid drafts stay open. */
+   const [applyingFilters, setApplyingFilters] = useState(false);
+   const lastLoadOkRef = useRef(true);
+
+   /** Modal Apply: validate first; the modal closes only after the
+       customer list has loaded successfully with the new filters. */
    const handleApplyFilters = useCallback(() => {
       if (!draftValid) {
          setShowFilterErrors(true);
          return;
       }
-      setAppliedFilters(draftFilters);
       setShowFilterErrors(false);
-      setFilterModalOpen(false);
+      setApplyingFilters(true);
+      setAppliedFilters(draftFilters);
    }, [draftValid, draftFilters]);
+
+   useEffect(() => {
+      if (!applyingFilters || loading) return;
+      setApplyingFilters(false);
+      if (lastLoadOkRef.current) setFilterModalOpen(false);
+   }, [applyingFilters, loading]);
 
    const handleChipDelete = (key: FilterChipKey) => {
       const next = clearFilterGroup(appliedFilters, key);
@@ -589,6 +603,7 @@ const Customers = () => {
                      onChange={setDraftFilters}
                      errors={draftErrors}
                      showErrors={showFilterErrors}
+                     currencySymbol={currencySymbol}
                   />
                   <Stack
                      direction={{ xs: "column", sm: "row" }}
@@ -598,11 +613,16 @@ const Customers = () => {
                      pb={{ xs: 6, sm: 0 }}
                      flexWrap="wrap"
                   >
-                     <Button color="inherit" onClick={handleResetFilters}>
-                        Reset
+                     <Button
+                        color="inherit"
+                        disabled={applyingFilters}
+                        onClick={handleResetFilters}
+                     >
+                        Reset Filters
                      </Button>
                      <Button
                         color="error"
+                        disabled={applyingFilters}
                         onClick={() => setFilterModalOpen(false)}
                      >
                         Cancel
@@ -610,9 +630,15 @@ const Customers = () => {
                      <Button
                         variant="contained"
                         color="primary"
+                        disabled={applyingFilters}
                         onClick={handleApplyFilters}
+                        startIcon={
+                           applyingFilters ? (
+                              <CircularProgress size={16} color="inherit" />
+                           ) : undefined
+                        }
                      >
-                        Apply
+                        {applyingFilters ? "Applying…" : "Apply Filters"}
                      </Button>
                   </Stack>
                </Stack>

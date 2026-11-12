@@ -18,6 +18,8 @@ type CustomerStats = {
    totalDue: number;
    lastOrderAt: Date | null;
    status: "New" | "Returning";
+   deliveredCount: number;
+   itemQtyTotal: number;
 };
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -39,7 +41,11 @@ function parseDateParam(
    return isNaN(d.getTime()) ? null : d;
 }
 
-type RangeCheck = { op: "eq" | "gt" | "lt" | "between"; v1: number; v2: number | null };
+type RangeCheck = {
+   op: "eq" | "gt" | "gte" | "lt" | "lte" | "between";
+   v1: number;
+   v2: number | null;
+};
 
 /** Read a generic range filter: {prefix}Op, {prefix}Value, {prefix}Value2. */
 function getRangeCheck(
@@ -49,7 +55,7 @@ function getRangeCheck(
    const op = searchParams.get(`${prefix}Op`);
    const raw1 = searchParams.get(`${prefix}Value`);
    if (!op || raw1 === null || raw1 === "") return null;
-   if (!["eq", "gt", "lt", "between"].includes(op)) return null;
+   if (!["eq", "gt", "gte", "lt", "lte", "between"].includes(op)) return null;
    const v1 = Number(raw1);
    if (Number.isNaN(v1)) return null;
    let v2: number | null = null;
@@ -68,8 +74,12 @@ function matchesRange(value: number, check: RangeCheck): boolean {
          return Math.abs(value - check.v1) < 0.005;
       case "gt":
          return value > check.v1;
+      case "gte":
+         return value >= check.v1;
       case "lt":
          return value < check.v1;
+      case "lte":
+         return value <= check.v1;
       case "between": {
          const lo = Math.min(check.v1, check.v2 ?? check.v1);
          const hi = Math.max(check.v1, check.v2 ?? check.v1);
@@ -98,6 +108,28 @@ export async function GET(request: NextRequest) {
    }
 
    const { searchParams } = new URL(request.url);
+
+   // Filter facets for the Customer Filters modal: the distinct order
+   // source values that actually exist in the data (no invented options).
+   if (searchParams.get("facets") === "1") {
+      try {
+         const grouped = await prisma.order.groupBy({
+            by: ["orderSource"],
+            where: { isDeleted: false, orderSource: { not: null } },
+         });
+         const orderSources = grouped
+            .map((g) => (g.orderSource || "").trim())
+            .filter((s) => s !== "")
+            .sort((a, b) => a.localeCompare(b));
+         return NextResponse.json({ orderSources });
+      } catch {
+         return NextResponse.json(
+            { error: "Failed to fetch filter options" },
+            { status: 500 },
+         );
+      }
+   }
+
    const isExportAll = searchParams.get("all") === "true" || searchParams.get("export") === "true";
    const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
    const limit = isExportAll ? 10000 : Math.min(parseInt(searchParams.get("limit") || "20"), 100);
@@ -112,6 +144,13 @@ export async function GET(request: NextRequest) {
          { email: { contains: search } },
          { customId: { contains: search } },
       ];
+   }
+
+   // BD mobile / phone filter — normalized "contains" on the stored
+   // phone, applied in the DB query (AND with the search group).
+   const phoneFilter = (searchParams.get("phoneFilter") || "").replace(/[\s-]/g, "");
+   if (phoneFilter) {
+      where.phone = { contains: phoneFilter };
    }
 
    // Registration (customer createdAt) range — applied in the DB query.
@@ -140,6 +179,25 @@ export async function GET(request: NextRequest) {
    const neverOrdered = searchParams.get("neverOrdered") === "1";
    const lastFrom = parseDateParam(searchParams.get("lastFrom"), "start");
    const lastTo = parseDateParam(searchParams.get("lastTo"), "end");
+
+   // Additional range filters over derived per-customer aggregates.
+   const deliveredCheck = getRangeCheck(searchParams, "delivered");
+   const itemQtyCheck = getRangeCheck(searchParams, "itemQty");
+
+   // Additional presence filters (customer must / must not have at least
+   // one matching non-deleted order).
+   const parseList = (raw: string | null) =>
+      (raw || "")
+         .split(",")
+         .map((s) => s.trim())
+         .filter((s) => s !== "");
+   const orderStatusList = parseList(searchParams.get("orderStatuses"));
+   const orderStatusExclude = searchParams.get("orderStatusMode") === "exclude";
+   const orderSourceList = parseList(searchParams.get("orderSources"));
+   const orderSourceExclude = searchParams.get("orderSourceMode") === "exclude";
+   const productIdParam = searchParams.get("productId") || "";
+   const categoryIdParam = searchParams.get("categoryId") || "";
+   const employeeIdParam = searchParams.get("employeeId") || "";
 
    const sortByParam = searchParams.get("sortBy") || "";
    const sortBy = (SORTABLE_FIELDS as readonly string[]).includes(sortByParam)
@@ -185,7 +243,64 @@ export async function GET(request: NextRequest) {
                totalDue: round2(Number(g._sum.dueAmount ?? 0)),
                lastOrderAt: g._max.createdAt ?? null,
                status: totalOrders > 1 ? "Returning" : "New",
+               deliveredCount: 0,
+               itemQtyTotal: 0,
             });
+         }
+
+         const matchedIds = matched.map((c) => c.id);
+         const validOrderWhere: any = {
+            customerId: { in: matchedIds },
+            isDeleted: false,
+            status: { notIn: [...EXCLUDED_ORDER_STATUSES] },
+         };
+
+         // Delivered/completed order count — same delivered definition as
+         // the customer analytics helpers (status DELIVERED/COMPLETED or
+         // courierStatus DELIVERED), over non-deleted orders.
+         if (deliveredCheck) {
+            const delivered = await prisma.order.groupBy({
+               by: ["customerId"],
+               where: {
+                  customerId: { in: matchedIds },
+                  isDeleted: false,
+                  OR: [
+                     { status: { in: ["DELIVERED", "COMPLETED"] } },
+                     { courierStatus: "DELIVERED" },
+                  ],
+               },
+               _count: { _all: true },
+            });
+            for (const g of delivered) {
+               if (!g.customerId) continue;
+               const s = statsByCustomer.get(g.customerId);
+               if (s) s.deliveredCount = g._count._all;
+            }
+         }
+
+         // Total purchased item quantity across the customer's valid
+         // orders (OrderItem.quantity summed per customer).
+         if (itemQtyCheck) {
+            const itemGroups = await prisma.orderItem.groupBy({
+               by: ["orderId"],
+               where: { order: validOrderWhere },
+               _sum: { quantity: true },
+            });
+            if (itemGroups.length > 0) {
+               const orders = await prisma.order.findMany({
+                  where: validOrderWhere,
+                  select: { id: true, customerId: true },
+               });
+               const customerByOrder = new Map(
+                  orders.map((o) => [o.id, o.customerId]),
+               );
+               for (const g of itemGroups) {
+                  const cid = customerByOrder.get(g.orderId);
+                  if (!cid) continue;
+                  const s = statsByCustomer.get(cid);
+                  if (s) s.itemQtyTotal += Number(g._sum.quantity ?? 0);
+               }
+            }
          }
       }
 
@@ -196,6 +311,8 @@ export async function GET(request: NextRequest) {
          totalDue: 0,
          lastOrderAt: null,
          status: "New",
+         deliveredCount: 0,
+         itemQtyTotal: 0,
       };
 
       let enriched = matched.map((c) => ({
@@ -224,6 +341,81 @@ export async function GET(request: NextRequest) {
             if (lastTo && d > lastTo) return false;
             return true;
          });
+      }
+
+      if (deliveredCheck) {
+         enriched = enriched.filter((c) =>
+            matchesRange(c.stats.deliveredCount, deliveredCheck),
+         );
+      }
+      if (itemQtyCheck) {
+         enriched = enriched.filter((c) =>
+            matchesRange(c.stats.itemQtyTotal, itemQtyCheck),
+         );
+      }
+
+      // ── Presence filters (order status / source) ──
+      // Based on ALL non-deleted orders (a CANCELLED-status filter must
+      // be able to match), grouped per customer — one query per filter.
+      const presenceFilter = async (
+         values: string[],
+         exclude: boolean,
+         byField: "status" | "orderSource",
+      ) => {
+         if (values.length === 0) return;
+         const groupedPresence = await prisma.order.groupBy({
+            by: ["customerId", byField],
+            where: {
+               customerId: { in: enriched.map((c) => c.id) },
+               isDeleted: false,
+               [byField]: { in: values },
+            },
+         });
+         const has = new Set(
+            groupedPresence.map((g) => g.customerId).filter(Boolean),
+         );
+         enriched = enriched.filter((c) =>
+            exclude ? !has.has(c.id) : has.has(c.id),
+         );
+      };
+      await presenceFilter(orderStatusList, orderStatusExclude, "status");
+      await presenceFilter(orderSourceList, orderSourceExclude, "orderSource");
+
+      // ── Product / category presence via order items (valid orders) ──
+      if (productIdParam || categoryIdParam) {
+         const items = await prisma.orderItem.findMany({
+            where: {
+               ...(productIdParam ? { productId: productIdParam } : {}),
+               ...(categoryIdParam
+                  ? { product: { categoryId: categoryIdParam } }
+                  : {}),
+               order: {
+                  customerId: { in: enriched.map((c) => c.id) },
+                  isDeleted: false,
+                  status: { notIn: [...EXCLUDED_ORDER_STATUSES] },
+               },
+            },
+            select: { order: { select: { customerId: true } } },
+         });
+         const has = new Set(
+            items.map((i) => i.order.customerId).filter(Boolean),
+         );
+         enriched = enriched.filter((c) => has.has(c.id));
+      }
+
+      // ── Employee presence (orders carry employeeId = creating user) ──
+      if (employeeIdParam) {
+         const orders = await prisma.order.findMany({
+            where: {
+               customerId: { in: enriched.map((c) => c.id) },
+               employeeId: employeeIdParam,
+               isDeleted: false,
+               status: { notIn: [...EXCLUDED_ORDER_STATUSES] },
+            },
+            select: { customerId: true },
+         });
+         const has = new Set(orders.map((o) => o.customerId).filter(Boolean));
+         enriched = enriched.filter((c) => has.has(c.id));
       }
 
       // ── Sorting (null lastOrderAt always sorts last) ──
