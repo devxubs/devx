@@ -5,7 +5,6 @@
 import {
    Alert,
    Button,
-   Chip,
    Snackbar,
    Stack,
    Typography,
@@ -23,14 +22,13 @@ import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityMo
 import CustomerTable from "./components/CustomerTable";
 import CustomerFilterModal from "./components/CustomerFilterModal";
 import {
+   buildCustomerFilterChips,
    buildCustomerQuery,
-   clearFilterGroup,
    countActiveFilters,
    CustomerFilterState,
    CustomerRow,
    DEFAULT_FILTERS,
-   describeFilters,
-   FilterChipKey,
+   syncFiltersFromCustomerData,
    validateCustomerFilters,
 } from "./components/customerFilterUtils";
 import {
@@ -140,17 +138,63 @@ const Customers = () => {
       () => countActiveFilters(appliedFilters),
       [appliedFilters],
    );
-   const chips = useMemo(
-      () => describeFilters(appliedFilters),
-      [appliedFilters],
-   );
    const filtersActive = activeCount > 0 || debouncedSearch.trim() !== "";
+
+   const initialRestoredRef = useRef(false);
+
+   // Restore active filters from URL on initial page mount if present
+   useEffect(() => {
+      if (initialRestoredRef.current) return;
+      initialRestoredRef.current = true;
+      const custData = filterQueryData.customerData;
+      if (custData?._raw) {
+         setAppliedFilters(custData._raw);
+         setDraftFilters(custData._raw);
+      }
+   }, [filterQueryData.customerData]);
+
+   // Synchronize applied filters when chips are removed or cleared from Table Filter toolbar
+   useEffect(() => {
+      if (!initialRestoredRef.current) return;
+      const custData = filterQueryData.customerData;
+
+      // Table Clear button clicked: customerData is empty
+      if (!custData || Object.keys(custData).length === 0) {
+         if (countActiveFilters(appliedFilters) > 0) {
+            setAppliedFilters(DEFAULT_FILTERS);
+            setDraftFilters(DEFAULT_FILTERS);
+         }
+         return;
+      }
+
+      // Check if any filter was removed from the Table Filter toolbar
+      const synced = syncFiltersFromCustomerData(appliedFilters, custData);
+      if (JSON.stringify(synced) !== JSON.stringify(appliedFilters)) {
+         setAppliedFilters(synced);
+         setDraftFilters(synced);
+         setFilterQueryData(
+            {
+               customerData: {
+                  ...custData,
+                  _raw: synced,
+               },
+            },
+            0,
+         );
+      }
+   }, [filterQueryData.customerData, appliedFilters, setFilterQueryData]);
 
    const handleReset = useCallback(() => {
       setDraftFilters(DEFAULT_FILTERS);
       setAppliedFilters(DEFAULT_FILTERS);
-      if (searchText) setFilterQueryData({ searchText: "" });
-   }, [searchText, setFilterQueryData]);
+      setFilterQueryData(
+         {
+            customerData: {},
+            searchText: "",
+         },
+         0,
+      );
+   }, [setFilterQueryData]);
 
    const handleResetFilters = useCallback(() => {
       setDraftFilters(DEFAULT_FILTERS);
@@ -167,19 +211,24 @@ const Customers = () => {
       setShowFilterErrors(false);
       setApplyingFilters(true);
       setAppliedFilters(draftFilters);
-   }, [draftValid, draftFilters]);
+
+      const chipsMap = buildCustomerFilterChips(draftFilters);
+      setFilterQueryData(
+         {
+            customerData: {
+               ...chipsMap,
+               _raw: draftFilters,
+            },
+         },
+         0,
+      );
+   }, [draftValid, draftFilters, setFilterQueryData]);
 
    useEffect(() => {
       if (!applyingFilters || loading) return;
       setApplyingFilters(false);
       if (lastLoadOkRef.current) setFilterModalOpen(false);
    }, [applyingFilters, loading]);
-
-   const handleChipDelete = (key: FilterChipKey) => {
-      const next = clearFilterGroup(appliedFilters, key);
-      setAppliedFilters(next);
-      setDraftFilters(next);
-   };
 
    const handleExport = async (
       format: "csv" | "excel",
@@ -238,30 +287,6 @@ const Customers = () => {
          spacing={2}
          sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
       >
-         {/* Active filter chips */}
-         {chips.length > 0 && (
-            <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
-               {chips.map((chip) => (
-                  <Chip
-                     key={chip.key}
-                     label={chip.label}
-                     size="small"
-                     onDelete={() => handleChipDelete(chip.key)}
-                     sx={{ fontWeight: 600 }}
-                  />
-               ))}
-               <Button
-                  size="small"
-                  variant="text"
-                  color="error"
-                  onClick={handleReset}
-                  sx={{ textTransform: "none", fontWeight: 600 }}
-               >
-                  Clear all
-               </Button>
-            </Stack>
-         )}
-
          {/* Empty-result guidance */}
          {loadedOnce && !loading && rows.length === 0 && (
             <Stack
