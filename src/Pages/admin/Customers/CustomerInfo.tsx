@@ -16,18 +16,27 @@ const CustomerInfo = ({
    const [copyText, setCopyText] = useState("Copy phone number");
 
    return (
-      <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
-         <Stack>
+      <Stack spacing={1} direction="row" alignItems="center" height={"100%"} sx={{ minWidth: 0, width: "100%" }}>
+         <Stack sx={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
             <Typography
                variant="body2"
                color="textPrimary"
+               noWrap
                sx={{
                   "&:hover": { textDecoration: "underline", cursor: "pointer" },
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                }}
             >
                {name}
             </Typography>
-            <Typography variant="body2" fontSize={14} color="textSecondary">
+            <Typography
+               variant="body2"
+               fontSize={14}
+               color="textSecondary"
+               noWrap
+               sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+            >
                {phone}
             </Typography>
          </Stack>
