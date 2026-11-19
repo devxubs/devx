@@ -80,31 +80,6 @@ const statusLabelToApi: Record<string, string> = {
    Failed: "FAILED",
 };
 
-// Phase 3B (3.4): courier pipeline stages, mapped onto the EXISTING
-// order lifecycle — no new statuses. The stages partition the whole
-// OrderStatus enum exactly once, so stage counts (from the API's
-// ordersByStatus aggregates) always sum to the total order count.
-//   Packed            = PROCESSING (being prepared/packed)
-//   With Courier      = SHIPPED (handed to courier) + OUT_FOR_DELIVERY
-//   Delivered         = DELIVERED + COMPLETED
-//   Returned/Cancelled = CANCELLED + FAILED (there is no RETURNED
-//   order status; courier-level returns are tracked via
-//   courierStatus = "Returned" and reported in the Courier report)
-interface PipelineStage {
-   key: string;
-   label: string;
-   statuses: string[];
-}
-const PIPELINE_STAGES: PipelineStage[] = [
-   { key: "pending", label: "Pending", statuses: ["PENDING"] },
-   { key: "confirmed", label: "Confirmed", statuses: ["CONFIRMED"] },
-   { key: "packed", label: "Packed", statuses: ["PROCESSING"] },
-   { key: "courier", label: "With Courier", statuses: ["SHIPPED", "OUT_FOR_DELIVERY"] },
-   { key: "delivered", label: "Delivered", statuses: ["DELIVERED", "COMPLETED"] },
-   { key: "returned", label: "Returned / Cancelled", statuses: ["CANCELLED", "FAILED"] },
-   { key: "hold", label: "On Hold", statuses: ["HOLD"] },
-];
-
 const BULK_COURIERS = [
    "Pathao",
    "Steadfast",
@@ -154,8 +129,6 @@ const OrderTable = () => {
       null,
    );
    const [selectedOrders, setSelectedOrders] = useState<any[]>([]);
-   // Phase 3B (3.4): active courier-pipeline stage filter.
-   const [pipelineStage, setPipelineStage] = useState<PipelineStage | null>(null);
    // Phase 3B (3.5): bulk action state.
    const [bulkStatusAnchor, setBulkStatusAnchor] = useState<HTMLElement | null>(null);
    const [courierModalOpen, setCourierModalOpen] = useState(false);
@@ -217,17 +190,12 @@ const OrderTable = () => {
 
          const f = (filterQueryData.orderData || {}) as any;
 
-         // Phase 3B (3.4): an active pipeline stage wins over the
-         // status tab — it sends the stage's API status values
-         // (comma-separated; the API already supports status lists).
          // Tab/filter labels are mapped through statusLabelToApi:
          // the API uppercases what it receives, so a raw label like
          // "Out for Delivery" never matched the OUT_FOR_DELIVERY
          // enum value.
          const currentStatus = orderStatus[orderTab]?.label;
-         if (pipelineStage) {
-            params.set("status", pipelineStage.statuses.join(","));
-         } else if (currentStatus && currentStatus !== "All") {
+         if (currentStatus && currentStatus !== "All") {
             params.set("status", statusLabelToApi[currentStatus] || currentStatus);
          } else if (f.status && f.status !== "All") {
             params.set("status", statusLabelToApi[f.status] || f.status);
@@ -391,7 +359,7 @@ const OrderTable = () => {
       } finally {
          setLoading(false);
       }
-   }, [orderTab, filterQueryData, paginationModel, pipelineStage]);
+   }, [orderTab, filterQueryData, paginationModel]);
 
    // Any tab / filter / search change returns to the first page so the
    // requested page can never point past the filtered result set.
@@ -399,7 +367,7 @@ const OrderTable = () => {
       setPaginationModel((prev) =>
          prev.page === 0 ? prev : { ...prev, page: 0 },
       );
-   }, [orderTab, filterQueryData, pipelineStage]);
+   }, [orderTab, filterQueryData]);
 
    useEffect(() => {
       loadOrders();
@@ -626,65 +594,12 @@ const OrderTable = () => {
             overflow: "hidden",
          }}
       >
-         {/* Phase 3B (3.4): courier pipeline — stage chips with real
-             counts from the API's ordersByStatus aggregates. Stages
-             map onto the existing order lifecycle (see PIPELINE_STAGES)
-             and filter the list through the same status parameter, so
-             counts and rows always agree. Picking a status tab clears
-             the stage, and vice versa. */}
-         <Stack
-            direction="row"
-            spacing={1}
-            flexWrap="wrap"
-            alignItems="center"
-            sx={{ px: 2, pt: 2 }}
-         >
-            <Typography
-               variant="caption"
-               fontWeight={700}
-               color="text.secondary"
-               letterSpacing="0.04em"
-            >
-               PIPELINE
-            </Typography>
-            {PIPELINE_STAGES.map((stage) => {
-               const count = statusCounts
-                  ? stage.statuses.reduce(
-                       (sum, st) => sum + (statusCounts[st] || 0),
-                       0,
-                    )
-                  : undefined;
-               const active = pipelineStage?.key === stage.key;
-               return (
-                  <Chip
-                     key={stage.key}
-                     label={
-                        count !== undefined
-                           ? `${stage.label} (${count})`
-                           : stage.label
-                     }
-                     color={active ? "primary" : "default"}
-                     variant={active ? "filled" : "outlined"}
-                     clickable
-                     onClick={() =>
-                        setPipelineStage(active ? null : stage)
-                     }
-                  />
-               );
-            })}
-            {pipelineStage && (
-               <Button size="small" onClick={() => setPipelineStage(null)}>
-                  Clear stage
-               </Button>
-            )}
-         </Stack>
          {/* Order tab */}
          <Stack>
             <OrderTab
                status={orderStatusWithCounts}
                value={orderTab}
                onChange={(s) => {
-                  setPipelineStage(null);
                   setFilterQueryData({
                      orderData: { status: s.label !== "All" ? s.label : null },
                   });
