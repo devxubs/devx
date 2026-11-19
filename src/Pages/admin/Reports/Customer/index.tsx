@@ -40,7 +40,7 @@ const Customer = () => {
 
    const columns = [
       {
-         field: "id",
+         field: "customId",
          headerName: "Customer ID",
          width: 140,
          renderCell: (params: any) => (
@@ -51,7 +51,7 @@ const Customer = () => {
                sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
                onClick={() => setSelectedCustomerId(params.row.id)}
             >
-               {params.row.id}
+               {params.row.customId || "—"}
             </Typography>
          ),
       },

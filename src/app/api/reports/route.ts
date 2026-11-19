@@ -307,7 +307,7 @@ export async function GET(request: NextRequest) {
             (g) => g._count.id > 1,
          ).length;
 
-         const rows = customers.map((c, idx) => {
+         const rows = customers.map((c) => {
             const totalOrders = c.orders.length;
             const completedOrders = c.orders.filter(
                (o) => o.status === "COMPLETED" || o.status === "DELIVERED",
@@ -320,7 +320,14 @@ export async function GET(request: NextRequest) {
                : "-";
 
             return {
-               id: c.customId || `CUS_${idx + 1}`,
+               // Row identity is the real primary key (the detail modal
+               // resolves it via /api/customers/[id]); the display ID is
+               // the record's own customId. The previous fallback
+               // fabricated `CUS_${idx + 1}` from the row index, which
+               // could collide with another customer's real customId and
+               // open the wrong record.
+               id: c.id,
+               customId: c.customId || null,
                customerName: c.name,
                phone: c.phone || "-",
                email: c.email || "-",
@@ -393,7 +400,7 @@ export async function GET(request: NextRequest) {
          });
 
          const ranks = users
-            .map((u, idx) => {
+            .map((u) => {
                const ordersHandled = u.ordersHandled.length;
                const completedSales = u.ordersHandled.filter(
                   (o: any) => o.status === "COMPLETED" || o.status === "DELIVERED",
@@ -406,7 +413,12 @@ export async function GET(request: NextRequest) {
                   .reduce((sum: number, o: any) => sum + Number(o.total || 0), 0);
 
                return {
-                  id: u.customId || `EP_${idx + 1}`,
+                  // Real primary key as row identity (detail modal
+                  // resolves it via /api/users/[id]); previously a
+                  // fabricated `EP_${idx + 1}` was used when customId
+                  // was null, which could open the wrong employee.
+                  id: u.id,
+                  customId: u.customId || null,
                   name: u.name || "Employee",
                   email: u.email,
                   role: u.role?.name || "Staff",
