@@ -35,6 +35,7 @@ import PaymentSection from "../create/PaymentSection";
 import ChargesSection from "../create/ChargesSection";
 import OrderSummaryPanel from "../create/OrderSummaryPanel";
 import NotesSection from "../create/NotesSection";
+import Breadcrumbs from "@src/components/Breadcrumbs";
 
 const toTitleStatus = (s?: string | null) =>
    s
@@ -167,6 +168,14 @@ const Publish = () => {
 
    return (
       <Container maxWidth="xl" sx={{ py: 2, px: { xs: 1, sm: 2 } }}>
+         <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+            <Breadcrumbs
+               href="/admin/order"
+               label={editId ? `Edit Order #${editId}` : "Create Order"}
+               parentLabel="Back to Orders"
+               parentHref="/admin/order"
+            />
+         </Stack>
          <Stack spacing={2.5}>
             <Stack
                direction="row"
