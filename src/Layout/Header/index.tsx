@@ -1,13 +1,11 @@
 "use client";
 import {
    alpha,
-   Alert,
    Avatar,
    Badge,
    IconButton,
    keyframes,
    Paper,
-   Snackbar,
    Stack,
    Typography,
    useMediaQuery,
@@ -19,6 +17,7 @@ import Icon from "@src/components/Icon";
 import React, { useState } from "react";
 import SearchBar from "./SearchBar";
 import NotificationDrawer from "./NotificationDrawer";
+import NotificationToast from "./NotificationToast";
 import CustomPopover from "@src/components/CustomPopover";
 import Menu from "@src/components/Menu";
 import SettingsDrawer from "./Settings";
@@ -285,37 +284,17 @@ const Header = () => {
             </Stack>
          </Paper>
 
-         {/* New-notification toast (same Snackbar+Alert pattern the
-             pages use). Clicking it opens the notification drawer. */}
-         <Snackbar
-            open={Boolean(toast)}
-            autoHideDuration={4000}
+         {/* New-notification toast. Presentation lives in
+             NotificationToast; behaviour is unchanged — clicking
+             the toast opens the notification drawer. */}
+         <NotificationToast
+            toast={toast}
             onClose={() => setToast(null)}
-         >
-            <Alert
-               severity={toast?.severity || "info"}
-               variant="filled"
-               onClose={() => setToast(null)}
-               onClick={() => {
-                  setToast(null);
-                  setOpenNotification(true);
-               }}
-               sx={{ cursor: "pointer", maxWidth: 360, alignItems: "center" }}
-            >
-               <Typography variant="body2" fontWeight={700}>
-                  {toast?.title}
-               </Typography>
-               {toast?.message && (
-                  <Typography variant="body2">{toast.message}</Typography>
-               )}
-               {toast && toast.more > 0 && (
-                  <Typography variant="caption">
-                     +{toast.more} more new notification
-                     {toast.more > 1 ? "s" : ""}
-                  </Typography>
-               )}
-            </Alert>
-         </Snackbar>
+            onOpen={() => {
+               setToast(null);
+               setOpenNotification(true);
+            }}
+         />
 
          {/* Full-width overlay SearchBar */}
          <Slide direction="down" in={openSearch} mountOnEnter unmountOnExit>
