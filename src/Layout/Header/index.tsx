@@ -1,11 +1,13 @@
 "use client";
 import {
    alpha,
+   Alert,
    Avatar,
    Badge,
    IconButton,
    keyframes,
    Paper,
+   Snackbar,
    Stack,
    Typography,
    useMediaQuery,
@@ -46,11 +48,56 @@ const Header = () => {
    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
    const [openSearch, setOpenSearch] = useState(false);
 
+   // Runtime-fix: toast on genuinely new notifications. The poll
+   // response already carries the notification list, so detection
+   // costs no extra request. `seenNotificationIds` starts null: the
+   // FIRST successful fetch only seeds the set (everything already
+   // there is "old" and must never toast — e.g. right after login).
+   // Later fetches toast for unread, unarchived notifications whose
+   // id was never seen; every fetched id joins the set, so the same
+   // notification can never toast twice across polls. In-memory only
+   // (a page reload re-seeds silently, which is the desired behaviour).
+   const seenNotificationIds = React.useRef<Set<string> | null>(null);
+   const [toast, setToast] = useState<{
+      title: string;
+      message: string;
+      severity: "info" | "warning" | "success" | "error";
+      more: number;
+   } | null>(null);
+
    const refreshUnreadCount = React.useCallback(() => {
       fetch("/api/notifications")
          .then((r) => (r.ok ? r.json() : null))
          .then((data) => {
             if (data?.unreadCount != null) setUnreadCount(data.unreadCount);
+            const list: any[] = Array.isArray(data?.notifications)
+               ? data.notifications
+               : [];
+            if (seenNotificationIds.current === null) {
+               seenNotificationIds.current = new Set(
+                  list.map((n: any) => n.id),
+               );
+               return;
+            }
+            const seen = seenNotificationIds.current;
+            // The list is newest-first, so fresh[0] is the newest.
+            const fresh = list.filter(
+               (n: any) => n && !n.isRead && !n.isArchived && !seen.has(n.id),
+            );
+            list.forEach((n: any) => n && seen.add(n.id));
+            if (fresh.length > 0) {
+               const newest = fresh[0];
+               setToast({
+                  title: newest.title || "New notification",
+                  message: newest.message || "",
+                  severity: ["success", "warning", "error"].includes(
+                     newest.type,
+                  )
+                     ? newest.type
+                     : "info",
+                  more: fresh.length - 1,
+               });
+            }
          })
          .catch(() => {});
    }, []);
@@ -237,6 +284,38 @@ const Header = () => {
                </IconButton>
             </Stack>
          </Paper>
+
+         {/* New-notification toast (same Snackbar+Alert pattern the
+             pages use). Clicking it opens the notification drawer. */}
+         <Snackbar
+            open={Boolean(toast)}
+            autoHideDuration={4000}
+            onClose={() => setToast(null)}
+         >
+            <Alert
+               severity={toast?.severity || "info"}
+               variant="filled"
+               onClose={() => setToast(null)}
+               onClick={() => {
+                  setToast(null);
+                  setOpenNotification(true);
+               }}
+               sx={{ cursor: "pointer", maxWidth: 360, alignItems: "center" }}
+            >
+               <Typography variant="body2" fontWeight={700}>
+                  {toast?.title}
+               </Typography>
+               {toast?.message && (
+                  <Typography variant="body2">{toast.message}</Typography>
+               )}
+               {toast && toast.more > 0 && (
+                  <Typography variant="caption">
+                     +{toast.more} more new notification
+                     {toast.more > 1 ? "s" : ""}
+                  </Typography>
+               )}
+            </Alert>
+         </Snackbar>
 
          {/* Full-width overlay SearchBar */}
          <Slide direction="down" in={openSearch} mountOnEnter unmountOnExit>
