@@ -18,11 +18,13 @@ export async function GET(request: NextRequest) {
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);
-   const isExportAll = searchParams.get("all") === "true" || searchParams.get("export") === "true";
-   const { page, limit: parsedLimit } = parsePagination(searchParams, 20);
-   const limit = isExportAll ? 10000 : parsedLimit;
+   // Follow-up round: the ?all=true / ?export=true escape hatch
+   // (one unbounded 10,000-row response for any active session) is
+   // removed — no client used it; exports page through this list
+   // via fetchAllPages. The route now always paginates normally.
+   const { page, limit } = parsePagination(searchParams, 20);
    const search = searchParams.get("search")?.trim() || "";
-   const skip = isExportAll ? 0 : (page - 1) * limit;
+   const skip = (page - 1) * limit;
 
    const where: any = { isDeleted: false };
    if (search) {

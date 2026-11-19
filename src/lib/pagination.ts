@@ -15,8 +15,11 @@
  * maxLimit defaults to 100: the shared table's server-pagination
  * page-size options top out at 100 ([10, 25, 50, 100] in
  * src/components/Table), so no legitimate UI request is affected.
- * The export paths (`?all=true` / `?export=true`, PERF-03) bypass
- * this helper exactly as before.
+ * Exports page through the list endpoints with this helper via
+ * fetchAllPages. One deliberate exception remains: the customers
+ * list still honours `?all=true` because its page fetches every
+ * matched customer (derived-stat filters must run before paging
+ * to keep the total accurate) — see src/app/api/customers.
  */
 export function parsePagination(
    searchParams: URLSearchParams,
