@@ -12,6 +12,7 @@ import {
    auditActorFromContext,
    requestAuditContext,
 } from "@src/lib/audit";
+import { deleteUploadedFiles } from "@src/lib/uploadedFiles";
 
 export async function GET(request: NextRequest) {
    // R-2 fix (Final Review): Recycle Bin contents are deleted business
@@ -399,12 +400,30 @@ export async function POST(request: NextRequest) {
                   { status: 409 },
                );
             }
+            // Phase 4 (D8): the record is gone for good — remove
+            // its uploaded image files too, so permanent deletion
+            // doesn't leave orphans in UPLOAD_DIR. (Soft delete
+            // keeps files: a restored product needs its images.)
+            const doomed = await prisma.product.findUnique({
+               where: { id },
+               select: {
+                  images: true,
+                  variants: { select: { image: true } },
+               },
+            });
             await prisma.$transaction([
                prisma.productBundleItem.deleteMany({
                   where: { componentProductId: id },
                }),
                prisma.product.delete({ where: { id } }),
             ]);
+            if (doomed) {
+               const urls = [
+                  ...((doomed.images as any[]) || []),
+                  ...(doomed.variants || []).map((v) => v.image),
+               ].filter(Boolean);
+               if (urls.length > 0) await deleteUploadedFiles(urls);
+            }
             return NextResponse.json({ message: "Product permanently deleted" });
          }
       }

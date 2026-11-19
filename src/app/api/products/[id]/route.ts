@@ -10,6 +10,7 @@ import {
    assertBarcodeAvailable,
    BarcodeConflictError,
 } from "@src/lib/barcodeUniqueness";
+import { deleteUploadedFiles } from "@src/lib/uploadedFiles";
 
 export async function GET(
    request: NextRequest,
@@ -323,6 +324,65 @@ export async function PUT(
 
          return p;
       });
+
+      // Phase 4 (D8): orphan cleanup — uploaded image files whose
+      // URL this save dropped (product image removed from the
+      // array, variant image replaced) are deleted from UPLOAD_DIR
+      // so replaced images don't leak on disk forever. Runs only
+      // after the update committed; best-effort (never throws);
+      // data-URLs and external URLs are ignored by the helper, and
+      // any URL still referenced by the saved product/variants is
+      // kept. Soft-deleted variants keep their files, matching
+      // soft-delete semantics.
+      try {
+         const keptProductImages: string[] = Array.isArray(body.images)
+            ? body.images
+            : Array.isArray((existing as any).images)
+              ? (existing as any).images
+              : [];
+         const incomingVariantIds = new Set(
+            Array.isArray(body.variants)
+               ? body.variants.map((v: any) => v?.id).filter(Boolean)
+               : [],
+         );
+         const keptVariantImages: string[] = Array.isArray(body.variants)
+            ? [
+                 ...body.variants.map((v: any) => v?.image).filter(Boolean),
+                 // Variants dropped by this save are soft-deleted,
+                 // not destroyed — their files stay with them.
+                 ...(existing.variants || [])
+                    .filter((v: any) => v.image && !incomingVariantIds.has(v.id))
+                    .map((v: any) => v.image),
+              ]
+            : (existing.variants || [])
+                 .filter((v: any) => !v.isDeleted)
+                 .map((v: any) => v.image)
+                 .filter(Boolean);
+         const kept = new Set([...keptProductImages, ...keptVariantImages]);
+         const orphans = new Set<string>();
+         if (Array.isArray(body.images)) {
+            for (const url of (existing as any).images || []) {
+               if (typeof url === "string" && !kept.has(url)) orphans.add(url);
+            }
+         }
+         if (Array.isArray(body.variants)) {
+            const incomingById = new Map(
+               body.variants
+                  .filter((v: any) => v?.id)
+                  .map((v: any) => [v.id, v?.image || null]),
+            );
+            for (const old of existing.variants || []) {
+               if (old.isDeleted || !old.image) continue;
+               if (!incomingById.has(old.id)) continue; // removed → soft-deleted, file kept
+               if (incomingById.get(old.id) !== old.image && !kept.has(old.image)) {
+                  orphans.add(old.image);
+               }
+            }
+         }
+         if (orphans.size > 0) await deleteUploadedFiles(orphans);
+      } catch (cleanupError) {
+         console.error("Product image orphan cleanup failed:", cleanupError);
+      }
 
       return NextResponse.json(product);
    } catch (error: any) {
