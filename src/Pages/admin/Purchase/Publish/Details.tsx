@@ -19,22 +19,34 @@ import React, { useState } from "react";
 import { Controller } from "react-hook-form";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
-import { productsData } from "@src/Pages/admin/Product";
-import { suppliersData } from "@src/Pages/admin/Suppliers";
 import { PurchaseTypes } from "..";
+import type { ProductOption, SupplierOption } from "./index";
 
 interface DetailsProps {
    control: any;
    errors: any;
    data: PurchaseTypes;
+   // Phase 2 (2.4): options come from the real suppliers/products APIs
+   // (fetched by the Publish page). The previous sources were the
+   // `suppliersData` / `productsData` exports — both empty arrays.
+   supplierOptions?: SupplierOption[];
+   productOptions?: ProductOption[];
+   onSupplierSelect?: (name: string) => void;
 }
 
-const Details = ({ control, errors, data }: DetailsProps) => {
+const Details = ({
+   control,
+   errors,
+   data,
+   supplierOptions = [],
+   productOptions = [],
+   onSupplierSelect,
+}: DetailsProps) => {
    const theme = useTheme();
    const [expanded, setExpanded] = useState(true);
 
-   const supplierName = suppliersData.map((sd) => sd.name);
-   const productName = productsData.map((pd: any) => pd.product_name);
+   const supplierName = supplierOptions.map((sd) => sd.name);
+   const productName = productOptions.map((pd) => pd.name);
 
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -89,9 +101,12 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                               label="Supplier"
                               options={supplierName}
                               value={field.value || []} // ✅ always controlled
-                              onChange={(val: any, e: any) =>
-                                 field.onChange(val)
-                              }
+                              onChange={(val: any, e: any) => {
+                                 field.onChange(val);
+                                 onSupplierSelect?.(
+                                    typeof val === "string" ? val : "",
+                                 );
+                              }}
                               error={!!errors.supplier}
                               helperText={errors.supplier?.message}
                               getOptionLabel={(option) => option.toString()}
@@ -125,23 +140,26 @@ const Details = ({ control, errors, data }: DetailsProps) => {
                                     onChange={(val: string[]) => {
                                        const newProducts = val.map((name) => {
                                           const existing = allProducts.find(
-                                             (p: any) =>
-                                                p.product_name === name,
+                                             (p: any) => p.name === name,
                                           );
                                           if (existing) return existing;
 
-                                          const found: any = productsData.find(
-                                             (p: any) =>
-                                                p.product_name === name,
+                                          const found = productOptions.find(
+                                             (p) => p.name === name,
                                           );
 
+                                          // Phase 2 (2.4): the line item
+                                          // carries its productId so the
+                                          // API can credit/debit the real
+                                          // product's stock.
                                           return found
                                              ? {
                                                   id: found.id,
-                                                  name: found.product_name,
+                                                  productId: found.id,
+                                                  name: found.name,
+                                                  code: found.code,
                                                   quantity: 1,
-                                                  price: found.salePrice ?? 0,
-                                                  image: found.images[0],
+                                                  price: found.price,
                                                }
                                              : null;
                                        });

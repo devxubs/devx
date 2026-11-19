@@ -19,6 +19,18 @@ import Details from "./Details";
 import Pricing from "./Pricing";
 import Information from "./Information";
 
+export interface SupplierOption {
+   id: string;
+   name: string;
+}
+
+export interface ProductOption {
+   id: string;
+   name: string;
+   code: string;
+   price: number;
+}
+
 export const purchaseSchema = yup.object({
    id: yup
       .number()
@@ -46,6 +58,11 @@ export const purchaseSchema = yup.object({
       .array()
       .of(
          yup.object({
+            // Phase 2 (2.4): line items carry their product reference so
+            // stock can be credited/debited against the real product.
+            id: yup.string().optional(),
+            productId: yup.string().nullable().optional(),
+            code: yup.string().nullable().optional(),
             name: yup.string().required("Product name is required"),
             quantity: yup
                .number()
@@ -59,6 +76,8 @@ export const purchaseSchema = yup.object({
          }),
       )
       .min(1, "At least one product is required"),
+
+   pay: yup.number().min(0, "Pay amount cannot be negative").optional(),
 
    product_amount: yup
       .number()
@@ -130,34 +149,138 @@ const Publish = () => {
    const [submitting, setSubmitting] = useState(false);
    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+   // Phase 2 (2.4): real option data for the pickers. The previous
+   // implementation read the `suppliersData` / `productsData` mock
+   // exports, which are empty arrays — the supplier picker had no
+   // options and line items never carried a productId, so stock was
+   // never credited for UI-created purchases and supplier was always
+   // null. Options now come from the real APIs.
+   const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
+   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
+   const [supplierId, setSupplierId] = useState<string | null>(null);
+
+   // Edit mode: /admin/purchase/publish?id=<purchase id> (the list's
+   // Edit action has always linked here; the page previously ignored
+   // the id and created a duplicate purchase instead of editing).
+   const [editId, setEditId] = useState<string | null>(null);
+   const [loadingPurchase, setLoadingPurchase] = useState(false);
+
+   React.useEffect(() => {
+      fetch("/api/suppliers")
+         .then((r) => (r.ok ? r.json() : []))
+         .then((list) => {
+            const arr = Array.isArray(list) ? list : list?.suppliers || [];
+            setSupplierOptions(
+               arr.map((s: any) => ({ id: s.id, name: s.name })),
+            );
+         })
+         .catch(() => {});
+      fetch("/api/products?limit=100")
+         .then((r) => (r.ok ? r.json() : { products: [] }))
+         .then((d) => {
+            setProductOptions(
+               (d.products || []).map((p: any) => ({
+                  id: p.id,
+                  name: p.productName,
+                  code: p.productCode || p.productSku || "",
+                  price: Number(p.costPrice ?? p.regularPrice ?? 0),
+               })),
+            );
+         })
+         .catch(() => {});
+   }, []);
+
+   React.useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("id");
+      if (!id) return;
+      setEditId(id);
+      setLoadingPurchase(true);
+      fetch(`/api/purchases/${id}`)
+         .then((r) => (r.ok ? r.json() : null))
+         .then((p) => {
+            if (!p) {
+               setErrorMsg("Purchase not found — it may have been deleted.");
+               return;
+            }
+            setSupplierId(p.supplierId || p.supplier?.id || null);
+            setData({
+               ...(p as any),
+               date: p.createdAt
+                  ? new Date(p.createdAt).toISOString().split("T")[0]
+                  : "",
+               invoice: p.invoice || "",
+               supplier: p.supplier?.name || "",
+               attachments: p.attachments || [],
+            } as PurchaseTypes);
+            reset({
+               id: 0,
+               date: p.createdAt
+                  ? new Date(p.createdAt).toISOString().split("T")[0]
+                  : "",
+               invoice: p.invoice || "",
+               supplier: p.supplier?.name || "",
+               product: (p.items || []).map((it: any) => ({
+                  id: it.productId || undefined,
+                  productId: it.productId || null,
+                  name: it.name,
+                  code: it.code || null,
+                  quantity: it.quantity,
+                  price: Number(it.price),
+               })),
+               product_amount: Number(p.productAmount),
+               others_cost: Number(p.othersCost),
+               discount: Number(p.discount),
+               pay: Number(p.paid),
+               total: Number(p.total),
+               due: Number(p.due),
+               note: p.note || "",
+               attachments: [],
+            } as PurchaseFormValues);
+         })
+         .catch(() => setErrorMsg("Failed to load the purchase for editing."))
+         .finally(() => setLoadingPurchase(false));
+   }, [reset]);
+
    const onSubmit: SubmitHandler<PurchaseFormValues> = async (formData) => {
       setSubmitting(true);
       setErrorMsg(null);
       try {
+         // Line items now include their productId (Phase 2, 2.4) so the
+         // API can net stock correctly; totals are recomputed on the
+         // server for both POST and PUT — client totals are advisory.
          const payload = {
-            supplierId: null,
+            supplierId: supplierId || null,
             invoice: formData.invoice?.trim() || undefined,
             items: (formData.product || []).map((p: any) => ({
+               productId: p.productId || p.id || null,
                name: p.name,
+               code: p.code || null,
                quantity: p.quantity,
                price: p.price,
             })),
             productAmount: formData.product_amount,
             othersCost: formData.others_cost,
             discount: formData.discount,
-            paid: 0,
+            paid: Number((formData as any).pay || 0),
             note: formData.note || "",
          };
 
-         const res = await fetch("/api/purchases", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-         });
+         const res = await fetch(
+            editId ? `/api/purchases/${editId}` : "/api/purchases",
+            {
+               method: editId ? "PUT" : "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify(payload),
+            },
+         );
 
          if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || "Failed to create purchase");
+            // The PUT's 409 (stock reversal unsafe — purchased units
+            // already sold) carries its explanation in `message`.
+            throw new Error(
+               err.message || err.error || "Failed to save purchase",
+            );
          }
 
          router.push("/admin/purchase");
@@ -176,9 +299,36 @@ const Publish = () => {
          height={"100%"}
          component="form"
       >
+         {editId && (
+            <Stack spacing={0.5} mb={3}>
+               <Typography variant="h6" fontWeight={700}>
+                  Edit Purchase {(data as any)?.customId || ""}
+               </Typography>
+               <Typography variant="body2" color="textSecondary">
+                  Internal Purchase ID: {(data as any)?.customId || editId} —
+                  the supplier&apos;s own invoice number is edited in the
+                  Information section below.
+               </Typography>
+               {loadingPurchase && (
+                  <Typography variant="body2" color="textSecondary">
+                     Loading purchase…
+                  </Typography>
+               )}
+            </Stack>
+         )}
          <Stack spacing={4}>
             <Stack>
-               <Details data={data || {}} control={control} errors={errors} />
+               <Details
+                  data={data || {}}
+                  control={control}
+                  errors={errors}
+                  supplierOptions={supplierOptions}
+                  productOptions={productOptions}
+                  onSupplierSelect={(name) => {
+                     const match = supplierOptions.find((s) => s.name === name);
+                     setSupplierId(match ? match.id : null);
+                  }}
+               />
             </Stack>
             <Stack>
                <Information
@@ -223,10 +373,14 @@ const Publish = () => {
                variant="contained"
                color="primary"
                type="submit"
-               disabled={submitting}
+               disabled={submitting || loadingPurchase}
                onClick={handleSubmit(onSubmit)}
             >
-               {submitting ? "Saving..." : "Add Purchase"}
+               {submitting
+                  ? "Saving..."
+                  : editId
+                    ? "Update Purchase"
+                    : "Add Purchase"}
             </Button>
          </Stack>
       </Stack>

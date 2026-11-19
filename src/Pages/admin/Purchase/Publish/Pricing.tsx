@@ -26,16 +26,20 @@ const Pricing = ({ control, errors, data, setValue, watch }: PricingProps) => {
    const [expanded, setExpanded] = useState(true);
 
    // ✅ Auto Calculation Effect
+   // Phase 2 (2.4): the displayed total/due now use the server's own
+   // definitions — total = productAmount + othersCost − discount and
+   // due = total − paid — so the form never disagrees with what the
+   // API stores. (The old due formula ignored othersCost and subtracted
+   // a decorative "advance" value that was never submitted.)
    useEffect(() => {
       const product = watch("product");
       const productAmount = Number(watch("product_amount")) || 0;
       const discount = Number(watch("discount")) || 0;
-      const advance = Number(watch("advance")) || 0;
       const othersCost = Number(watch("others_cost")) || 0;
-      const pay = Number(watch("pay"));
+      const pay = Number(watch("pay")) || 0;
 
       const total = productAmount - discount + othersCost;
-      const due = productAmount - (discount + advance) - pay;
+      const due = total - pay;
 
       const pa = product
          .map((p: any, i: number) => p.price * p.quantity)
@@ -52,7 +56,7 @@ const Pricing = ({ control, errors, data, setValue, watch }: PricingProps) => {
       watch("product"),
       watch("product_amount"),
       watch("discount"),
-      watch("advance"),
+      watch("pay"),
       watch("others_cost"),
    ]);
 
@@ -166,31 +170,6 @@ const Pricing = ({ control, errors, data, setValue, watch }: PricingProps) => {
                                  label="Pay"
                                  error={!!errors?.pay}
                                  helperText={errors?.pay?.message}
-                              />
-                           )}
-                        />
-                     </Stack>
-                  </Grid>
-
-                  {/* Advance Payment */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <Stack spacing={1.5}>
-                        <Typography fontSize={13} fontWeight={500}>
-                           Advance Payment
-                        </Typography>
-                        <Controller
-                           name="advance"
-                           control={control}
-                           defaultValue={data?.advance ?? 0}
-                           render={({ field }) => (
-                              <TextField
-                                 {...field}
-                                 type="number"
-                                 inputProps={{ min: 0 }}
-                                 fullWidth
-                                 label="Advance"
-                                 error={!!errors?.advance}
-                                 helperText={errors?.advance?.message}
                               />
                            )}
                         />

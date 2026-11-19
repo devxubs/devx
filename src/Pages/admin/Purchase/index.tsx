@@ -389,20 +389,6 @@ const Purchase = () => {
                maxRows={3}
                value={note || ""}
                onChange={(e) => setNote(e.target.value || "")}
-               onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                     if (updateNote) {
-                        setPurchases((prev) =>
-                           prev.map((item) =>
-                              item.id === updateNote.id
-                                 ? { ...item, note: note }
-                                 : item,
-                           ),
-                        );
-                     }
-                     setUpdateNote(null);
-                  }
-               }}
             />
             <Stack
                spacing={2}
@@ -422,16 +408,35 @@ const Purchase = () => {
                <Button
                   variant="contained"
                   color="primary"
-                  onClick={() => {
+                  onClick={async () => {
                      if (updateNote) {
-                        setPurchases((prev) =>
-                           prev.map((item) =>
-                              item.id === updateNote.id
-                                 ? { ...item, note: note }
-                                 : item,
-                           ),
-                        );
-                        setUpdateNote(null);
+                        // Phase 2 (2.4): persist the note through the
+                        // purchases API — this dialog previously updated
+                        // only local state, so the note vanished on the
+                        // next reload.
+                        try {
+                           const res = await fetch(
+                              `/api/purchases/${updateNote.id}`,
+                              {
+                                 method: "PUT",
+                                 headers: {
+                                    "Content-Type": "application/json",
+                                 },
+                                 body: JSON.stringify({ note }),
+                              },
+                           );
+                           if (!res.ok) throw new Error("save failed");
+                           setPurchases((prev) =>
+                              prev.map((item) =>
+                                 item.id === updateNote.id
+                                    ? { ...item, note: note }
+                                    : item,
+                              ),
+                           );
+                           setUpdateNote(null);
+                        } catch {
+                           // Keep the dialog open so the note is not lost.
+                        }
                      }
                   }}
                   sx={

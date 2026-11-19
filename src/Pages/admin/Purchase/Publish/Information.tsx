@@ -142,6 +142,36 @@ const Information = ({ control, errors, data }: DetailsProps) => {
                               />
                            )}
                         />
+                        {/* Phase 2 (2.4): attachments already stored on
+                            the purchase (edit mode) are listed so they
+                            are not invisible while editing. */}
+                        {Array.isArray(data.attachments) &&
+                           data.attachments.length > 0 && (
+                              <Stack spacing={0.5}>
+                                 <Typography
+                                    variant="caption"
+                                    color="textSecondary"
+                                 >
+                                    Saved attachments:
+                                 </Typography>
+                                 {data.attachments.map(
+                                    (att: any, i: number) => (
+                                       <Typography
+                                          key={att.id || i}
+                                          variant="body2"
+                                       >
+                                          • {att.name}
+                                          {att.size
+                                             ? ` (${Math.max(
+                                                  1,
+                                                  Math.round(att.size / 1024),
+                                               )} KB)`
+                                             : ""}
+                                       </Typography>
+                                    ),
+                                 )}
+                              </Stack>
+                           )}
                      </Stack>
                   </Grid>
                   <Grid size={{ xs: 12 }}>
