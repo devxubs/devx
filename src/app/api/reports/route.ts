@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { calculateNetProfit } from "@src/lib/finance";
+import { standingCreditOf } from "@src/lib/purchaseReturns";
 
 export async function GET(request: NextRequest) {
    const gate = await requirePermission(request, ["reports", "report", "report_view", "report_view_report"]);
@@ -884,8 +885,11 @@ export async function GET(request: NextRequest) {
          // minus unallocated supplier-payment credit (Phase 3B §3 of
          // the schema plan: allocated payments already reduced the
          // purchase due when recorded, so only unallocated payments
-         // stand as credit). Oldest open purchase first.
-         const [dueGroups, creditGroups] = await Promise.all([
+         // stand as credit) and minus standing purchase-return
+         // credit (Phase 4, D2: the credit term's second documented
+         // source — the one outstanding definition, extended).
+         // Oldest open purchase first.
+         const [dueGroups, creditGroups, returnGroups] = await Promise.all([
             prisma.purchase.groupBy({
                by: ["supplierId"],
                where: { isDeleted: false, due: { gt: 0 } },
@@ -897,14 +901,31 @@ export async function GET(request: NextRequest) {
                where: { isDeleted: false, purchaseId: null },
                _sum: { amount: true },
             }),
+            prisma.purchaseReturn.groupBy({
+               by: ["supplierId"],
+               where: { isDeleted: false },
+               _sum: { totalAmount: true, creditConsumed: true },
+            }),
          ]);
          const creditBySupplier = new Map(
             creditGroups.map((g) => [g.supplierId, Number(g._sum.amount || 0)]),
+         );
+         const returnCreditBySupplier = new Map(
+            returnGroups
+               .filter((g) => g.supplierId)
+               .map((g) => [
+                  g.supplierId as string,
+                  standingCreditOf(
+                     Number(g._sum.totalAmount || 0),
+                     Number(g._sum.creditConsumed || 0),
+                  ),
+               ]),
          );
          const payableSupplierIds = Array.from(
             new Set([
                ...dueGroups.map((g) => g.supplierId).filter(Boolean),
                ...creditGroups.map((g) => g.supplierId),
+               ...returnGroups.map((g) => g.supplierId).filter(Boolean),
             ]),
          ) as string[];
          const [payableSuppliers, oldestDuePurchases] = await Promise.all([
@@ -949,6 +970,7 @@ export async function GET(request: NextRequest) {
                const s = supplierById.get(supplierId);
                const dueInfo = dueBySupplier.get(supplierId) || { due: 0, purchases: 0 };
                const credit = creditBySupplier.get(supplierId) || 0;
+               const returnCredit = returnCreditBySupplier.get(supplierId) || 0;
                return {
                   supplierId,
                   supplierCustomId: s?.customId || null,
@@ -957,12 +979,13 @@ export async function GET(request: NextRequest) {
                   purchasesWithDue: dueInfo.purchases,
                   totalDue: dueInfo.due,
                   credit,
-                  netPayable: Math.max(0, dueInfo.due - credit),
+                  returnCredit,
+                  netPayable: Math.max(0, dueInfo.due - credit - returnCredit),
                   oldestDueAt:
                      oldestPurchaseBySupplier.get(supplierId)?.toISOString() ?? null,
                };
             })
-            .filter((p) => p.totalDue > 0 || p.credit > 0)
+            .filter((p) => p.totalDue > 0 || p.credit > 0 || p.returnCredit > 0)
             .sort((a, b) => {
                const at = a.oldestDueAt ? new Date(a.oldestDueAt).getTime() : Infinity;
                const bt = b.oldestDueAt ? new Date(b.oldestDueAt).getTime() : Infinity;

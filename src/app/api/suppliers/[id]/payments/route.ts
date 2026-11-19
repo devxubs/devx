@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   lockPurchaseRow,
+   standingCreditOf,
+} from "@src/lib/purchaseReturns";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 // Supplier payment ledger (Phase 3B, roadmap 3.7 / schema plan §3).
 //
@@ -12,8 +21,14 @@ import { generateNextEntityId } from "@src/lib/idGenerator";
 //    screen and report already reads, so no other math changes.
 //  - Unallocated: the payment stands as supplier credit.
 // Outstanding payable = Σ purchase due (non-deleted) − Σ unallocated
-// payments. Payments are voided (soft delete), never hard-deleted,
-// and voiding reverses the allocation in the same transaction.
+// payments − Σ standing purchase-return credit (Phase 4, D2: the
+// one definition, extended by its second documented credit source;
+// dueAbsorbed is already inside purchase.due and is never
+// subtracted twice). Payments are voided (soft delete), never
+// hard-deleted, and voiding reverses the allocation in the same
+// transaction. Allocated creates/voids take the Purchase-row
+// FOR UPDATE lock first (Phase 4 §2.2) so they serialize against
+// purchase returns and purchase edits of the same purchase.
 
 const PAYMENT_GATE = [
    "suppliers",
@@ -30,7 +45,7 @@ async function resolveSupplier(id: string) {
 }
 
 async function payableSummary(db: any, supplierId: string) {
-   const [dueAgg, creditAgg, paidAgg] = await Promise.all([
+   const [dueAgg, creditAgg, paidAgg, returnAgg] = await Promise.all([
       db.purchase.aggregate({
          where: { supplierId, isDeleted: false },
          _sum: { total: true, paid: true, due: true },
@@ -43,17 +58,29 @@ async function payableSummary(db: any, supplierId: string) {
          where: { supplierId, isDeleted: false },
          _sum: { amount: true },
       }),
+      // Phase 4 (D2): standing purchase-return credit — Σ
+      // (totalAmount − creditConsumed) over non-deleted returns,
+      // from stored columns alone (lib/purchaseReturns).
+      db.purchaseReturn.aggregate({
+         where: { supplierId, isDeleted: false },
+         _sum: { totalAmount: true, creditConsumed: true },
+      }),
    ]);
    const totalPurchased = Number(dueAgg._sum.total || 0);
    const purchasePaid = Number(dueAgg._sum.paid || 0);
    const totalDue = Number(dueAgg._sum.due || 0);
    const credit = Number(creditAgg._sum.amount || 0);
+   const returnCredit = standingCreditOf(
+      Number(returnAgg._sum.totalAmount || 0),
+      Number(returnAgg._sum.creditConsumed || 0),
+   );
    return {
       totalPurchased,
       purchasePaid,
       totalDue,
       credit,
-      netPayable: Math.max(0, totalDue - credit),
+      returnCredit,
+      netPayable: Math.max(0, totalDue - credit - returnCredit),
       ledgerPaymentsTotal: Number(paidAgg._sum.amount || 0),
    };
 }
@@ -184,6 +211,8 @@ export async function POST(
          );
       }
 
+      const auditCtx = requestAuditContext(request);
+
       const result = await prisma.$transaction(async (tx) => {
          // QA fix (S2): re-read the purchase INSIDE the transaction
          // and validate + compute from that fresh row. Previously the
@@ -195,8 +224,21 @@ export async function POST(
          // path; this in-transaction check is the authoritative one.
          // Validation runs before any write, so a failure returns
          // without persisting anything.
+         //
+         // Phase 4 (§2.2 companion): an allocated payment takes the
+         // Purchase-row FOR UPDATE lock as its first statement —
+         // the QA re-read above is a snapshot read and does not by
+         // itself serialize against a concurrent purchase return or
+         // purchase edit rewriting the same paid/due.
          let freshPurchase: any = null;
          if (purchase) {
+            const locked = await lockPurchaseRow(tx, purchase.id);
+            if (!locked) {
+               return {
+                  ok: false as const,
+                  message: "The selected purchase does not belong to this supplier.",
+               };
+            }
             freshPurchase = await tx.purchase.findFirst({
                where: { id: purchase.id, supplierId: supplier.id, isDeleted: false },
             });
@@ -242,6 +284,19 @@ export async function POST(
                data: { paid: newPaid, due: newDue },
             });
          }
+
+         // Phase 4 (D1): audit in the same transaction.
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "PAYMENT",
+            entityType: "SUPPLIER_PAYMENT",
+            entityId: payment.id,
+            entityCustomId: payment.customId,
+            summary: freshPurchase
+               ? `Supplier payment ${payment.customId} of ৳${(amountCents / 100).toFixed(2)} allocated to purchase ${freshPurchase.customId || freshPurchase.id}`
+               : `Supplier payment ${payment.customId} of ৳${(amountCents / 100).toFixed(2)} recorded as unallocated credit`,
+            ...auditCtx,
+         });
 
          const summary = await payableSummary(tx, supplier.id);
          return { ok: true as const, payment, summary };

@@ -195,8 +195,17 @@ const Finance = () => {
       {
          field: "credit",
          headerName: "Supplier Credit",
-         width: 140,
-         renderCell: (p: any) => formatCurrency(p.row.credit),
+         width: 170,
+         renderCell: (p: any) => (
+            <Stack spacing={0}>
+               <Typography variant="body2">{formatCurrency(p.row.credit)}</Typography>
+               {Number(p.row.returnCredit || 0) > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                     + return credit {formatCurrency(p.row.returnCredit)}
+                  </Typography>
+               )}
+            </Stack>
+         ),
       },
       {
          field: "netPayable",
@@ -335,9 +344,10 @@ const Finance = () => {
                </Button>
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ px: 3 }}>
-               Net Payable = total purchase due − unallocated supplier credit (payments recorded
-               against a purchase already reduced that purchase&apos;s due). Oldest due purchase
-               first. Current outstanding balances — NOT limited to the selected period above.
+               Net Payable = total purchase due − unallocated supplier credit − standing
+               purchase-return credit (payments recorded against a purchase already reduced
+               that purchase&apos;s due). Oldest due purchase first. Current outstanding
+               balances — NOT limited to the selected period above.
             </Typography>
             {payableRows.length === 0 && !loading ? (
                <Typography variant="body2" color="text.secondary" sx={{ px: 3, pb: 3 }}>

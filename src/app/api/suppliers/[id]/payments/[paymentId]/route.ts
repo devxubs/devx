@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { lockPurchaseRow } from "@src/lib/purchaseReturns";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 // Void a supplier payment (Phase 3B, roadmap 3.7 / schema plan §3).
 // Payments are financial records: they are soft-deleted (voided),
 // never hard-deleted. Voiding reverses the payment's allocation in
 // the same transaction — an allocated payment decrements its
 // purchase's `paid` and recomputes `due`; an unallocated payment
-// simply stops counting as supplier credit.
+// simply stops counting as supplier credit. Phase 4 (§2.2): an
+// allocated void takes the Purchase-row FOR UPDATE lock before
+// writing, serializing against concurrent purchase returns/edits.
 
 const PAYMENT_GATE = [
    "suppliers",
@@ -34,12 +42,20 @@ export async function DELETE(
          return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
       }
 
+      const auditCtx = requestAuditContext(request);
+
       const result = await prisma.$transaction(async (tx) => {
          const payment = await tx.supplierPayment.findFirst({
             where: { id: paymentId, supplierId: supplier.id },
          });
          if (!payment) return { status: 404 as const };
          if (payment.isDeleted) return { status: 200 as const, alreadyVoided: true };
+
+         // Phase 4 (§2.2): lock the purchase row before reversing
+         // an allocation — the same lock purchase returns take.
+         if (payment.purchaseId) {
+            await lockPurchaseRow(tx, payment.purchaseId);
+         }
 
          await tx.supplierPayment.update({
             where: { id: payment.id },
@@ -64,6 +80,17 @@ export async function DELETE(
                });
             }
          }
+
+         // Phase 4 (D1): audit in the same transaction.
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "PAYMENT",
+            entityType: "SUPPLIER_PAYMENT",
+            entityId: payment.id,
+            entityCustomId: payment.customId,
+            summary: `Supplier payment ${payment.customId || payment.id} of ৳${Number(payment.amount || 0).toFixed(2)} voided${payment.purchaseId ? " — allocation reversed" : ""}`,
+            ...auditCtx,
+         });
 
          return { status: 200 as const, alreadyVoided: false };
       });

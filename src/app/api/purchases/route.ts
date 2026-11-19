@@ -7,6 +7,11 @@ import {
    addStockForPurchaseItems,
    findVariantlessVariableLine,
 } from "@src/lib/stock";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -252,6 +257,17 @@ export async function POST(request: NextRequest) {
                note: `Purchase ${newPurchase.customId} (Invoice: ${invoiceNumber || "—"})`,
             },
          );
+
+         // Phase 4 (D1): audit in the same transaction.
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "PURCHASE",
+            entityId: newPurchase.id,
+            entityCustomId: newPurchase.customId,
+            summary: `Purchase ${newPurchase.customId} created — total ৳${total.toFixed(2)}, due ৳${due.toFixed(2)}`,
+            ...requestAuditContext(request),
+         });
 
          return newPurchase;
       });

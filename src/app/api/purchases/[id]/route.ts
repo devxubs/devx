@@ -7,6 +7,13 @@ import {
    findVariantlessVariableLine,
    StockReversalUnsafeError,
 } from "@src/lib/stock";
+import { lockPurchaseRow } from "@src/lib/purchaseReturns";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+   buildChanges,
+} from "@src/lib/audit";
 
 export async function GET(
    request: NextRequest,
@@ -200,12 +207,29 @@ export async function PUT(
       }
 
       const itemsSnapshot = normalizedItems;
+      const auditCtx = requestAuditContext(request);
 
       const updated = await prisma.$transaction(async (tx) => {
-         let productAmount = Number(existing.productAmount);
-         let othersCost = Number(existing.othersCost);
-         let discount = Number(existing.discount);
-         let paid = Number(existing.paid);
+         // Phase 4 (§2.2 companion): lock the Purchase row FIRST,
+         // then re-read it — item netting and totals must be
+         // computed from the latest committed state, serialized
+         // against concurrent purchase returns and allocated
+         // supplier payments (which take the same lock). The
+         // pre-transaction `existing` read above remains the 404 /
+         // validation fast path; `fresh` is authoritative here.
+         await lockPurchaseRow(tx, id);
+         const fresh = await tx.purchase.findUnique({
+            where: { id },
+            include: { items: true },
+         });
+         if (!fresh || fresh.isDeleted) {
+            throw new Error("Purchase not found");
+         }
+
+         let productAmount = Number(fresh.productAmount);
+         let othersCost = Number(fresh.othersCost);
+         let discount = Number(fresh.discount);
+         let paid = Number(fresh.paid);
 
          if (body.othersCost !== undefined) othersCost = safeMoney(body.othersCost);
          if (body.discount !== undefined) discount = safeMoney(body.discount);
@@ -230,7 +254,7 @@ export async function PUT(
                if (current) current.diff += delta;
                else diffMap.set(key, { productId, variantId, diff: delta });
             };
-            for (const oldItem of existing.items) {
+            for (const oldItem of fresh.items) {
                if (oldItem.productId) {
                   addDiff(oldItem.productId, oldItem.variantId ?? null, -oldItem.quantity);
                }
@@ -259,24 +283,24 @@ export async function PUT(
 
             if (decreases.length > 0) {
                await reverseStockForPurchaseItems(tx, decreases, {
-                  purchaseId: existing.id,
-                  note: `Purchase ${existing.customId} edited — stock corrected`,
+                  purchaseId: fresh.id,
+                  note: `Purchase ${fresh.customId} edited — stock corrected`,
                });
             }
             if (increases.length > 0) {
                const { addStockForPurchaseItems } = await import("@src/lib/stock");
                await addStockForPurchaseItems(tx, increases, {
-                  purchaseId: existing.id,
-                  note: `Purchase ${existing.customId} edited — stock corrected`,
+                  purchaseId: fresh.id,
+                  note: `Purchase ${fresh.customId} edited — stock corrected`,
                });
             }
 
             await tx.purchaseItem.deleteMany({
-               where: { purchaseId: existing.id },
+               where: { purchaseId: fresh.id },
             });
             await tx.purchaseItem.createMany({
                data: normalizedItems.map((it) => ({
-                  purchaseId: existing.id,
+                  purchaseId: fresh.id,
                   productId: it.productId,
                   variantId: it.variantId,
                   name: it.name,
@@ -297,7 +321,7 @@ export async function PUT(
          const total = Math.max(0, productAmount + othersCost - discount);
          const due = Math.max(0, total - paid);
 
-         return tx.purchase.update({
+         const result = await tx.purchase.update({
             where: { id },
             data: {
                invoice:
@@ -325,6 +349,27 @@ export async function PUT(
                attachments: true,
             },
          });
+
+         // Phase 4 (D1): audit in the same transaction.
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "UPDATE",
+            entityType: "PURCHASE",
+            entityId: fresh.id,
+            entityCustomId: fresh.customId,
+            summary: `Purchase ${fresh.customId || fresh.id} updated — total ৳${total.toFixed(2)}, due ৳${due.toFixed(2)}`,
+            changes: buildChanges(fresh, result, [
+               "total",
+               "due",
+               "paid",
+               "productAmount",
+               "othersCost",
+               "discount",
+            ]),
+            ...auditCtx,
+         });
+
+         return result;
       });
 
       return NextResponse.json(updated);
@@ -347,13 +392,19 @@ export async function DELETE(
    if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
+   const auditCtx = requestAuditContext(request);
 
    try {
       // PUR-03 fix: soft-deleting a purchase reverses the stock it
       // added, exactly once (state-checked inside the transaction),
       // and refuses — without changing anything — when the purchased
       // units have already been sold (fix instruction #15).
+      // Phase 4 (§2.2 companion): the Purchase-row lock is taken
+      // first so the delete serializes against concurrent purchase
+      // returns and allocated payments of the same purchase.
       const purchase = await prisma.$transaction(async (tx) => {
+         await lockPurchaseRow(tx, id);
+
          const existing = await tx.purchase.findUnique({
             where: { id },
             include: { items: true },
@@ -379,10 +430,23 @@ export async function DELETE(
                },
             );
 
-            return tx.purchase.update({
+            const deleted = await tx.purchase.update({
                where: { id },
                data: { isDeleted: true, deletedAt: new Date() },
             });
+
+            // Phase 4 (D1): audit in the same transaction.
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "DELETE",
+               entityType: "PURCHASE",
+               entityId: existing.id,
+               entityCustomId: existing.customId,
+               summary: `Purchase ${existing.customId || existing.id} moved to bin — stock reversed`,
+               ...auditCtx,
+            });
+
+            return deleted;
          }
 
          return existing;

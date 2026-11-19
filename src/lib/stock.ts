@@ -740,6 +740,142 @@ export async function reverseStockForPurchaseItems(
 }
 
 /**
+ * Deduct stock for a purchase return (Phase 4, D2). Same
+ * never-negative safety rule as reverseStockForPurchaseItems — the
+ * pre-check runs per product AND per variant over the aggregated
+ * lines and throws StockReversalUnsafeError before anything is
+ * written when units were already sold — but the movements use the
+ * RETURN type with NEGATIVE quantities (R4 in the schema diff: the
+ * sign + the PRET_ id in the note + purchaseId make the direction
+ * unambiguous against order-side RETURN restores, which are
+ * positive).
+ */
+export async function deductStockForPurchaseReturn(
+   tx: any,
+   lines: StockLine[],
+   opts: { purchaseId?: string | null; note: string },
+): Promise<void> {
+   const aggregated = aggregateLines(lines);
+   if (aggregated.size === 0) return;
+   const entries = Array.from(aggregated.values());
+
+   const products = await tx.product.findMany({
+      where: { id: { in: Array.from(new Set(entries.map((e) => e.productId))) } },
+      select: { id: true, productName: true, quantity: true, trackInventory: true },
+   });
+   const productMap = new Map<string, any>(products.map((p: any) => [p.id, p] as [string, any]));
+   const variantMap = await loadVariantMap(tx, entries);
+
+   const productTotals = new Map<string, number>();
+   for (const entry of entries) {
+      productTotals.set(
+         entry.productId,
+         (productTotals.get(entry.productId) || 0) + entry.quantity,
+      );
+   }
+   for (const [productId, qty] of productTotals.entries()) {
+      const product = productMap.get(productId);
+      if (!product || product.trackInventory === false) continue;
+      if (product.quantity < qty) {
+         throw new StockReversalUnsafeError(product.productName, product.quantity, qty);
+      }
+   }
+   for (const entry of entries) {
+      const product = productMap.get(entry.productId);
+      if (!product || product.trackInventory === false) continue;
+      const variant = resolveVariant(variantMap, entry);
+      if (variant && variant.quantity < entry.quantity) {
+         throw new StockReversalUnsafeError(
+            `${product.productName} (${variant.variantName})`,
+            variant.quantity,
+            entry.quantity,
+         );
+      }
+   }
+
+   for (const entry of entries) {
+      const product = productMap.get(entry.productId);
+      if (!product || product.trackInventory === false) continue;
+      const variant = resolveVariant(variantMap, entry);
+
+      await tx.product.update({
+         where: { id: entry.productId },
+         data: { quantity: { decrement: entry.quantity } },
+      });
+      if (variant) {
+         await tx.productVariant.update({
+            where: { id: variant.id },
+            data: { quantity: { decrement: entry.quantity } },
+         });
+      }
+      await adjustWarehouseStock(tx, entry.productId, -entry.quantity);
+      await tx.stockMovement.create({
+         data: {
+            productId: entry.productId,
+            type: "RETURN",
+            quantity: -entry.quantity,
+            variantId: entry.variantId,
+            purchaseId: opts.purchaseId || null,
+            note: opts.note,
+         },
+      });
+   }
+}
+
+/**
+ * Put stock back when a purchase return is deleted (Phase 4, D2) —
+ * the exact inverse of deductStockForPurchaseReturn: RETURN
+ * movements with POSITIVE quantities referencing the same PRET_ id,
+ * so the movement ledger shows the return and its reversal as a
+ * matched pair. No availability check: stock only ever increases.
+ */
+export async function restoreStockForPurchaseReturn(
+   tx: any,
+   lines: StockLine[],
+   opts: { purchaseId?: string | null; note: string },
+): Promise<void> {
+   const aggregated = aggregateLines(lines);
+   if (aggregated.size === 0) return;
+   const entries = Array.from(aggregated.values());
+
+   const products = await tx.product.findMany({
+      where: { id: { in: Array.from(new Set(entries.map((e) => e.productId))) } },
+      select: { id: true, trackInventory: true },
+   });
+   const productMap = new Map<string, any>(products.map((p: any) => [p.id, p] as [string, any]));
+   const variantMap = await loadVariantMap(tx, entries);
+
+   for (const entry of entries) {
+      const product = productMap.get(entry.productId);
+      if (!product) continue;
+      if (product.trackInventory === false) continue;
+      const variant = resolveVariant(variantMap, entry);
+
+      await tx.product.update({
+         where: { id: entry.productId },
+         data: { quantity: { increment: entry.quantity } },
+      });
+      if (variant) {
+         await tx.productVariant.update({
+            where: { id: variant.id },
+            data: { quantity: { increment: entry.quantity } },
+         });
+      }
+      await adjustWarehouseStock(tx, entry.productId, entry.quantity);
+      await tx.stockMovement.create({
+         data: {
+            productId: entry.productId,
+            type: "RETURN",
+            quantity: entry.quantity,
+            variantId: entry.variantId,
+            purchaseId: opts.purchaseId || null,
+            note: opts.note,
+         },
+      });
+   }
+}
+
+/**
  * Manual stock adjustment (Stock workspace, Phase 3A): move a single
  * product's — or a single variant's — stock by a signed delta with a
  * mandatory reason. Positive delta = stock in, negative = stock out.

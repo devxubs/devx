@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import { standingCreditOf } from "@src/lib/purchaseReturns";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -32,6 +33,10 @@ export async function GET(request: NextRequest) {
       // netPayable = Σ purchase due − Σ unallocated payments.
       // Allocated payments already reduced their purchase's due when
       // recorded, so they are not subtracted twice.
+      // Phase 4 (D2): standing purchase-return credit joins the
+      // credit term as its second documented source — the same one
+      // definition, extended (dueAbsorbed already reduced purchase
+      // due at return creation and is never subtracted again).
       const creditAggregates = await prisma.supplierPayment.groupBy({
          by: ["supplierId"],
          where: { isDeleted: false, purchaseId: null },
@@ -40,10 +45,26 @@ export async function GET(request: NextRequest) {
       const creditBySupplier = new Map(
          creditAggregates.map((a) => [a.supplierId, Number(a._sum.amount || 0)]),
       );
+      const returnCreditAggregates = await prisma.purchaseReturn.groupBy({
+         by: ["supplierId"],
+         where: { isDeleted: false, supplierId: { not: null } },
+         _sum: { totalAmount: true, creditConsumed: true },
+      });
+      const returnCreditBySupplier = new Map(
+         returnCreditAggregates.map((a) => [
+            a.supplierId,
+            standingCreditOf(
+               Number(a._sum.totalAmount || 0),
+               Number(a._sum.creditConsumed || 0),
+            ),
+         ]),
+      );
       const totalsBySupplier = new Map(
          aggregates.map((a) => {
             const due = Number(a._sum.due || 0);
             const credit = creditBySupplier.get(a.supplierId as string) || 0;
+            const returnCredit =
+               returnCreditBySupplier.get(a.supplierId as string) || 0;
             return [
                a.supplierId,
                {
@@ -51,7 +72,8 @@ export async function GET(request: NextRequest) {
                   paid: Number(a._sum.paid || 0),
                   due,
                   credit,
-                  netPayable: Math.max(0, due - credit),
+                  returnCredit,
+                  netPayable: Math.max(0, due - credit - returnCredit),
                   purchases: a._count.id,
                },
             ];
@@ -61,6 +83,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
          suppliers.map((s) => {
             const credit = creditBySupplier.get(s.id) || 0;
+            const returnCredit = returnCreditBySupplier.get(s.id) || 0;
             return {
                ...s,
                totals: totalsBySupplier.get(s.id) || {
@@ -68,6 +91,7 @@ export async function GET(request: NextRequest) {
                   paid: 0,
                   due: 0,
                   credit,
+                  returnCredit,
                   netPayable: 0,
                   purchases: 0,
                },

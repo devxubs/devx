@@ -195,8 +195,14 @@ const SupplierPaymentLedger = ({
          {summary && (
             <Typography variant="caption" color="text.secondary">
                Purchase due {formatCurrency(summary.totalDue)} − unallocated credit{" "}
-               {formatCurrency(summary.credit)} ={" "}
-               <b>net payable {formatCurrency(summary.netPayable)}</b>
+               {formatCurrency(summary.credit)}
+               {summary.returnCredit > 0 && (
+                  <>
+                     {" "}
+                     − return credit {formatCurrency(summary.returnCredit)}
+                  </>
+               )}{" "}
+               = <b>net payable {formatCurrency(summary.netPayable)}</b>
             </Typography>
          )}
 

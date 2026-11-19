@@ -31,6 +31,8 @@ import { isDescriptionEmpty } from "@src/lib/sanitizeHtml";
 import { exportToExcel, exportToWord } from "@src/lib/exportEngine";
 import { useSettings } from "@src/lib/settingsContext";
 import SupplierPaymentLedger from "./SupplierPaymentLedger";
+import PurchaseReturnForm from "./PurchaseReturnForm";
+import AlertDialog from "@src/components/AlertDialog";
 
 // ==========================================
 // 1. EMPLOYEE DETAIL MODAL
@@ -339,16 +341,61 @@ export const PurchaseDetailModal = ({
    const { formatCurrency } = useSettings();
    const [purchase, setPurchase] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   // Phase 4 (D2): purchase returns for this purchase + the
+   // return-create form and the reversal (delete) confirmation.
+   const [returns, setReturns] = useState<any[]>([]);
+   const [returnFormOpen, setReturnFormOpen] = useState(false);
+   const [deleteTarget, setDeleteTarget] = useState<any>(null);
+   const [returnError, setReturnError] = useState<string | null>(null);
+
+   const loadPurchase = React.useCallback(() => {
+      if (!purchaseId) return Promise.resolve();
+      return fetch(`/api/purchases/${purchaseId}`)
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => setPurchase(d))
+         .catch(() => {});
+   }, [purchaseId]);
 
    useEffect(() => {
       if (!open || !purchaseId) return;
       setLoading(true);
-      fetch(`/api/purchases/${purchaseId}`)
+      loadPurchase().finally(() => setLoading(false));
+   }, [open, purchaseId, loadPurchase]);
+
+   const loadReturns = React.useCallback(() => {
+      if (!purchase?.id) return;
+      fetch(`/api/purchase-returns?purchaseId=${purchase.id}`)
          .then((r) => (r.ok ? r.json() : null))
-         .then((d) => setPurchase(d))
-         .catch(() => {})
-         .finally(() => setLoading(false));
-   }, [open, purchaseId]);
+         .then((d) => setReturns(d?.returns || []))
+         .catch(() => {});
+   }, [purchase?.id]);
+
+   useEffect(() => {
+      if (open && purchase?.id) loadReturns();
+   }, [open, purchase?.id, loadReturns]);
+
+   const handleDeleteReturn = async () => {
+      if (!deleteTarget) return;
+      const target = deleteTarget;
+      setDeleteTarget(null);
+      setReturnError(null);
+      try {
+         const res = await fetch(`/api/purchase-returns/${target.id}`, {
+            method: "DELETE",
+         });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) {
+            setReturnError(
+               data.message || data.error || "Failed to reverse the return.",
+            );
+            return;
+         }
+         loadPurchase();
+         loadReturns();
+      } catch {
+         setReturnError("Failed to reverse the return.");
+      }
+   };
 
    const handleExportPurchaseDocx = () => {
       if (!purchase) return;
@@ -423,6 +470,7 @@ export const PurchaseDetailModal = ({
    };
 
    return (
+      <>
       <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
          <DialogTitle
             sx={{
@@ -573,6 +621,116 @@ export const PurchaseDetailModal = ({
                         </Box>
                      )}
 
+                  {/* Phase 4 (D2): returns recorded against this
+                      purchase. Deleting a return reverses its stock
+                      and settlement effects exactly; deleted returns
+                      do not appear in the Recycle Bin. */}
+                  <Box mt={1}>
+                     <Typography variant="subtitle2" fontWeight={700} mb={1}>
+                        Returns ({returns.length})
+                     </Typography>
+                     {returnError && (
+                        <Typography
+                           variant="body2"
+                           color="error.main"
+                           mb={1}
+                        >
+                           {returnError}
+                        </Typography>
+                     )}
+                     {returns.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                           No returns recorded for this purchase.
+                        </Typography>
+                     ) : (
+                        <Stack spacing={1}>
+                           {returns.map((ret: any) => (
+                              <Stack
+                                 key={ret.id}
+                                 direction="row"
+                                 justifyContent="space-between"
+                                 alignItems="center"
+                                 sx={{
+                                    border: 1,
+                                    borderColor: "divider",
+                                    borderRadius: 1,
+                                    px: 1.5,
+                                    py: 1,
+                                 }}
+                              >
+                                 <Box>
+                                    <Stack
+                                       direction="row"
+                                       spacing={1}
+                                       alignItems="center"
+                                    >
+                                       <Typography
+                                          variant="body2"
+                                          fontWeight={600}
+                                       >
+                                          {ret.customId || ret.id}
+                                       </Typography>
+                                       <Chip
+                                          size="small"
+                                          label={String(
+                                             ret.settlement || "",
+                                          ).replace(/_/g, " ")}
+                                          variant="outlined"
+                                       />
+                                    </Stack>
+                                    <Typography
+                                       variant="caption"
+                                       color="text.secondary"
+                                    >
+                                       {ret.createdAt
+                                          ? new Date(
+                                               ret.createdAt,
+                                            ).toLocaleDateString()
+                                          : ""}
+                                       {ret.reason ? ` · ${ret.reason}` : ""}
+                                       {ret.standingCredit > 0
+                                          ? ` · Standing credit ${formatCurrency(ret.standingCredit)}`
+                                          : ""}
+                                    </Typography>
+                                 </Box>
+                                 <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    alignItems="center"
+                                 >
+                                    <Typography
+                                       variant="body2"
+                                       fontWeight={700}
+                                    >
+                                       {formatCurrency(
+                                          Number(ret.totalAmount || 0),
+                                       )}
+                                    </Typography>
+                                    <Button
+                                       size="small"
+                                       color="error"
+                                       variant="outlined"
+                                       onClick={() => setDeleteTarget(ret)}
+                                    >
+                                       Delete
+                                    </Button>
+                                 </Stack>
+                              </Stack>
+                           ))}
+                        </Stack>
+                     )}
+                     <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                        mt={1}
+                     >
+                        Deleting a return reverses its stock and settlement
+                        effects. Deleted returns stay reversed and never
+                        appear in the Recycle Bin.
+                     </Typography>
+                  </Box>
+
                   {purchase.note && (
                      <Box>
                         <Typography variant="caption" color="text.secondary">
@@ -624,6 +782,14 @@ export const PurchaseDetailModal = ({
                >
                   Excel
                </Button>
+               <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!purchase}
+                  onClick={() => setReturnFormOpen(true)}
+               >
+                  Return Items
+               </Button>
             </Stack>
             <Button
                onClick={onClose}
@@ -635,6 +801,26 @@ export const PurchaseDetailModal = ({
             </Button>
          </DialogActions>
       </Dialog>
+
+      <PurchaseReturnForm
+         purchase={purchase}
+         open={returnFormOpen}
+         onClose={() => setReturnFormOpen(false)}
+         onSaved={() => {
+            loadPurchase();
+            loadReturns();
+         }}
+      />
+
+      <AlertDialog
+         open={!!deleteTarget}
+         onClose={() => setDeleteTarget(null)}
+         type="delete"
+         title={`Delete return ${deleteTarget?.customId || ""}? Its stock and settlement effects (due, credit or refund) will be reversed exactly.`}
+         confirmText="Delete & Reverse"
+         onConfirm={handleDeleteReturn}
+      />
+      </>
    );
 };
 
@@ -715,6 +901,10 @@ export const SupplierDetailModal = ({
                field: "Supplier Credit (unallocated payments)",
                value: String(payableSummary?.credit ?? 0),
             },
+            {
+               field: "Return Credit (standing, from purchase returns)",
+               value: String(payableSummary?.returnCredit ?? 0),
+            },
          ],
       });
    };
@@ -756,6 +946,10 @@ export const SupplierDetailModal = ({
             {
                field: "Supplier Credit (unallocated payments)",
                value: String(payableSummary?.credit ?? 0),
+            },
+            {
+               field: "Return Credit (standing, from purchase returns)",
+               value: String(payableSummary?.returnCredit ?? 0),
             },
          ],
       });
@@ -871,10 +1065,37 @@ export const SupplierDetailModal = ({
                                        payableSummary ? payableSummary.netPayable : totalDue,
                                     )}
                                  </Typography>
-                                 {payableSummary && payableSummary.credit > 0 && (
-                                    <Typography variant="caption" color="text.secondary">
-                                       Due {formatCurrency(totalDue)} − credit{" "}
-                                       {formatCurrency(payableSummary.credit)}
+                                 {payableSummary &&
+                                    (payableSummary.credit > 0 ||
+                                       payableSummary.returnCredit > 0) && (
+                                       <Typography variant="caption" color="text.secondary">
+                                          Due {formatCurrency(totalDue)}
+                                          {payableSummary.credit > 0 && (
+                                             <>
+                                                {" "}
+                                                − payment credit{" "}
+                                                {formatCurrency(payableSummary.credit)}
+                                             </>
+                                          )}
+                                          {payableSummary.returnCredit > 0 && (
+                                             <>
+                                                {" "}
+                                                − return credit{" "}
+                                                {formatCurrency(
+                                                   payableSummary.returnCredit,
+                                                )}
+                                             </>
+                                          )}
+                                       </Typography>
+                                    )}
+                                 {payableSummary && payableSummary.returnCredit > 0 && (
+                                    <Typography
+                                       variant="caption"
+                                       color="text.secondary"
+                                       display="block"
+                                    >
+                                       Return credit (standing):{" "}
+                                       {formatCurrency(payableSummary.returnCredit)}
                                     </Typography>
                                  )}
                               </Grid>
