@@ -3,6 +3,7 @@
 import { Alert, Grid, Stack, Typography } from "@mui/material";
 import CustomerInfo from "@src/Pages/admin/Customers/CustomerInfo";
 import CustomTable from "@src/components/Table";
+import DateRange from "@src/components/DateRange";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
@@ -16,11 +17,14 @@ const Customer = () => {
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState<string | null>(null);
    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
    const loadCustomerReport = useCallback(async () => {
       setLoading(true);
       try {
-         const res = await fetch("/api/reports?tab=customers");
+         const res = await fetch(
+            `/api/reports?${reportParams("customers", dateRange).toString()}`,
+         );
          if (res.ok) {
             const data = await res.json();
             setReport(data);
@@ -32,11 +36,13 @@ const Customer = () => {
          setError("Failed to load the customer report. The figures below may be out of date.");
       }
       setLoading(false);
-   }, []);
+   }, [dateRange]);
 
    useEffect(() => {
       loadCustomerReport();
    }, [loadCustomerReport]);
+
+   const hasRange = Boolean(dateRange[0] || dateRange[1]);
 
    const columns = [
       {
@@ -113,6 +119,14 @@ const Customer = () => {
    return (
       <Stack spacing={2}>
          {error && <Alert severity="error">{error}</Alert>}
+         {/* Honest scope caption: order counts follow the selected
+             period; the customer list and Total Customers are current
+             records and are not date-filtered. */}
+         <Typography variant="caption" color="text.secondary">
+            {hasRange
+               ? "Order counts, Last Order At, Active and Repeat figures count only orders placed in the selected period. The customer list and Total Customers are current records."
+               : "Order counts are all-time. Pick a date range in the table filter to count only orders from a specific period."}
+         </Typography>
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
@@ -166,11 +180,20 @@ const Customer = () => {
                         filename: `Customers_Report_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Customers Analytics Report",
                         fetchAllData: () =>
-                           fetchAllReportRows(reportParams("customers"), (d) => d.rows || []),
+                           fetchAllReportRows(reportParams("customers", dateRange), (d) => d.rows || []),
                      }}
                      printConfig={{
                         title: "DevX POS - Customers Analytics Report",
                      }}
+                     filter={(data, onChange) => (
+                        <DateRange
+                           title="Filter by Order Date"
+                           value={dateRange}
+                           onChange={(v: [Date | null, Date | null]) => {
+                              setDateRange(v);
+                           }}
+                        />
+                     )}
                   />
                </Stack>
             </Grid>

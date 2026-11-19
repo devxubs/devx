@@ -1,17 +1,21 @@
-import { Alert, Grid, Stack } from "@mui/material";
+import { Alert, Grid, Stack, Typography } from "@mui/material";
 import React from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import RadialBar from "@cmp/RadialBar";
+import DateRangePickerCustom from "@src/components/DateRange";
 import { useSettings } from "@src/lib/settingsContext";
 import { formatCompactNumber } from "@src/lib/utils";
+import { reportParams } from "../reportExport";
 
 const Summary = () => {
    const { settings } = useSettings();
    const [report, setReport] = React.useState<any>(null);
    const [error, setError] = React.useState<string | null>(null);
+   const [dateRange, setDateRange] = React.useState<[Date | null, Date | null]>([null, null]);
 
    React.useEffect(() => {
-      fetch("/api/reports")
+      const params = reportParams("summary", dateRange);
+      fetch(`/api/reports?${params.toString()}`)
          .then((r) => {
             if (!r.ok) throw new Error("Failed to load summary report");
             return r.json();
@@ -25,7 +29,9 @@ const Summary = () => {
                "Failed to load the summary report. The figures below may be missing or out of date.",
             ),
          );
-   }, []);
+   }, [dateRange]);
+
+   const hasRange = Boolean(dateRange[0] || dateRange[1]);
 
    // Phase 1 (NEW-04/NEW-05): every figure on this tab comes from the
    // reports API. The previous version rendered invented trend
@@ -75,6 +81,22 @@ const Summary = () => {
    return (
       <Stack spacing={2}>
          {error && <Alert severity="error">{error}</Alert>}
+         <Stack direction="row" justifyContent="flex-end">
+            <DateRangePickerCustom
+               title="Filter by Date"
+               value={dateRange}
+               onChange={(v: [Date | null, Date | null]) => setDateRange(v)}
+            />
+         </Stack>
+         {/* Honest scope caption: period flows (revenue, orders,
+             status breakdown) follow the selected range; the product
+             and customer totals are current all-time counts and do
+             not change with the range. */}
+         <Typography variant="caption" color="text.secondary">
+            {hasRange
+               ? "Revenue, orders and the status breakdown cover the selected period. Total Products and Total Customers are current all-time counts."
+               : "All figures are all-time totals. Pick a date range to view a specific period — product and customer totals always stay current."}
+         </Typography>
          <Grid container spacing={2}>
             {dynamicCards.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>

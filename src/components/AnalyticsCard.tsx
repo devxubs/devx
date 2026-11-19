@@ -4,7 +4,7 @@ import React from "react";
 import { Stack, Typography, Box, useTheme } from "@mui/material";
 import dynamic from "next/dynamic";
 import useGlobalState from "@src/handler/globalState";
-import { formatCompactNumber } from "@src/handler";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
    ssr: false,

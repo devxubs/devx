@@ -7,11 +7,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useSettings } from "@src/lib/settingsContext";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
-// Phase 1: ExpenseChart is intentionally not rendered — it is built
-// entirely on hard-coded example data (invented daily expenses for
-// Dec 2025), not on the reports API. The table below is real. The
-// chart component file is left on disk for a future data-backed
-// rewrite using the API's byType totals.
+// Phase 1: the old ExpenseChart was intentionally not rendered — it
+// was built entirely on hard-coded example data (invented daily
+// expenses for Dec 2025), not on the reports API. The table below is
+// real. (Phase 4/5 cleanup: the unused ExpenseChart file has been
+// removed; a future data-backed chart can be rebuilt from the API's
+// byType totals.)
 
 const Expenses = () => {
    const { formatCurrency } = useSettings();

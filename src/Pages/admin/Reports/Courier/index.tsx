@@ -344,7 +344,12 @@ const Courier = () => {
                      }}
                      filter={(data, onChange) => (
                         <DateRange
-                           title="Filter by Courier Submitted Date"
+                           // The range filters orders by their ORDER
+                           // (creation) date — the API's where clause
+                           // is on Order.createdAt. The previous title
+                           // claimed it filtered by courier submission
+                           // date, which it never did.
+                           title="Filter by Order Date"
                            value={dateRange}
                            onChange={(v: [Date | null, Date | null]) => {
                               setDateRange(v);

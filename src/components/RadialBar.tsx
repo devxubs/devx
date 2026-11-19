@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { Box, Typography, Stack, useTheme } from "@mui/material";
 import { ApexOptions } from "apexcharts";
 import CustomCard from "@src/components/CustomCard";
-import { formatCompactNumber } from "@src/handler";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
    ssr: false,
@@ -26,15 +26,19 @@ interface RadialBarProps {
 const RadialBar = ({ data, title, value }: RadialBarProps) => {
    const theme = useTheme();
 
+   const segmentColors = [
+      theme.palette.primary.main,
+      theme.palette.warning.main,
+      theme.palette.error.main,
+      theme.palette.info.main,
+      theme.palette.secondary.main,
+   ];
+
    const options: ApexOptions = {
       chart: {
          type: "radialBar",
       },
-      colors: [
-         theme.palette.primary.main,
-         theme.palette.warning.main,
-         theme.palette.error.main,
-      ],
+      colors: segmentColors,
       plotOptions: {
          radialBar: {
             hollow: {
@@ -53,7 +57,10 @@ const RadialBar = ({ data, title, value }: RadialBarProps) => {
                   color: theme.palette.text.primary,
                   offsetY: 10,
                   formatter: function (val) {
-                     return (val || 0) + "%";
+                     // val is the segment's percentage share (see the
+                     // series computation below), never a raw count.
+                     const pct = Math.round((Number(val) || 0) * 10) / 10;
+                     return `${pct}%`;
                   },
                },
                total: {
@@ -75,15 +82,23 @@ const RadialBar = ({ data, title, value }: RadialBarProps) => {
    };
 
    const safeData = data || [];
-   const series = safeData.map((item) => Number(item?.value) || 0);
+   // ApexCharts radialBar series are PERCENTAGES (0–100) of a full
+   // ring. Callers pass raw COUNTS (orders by status, orders by
+   // courier, products by availability), so each segment is converted
+   // to its share of the total here — previously the raw counts were
+   // fed straight in, so a count of 250 rendered as a "250%" ring and
+   // the data label printed the count with a "%" sign. The raw counts
+   // remain visible in the legend below.
+   const totalValue = safeData.reduce(
+      (sum, item) => sum + (Number(item?.value) || 0),
+      0,
+   );
+   const series = safeData.map((item) => {
+      const v = Number(item?.value) || 0;
+      return totalValue > 0 ? Math.round((v / totalValue) * 1000) / 10 : 0;
+   });
    const labels = safeData.map((item) => item?.label || "");
-   const colors = [
-      theme.palette.primary.main,
-      theme.palette.warning.main,
-      theme.palette.error.main,
-      theme.palette.info.main,
-      theme.palette.secondary.main,
-   ];
+   const colors = segmentColors;
 
    return (
       <CustomCard title={title || "No title"}>
@@ -110,6 +125,9 @@ const RadialBar = ({ data, title, value }: RadialBarProps) => {
                         bgcolor={colors[i % colors.length]}
                      />
                      <Typography variant="caption">{item.label || `Item ${i + 1}`}</Typography>
+                     <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        {formatCompactNumber(Number(item?.value) || 0)}
+                     </Typography>
                   </Stack>
                ))}
             </Stack>

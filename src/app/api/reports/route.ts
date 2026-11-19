@@ -251,9 +251,13 @@ export async function GET(request: NextRequest) {
 
             return {
                id: o.orderId || o.customId || o.id,
+               // Only a real submission timestamp is shown. The
+               // previous fallback printed the order's creation date
+               // as if it were the courier submission date, which made
+               // never-submitted orders look submitted.
                courier_submitted_at: o.courierSubmittedAt
                   ? o.courierSubmittedAt.toLocaleString()
-                  : o.createdAt.toLocaleString(),
+                  : "—",
                total_price: sub,
                shipping_charge: shipping,
                total_amount: total,
@@ -275,6 +279,13 @@ export async function GET(request: NextRequest) {
 
       // 3. CUSTOMER REPORT
       if (tab === "customers" || tab === "customer") {
+         // Date behaviour: the customer LIST and the Total Customers
+         // headline are current-state (every customer on record) and
+         // are never date-filtered. Every order-derived figure — the
+         // per-row Total/Completed/Failed counts, Last Order At, and
+         // the Active/Repeat headline counts — counts only orders
+         // placed inside the selected range when one is given.
+         const orderRangeWhere = hasDate ? { createdAt: dateFilter } : {};
          const customers = await prisma.customer.findMany({
             include: {
                orders: {
@@ -282,7 +293,7 @@ export async function GET(request: NextRequest) {
                   // same filter the headline groupBy below already
                   // uses — otherwise a customer's Total/Completed/
                   // Failed counts disagree with Active/Returning.
-                  where: { isDeleted: false },
+                  where: { isDeleted: false, ...orderRangeWhere },
                   select: { status: true, createdAt: true },
                   orderBy: { createdAt: "desc" },
                },
@@ -298,7 +309,11 @@ export async function GET(request: NextRequest) {
             prisma.customer.count(),
             prisma.order.groupBy({
                by: ["customerId"],
-               where: { isDeleted: false, customerId: { not: null } },
+               where: {
+                  isDeleted: false,
+                  customerId: { not: null },
+                  ...orderRangeWhere,
+               },
                _count: { id: true },
             }),
          ]);
@@ -389,11 +404,18 @@ export async function GET(request: NextRequest) {
 
       // 5. EMPLOYEES REPORT
       if (tab === "employees") {
+         // Date behaviour: the employee list is current-state (all
+         // staff on record). Every figure derived from handled orders
+         // — completed sales, cancels, revenue, ranking — counts only
+         // orders handled inside the selected range when one is given.
          const users = await prisma.user.findMany({
             include: {
                role: true,
                ordersHandled: {
-                  where: { isDeleted: false },
+                  where: {
+                     isDeleted: false,
+                     ...(hasDate ? { createdAt: dateFilter } : {}),
+                  },
                   select: { status: true, total: true },
                },
             },
@@ -447,7 +469,7 @@ export async function GET(request: NextRequest) {
 
       // 6. PRODUCTS REPORT
       if (tab === "products") {
-         const [allProducts, lowStockProducts, topSold, stockAgg, outOfStockAll, lowStockCountAll] = await Promise.all([
+         const [allProducts, allStockLevels, topSold, stockAgg, outOfStockAll] = await Promise.all([
             prisma.product.findMany({
                where: { isDeleted: false },
                select: { id: true, customId: true, productName: true, quantity: true, regularPrice: true, lowStockAlert: true },
@@ -455,13 +477,34 @@ export async function GET(request: NextRequest) {
                skip,
                take: limit,
             }),
+            // THE low-stock definition — the same rule the Dashboard,
+            // the Stock workspace and the Product list use:
+            // quantity <= the product's OWN lowStockAlert threshold
+            // (schema default 10). Prisma cannot compare two columns
+            // in a where clause, so the light stock-level list is
+            // filtered in JS (the Dashboard route uses the same
+            // pattern). The previous implementation hard-coded
+            // quantity <= 10 — which disagreed with every other screen
+            // for any product whose threshold was not 10 — and capped
+            // the row list at take: 50; the list and the count below
+            // now come from this one filtered set, with no row cap.
             prisma.product.findMany({
-               where: { isDeleted: false, quantity: { lte: 10 } },
+               where: { isDeleted: false },
                select: { id: true, customId: true, productName: true, quantity: true, lowStockAlert: true },
-               take: 50,
+               orderBy: { quantity: "asc" },
             }),
             prisma.orderItem.groupBy({
                by: ["name"],
+               // Top sellers are order-derived, so they honour the
+               // selected date range (on the parent order) and exclude
+               // soft-deleted orders — previously this groupBy had no
+               // filter at all and counted deleted orders' items.
+               where: {
+                  order: {
+                     isDeleted: false,
+                     ...(hasDate ? { createdAt: dateFilter } : {}),
+                  },
+               },
                _sum: { quantity: true, subtotal: true },
                orderBy: { _sum: { quantity: "desc" } },
                take: 5,
@@ -474,24 +517,21 @@ export async function GET(request: NextRequest) {
             prisma.product.count({
                where: { isDeleted: false, quantity: 0 },
             }),
-            // The low-stock ROW list below is display-capped (take: 50),
-            // so the headline count needs its own COUNT over the same
-            // filter — lowStockProducts.length silently capped the
-            // reported count at 50.
-            prisma.product.count({
-               where: { isDeleted: false, quantity: { lte: 10 } },
-            }),
          ]);
+
+         const lowStockList = allStockLevels.filter(
+            (p) => p.quantity <= (p.lowStockAlert || 10),
+         );
 
          const totalInStock = Number(stockAgg._sum.quantity || 0);
          const outOfStockCount = outOfStockAll;
-         const lowStockCount = lowStockCountAll;
+         const lowStockCount = lowStockList.length;
 
          return NextResponse.json({
             totalInStock,
             outOfStockCount,
             lowStockCount,
-            lowStockRows: lowStockProducts.map((p) => ({
+            lowStockRows: lowStockList.map((p) => ({
                id: p.customId || p.id,
                name: p.productName,
                stock: p.quantity,
@@ -963,6 +1003,16 @@ export async function GET(request: NextRequest) {
       }
 
       // 8. SUMMARY (DEFAULT)
+      // Date behaviour: revenue, expenses, purchases, order count,
+      // orders-by-status, top products and orders-by-source are
+      // period flows and honour the selected range when one is given.
+      // Total Customers and Total Products are current-state counts
+      // (records on file right now) and are never date-filtered — the
+      // Summary UI captions them as such.
+      const summaryOrderWhere: any = { isDeleted: false };
+      if (hasDate) summaryOrderWhere.createdAt = dateFilter;
+      const summaryFlowWhere: any = { isDeleted: false };
+      if (hasDate) summaryFlowWhere.createdAt = dateFilter;
       const [
          totalRevenueAgg,
          totalExpensesAgg,
@@ -975,34 +1025,40 @@ export async function GET(request: NextRequest) {
          courierOrders,
       ] = await Promise.all([
          prisma.order.aggregate({
-            where: { isDeleted: false, status: { in: ["COMPLETED", "DELIVERED"] } },
+            where: { ...summaryOrderWhere, status: { in: ["COMPLETED", "DELIVERED"] } },
             _sum: { total: true },
          }),
          prisma.expense.aggregate({
-            where: { isDeleted: false },
+            where: summaryFlowWhere,
             _sum: { amount: true },
          }),
          prisma.purchase.aggregate({
-            where: { isDeleted: false },
+            where: summaryFlowWhere,
             _sum: { total: true },
          }),
-         prisma.order.count({ where: { isDeleted: false } }),
+         prisma.order.count({ where: summaryOrderWhere }),
          prisma.customer.count(),
          prisma.product.count({ where: { isDeleted: false } }),
          prisma.order.groupBy({
             by: ["status"],
-            where: { isDeleted: false },
+            where: summaryOrderWhere,
             _count: { id: true },
          }),
          prisma.orderItem.groupBy({
             by: ["name"],
+            where: {
+               order: {
+                  isDeleted: false,
+                  ...(hasDate ? { createdAt: dateFilter } : {}),
+               },
+            },
             _sum: { quantity: true, subtotal: true },
             orderBy: { _sum: { quantity: "desc" } },
             take: 5,
          }),
          prisma.order.groupBy({
             by: ["orderSource"],
-            where: { isDeleted: false },
+            where: summaryOrderWhere,
             _count: { id: true },
          }),
       ]);

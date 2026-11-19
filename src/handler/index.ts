@@ -1,16 +1,7 @@
-export const formatCompactNumber = (num: number | string | null | undefined): string => {
-   if (num === null || num === undefined) return "0";
-   let parsed: number;
-   if (typeof num === "number") {
-      parsed = isNaN(num) ? 0 : num;
-   } else {
-      const cleaned = String(num).replace(/[^0-9.-]/g, "");
-      parsed = cleaned ? parseFloat(cleaned) : 0;
-      if (isNaN(parsed)) parsed = 0;
-   }
-
-   return new Intl.NumberFormat("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 1,
-   }).format(parsed);
-};
+// The compact number formatter lives in @src/lib/utils
+// (formatCompactNumber) — the single shared implementation used by
+// Reports, Dashboard and shared components. This module previously
+// carried a duplicate Intl-based copy (uppercase "K"); it now simply
+// re-exports the shared one so any legacy import from "@src/handler"
+// resolves to the same formatter.
+export { formatCompactNumber } from "@src/lib/utils";

@@ -20,7 +20,7 @@ import { GridCellParams } from "@mui/x-data-grid";
 
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import Icon from "@src/components/Icon";
-import { formatCompactNumber } from "@src/handler";
+import { formatCompactNumber } from "@src/lib/utils";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import CustomModal from "@src/components/Modal";
 import Modal from "./Modal";

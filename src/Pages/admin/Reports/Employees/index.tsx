@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import CustomTable from "@src/components/Table";
+import DateRange from "@src/components/DateRange";
 import { SellerProFile } from "../../Dashboard";
 import { GridCellParams } from "@mui/x-data-grid";
 import { useSettings } from "@src/lib/settingsContext";
@@ -18,10 +19,11 @@ const Employees = () => {
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState<string | null>(null);
    const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
+   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
    useEffect(() => {
       setLoading(true);
-      fetch("/api/reports?tab=employees")
+      fetch(`/api/reports?${reportParams("employees", dateRange).toString()}`)
          .then((r) => {
             if (!r.ok) throw new Error("Failed to load employees report");
             return r.json();
@@ -33,7 +35,9 @@ const Employees = () => {
             setError("Failed to load the employees report. The figures below may be out of date."),
          )
          .finally(() => setLoading(false));
-   }, []);
+   }, [dateRange]);
+
+   const hasRange = Boolean(dateRange[0] || dateRange[1]);
 
    const rankSalesmanColumns = [
       {
@@ -101,6 +105,13 @@ const Employees = () => {
    return (
       <Stack spacing={3}>
          {error && <Alert severity="error">{error}</Alert>}
+         {/* Honest scope caption: sales/revenue figures follow the
+             selected period; the employee list itself is current. */}
+         <Typography variant="caption" color="text.secondary">
+            {hasRange
+               ? "Completed Sales, Cancelled and Revenue count only orders handled in the selected period."
+               : "Figures are all-time. Pick a date range in the table filter to view a specific period."}
+         </Typography>
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
@@ -168,11 +179,20 @@ const Employees = () => {
                         filename: `Employees_Ranking_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Employee Performance Ranking",
                         fetchAllData: () =>
-                           fetchAllReportRows(reportParams("employees"), (d) => d.rows || []),
+                           fetchAllReportRows(reportParams("employees", dateRange), (d) => d.rows || []),
                      }}
                      printConfig={{
                         title: "DevX POS - Employee Performance Ranking",
                      }}
+                     filter={(data, onChange) => (
+                        <DateRange
+                           title="Filter by Order Date"
+                           value={dateRange}
+                           onChange={(v: [Date | null, Date | null]) => {
+                              setDateRange(v);
+                           }}
+                        />
+                     )}
                   />
                </Stack>
             </Grid>

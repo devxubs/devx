@@ -7,6 +7,7 @@ import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import RadialBar from "@cmp/RadialBar";
 import CustomTable from "@src/components/Table";
+import DateRangePickerCustom from "@src/components/DateRange";
 import { GridCellParams } from "@mui/x-data-grid";
 import { Stock } from "../../Product";
 import { useSettings } from "@src/lib/settingsContext";
@@ -28,10 +29,11 @@ const Products = () => {
       total: number;
    } | null>(null);
    const [detailProductId, setDetailProductId] = useState<string | null>(null);
+   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
    useEffect(() => {
       setLoading(true);
-      fetch("/api/reports?tab=products")
+      fetch(`/api/reports?${reportParams("products", dateRange).toString()}`)
          .then((r) => {
             if (!r.ok) throw new Error("Failed to load products report");
             return r.json();
@@ -43,7 +45,7 @@ const Products = () => {
             setError("Failed to load the products report. The figures below may be out of date."),
          )
          .finally(() => setLoading(false));
-   }, []);
+   }, [dateRange]);
 
    // The main response's availabilityRows are one page (100 rows,
    // sorted by quantity ascending — a biased sample), so chart counts
@@ -53,7 +55,7 @@ const Products = () => {
    // lowStockCount, which subtracts PRODUCT counts from a QUANTITY
    // sum (units) and produced a meaningless distribution.
    useEffect(() => {
-      fetchAllReportRows(reportParams("products"), (d) => d.availabilityRows || [])
+      fetchAllReportRows(reportParams("products", dateRange), (d) => d.availabilityRows || [])
          .then((all) => {
             if (all.length > 0) {
                setStockCounts({
@@ -65,7 +67,9 @@ const Products = () => {
             }
          })
          .catch(() => {});
-   }, []);
+   }, [dateRange]);
+
+   const hasRange = Boolean(dateRange[0] || dateRange[1]);
 
    const lowStockColumns = [
       {
@@ -115,6 +119,21 @@ const Products = () => {
    return (
       <Stack spacing={3}>
          {error && <Alert severity="error">{error}</Alert>}
+         <Stack direction="row" justifyContent="flex-end">
+            <DateRangePickerCustom
+               title="Top Sellers Period"
+               value={dateRange}
+               onChange={(v: [Date | null, Date | null]) => setDateRange(v)}
+            />
+         </Stack>
+         {/* Honest scope caption: stock levels are the CURRENT state
+             of the catalogue and cannot be date-ranged; only the
+             order-derived Top Sellers figures follow the period. */}
+         <Typography variant="caption" color="text.secondary">
+            {hasRange
+               ? "Stock figures (in stock, low stock, out of stock, distribution) are current and do not change with the period. Top Selling Products counts only sales in the selected period."
+               : "Stock figures are the current state of the catalogue. Top Selling Products are all-time — pick a period above to narrow them."}
+         </Typography>
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
@@ -205,7 +224,7 @@ const Products = () => {
                         filename: `Low_Stock_Alert_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Low Stock Alert Monitor",
                         fetchAllData: () =>
-                           fetchAllReportRows(reportParams("products"), (d) => d.lowStockRows || []),
+                           fetchAllReportRows(reportParams("products", dateRange), (d) => d.lowStockRows || []),
                      }}
                      printConfig={{
                         title: "DevX POS - Low Stock Alert Monitor",
