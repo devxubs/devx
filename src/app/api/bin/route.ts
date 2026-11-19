@@ -375,9 +375,25 @@ export async function POST(request: NextRequest) {
       // 5. PRODUCT HANDLING
       if (type === "product") {
          if (action === "restore") {
-            await prisma.product.update({
-               where: { id },
-               data: { isDeleted: false, deletedAt: null },
+            await prisma.$transaction(async (tx) => {
+               const product = await tx.product.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, productName: true },
+               });
+               if (!product) throw new Error("Product not found");
+               await tx.product.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "PRODUCT",
+                  entityId: product.id,
+                  entityCustomId: product.customId,
+                  summary: `Product ${product.customId || product.productName} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Product restored successfully" });
          } else if (action === "delete") {
@@ -388,10 +404,43 @@ export async function POST(request: NextRequest) {
             // that history — reject safely instead. Bundle-component
             // links (configuration, not history) are cleaned up first
             // so they no longer block deletion with a raw FK error.
-            const movementCount = await prisma.stockMovement.count({
-               where: { productId: id },
+            // The history check, deletion, and D1 audit row share one
+            // transaction; uploaded-file cleanup remains best-effort
+            // after the database commit.
+            const result = await prisma.$transaction(async (tx) => {
+               const product = await tx.product.findUnique({
+                  where: { id },
+                  select: {
+                     id: true,
+                     customId: true,
+                     productName: true,
+                     images: true,
+                     variants: { select: { image: true } },
+                  },
+               });
+               if (!product) throw new Error("Product not found");
+
+               const movementCount = await tx.stockMovement.count({
+                  where: { productId: id },
+               });
+               if (movementCount > 0) return { blocked: true, product };
+
+               await tx.productBundleItem.deleteMany({
+                  where: { componentProductId: id },
+               });
+               await tx.product.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "PRODUCT",
+                  entityId: product.id,
+                  entityCustomId: product.customId,
+                  summary: `Product ${product.customId || product.productName} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+               return { blocked: false, product };
             });
-            if (movementCount > 0) {
+            if (result.blocked) {
                return NextResponse.json(
                   {
                      error:
@@ -404,26 +453,11 @@ export async function POST(request: NextRequest) {
             // its uploaded image files too, so permanent deletion
             // doesn't leave orphans in UPLOAD_DIR. (Soft delete
             // keeps files: a restored product needs its images.)
-            const doomed = await prisma.product.findUnique({
-               where: { id },
-               select: {
-                  images: true,
-                  variants: { select: { image: true } },
-               },
-            });
-            await prisma.$transaction([
-               prisma.productBundleItem.deleteMany({
-                  where: { componentProductId: id },
-               }),
-               prisma.product.delete({ where: { id } }),
-            ]);
-            if (doomed) {
-               const urls = [
-                  ...((doomed.images as any[]) || []),
-                  ...(doomed.variants || []).map((v) => v.image),
-               ].filter(Boolean);
-               if (urls.length > 0) await deleteUploadedFiles(urls);
-            }
+            const urls = [
+               ...((result.product.images as any[]) || []),
+               ...(result.product.variants || []).map((v) => v.image),
+            ].filter(Boolean);
+            if (urls.length > 0) await deleteUploadedFiles(urls);
             return NextResponse.json({ message: "Product permanently deleted" });
          }
       }
