@@ -94,6 +94,15 @@ const OrderTable = () => {
    const [orderRows, setOrderRows] = useState<OrderType[]>([]);
    const [statusCounts, setStatusCounts] = useState<Record<string, number> | null>(null);
    const [loading, setLoading] = useState(false);
+   // Phase 2 (2.1): server-side pagination — the API already accepts
+   // page/limit and returns the filtered `total`; the list previously
+   // fetched a flat limit=100 and paged those rows client-side, which
+   // made every order past the first 100 unreachable.
+   const [paginationModel, setPaginationModel] = useState({
+      page: 0,
+      pageSize: 25,
+   });
+   const [totalOrders, setTotalOrders] = useState(0);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
    const [detailCustomerId, setDetailCustomerId] = useState<string | null>(
       null,
@@ -148,7 +157,8 @@ const OrderTable = () => {
       setLoading(true);
       try {
          const params = new URLSearchParams();
-         params.set("limit", "100");
+         params.set("page", String(paginationModel.page + 1));
+         params.set("limit", String(paginationModel.pageSize));
 
          const f = (filterQueryData.orderData || {}) as any;
 
@@ -304,12 +314,21 @@ const OrderTable = () => {
                },
             }));
             setOrderRows(mapped);
+            setTotalOrders(Number(data.total ?? mapped.length));
          }
       } catch {
          // fallback
       } finally {
          setLoading(false);
       }
+   }, [orderTab, filterQueryData, paginationModel]);
+
+   // Any tab / filter / search change returns to the first page so the
+   // requested page can never point past the filtered result set.
+   useEffect(() => {
+      setPaginationModel((prev) =>
+         prev.page === 0 ? prev : { ...prev, page: 0 },
+      );
    }, [orderTab, filterQueryData]);
 
    useEffect(() => {
@@ -517,6 +536,11 @@ const OrderTable = () => {
          <CustomTable
             rows={orderRows as OrderType[]}
             columns={columns}
+            serverPagination
+            rowCount={totalOrders}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            loading={loading}
             filter={(data, onChange) =>
                OrderFilter(data, (d: any) => {
                   onChange(d);

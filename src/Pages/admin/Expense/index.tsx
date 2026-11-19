@@ -2,6 +2,7 @@
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
+   Alert,
    Button,
    Stack,
    useTheme,
@@ -15,6 +16,7 @@ import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -43,7 +45,24 @@ const expenseSchema = yup.object({
 
 const Expense = () => {
    const theme = useTheme();
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
    const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
+   // Phase 2 (2.1): server-side pagination + toolbar search — the API
+   // accepts page/limit/search and returns the filtered total; the
+   // list previously fetched a flat limit=100.
+   const [paginationModel, setPaginationModel] = useState({
+      page: 0,
+      pageSize: 25,
+   });
+   const [totalExpenses, setTotalExpenses] = useState(0);
+   const [loadError, setLoadError] = useState(false);
+
+   // Phase 2 (2.3): global-search deep link — /admin/expense?expense=<id>
+   useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("expense");
+      if (id) setDetailExpenseId(id);
+   }, []);
 
    const columns: ColumnConfig[] = [
       {
@@ -75,7 +94,11 @@ const Expense = () => {
    const loadExpenses = React.useCallback(async () => {
       setLoading(true);
       try {
-         const res = await fetch("/api/expenses?limit=100");
+         const params = new URLSearchParams();
+         params.set("page", String(paginationModel.page + 1));
+         params.set("limit", String(paginationModel.pageSize));
+         if (searchText.trim()) params.set("search", searchText.trim());
+         const res = await fetch(`/api/expenses?${params.toString()}`);
          if (res.ok) {
             const data = await res.json();
             const mapped = (data.expenses || []).map((e: any) => ({
@@ -87,17 +110,28 @@ const Expense = () => {
                note: e.note || "",
             }));
             setExpenses(mapped);
+            setTotalExpenses(Number(data.total ?? mapped.length));
+            setLoadError(false);
+         } else {
+            setLoadError(true);
          }
       } catch {
-         // fallback
+         setLoadError(true);
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [paginationModel, searchText]);
 
    useEffect(() => {
       loadExpenses();
    }, [loadExpenses]);
+
+   // Search changes return to the first page.
+   useEffect(() => {
+      setPaginationModel((prev) =>
+         prev.page === 0 ? prev : { ...prev, page: 0 },
+      );
+   }, [searchText]);
 
    const [openModal, setOpenModal] = useState(false);
 
@@ -180,12 +214,29 @@ const Expense = () => {
                Add Expense
             </Button>
          </Stack>
-         {loading ? (
+         {loadError && !loading && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={loadExpenses}>
+                     Retry
+                  </Button>
+               }
+            >
+               Failed to load expenses. Please try again.
+            </Alert>
+         )}
+         {loading && expenses.length === 0 ? (
             <TableSkeleton rows={5} cols={5} />
          ) : (
             <CustomTable
                rows={expenses}
                columns={columns}
+               serverPagination
+               rowCount={totalExpenses}
+               paginationModel={paginationModel}
+               onPaginationModelChange={setPaginationModel}
+               loading={loading}
                checkBox={true}
                hideSelectionActions={true}
                canPrint={true}

@@ -63,6 +63,19 @@ interface DataTableProps {
       selectedRows: any[],
       onClearSelection?: () => void,
    ) => React.ReactNode;
+   // Phase 2 (roadmap 2.1 / §15): optional server-side pagination mode.
+   // All props are optional — existing callers keep client pagination.
+   // When `serverPagination` is set, the grid renders only the rows it
+   // is given (one server page), reports `rowCount` as the total, and
+   // reports page changes through `onPaginationModelChange`.
+   serverPagination?: boolean;
+   rowCount?: number;
+   paginationModel?: { page: number; pageSize: number };
+   onPaginationModelChange?: (model: {
+      page: number;
+      pageSize: number;
+   }) => void;
+   loading?: boolean;
 }
 
 export default function CustomTable({
@@ -81,16 +94,22 @@ export default function CustomTable({
    hideFooterSelectedRowCount = false,
    hideSelectionActions = false,
    customSelectionToolbar,
+   serverPagination = false,
+   rowCount,
+   paginationModel: controlledPaginationModel,
+   onPaginationModelChange,
+   loading = false,
 }: DataTableProps) {
    const theme = useTheme();
 
    const [actionMenuOpen, setActionMenuOpen] = useState(
       null as null | HTMLElement,
    );
-   const [paginationModel, setPaginationModel] = useState({
+   const [internalPaginationModel, setInternalPaginationModel] = useState({
       pageSize: 10,
       page: 0,
    });
+   const paginationModel = controlledPaginationModel ?? internalPaginationModel;
    const [selectedRowParams, setSelectedRowParams] =
       useState<GridRenderCellParams | null>(null);
 
@@ -146,9 +165,15 @@ export default function CustomTable({
       }
    }, [rows]);
 
-   const handlePaginationChange = useCallback((model: any) => {
-      setPaginationModel(model);
-   }, []);
+   const handlePaginationChange = useCallback(
+      (model: any) => {
+         if (!controlledPaginationModel) {
+            setInternalPaginationModel(model);
+         }
+         onPaginationModelChange?.(model);
+      },
+      [controlledPaginationModel, onPaginationModelChange],
+   );
 
    const processedColumns = useMemo(() => {
       return columns.map((col) => {
@@ -363,7 +388,14 @@ export default function CustomTable({
                   setRowSelectionModel(newModel)
                }
                // autoPageSize //* enable this to make Whichever one you show based on the height of the table
-               pageSizeOptions={[10, 25, 50, { value: -1, label: "All" }]}
+               pageSizeOptions={
+                  serverPagination
+                     ? [10, 25, 50, 100]
+                     : [10, 25, 50, { value: -1, label: "All" }]
+               }
+               paginationMode={serverPagination ? "server" : "client"}
+               {...(serverPagination ? { rowCount: rowCount ?? 0 } : {})}
+               loading={loading}
                paginationModel={paginationModel}
                onPaginationModelChange={handlePaginationChange}
                disableColumnSorting

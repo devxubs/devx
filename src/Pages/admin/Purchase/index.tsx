@@ -1,6 +1,7 @@
 "use client";
 
 import {
+   Alert,
    Button,
    Stack,
    useTheme,
@@ -15,6 +16,7 @@ import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig, MenuItem } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { PurchaseDetailModal, SupplierDetailModal } from "@src/components/EntityDetailModals/EntityModals";
@@ -55,15 +57,36 @@ export const purchaseData: PurchaseTypes[] = [];
 const Purchase = () => {
    const theme = useTheme();
    const router = useRouter();
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
    const [purchases, setPurchases] = useState<PurchaseTypes[]>([]);
    const [loading, setLoading] = useState(false);
    const [detailPurchaseId, setDetailPurchaseId] = useState<string | null>(null);
    const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
+   // Phase 2 (2.1): server-side pagination + toolbar search — the API
+   // already accepts page/limit/search and returns the filtered total;
+   // the list previously fetched a flat limit=100 with no search wiring.
+   const [paginationModel, setPaginationModel] = useState({
+      page: 0,
+      pageSize: 25,
+   });
+   const [totalPurchases, setTotalPurchases] = useState(0);
+   const [loadError, setLoadError] = useState(false);
+
+   // Phase 2 (2.3): global-search deep link — /admin/purchase?purchase=<id>
+   React.useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("purchase");
+      if (id) setDetailPurchaseId(id);
+   }, []);
 
    const loadPurchases = React.useCallback(async () => {
       setLoading(true);
       try {
-         const res = await fetch("/api/purchases?limit=100");
+         const params = new URLSearchParams();
+         params.set("page", String(paginationModel.page + 1));
+         params.set("limit", String(paginationModel.pageSize));
+         if (searchText.trim()) params.set("search", searchText.trim());
+         const res = await fetch(`/api/purchases?${params.toString()}`);
          if (res.ok) {
             const data = await res.json();
             const mapped = (data.purchases || []).map((p: any) => ({
@@ -92,17 +115,28 @@ const Purchase = () => {
                attachments: p.attachments || [],
             }));
             setPurchases(mapped);
+            setTotalPurchases(Number(data.total ?? mapped.length));
+            setLoadError(false);
+         } else {
+            setLoadError(true);
          }
       } catch {
-         // fallback
+         setLoadError(true);
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [paginationModel, searchText]);
 
    React.useEffect(() => {
       loadPurchases();
    }, [loadPurchases]);
+
+   // Search changes return to the first page.
+   React.useEffect(() => {
+      setPaginationModel((prev) =>
+         prev.page === 0 ? prev : { ...prev, page: 0 },
+      );
+   }, [searchText]);
 
    // note
    const [note, setNote] = useState<string>("");
@@ -273,12 +307,29 @@ const Purchase = () => {
                Add purchase
             </Button>
          </Stack>
-         {loading ? (
+         {loadError && !loading && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={loadPurchases}>
+                     Retry
+                  </Button>
+               }
+            >
+               Failed to load purchases. Please try again.
+            </Alert>
+         )}
+         {loading && purchases.length === 0 ? (
             <TableSkeleton rows={5} cols={6} />
          ) : (
             <CustomTable
                rows={purchases}
                columns={columns}
+               serverPagination
+               loading={loading}
+               rowCount={totalPurchases}
+               paginationModel={paginationModel}
+               onPaginationModelChange={setPaginationModel}
                checkBox
                hideSelectionActions={true}
                canPrint={true}

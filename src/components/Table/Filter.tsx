@@ -725,7 +725,7 @@ const Filter: React.FC<FilterProps> = ({
                               ? `${dayjs(value[0]).format("YYYY-MM-DD")} → ${dayjs(
                                    value[1],
                                 ).format("YYYY-MM-DD")}`
-                              : String(value)
+                              : formatChipValue(key, value)
                         }
                         size="small"
                         onDelete={() =>
@@ -745,7 +745,7 @@ const Filter: React.FC<FilterProps> = ({
                {activeCustomerFilters.map(([key, value]) => (
                   <FilterChipWrapper key={key} title={formatLabel(key)}>
                      <Chip
-                        label={String(value)}
+                        label={formatChipValue(key, value)}
                         size="small"
                         onDelete={() =>
                            setFilterQueryData({
@@ -821,6 +821,17 @@ const chipStyle = (theme: any) => ({
 });
 
 // Convert snake_case → Normal Label
+// Phase 2 (2.7): boolean filter values (the exclude* flags) used to
+// render as the raw string "true" on the chip. Give them a readable
+// label; every other value keeps its plain string form.
+const formatChipValue = (key: string, value: any): string => {
+   if (typeof value === "boolean") {
+      if (!value) return "No";
+      return key.toLowerCase().startsWith("exclude") ? "Excluded" : "Yes";
+   }
+   return String(value);
+};
+
 const formatLabel = (str: string) => {
    if (str === "order_status_excl") return "Order Status (Excl)";
    if (str === "order_source_excl") return "Order Source (Excl)";

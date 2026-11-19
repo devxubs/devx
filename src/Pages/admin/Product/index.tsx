@@ -15,6 +15,7 @@ import {
    CircularProgress,
    IconButton,
    Tooltip,
+   Alert,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
@@ -183,6 +184,15 @@ const Product = () => {
    const [products, setProducts] = useState<ProductType[]>([]);
    const [initialLoading, setInitialLoading] = useState(true);
    const [isFetching, setIsFetching] = useState(false);
+   // Phase 2 (2.1): server-side pagination — the products API already
+   // accepts page/limit and returns the filtered `total`; the list
+   // previously fetched a flat limit=100 and hid every product past it.
+   const [paginationModel, setPaginationModel] = useState({
+      page: 0,
+      pageSize: 25,
+   });
+   const [totalProducts, setTotalProducts] = useState(0);
+   const [loadError, setLoadError] = useState(false);
    const [selectedProductId, setSelectedProductId] = useState<string | null>(
       null,
    );
@@ -192,6 +202,13 @@ const Product = () => {
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
    const [viewProduct, setViewProduct] = useState<any>(null);
    const [loadingDetail, setLoadingDetail] = useState(false);
+
+   // Phase 2 (2.3): global-search deep link — /admin/product?id=<id>
+   // opens that product's detail view directly.
+   useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("id");
+      if (id) setSelectedProductId(id);
+   }, []);
 
    useEffect(() => {
       if (!selectedProductId) {
@@ -307,7 +324,8 @@ const Product = () => {
       setIsFetching(true);
       try {
          const params = new URLSearchParams();
-         params.set("limit", "100");
+         params.set("page", String(paginationModel.page + 1));
+         params.set("limit", String(paginationModel.pageSize));
          if (filterQueryData.searchText) {
             params.set("search", filterQueryData.searchText);
          }
@@ -376,13 +394,24 @@ const Product = () => {
                };
             });
             setProducts(mapped);
+            setTotalProducts(Number(data.total ?? mapped.length));
+            setLoadError(false);
+         } else {
+            setLoadError(true);
          }
       } catch {
-         // fallback
+         setLoadError(true);
       } finally {
          setIsFetching(false);
          setInitialLoading(false);
       }
+   }, [filterQueryData, paginationModel]);
+
+   // Filter / search changes return to the first page.
+   useEffect(() => {
+      setPaginationModel((prev) =>
+         prev.page === 0 ? prev : { ...prev, page: 0 },
+      );
    }, [filterQueryData]);
 
    useEffect(() => {
@@ -424,6 +453,24 @@ const Product = () => {
                   Add product
                </Button>
             </Stack>
+            {/* Phase 2 (2.6): standard load-error banner with retry
+                (Customers dialect) instead of a silently empty table. */}
+            {loadError && !initialLoading && (
+               <Alert
+                  severity="error"
+                  action={
+                     <Button
+                        color="inherit"
+                        size="small"
+                        onClick={loadProducts}
+                     >
+                        Retry
+                     </Button>
+                  }
+               >
+                  Failed to load products. Please try again.
+               </Alert>
+            )}
             <Stack>
                {initialLoading ? (
                   <TableSkeleton rows={5} cols={6} />
@@ -431,6 +478,11 @@ const Product = () => {
                   <CustomTable
                      rows={products}
                      columns={columns}
+                     serverPagination
+                     rowCount={totalProducts}
+                     paginationModel={paginationModel}
+                     onPaginationModelChange={setPaginationModel}
+                     loading={isFetching}
                      checkBox={true}
                      canPrint={false}
                      canExport={false}

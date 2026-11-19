@@ -12,11 +12,21 @@ export async function GET(request: NextRequest) {
    const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
    const limit = isExportAll ? 10000 : Math.min(parseInt(searchParams.get("limit") || "50"), 100);
    const type = searchParams.get("type") || undefined;
+   // Phase 2 (2.1): free-text search so the list toolbar's search box
+   // works against the same filtered set the pagination total counts.
+   const search = searchParams.get("search")?.trim() || "";
    const skip = isExportAll ? 0 : (page - 1) * limit;
 
    const where: any = { isDeleted: false };
    if (type) {
       where.type = { contains: type };
+   }
+   if (search) {
+      where.OR = [
+         { type: { contains: search } },
+         { note: { contains: search } },
+         { customId: { contains: search } },
+      ];
    }
 
    try {
