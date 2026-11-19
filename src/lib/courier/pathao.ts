@@ -31,6 +31,12 @@ import {
    CourierNotConfiguredError,
    CourierNotImplementedError,
 } from "./errors";
+import {
+   fetchJsonWithTimeout,
+   httpErrorKind,
+   isRecord,
+   providerMessage,
+} from "./http";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 // Documented token lifetime is 5 days; used when the response
@@ -50,6 +56,35 @@ export function resetPathaoTokenCache(): void {
    tokenCache = null;
 }
 
+/** Pure parser for the corroborated issue-token response shape. */
+export function parsePathaoTokenResponse(data: unknown): {
+   accessToken: string;
+   ttlSeconds: number;
+} {
+   if (!isRecord(data)) {
+      throw new CourierApiError(
+         "pathao",
+         200,
+         "Pathao token response was not a JSON object.",
+         "invalid_response",
+      );
+   }
+   const accessToken = data.access_token;
+   if (typeof accessToken !== "string" || !accessToken.trim()) {
+      throw new CourierApiError(
+         "pathao",
+         200,
+         "Pathao token response carried no access_token.",
+         "invalid_response",
+      );
+   }
+   const ttlSeconds =
+      Number(data.expires_in) > 0
+         ? Number(data.expires_in)
+         : FALLBACK_TOKEN_TTL_SECONDS;
+   return { accessToken, ttlSeconds };
+}
+
 export async function getPathaoAccessToken(
    config: PathaoConfig | null,
    fetchImpl: FetchLike = fetch,
@@ -61,13 +96,12 @@ export async function getPathaoAccessToken(
       return tokenCache.accessToken;
    }
 
-   const controller = new AbortController();
-   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-   let res: Response;
-   try {
-      res = await fetchImpl(`${config.baseUrl}/aladdin/api/v1/issue-token`, {
+   const { status, ok, data } = await fetchJsonWithTimeout(
+      "pathao",
+      fetchImpl,
+      `${config.baseUrl}/aladdin/api/v1/issue-token`,
+      {
          method: "POST",
-         signal: controller.signal,
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({
             client_id: config.clientId,
@@ -76,32 +110,23 @@ export async function getPathaoAccessToken(
             password: config.password,
             grant_type: "password",
          }),
-      });
-   } catch {
+      },
+      REQUEST_TIMEOUT_MS,
+   );
+   if (!ok) {
+      const message = providerMessage(data);
       throw new CourierApiError(
          "pathao",
-         null,
-         "Pathao token request failed before a response was received (network error or timeout).",
+         status,
+         `Pathao token request failed with HTTP ${status}${message ? `: ${message}` : ""}.`,
+         httpErrorKind(status),
       );
-   } finally {
-      clearTimeout(timer);
    }
 
-   const data: any = await res.json().catch(() => null);
-   if (!res.ok || !data?.access_token) {
-      throw new CourierApiError(
-         "pathao",
-         res.status,
-         `Pathao token request failed with HTTP ${res.status}${data?.message ? `: ${data.message}` : ""}.`,
-      );
-   }
-   const ttlSeconds =
-      Number(data.expires_in) > 0
-         ? Number(data.expires_in)
-         : FALLBACK_TOKEN_TTL_SECONDS;
+   const parsed = parsePathaoTokenResponse(data);
    tokenCache = {
-      accessToken: String(data.access_token),
-      expiresAt: Date.now() + ttlSeconds * 1000,
+      accessToken: parsed.accessToken,
+      expiresAt: Date.now() + parsed.ttlSeconds * 1000,
    };
    return tokenCache.accessToken;
 }

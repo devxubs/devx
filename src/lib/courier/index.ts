@@ -21,8 +21,16 @@ export * from "./config";
 export * from "./errors";
 export * from "./types";
 export { mapSteadfastStatus, mapPathaoStatus } from "./statusMap";
-export { createSteadfastProvider } from "./steadfast";
-export { createPathaoProvider, getPathaoAccessToken } from "./pathao";
+export {
+   createSteadfastProvider,
+   parseSteadfastCreateResponse,
+   parseSteadfastStatusResponse,
+} from "./steadfast";
+export {
+   createPathaoProvider,
+   getPathaoAccessToken,
+   parsePathaoTokenResponse,
+} from "./pathao";
 
 /** The provider implementation for an id, bound to env config. */
 export function getCourierProvider(

@@ -13,20 +13,27 @@ import {
    CourierApiError,
    CourierNotConfiguredError,
    CourierNotImplementedError,
+   courierErrorToHttp,
 } from "@src/lib/courier/errors";
 import {
    mapSteadfastStatus,
    mapPathaoStatus,
 } from "@src/lib/courier/statusMap";
-import { createSteadfastProvider } from "@src/lib/courier/steadfast";
+import {
+   createSteadfastProvider,
+   parseSteadfastCreateResponse,
+   parseSteadfastStatusResponse,
+} from "@src/lib/courier/steadfast";
 import {
    createPathaoProvider,
    getPathaoAccessToken,
+   parsePathaoTokenResponse,
    resetPathaoTokenCache,
 } from "@src/lib/courier/pathao";
 import {
    assertOrderNotBooked,
    buildConsignmentInput,
+   getCourierProvider,
 } from "@src/lib/courier/index";
 
 // Phase 4 (D4/D5): courier foundation. No test here may touch the
@@ -224,6 +231,108 @@ describe("Steadfast provider (UNVERIFIED contract)", () => {
    });
 });
 
+describe("typed courier failures + response parsers (D5 hardening)", () => {
+   const cfg = getSteadfastConfig(STEADFAST_ENV);
+
+   it("classifies network failures and timeouts separately", async () => {
+      const network = createSteadfastProvider(
+         cfg,
+         vi.fn(async () => {
+            throw new Error("socket reset");
+         }) as any,
+      );
+      await expect(network.getStatus("1")).rejects.toMatchObject({
+         name: "CourierApiError",
+         kind: "network",
+         retryable: true,
+         status: null,
+      });
+
+      const abort = new Error("aborted");
+      abort.name = "AbortError";
+      const timeout = createSteadfastProvider(
+         cfg,
+         vi.fn(async () => {
+            throw abort;
+         }) as any,
+      );
+      await expect(timeout.getStatus("1")).rejects.toMatchObject({
+         name: "CourierApiError",
+         kind: "timeout",
+         retryable: true,
+         status: null,
+      });
+   });
+
+   it("classifies non-JSON and malformed success bodies as invalid_response", async () => {
+      const nonJson = createSteadfastProvider(
+         cfg,
+         vi.fn(async () => ({
+            ok: true,
+            status: 200,
+            text: async () => "not json",
+         })) as any,
+      );
+      await expect(nonJson.getStatus("1")).rejects.toMatchObject({
+         name: "CourierApiError",
+         kind: "invalid_response",
+         retryable: false,
+      });
+      expect(() => parseSteadfastCreateResponse({ consignment: {} })).toThrow(
+         expect.objectContaining({ kind: "invalid_response" }),
+      );
+      expect(() => parseSteadfastStatusResponse({})).toThrow(
+         expect.objectContaining({ kind: "invalid_response" }),
+      );
+      expect(() => parsePathaoTokenResponse({ expires_in: 10 })).toThrow(
+         expect.objectContaining({ kind: "invalid_response" }),
+      );
+   });
+
+   it("detects provider rejection embedded in an HTTP 200 body", () => {
+      expect(() =>
+         parseSteadfastCreateResponse({
+            status: 422,
+            message: "Invalid invoice",
+            consignment: { consignment_id: 1 },
+         }),
+      ).toThrow(
+         expect.objectContaining({
+            kind: "provider_rejected",
+            status: 422,
+            message: expect.stringContaining("Invalid invoice"),
+         }),
+      );
+   });
+
+   it("maps typed errors to safe HTTP responses without payload leakage", () => {
+      expect(
+         courierErrorToHttp(new CourierNotConfiguredError("steadfast", ["K"])),
+      ).toMatchObject({ status: 503, body: { kind: "not_configured" } });
+      expect(
+         courierErrorToHttp(new CourierAlreadyBookedError("SF-1")),
+      ).toMatchObject({ status: 409, body: { kind: "already_booked" } });
+      expect(
+         courierErrorToHttp(
+            new CourierApiError("steadfast", null, "timed out", "timeout"),
+         ),
+      ).toMatchObject({ status: 504, body: { kind: "timeout" } });
+      expect(JSON.stringify(courierErrorToHttp(new Error("secret payload")))).not.toContain(
+         "secret payload",
+      );
+   });
+
+   it("registry binds providers and rejects unknown ids", () => {
+      expect(getCourierProvider("steadfast", STEADFAST_ENV).id).toBe(
+         "steadfast",
+      );
+      expect(getCourierProvider("pathao", PATHAO_ENV).id).toBe("pathao");
+      expect(() => getCourierProvider("unknown" as any, {})).toThrow(
+         /Unknown courier provider/,
+      );
+   });
+});
+
 describe("Pathao scaffolding (D5)", () => {
    beforeEach(() => resetPathaoTokenCache());
 
@@ -263,6 +372,28 @@ describe("Pathao scaffolding (D5)", () => {
       expect(body.grant_type).toBe("password");
       expect(body.client_id).toBe("cid");
       expect(body.store_id).toBeUndefined();
+   });
+
+   it("token request maps HTTP rejection and invalid success shapes", async () => {
+      const cfg = getPathaoConfig(PATHAO_ENV);
+      const rejected = vi.fn(async () =>
+         jsonResponse({ message: "Bad credentials" }, 401),
+      );
+      await expect(
+         getPathaoAccessToken(cfg, rejected as any),
+      ).rejects.toMatchObject({
+         name: "CourierApiError",
+         kind: "provider_rejected",
+         status: 401,
+      });
+
+      const malformed = vi.fn(async () => jsonResponse({ expires_in: 10 }));
+      await expect(
+         getPathaoAccessToken(cfg, malformed as any),
+      ).rejects.toMatchObject({
+         name: "CourierApiError",
+         kind: "invalid_response",
+      });
    });
 
    it("token request refuses when unconfigured, before any fetch", async () => {

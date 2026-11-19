@@ -27,6 +27,12 @@ import type {
    ConsignmentStatusResult,
 } from "./types";
 import { CourierApiError, CourierNotConfiguredError } from "./errors";
+import {
+   fetchJsonWithTimeout,
+   httpErrorKind,
+   isRecord,
+   providerMessage,
+} from "./http";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -37,50 +43,125 @@ async function steadfastRequest(
    fetchImpl: FetchLike,
    pathSegment: string,
    init: RequestInit,
-): Promise<any> {
-   const controller = new AbortController();
-   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-   let res: Response;
-   try {
-      res = await fetchImpl(`${config.baseUrl}${pathSegment}`, {
+): Promise<unknown> {
+   const { status, ok, data } = await fetchJsonWithTimeout(
+      "steadfast",
+      fetchImpl,
+      `${config.baseUrl}${pathSegment}`,
+      {
          ...init,
-         signal: controller.signal,
          headers: {
             "Content-Type": "application/json",
             "Api-Key": config.apiKey,
             "Secret-Key": config.secretKey,
             ...(init.headers || {}),
          },
-      });
-   } catch (error: any) {
+      },
+      REQUEST_TIMEOUT_MS,
+   );
+   if (!ok) {
+      const message = providerMessage(data);
       throw new CourierApiError(
          "steadfast",
-         null,
-         `Steadfast request failed before a response was received (${error?.name === "AbortError" ? "timeout" : "network error"}).`,
-      );
-   } finally {
-      clearTimeout(timer);
-   }
-
-   const text = await res.text().catch(() => "");
-   let data: any = null;
-   try {
-      data = text ? JSON.parse(text) : null;
-   } catch {
-      throw new CourierApiError(
-         "steadfast",
-         res.status,
-         "Steadfast returned a non-JSON response.",
-      );
-   }
-   if (!res.ok) {
-      throw new CourierApiError(
-         "steadfast",
-         res.status,
-         `Steadfast request failed with HTTP ${res.status}${data?.message ? `: ${data.message}` : ""}.`,
+         status,
+         `Steadfast request failed with HTTP ${status}${message ? `: ${message}` : ""}.`,
+         httpErrorKind(status),
       );
    }
    return data;
+}
+
+function bodyStatus(data: Record<string, any>): number | null {
+   const status = Number(data.status);
+   return Number.isFinite(status) && data.status !== undefined
+      ? status
+      : null;
+}
+
+function assertNoBodyRejection(data: unknown): Record<string, any> {
+   if (!isRecord(data)) {
+      throw new CourierApiError(
+         "steadfast",
+         200,
+         "Steadfast returned an invalid response shape — the contract may have changed (D5 verification pending).",
+         "invalid_response",
+      );
+   }
+   const status = bodyStatus(data);
+   if (status !== null && (status < 200 || status >= 300)) {
+      const message = providerMessage(data);
+      throw new CourierApiError(
+         "steadfast",
+         status,
+         `Steadfast rejected the request${message ? `: ${message}` : ""}.`,
+         "provider_rejected",
+      );
+   }
+   return data;
+}
+
+/** Pure parser for the researched create_order response shape. */
+export function parseSteadfastCreateResponse(data: unknown): {
+   consignmentId: string;
+   trackingCode: string;
+} {
+   const body = assertNoBodyRejection(data);
+   const consignment = body.consignment;
+   if (!isRecord(consignment)) {
+      throw new CourierApiError(
+         "steadfast",
+         200,
+         "Steadfast answered but the response carried no consignment object — the contract may have changed (D5 verification pending).",
+         "invalid_response",
+      );
+   }
+   const rawId = consignment.consignment_id;
+   if (
+      (typeof rawId !== "string" && typeof rawId !== "number") ||
+      !String(rawId).trim()
+   ) {
+      throw new CourierApiError(
+         "steadfast",
+         200,
+         "Steadfast answered but the response carried no consignment_id — the contract may have changed (D5 verification pending).",
+         "invalid_response",
+      );
+   }
+   const rawTracking = consignment.tracking_code;
+   if (
+      rawTracking !== undefined &&
+      rawTracking !== null &&
+      typeof rawTracking !== "string" &&
+      typeof rawTracking !== "number"
+   ) {
+      throw new CourierApiError(
+         "steadfast",
+         200,
+         "Steadfast returned an invalid tracking_code — the contract may have changed (D5 verification pending).",
+         "invalid_response",
+      );
+   }
+   return {
+      consignmentId: String(rawId),
+      trackingCode: rawTracking == null ? "" : String(rawTracking),
+   };
+}
+
+/** Pure parser for the researched status_by_cid response shape. */
+export function parseSteadfastStatusResponse(data: unknown): {
+   providerStatus: string;
+} {
+   const body = assertNoBodyRejection(data);
+   const status = body.delivery_status;
+   if (typeof status !== "string" || !status.trim()) {
+      throw new CourierApiError(
+         "steadfast",
+         200,
+         "Steadfast status response carried no delivery_status — the contract may have changed (D5 verification pending).",
+         "invalid_response",
+      );
+   }
+   return { providerStatus: status };
 }
 
 export function createSteadfastProvider(
@@ -115,17 +196,8 @@ export function createSteadfastProvider(
                ...(input.note ? { note: input.note } : {}),
             }),
          });
-         const consignment = data?.consignment;
-         if (!consignment?.consignment_id) {
-            throw new CourierApiError(
-               "steadfast",
-               200,
-               "Steadfast answered but the response carried no consignment_id — the contract may have changed (D5 verification pending).",
-            );
-         }
          return {
-            consignmentId: String(consignment.consignment_id),
-            trackingCode: String(consignment.tracking_code || ""),
+            ...parseSteadfastCreateResponse(data),
             raw: data,
          };
       },
@@ -140,15 +212,10 @@ export function createSteadfastProvider(
             `/status_by_cid/${encodeURIComponent(consignmentId)}`,
             { method: "GET" },
          );
-         const status = data?.delivery_status;
-         if (typeof status !== "string" || !status) {
-            throw new CourierApiError(
-               "steadfast",
-               200,
-               "Steadfast status response carried no delivery_status — the contract may have changed (D5 verification pending).",
-            );
-         }
-         return { providerStatus: status, raw: data };
+         return {
+            ...parseSteadfastStatusResponse(data),
+            raw: data,
+         };
       },
    };
 }
