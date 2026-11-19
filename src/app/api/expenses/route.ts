@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { parsePagination } from "@src/lib/pagination";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 
 export async function GET(request: NextRequest) {
@@ -9,8 +10,8 @@ export async function GET(request: NextRequest) {
 
    const { searchParams } = new URL(request.url);
    const isExportAll = searchParams.get("all") === "true" || searchParams.get("export") === "true";
-   const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
-   const limit = isExportAll ? 10000 : Math.min(parseInt(searchParams.get("limit") || "50"), 100);
+   const { page, limit: parsedLimit } = parsePagination(searchParams, 50);
+   const limit = isExportAll ? 10000 : parsedLimit;
    const type = searchParams.get("type") || undefined;
    // Phase 2 (2.1): free-text search so the list toolbar's search box
    // works against the same filtered set the pagination total counts.

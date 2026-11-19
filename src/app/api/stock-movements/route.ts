@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { parsePagination } from "@src/lib/pagination";
 
 // Phase 3A (3.2): read API for the Stock workspace Movements tab.
 // StockMovement stores: productId, type, SIGNED quantity, note,
@@ -13,8 +14,7 @@ export async function GET(request: NextRequest) {
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);
-   const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
-   const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
+   const { page, limit } = parsePagination(searchParams, 20);
    const skip = (page - 1) * limit;
    const productId = searchParams.get("productId")?.trim() || "";
    const type = searchParams.get("type")?.trim() || "";
