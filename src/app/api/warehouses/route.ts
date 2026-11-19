@@ -8,9 +8,14 @@ export async function GET(request: NextRequest) {
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
-      let warehouses = await prisma.warehouse.findMany({
+      let warehouses: any[] = await prisma.warehouse.findMany({
          where: { isDeleted: false },
          orderBy: { createdAt: "asc" },
+         // Phase 3A (3.2): the Stock workspace lists per-warehouse stock
+         // totals — additive include, existing consumers unaffected.
+         include: {
+            stocks: { select: { productId: true, quantity: true } },
+         },
       });
 
       // Auto-provision default warehouse if none exist

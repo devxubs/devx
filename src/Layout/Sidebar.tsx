@@ -106,6 +106,16 @@ const items: NavItem[] = [
       module: { plural: "purchases", singular: "purchase" },
    },
    {
+      // Phase 3A (3.2): Stock workspace — governed by the products
+      // module permission family (no new permission keys, per the
+      // Phase 1/2 convention); its APIs enforce the same server-side.
+      headingId: "management",
+      icon: "solar:box-bold-duotone",
+      label: "Stock",
+      url: "/admin/stock",
+      module: { plural: "products", singular: "product" },
+   },
+   {
       headingId: "management",
       icon: "solar:explicit-bold-duotone",
       label: "Expenses",

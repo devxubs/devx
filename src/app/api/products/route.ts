@@ -78,6 +78,8 @@ export async function GET(request: NextRequest) {
                      quantity: true,
                      regularPrice: true,
                      salePrice: true,
+                     // Purchase picker prices variant lines at cost.
+                     costPrice: true,
                      attributes: true,
                   },
                },
