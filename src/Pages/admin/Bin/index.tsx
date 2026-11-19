@@ -163,22 +163,39 @@ const Bin = () => {
       },
       {
          field: "deleteDate",
-         // Phase 1 (1.8): the API projects this value from the record's
-         // updatedAt — there is no real deletedAt column yet (BIN-03,
-         // approval-gated). Label it honestly as "Last Modified", and
-         // show a dash instead of inventing today's date when absent.
-         headerName: "Last Modified",
+         // Phase 3A (BIN-03): deletedAt is now a real column, set by
+         // every delete path and cleared on restore. Rows deleted
+         // before BIN-03 have deletedAt = NULL — render those honestly
+         // as "Not recorded" (last-modified time in the tooltip)
+         // instead of presenting updatedAt as the deletion time.
+         headerName: "Deleted At",
          flex: 0.8,
          renderCell: (params) => {
-            if (!params.row.deletedAt) return "—";
-            const d = new Date(params.row.deletedAt);
-            return d.toLocaleDateString("en-US", {
-               year: "numeric",
-               month: "short",
-               day: "numeric",
-               hour: "2-digit",
-               minute: "2-digit",
-            });
+            if (params.row.deletedAt) {
+               const d = new Date(params.row.deletedAt);
+               return d.toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+               });
+            }
+            return (
+               <Tooltip
+                  title={
+                     params.row.updatedAt
+                        ? `Deletion time not recorded (deleted before BIN-03). Last modified ${new Date(params.row.updatedAt).toLocaleString()}`
+                        : "Deletion time not recorded"
+                  }
+                  placement="top"
+                  disableInteractive
+               >
+                  <Typography variant="body2" color="text.secondary">
+                     Not recorded
+                  </Typography>
+               </Tooltip>
+            );
          },
       },
       {

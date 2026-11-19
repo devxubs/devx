@@ -1005,7 +1005,7 @@ export async function DELETE(
 
             return tx.order.update({
                where: { id },
-               data: { isDeleted: true },
+               data: { isDeleted: true, deletedAt: new Date() },
             });
          }
 

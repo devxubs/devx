@@ -66,7 +66,7 @@ export async function DELETE(
    try {
       await prisma.expense.update({
          where: { id },
-         data: { isDeleted: true },
+         data: { isDeleted: true, deletedAt: new Date() },
       });
       return NextResponse.json({ success: true });
    } catch {

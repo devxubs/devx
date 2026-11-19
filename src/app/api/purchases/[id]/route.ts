@@ -291,7 +291,7 @@ export async function DELETE(
 
             return tx.purchase.update({
                where: { id },
-               data: { isDeleted: true },
+               data: { isDeleted: true, deletedAt: new Date() },
             });
          }
 

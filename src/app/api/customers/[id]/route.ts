@@ -260,7 +260,7 @@ export async function DELETE(
    const { id } = await params;
 
    try {
-      await prisma.customer.update({ where: { id }, data: { isDeleted: true } });
+      await prisma.customer.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
       return NextResponse.json({ message: "Customer moved to Recycle Bin" });
    } catch {
       return NextResponse.json({ error: "Failed to delete customer" }, { status: 500 });

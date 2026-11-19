@@ -64,7 +64,7 @@ export async function DELETE(
    const { id } = await params;
 
    try {
-      await prisma.category.update({ where: { id }, data: { isDeleted: true } });
+      await prisma.category.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
       return NextResponse.json({ message: "Category moved to Recycle Bin" });
    } catch {
       return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });

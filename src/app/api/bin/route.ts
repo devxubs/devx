@@ -30,39 +30,39 @@ export async function GET(request: NextRequest) {
       ] = await Promise.all([
          prisma.product.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, productName: true, updatedAt: true },
+            select: { id: true, customId: true, productName: true, deletedAt: true, updatedAt: true },
          }),
          prisma.order.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, orderId: true, total: true, updatedAt: true },
+            select: { id: true, customId: true, orderId: true, total: true, deletedAt: true, updatedAt: true },
          }),
          prisma.supplier.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, name: true, updatedAt: true },
+            select: { id: true, customId: true, name: true, deletedAt: true, updatedAt: true },
          }),
          prisma.purchase.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, invoice: true, total: true, updatedAt: true },
+            select: { id: true, customId: true, invoice: true, total: true, deletedAt: true, updatedAt: true },
          }),
          prisma.expense.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, type: true, amount: true, updatedAt: true },
+            select: { id: true, customId: true, type: true, amount: true, deletedAt: true, updatedAt: true },
          }),
          prisma.asset.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, name: true, value: true, updatedAt: true },
+            select: { id: true, customId: true, name: true, value: true, deletedAt: true, updatedAt: true },
          }),
          prisma.customer.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, name: true, phone: true, updatedAt: true },
+            select: { id: true, customId: true, name: true, phone: true, deletedAt: true, updatedAt: true },
          }),
          prisma.category.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, name: true, updatedAt: true },
+            select: { id: true, customId: true, name: true, deletedAt: true, updatedAt: true },
          }),
          prisma.unit.findMany({
             where: { isDeleted: true },
-            select: { id: true, customId: true, name: true, updatedAt: true },
+            select: { id: true, customId: true, name: true, deletedAt: true, updatedAt: true },
          }),
       ]);
 
@@ -72,63 +72,72 @@ export async function GET(request: NextRequest) {
             customId: p.customId,
             type: "product",
             name: p.productName,
-            deletedAt: p.updatedAt,
+            deletedAt: p.deletedAt,
+            updatedAt: p.updatedAt,
          })),
          ...orders.map((o) => ({
             id: o.id,
             customId: o.customId || o.orderId,
             type: "order",
             name: `Order ${o.orderId || o.customId}`,
-            deletedAt: o.updatedAt,
+            deletedAt: o.deletedAt,
+            updatedAt: o.updatedAt,
          })),
          ...suppliers.map((s) => ({
             id: s.id,
             customId: s.customId,
             type: "supplier",
             name: s.name,
-            deletedAt: s.updatedAt,
+            deletedAt: s.deletedAt,
+            updatedAt: s.updatedAt,
          })),
          ...purchases.map((p) => ({
             id: p.id,
             customId: p.customId || p.invoice,
             type: "purchase",
             name: `Purchase ${p.invoice || p.customId}`,
-            deletedAt: p.updatedAt,
+            deletedAt: p.deletedAt,
+            updatedAt: p.updatedAt,
          })),
          ...expenses.map((e) => ({
             id: e.id,
             customId: e.customId,
             type: "expense",
             name: `Expense: ${e.type} (৳${e.amount})`,
-            deletedAt: e.updatedAt,
+            deletedAt: e.deletedAt,
+            updatedAt: e.updatedAt,
          })),
          ...assets.map((a) => ({
             id: a.id,
             customId: a.customId,
             type: "asset",
             name: `Asset: ${a.name}`,
-            deletedAt: a.updatedAt,
+            deletedAt: a.deletedAt,
+            updatedAt: a.updatedAt,
          })),
          ...customers.map((c) => ({
             id: c.id,
             customId: c.customId,
             type: "customer",
             name: `Customer: ${c.name} (${c.phone || "No phone"})`,
-            deletedAt: c.updatedAt,
+            deletedAt: c.deletedAt,
+            updatedAt: c.updatedAt,
          })),
          ...categories.map((cat) => ({
             id: cat.id,
             customId: cat.customId,
             type: "category",
             name: `Category: ${cat.name}`,
-            deletedAt: cat.updatedAt,
+            deletedAt: cat.deletedAt,
+            updatedAt: cat.updatedAt,
          })),
          ...units.map((u) => ({
             id: u.id,
             customId: u.customId,
             type: "unit",
             name: `Unit: ${u.name}`,
-            deletedAt: u.updatedAt,
+            deletedAt: u.deletedAt,
+            updatedAt: u.updatedAt,
          })),
          // BIN-01 fix: INACTIVE/SUSPENDED users are NOT deleted
          // records and no longer appear in the Recycle Bin. The User
@@ -216,7 +225,7 @@ export async function POST(request: NextRequest) {
                }
                await tx.order.update({
                   where: { id },
-                  data: { isDeleted: false },
+                  data: { isDeleted: false, deletedAt: null },
                });
             });
             return NextResponse.json({ message: "Order restored successfully" });
@@ -257,7 +266,7 @@ export async function POST(request: NextRequest) {
                }
                await tx.purchase.update({
                   where: { id },
-                  data: { isDeleted: false },
+                  data: { isDeleted: false, deletedAt: null },
                });
             });
             return NextResponse.json({ message: "Purchase restored successfully" });
@@ -276,7 +285,7 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             await prisma.supplier.update({
                where: { id },
-               data: { isDeleted: false },
+               data: { isDeleted: false, deletedAt: null },
             });
             return NextResponse.json({ message: "Supplier restored successfully" });
          } else if (action === "delete") {
@@ -293,7 +302,7 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             await prisma.product.update({
                where: { id },
-               data: { isDeleted: false },
+               data: { isDeleted: false, deletedAt: null },
             });
             return NextResponse.json({ message: "Product restored successfully" });
          } else if (action === "delete") {
@@ -331,7 +340,7 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             await prisma.expense.update({
                where: { id },
-               data: { isDeleted: false },
+               data: { isDeleted: false, deletedAt: null },
             });
             return NextResponse.json({ message: "Expense restored successfully" });
          } else if (action === "delete") {
@@ -345,7 +354,7 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             await prisma.asset.update({
                where: { id },
-               data: { isDeleted: false },
+               data: { isDeleted: false, deletedAt: null },
             });
             return NextResponse.json({ message: "Asset restored successfully" });
          } else if (action === "delete") {
@@ -359,7 +368,7 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             await prisma.customer.update({
                where: { id },
-               data: { isDeleted: false },
+               data: { isDeleted: false, deletedAt: null },
             });
             return NextResponse.json({ message: "Customer restored successfully" });
          } else if (action === "delete") {
@@ -376,7 +385,7 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             await prisma.category.update({
                where: { id },
-               data: { isDeleted: false },
+               data: { isDeleted: false, deletedAt: null },
             });
             return NextResponse.json({ message: "Category restored successfully" });
          } else if (action === "delete") {
@@ -393,7 +402,7 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             await prisma.unit.update({
                where: { id },
-               data: { isDeleted: false },
+               data: { isDeleted: false, deletedAt: null },
             });
             return NextResponse.json({ message: "Unit restored successfully" });
          } else if (action === "delete") {

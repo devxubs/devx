@@ -212,7 +212,7 @@ export async function PUT(
                   productId: id,
                   id: { notIn: incomingIds },
                },
-               data: { isDeleted: true },
+               data: { isDeleted: true, deletedAt: new Date() },
             });
 
             // Upsert incoming variants
@@ -233,6 +233,7 @@ export async function PUT(
                   status: v.status || "ACTIVE",
                   attributes: v.attributes || null,
                   isDeleted: false,
+                  deletedAt: null,
                };
 
                if (v.id) {
@@ -298,11 +299,11 @@ export async function DELETE(
       await prisma.$transaction([
          prisma.product.update({
             where: { id },
-            data: { isDeleted: true },
+            data: { isDeleted: true, deletedAt: new Date() },
          }),
          prisma.productVariant.updateMany({
             where: { productId: id },
-            data: { isDeleted: true },
+            data: { isDeleted: true, deletedAt: new Date() },
          }),
       ]);
 

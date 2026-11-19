@@ -64,7 +64,7 @@ export async function DELETE(
    try {
       const asset = await prisma.asset.update({
          where: { id },
-         data: { isDeleted: true },
+         data: { isDeleted: true, deletedAt: new Date() },
       });
 
       return NextResponse.json({ message: "Asset moved to bin", asset });

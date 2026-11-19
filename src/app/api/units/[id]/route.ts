@@ -172,7 +172,7 @@ export async function DELETE(
 
       await prisma.unit.update({
          where: { id: targetUnit.id },
-         data: { isDeleted: true },
+         data: { isDeleted: true, deletedAt: new Date() },
       });
 
       return NextResponse.json({

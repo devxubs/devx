@@ -72,7 +72,7 @@ export async function DELETE(
    try {
       const supplier = await prisma.supplier.update({
          where: { id },
-         data: { isDeleted: true },
+         data: { isDeleted: true, deletedAt: new Date() },
       });
 
       return NextResponse.json({ message: "Supplier moved to bin", supplier });
