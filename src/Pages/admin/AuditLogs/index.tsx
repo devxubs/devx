@@ -3,11 +3,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
    Alert,
-   Badge,
    Box,
    Chip,
    Divider,
-   Grid,
    IconButton,
    Paper,
    Stack,
@@ -19,56 +17,26 @@ import {
    Typography,
 } from "@mui/material";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
-import CustomAutocomplete from "@src/components/Autocomplete";
 import CustomModal from "@src/components/Modal";
-import DateRange from "@src/components/DateRange";
-import FilterModalShell from "@src/components/FilterModalShell";
 import Icon from "@src/components/Icon";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
-
-// Mirror of AUDIT_ENTITY_TYPES / AUDIT_ACTIONS in src/lib/audit.ts —
-// duplicated here on purpose: the lib imports Prisma (server-only),
-// so a client component must not import from it.
-const ENTITY_TYPE_OPTIONS = [
-   "ORDER",
-   "PURCHASE",
-   "PURCHASE_RETURN",
-   "SUPPLIER_PAYMENT",
-   "EXPENSE",
-   "PRODUCT",
-   "USER",
-];
-const ACTION_OPTIONS = [
-   "CREATE",
-   "UPDATE",
-   "DELETE",
-   "RESTORE",
-   "STATUS_CHANGE",
-   "PAYMENT",
-   "STOCK",
-   "LOGIN",
-];
+import AuditFilter, {
+   reviveAuditFilters,
+   serializeAuditFilters,
+   syncAuditFilters,
+} from "./AuditFilter";
+import { AuditFilters, EMPTY_AUDIT_FILTERS } from "./AuditFilterModel";
 
 // Phase 4 (D1): administrator-only, read-only audit trail viewer.
 // Data comes from GET /api/audit-logs (requireAdmin on the server);
 // there is deliberately no create/edit/delete surface for audit
 // records anywhere in the app. Layout follows the Stock → Movements
-// pattern: CustomTable server pagination, toolbar search, and the
-// remaining filters behind the table's filter button.
-
-interface AuditFilters {
-   entityType: string;
-   action: string;
-   actorId: string;
-   range: [Date | null, Date | null];
-}
-
-const EMPTY_FILTERS: AuditFilters = {
-   entityType: "",
-   action: "",
-   actorId: "",
-   range: [null, null],
-};
+// pattern: CustomTable server pagination and toolbar search, with
+// the remaining filters on the shared CustomTable filter system
+// (AuditFilter, mirroring the Orders table): the applied state rides
+// in the shared filter query (FilterData.customerData — display chip
+// entries plus the full state under `_raw`), so the shared Filter
+// toolbar renders the chips, chip removal and Clear for this page.
 
 const countActive = (f: AuditFilters) =>
    (f.entityType ? 1 : 0) +
@@ -99,40 +67,8 @@ const formatValue = (value: any): string => {
    return String(value);
 };
 
-// Section/field labels mirroring the Customers filter modal
-// (CustomerFilters) so all filter modals share one visual language.
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-   <Typography
-      variant="subtitle2"
-      sx={{
-         fontWeight: 700,
-         fontSize: "0.85rem",
-         letterSpacing: "0.03em",
-         textTransform: "uppercase",
-         color: "text.primary",
-         mb: 1.5,
-      }}
-   >
-      {children}
-   </Typography>
-);
-
-const FieldLabel = ({ children }: { children: React.ReactNode }) => (
-   <Typography
-      variant="body2"
-      sx={{
-         fontSize: "0.8125rem",
-         fontWeight: 600,
-         color: "text.secondary",
-         letterSpacing: "0.01em",
-      }}
-   >
-      {children}
-   </Typography>
-);
-
 const AuditLogs = () => {
-   const { filterQueryData } = useFilterQuery();
+   const { filterQueryData, setFilterQueryData } = useFilterQuery();
    const search = filterQueryData.searchText || "";
    const [rows, setRows] = useState<any[]>([]);
    const [total, setTotal] = useState(0);
@@ -142,9 +78,7 @@ const AuditLogs = () => {
       page: 0,
       pageSize: 25,
    });
-   const [filters, setFilters] = useState<AuditFilters>(EMPTY_FILTERS);
-   const [filterOpen, setFilterOpen] = useState(false);
-   const [draft, setDraft] = useState<AuditFilters>(EMPTY_FILTERS);
+   const [filters, setFilters] = useState<AuditFilters>(EMPTY_AUDIT_FILTERS);
    const [actors, setActors] = useState<Array<{ id: string; label: string }>>(
       [],
    );
@@ -226,10 +160,41 @@ const AuditLogs = () => {
       );
    }, [search, filters]);
 
-   const openFilters = () => {
-      setDraft(filters);
-      setFilterOpen(true);
-   };
+   // The filter modal, chips and Clear all write through the shared
+   // filter query (FilterData.customerData — see AuditFilter.tsx).
+   // Adopt its `_raw` as the applied filters and mirror chip
+   // removals back into it — the same sync the Customers page
+   // performs for its bucket. An emptied bucket (Clear) resets all.
+   useEffect(() => {
+      const custData = filterQueryData.customerData;
+      if (!custData || Object.keys(custData).length === 0) {
+         if (countActive(filters) > 0) setFilters(EMPTY_AUDIT_FILTERS);
+         return;
+      }
+      const raw = reviveAuditFilters(custData._raw);
+      const synced = syncAuditFilters(raw ?? filters, custData);
+      if (
+         JSON.stringify(serializeAuditFilters(synced)) !==
+         JSON.stringify(serializeAuditFilters(filters))
+      ) {
+         setFilters(synced);
+      }
+      if (
+         raw &&
+         JSON.stringify(serializeAuditFilters(synced)) !==
+            JSON.stringify(serializeAuditFilters(raw))
+      ) {
+         setFilterQueryData(
+            {
+               customerData: {
+                  ...custData,
+                  _raw: serializeAuditFilters(synced),
+               },
+            },
+            0,
+         );
+      }
+   }, [filterQueryData.customerData, filters, setFilterQueryData]);
 
    const columns: ColumnConfig[] = [
       { field: "date", headerName: "Date", width: 180 },
@@ -282,22 +247,6 @@ const AuditLogs = () => {
          ? Object.entries(selected.changes)
          : [];
 
-   // Filter option lists for the shared Autocomplete pickers. The
-   // empty-string option is the "All …" choice, exactly matching the
-   // previous Select semantics ("" = no filter).
-   const entityTypeOptions = [
-      { label: "All types", value: "" },
-      ...ENTITY_TYPE_OPTIONS.map((t) => ({ label: t, value: t })),
-   ];
-   const actionOptions = [
-      { label: "All actions", value: "" },
-      ...ACTION_OPTIONS.map((a) => ({ label: a, value: a })),
-   ];
-   const actorOptions = [
-      { label: "All actors", value: "" },
-      ...actors.map((a) => ({ label: a.label, value: a.id })),
-   ];
-
    return (
       <Stack spacing={2.5} p={1} height="100%">
          <Stack spacing={0.5}>
@@ -330,120 +279,12 @@ const AuditLogs = () => {
                   hideSelectionToolbar
                   showSelectionIndicators={false}
                   hideSelectionActions
-                  filter={() => (
-                     <Tooltip title="Filter">
-                        <Badge
-                           badgeContent={countActive(filters)}
-                           color="primary"
-                        >
-                           <IconButton
-                              data-testid="audit-logs-filter-btn"
-                              sx={{ color: "text.secondary" }}
-                              onClick={openFilters}
-                           >
-                              <Icon icon="solar:filters-bold-duotone" />
-                           </IconButton>
-                        </Badge>
-                     </Tooltip>
-                  )}
+                  filter={(data, onChange) =>
+                     AuditFilter(data, onChange, actors)
+                  }
                />
             </Paper>
          )}
-
-         <FilterModalShell
-            open={filterOpen}
-            onClose={() => setFilterOpen(false)}
-            title="Audit Filters"
-            onApply={() => {
-               setFilters(draft);
-               setFilterOpen(false);
-            }}
-            onReset={() => setDraft(EMPTY_FILTERS)}
-         >
-            <Box>
-               <SectionTitle>Event</SectionTitle>
-               <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                     <Stack spacing={0.75}>
-                        <FieldLabel>Entity Type</FieldLabel>
-                        <CustomAutocomplete
-                           size="small"
-                           arrow={true}
-                           placeholder="All types"
-                           options={entityTypeOptions}
-                           value={
-                              entityTypeOptions.find(
-                                 (o) => o.value === draft.entityType,
-                              ) ?? entityTypeOptions[0]
-                           }
-                           isOptionEqualToValue={(option: any, val: any) =>
-                              option.value === val?.value
-                           }
-                           onChange={(opt: any) =>
-                              setDraft({
-                                 ...draft,
-                                 entityType: opt?.value ?? "",
-                              })
-                           }
-                        />
-                     </Stack>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                     <Stack spacing={0.75}>
-                        <FieldLabel>Action</FieldLabel>
-                        <CustomAutocomplete
-                           size="small"
-                           arrow={true}
-                           placeholder="All actions"
-                           options={actionOptions}
-                           value={
-                              actionOptions.find(
-                                 (o) => o.value === draft.action,
-                              ) ?? actionOptions[0]
-                           }
-                           isOptionEqualToValue={(option: any, val: any) =>
-                              option.value === val?.value
-                           }
-                           onChange={(opt: any) =>
-                              setDraft({ ...draft, action: opt?.value ?? "" })
-                           }
-                        />
-                     </Stack>
-                  </Grid>
-               </Grid>
-            </Box>
-            <Box>
-               <SectionTitle>Actor & Date</SectionTitle>
-               <Stack spacing={2}>
-                  <Stack spacing={0.75}>
-                     <FieldLabel>Actor</FieldLabel>
-                     <CustomAutocomplete
-                        size="small"
-                        arrow={true}
-                        placeholder="All actors"
-                        options={actorOptions}
-                        value={
-                           actorOptions.find(
-                              (o) => o.value === draft.actorId,
-                           ) ?? actorOptions[0]
-                        }
-                        isOptionEqualToValue={(option: any, val: any) =>
-                           option.value === val?.value
-                        }
-                        onChange={(opt: any) =>
-                           setDraft({ ...draft, actorId: opt?.value ?? "" })
-                        }
-                     />
-                  </Stack>
-                  <DateRange
-                     size="small"
-                     title="Date Range"
-                     value={draft.range}
-                     onChange={(v: any) => setDraft({ ...draft, range: v })}
-                  />
-               </Stack>
-            </Box>
-         </FilterModalShell>
 
          <CustomModal
             open={!!selected}
