@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
    Box,
    Chip,
@@ -16,6 +16,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import Icon from "@src/components/Icon";
 import UploadIcon from "@src/SvgIcon/UploadIcon";
+import { uploadImageFile } from "@src/lib/uploadImage";
 
 interface ProductMediaSectionProps {
    images: any[];
@@ -29,13 +30,34 @@ export const ProductMediaSection: React.FC<ProductMediaSectionProps> = ({
    error,
 }) => {
    const theme = useTheme();
+   const [uploading, setUploading] = useState(false);
+   const [uploadError, setUploadError] = useState<string | null>(null);
 
    const onDrop = useCallback(
-      (acceptedFiles: File[]) => {
+      async (acceptedFiles: File[]) => {
          if (!acceptedFiles.length) return;
-         // In Next.js POS client, convert to object URLs or data URLs
-         const newUrls = acceptedFiles.map((file) => URL.createObjectURL(file));
-         onChangeImages([...images, ...newUrls]);
+         // Phase 5 (§5.3): new images are uploaded to the server
+         // (POST /api/uploads) and stored by URL — previously this
+         // kept session-only blob: URLs that died on reload.
+         // Existing stored images (URLs or legacy data-URLs) are
+         // not touched.
+         setUploading(true);
+         setUploadError(null);
+         try {
+            const urls: string[] = [];
+            for (const file of acceptedFiles) {
+               urls.push(await uploadImageFile(file));
+            }
+            onChangeImages([...images, ...urls]);
+         } catch (err) {
+            setUploadError(
+               err instanceof Error
+                  ? err.message
+                  : "Image upload failed. Please try again.",
+            );
+         } finally {
+            setUploading(false);
+         }
       },
       [images, onChangeImages],
    );
@@ -45,6 +67,7 @@ export const ProductMediaSection: React.FC<ProductMediaSectionProps> = ({
       accept: { "image/*": [".jpeg", ".jpg", ".png", ".webp", ".avif"] },
       maxSize: 5 * 1024 * 1024, // 5MB
       multiple: true,
+      disabled: uploading,
    });
 
    const handleRemove = (index: number) => {
@@ -91,7 +114,9 @@ export const ProductMediaSection: React.FC<ProductMediaSectionProps> = ({
                   </Typography>
                </Stack>
                <Typography variant="caption" color="text.secondary">
-                  {images.length} / 5 uploaded
+                  {uploading
+                     ? "Uploading…"
+                     : `${images.length} / 5 uploaded`}
                </Typography>
             </Stack>
 
@@ -153,6 +178,12 @@ export const ProductMediaSection: React.FC<ProductMediaSectionProps> = ({
             {error && (
                <Typography variant="caption" color="error">
                   {error}
+               </Typography>
+            )}
+
+            {uploadError && (
+               <Typography variant="caption" color="error">
+                  {uploadError}
                </Typography>
             )}
 
