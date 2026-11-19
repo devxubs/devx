@@ -42,16 +42,26 @@ export async function GET(request: NextRequest) {
          // filtered dataset (previously orders.length of a take:100
          // fetch), and the 7-day trend is computed from a dedicated
          // query over the last 7 days — not from the paginated rows.
-         const sevenDaysAgo = new Date();
+         // The 7-day window ENDS at the selected range's end when the
+         // range lies in the past (previously the window was always
+         // the last 7 days ending today, so a past range produced an
+         // impossible gte > lte filter and an all-zero trend, and the
+         // day labels below never matched the queried window).
+         const nowForTrend = new Date();
+         const trendEnd =
+            hasDate && dateFilter.lte && dateFilter.lte < nowForTrend
+               ? dateFilter.lte
+               : nowForTrend;
+         const sevenDaysAgo = new Date(trendEnd);
          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
          sevenDaysAgo.setHours(0, 0, 0, 0);
          const trendWhere: any = { ...whereOrder };
          trendWhere.createdAt = {
-            ...(hasDate ? dateFilter : {}),
             gte:
                hasDate && dateFilter.gte && dateFilter.gte > sevenDaysAgo
                   ? dateFilter.gte
                   : sevenDaysAgo,
+            lte: trendEnd,
          };
 
          const [orders, totalOrders, totalRevenueAgg, completedCount, returnedCount, trendOrders] = await Promise.all([
@@ -81,10 +91,11 @@ export async function GET(request: NextRequest) {
 
          const totalRevenue = Number(totalRevenueAgg._sum.total || 0);
 
-         // Generate 7-day revenue trend from the full trend population
-         const now = new Date();
+         // Generate 7-day revenue trend from the full trend population.
+         // The labelled days are the same window the query above used:
+         // the 7 days ending at trendEnd.
          const trendDays = Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(now);
+            const d = new Date(trendEnd);
             d.setDate(d.getDate() - (6 - i));
             return d.toISOString().split("T")[0];
          });
@@ -267,6 +278,11 @@ export async function GET(request: NextRequest) {
          const customers = await prisma.customer.findMany({
             include: {
                orders: {
+                  // Row counts must exclude soft-deleted orders, the
+                  // same filter the headline groupBy below already
+                  // uses — otherwise a customer's Total/Completed/
+                  // Failed counts disagree with Active/Returning.
+                  where: { isDeleted: false },
                   select: { status: true, createdAt: true },
                   orderBy: { createdAt: "desc" },
                },
@@ -419,7 +435,7 @@ export async function GET(request: NextRequest) {
 
       // 6. PRODUCTS REPORT
       if (tab === "products") {
-         const [allProducts, lowStockProducts, topSold, stockAgg, outOfStockAll] = await Promise.all([
+         const [allProducts, lowStockProducts, topSold, stockAgg, outOfStockAll, lowStockCountAll] = await Promise.all([
             prisma.product.findMany({
                where: { isDeleted: false },
                select: { id: true, customId: true, productName: true, quantity: true, regularPrice: true, lowStockAlert: true },
@@ -446,11 +462,18 @@ export async function GET(request: NextRequest) {
             prisma.product.count({
                where: { isDeleted: false, quantity: 0 },
             }),
+            // The low-stock ROW list below is display-capped (take: 50),
+            // so the headline count needs its own COUNT over the same
+            // filter — lowStockProducts.length silently capped the
+            // reported count at 50.
+            prisma.product.count({
+               where: { isDeleted: false, quantity: { lte: 10 } },
+            }),
          ]);
 
          const totalInStock = Number(stockAgg._sum.quantity || 0);
          const outOfStockCount = outOfStockAll;
-         const lowStockCount = lowStockProducts.length;
+         const lowStockCount = lowStockCountAll;
 
          return NextResponse.json({
             totalInStock,
