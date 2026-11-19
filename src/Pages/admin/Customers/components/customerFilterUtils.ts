@@ -24,7 +24,26 @@ export interface NumericRange {
    value2: string;
 }
 
-export type StatusFilter = "all" | "new" | "returning";
+// The status control doubles as the customer SEGMENT selector
+// (Phase 4, §4.6). Segment definitions — all computed from the real
+// per-customer analytics the API already returns, no invented data:
+//   new       = 1 or fewer valid orders (existing rule)
+//   returning = more than 1 valid order (existing rule)
+//   highValue = lifetime spend in the top 20% of customers who have
+//               spent anything — the threshold is the 80th percentile
+//               of the actual spend distribution, computed by the API
+//               per request (returned as segmentMeta.highValueThreshold)
+//   inactive  = has ordered before, but no valid order in the last
+//               90 days (the window is part of the definition and is
+//               stated wherever the segment is offered)
+export type StatusFilter = "all" | "new" | "returning" | "highValue" | "inactive";
+
+export const SEGMENT_LABELS: Record<Exclude<StatusFilter, "all">, string> = {
+   new: "New",
+   returning: "Returning",
+   highValue: "High Value",
+   inactive: "Inactive",
+};
 
 export type RegPreset =
    | "all"
@@ -226,7 +245,11 @@ export function buildCustomerQuery(
    q.set("all", "true");
    const trimmed = search.trim();
    if (trimmed) q.set("search", trimmed);
-   if (f.status !== "all") q.set("status", f.status);
+   if (f.status === "new" || f.status === "returning") {
+      q.set("status", f.status);
+   } else if (f.status === "highValue" || f.status === "inactive") {
+      q.set("segment", f.status);
+   }
 
    const reg = resolveDateRange(f.regPreset, f.regRange);
    if (reg) {
@@ -449,7 +472,12 @@ export function describeFilters(
    if (f.status !== "all") {
       chips.push({
          key: "status",
-         label: `Status: ${f.status === "new" ? "New" : "Returning"}`,
+         label:
+            f.status === "highValue"
+               ? "Segment: High Value (top 20% lifetime spend)"
+               : f.status === "inactive"
+                 ? "Segment: Inactive (no valid order in 90+ days)"
+                 : `Status: ${SEGMENT_LABELS[f.status]}`,
       });
    }
    const reg = dateRangeLabel("Registered", f.regPreset, f.regRange, REG_PRESET_OPTIONS);
@@ -588,7 +616,7 @@ export function buildCustomerFilterChips(
    }
 
    if (f.status !== "all") {
-      data.status = f.status === "new" ? "New" : "Returning";
+      data.status = SEGMENT_LABELS[f.status];
    }
 
    const reg = dateRangeLabel(

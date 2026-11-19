@@ -5,6 +5,18 @@ import { ExportColumn, SummaryRowItem, getColField, getColHeader } from "@src/li
 import { StoreSettings } from "@src/lib/settingsContext";
 import InvoiceRenderer from "../InvoiceTemplates/InvoiceRenderer";
 import { InvoiceOrderData } from "../InvoiceTemplates/types";
+import Barcode from "../Barcode";
+
+/** One printed product label (Phase 4, §4.1). `code` is the value the
+ * barcode encodes — the product/variant barcode, or its SKU when no
+ * barcode is set (both resolve through GET /api/products/barcode). */
+export interface PrintLabelItem {
+   name: string;
+   subName?: string;
+   priceLabel?: string;
+   code: string;
+   copies: number;
+}
 
 export interface PrintDocumentProps {
    title: string;
@@ -15,6 +27,8 @@ export interface PrintDocumentProps {
    metadata?: { label: string; value: string }[];
    isInvoiceBatch?: boolean;
    invoiceOrders?: InvoiceOrderData[];
+   isLabelSheet?: boolean;
+   labels?: PrintLabelItem[];
 }
 
 export default function TablePrintDocument({
@@ -26,7 +40,62 @@ export default function TablePrintDocument({
    metadata,
    isInvoiceBatch,
    invoiceOrders,
+   isLabelSheet,
+   labels,
 }: PrintDocumentProps) {
+   // 0. Product Label Sheet Mode (Phase 4, §4.1) — fixed-size labels
+   // in a wrapping grid; dashed outlines are cutting guides.
+   if (isLabelSheet && labels && labels.length > 0) {
+      const expanded = labels.flatMap((label) =>
+         Array.from({ length: Math.max(1, Math.floor(label.copies) || 1) }, () => label),
+      );
+      return (
+         <div className="devx-print-document-container" style={{ width: "100%", background: "#fff", color: "#000" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "3mm" }}>
+               {expanded.map((label, i) => (
+                  <div
+                     key={i}
+                     style={{
+                        width: "54mm",
+                        minHeight: "34mm",
+                        border: "1px dashed #bbb",
+                        borderRadius: "2mm",
+                        padding: "2.5mm 3mm",
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pageBreakInside: "avoid",
+                        breakInside: "avoid",
+                     }}
+                  >
+                     <div
+                        style={{
+                           fontSize: "9pt",
+                           fontWeight: 700,
+                           textAlign: "center",
+                           lineHeight: 1.25,
+                           maxHeight: "2.5em",
+                           overflow: "hidden",
+                        }}
+                     >
+                        {label.name}
+                        {label.subName ? ` — ${label.subName}` : ""}
+                     </div>
+                     {label.priceLabel && (
+                        <div style={{ fontSize: "10pt", fontWeight: 800, margin: "1mm 0" }}>
+                           {label.priceLabel}
+                        </div>
+                     )}
+                     <Barcode value={label.code} height={30} moduleWidth={1.4} />
+                  </div>
+               ))}
+            </div>
+         </div>
+      );
+   }
+
    // 1. Batch Invoices Mode (Orders)
    if (isInvoiceBatch && invoiceOrders && invoiceOrders.length > 0) {
       return (

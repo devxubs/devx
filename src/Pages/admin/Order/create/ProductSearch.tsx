@@ -22,15 +22,48 @@ interface ProductSearchProps {
    searchProducts: (query: string) => Promise<ApiProduct[]>;
    /** Returns an error message to surface, or null when added silently. */
    onAdd: (product: ApiProduct) => string | null;
+   /**
+    * Barcode scan handler (Phase 4, §4.1). Wedge scanners type the
+    * code and finish with Enter; when the field holds a code-like
+    * value (no spaces) Enter is routed here for an exact lookup
+    * instead of picking a fuzzy search result. Returns an error
+    * message or null on success (the field then clears, ready for
+    * the next scan).
+    */
+   onScan?: (code: string) => Promise<string | null>;
    currencySymbol?: string;
 }
 
-const ProductSearch = ({ searchProducts, onAdd, currencySymbol = "৳" }: ProductSearchProps) => {
+const ProductSearch = ({ searchProducts, onAdd, onScan, currencySymbol = "৳" }: ProductSearchProps) => {
    const [options, setOptions] = useState<ApiProduct[]>([]);
    const [loading, setLoading] = useState(false);
    const [inputValue, setInputValue] = useState("");
+   const [scanBusy, setScanBusy] = useState(false);
    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
    const requestRef = useRef(0);
+
+   const handleScanKey = async (event: React.KeyboardEvent) => {
+      if (event.key !== "Enter" || !onScan || scanBusy) return;
+      const code = inputValue.trim();
+      // Only a single token can be a scanned code; multi-word input
+      // is a name search and keeps the normal Enter behaviour
+      // (picking the highlighted result).
+      if (!code || /\s/.test(code)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setScanBusy(true);
+      try {
+         const message = await onScan(code);
+         if (message === null) {
+            setInputValue("");
+            setOptions([]);
+         }
+         // On error the parent surfaces the message and the code
+         // stays in the field so it can be corrected or searched.
+      } finally {
+         setScanBusy(false);
+      }
+   };
 
    const runSearch = useCallback(
       (query: string) => {
@@ -108,14 +141,19 @@ const ProductSearch = ({ searchProducts, onAdd, currencySymbol = "৳" }: Produc
          renderInput={(params) => (
             <TextField
                {...params}
-               label="Search product (name or SKU)"
-               placeholder="Start typing to search products…"
+               label={onScan ? "Search or scan product" : "Search product (name or SKU)"}
+               placeholder={
+                  onScan
+                     ? "Search products, or scan a barcode…"
+                     : "Start typing to search products…"
+               }
                size="small"
+               onKeyDown={handleScanKey}
                InputProps={{
                   ...params.InputProps,
                   endAdornment: (
                      <>
-                        {loading ? <CircularProgress size={16} /> : null}
+                        {loading || scanBusy ? <CircularProgress size={16} /> : null}
                         {params.InputProps.endAdornment}
                      </>
                   ),

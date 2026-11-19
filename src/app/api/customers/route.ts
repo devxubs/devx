@@ -164,6 +164,17 @@ export async function GET(request: NextRequest) {
 
    // Statistic / last-order filters — applied after stats are merged.
    const statusParam = searchParams.get("status");
+   // Customer segments (Phase 4, §4.6) — computed from the same
+   // per-customer analytics as every other filter here:
+   //   highValue: lifetime spend at or above the 80th percentile of
+   //     the matched customers who have spent anything (top 20%).
+   //     The threshold is derived from the live data distribution on
+   //     every request — never a hard-coded money amount — and is
+   //     returned to the caller as segmentMeta.highValueThreshold.
+   //   inactive: has at least one valid order, but none in the last
+   //     90 days (the window is part of the segment's definition).
+   const segmentParam = searchParams.get("segment");
+   const INACTIVE_WINDOW_DAYS = 90;
    const rangeChecks: { field: keyof CustomerStats; check: RangeCheck }[] = [];
    const rangeParamMap: { prefix: string; field: "totalOrders" | "totalPurchase" | "totalPaid" | "totalDue" }[] = [
       { prefix: "orders", field: "totalOrders" },
@@ -325,6 +336,41 @@ export async function GET(request: NextRequest) {
             (c) => c.stats.status.toLowerCase() === statusParam,
          );
       }
+      // Segment filters. The high-value threshold is computed over
+      // the matched set BEFORE the segment filter itself is applied
+      // (but after the DB-level search/registration filters), so it
+      // always describes the population the user is looking at.
+      let segmentMeta: { highValueThreshold: number | null } = {
+         highValueThreshold: null,
+      };
+      if (segmentParam === "highValue") {
+         const spends = enriched
+            .map((c) => c.stats.totalPurchase)
+            .filter((v) => v > 0)
+            .sort((a, b) => a - b);
+         if (spends.length > 0) {
+            // Nearest-rank 80th percentile of the actual distribution.
+            const rank = Math.max(
+               1,
+               Math.ceil(0.8 * spends.length),
+            );
+            const threshold = spends[rank - 1];
+            segmentMeta = { highValueThreshold: threshold };
+            enriched = enriched.filter(
+               (c) => c.stats.totalPurchase >= threshold,
+            );
+         } else {
+            enriched = [];
+         }
+      } else if (segmentParam === "inactive") {
+         const cutoff = new Date(
+            Date.now() - INACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+         );
+         enriched = enriched.filter(
+            (c) =>
+               c.stats.lastOrderAt !== null && c.stats.lastOrderAt < cutoff,
+         );
+      }
       for (const { field, check } of rangeChecks) {
          enriched = enriched.filter((c) =>
             matchesRange(Number(c.stats[field] ?? 0), check),
@@ -455,7 +501,7 @@ export async function GET(request: NextRequest) {
          ? enriched.slice(0, limit)
          : enriched.slice(skip, skip + limit);
 
-      return NextResponse.json({ customers, total, page, limit });
+      return NextResponse.json({ customers, total, page, limit, segmentMeta });
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch customers" },

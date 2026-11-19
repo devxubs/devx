@@ -43,6 +43,9 @@ export interface InvoiceOrderData {
 
 export interface InvoiceCustomization {
    templateId?: string;
+   /** Invoice language: "en" (default) or "bn" (Bengali). Flows in
+    * from the store settings' language field (Settings → Invoices). */
+   language?: string;
    storeName?: string;
    tagline?: string;
    logoUrl?: string;

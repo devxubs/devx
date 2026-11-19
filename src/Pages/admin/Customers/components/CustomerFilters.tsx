@@ -54,6 +54,8 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
    { value: "all", label: "All" },
    { value: "new", label: "New" },
    { value: "returning", label: "Returning" },
+   { value: "highValue", label: "High Value" },
+   { value: "inactive", label: "Inactive" },
 ];
 
 type EntityOption = { id: string; label: string };
@@ -544,7 +546,7 @@ const CustomerFilters = ({
                {/* Customer Status: Replaced ButtonGroup with searchable Autocomplete */}
                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                   <Stack spacing={0.75}>
-                     <FieldLabel>Customer Status</FieldLabel>
+                     <FieldLabel>Customer Status / Segment</FieldLabel>
                      <CustomAutocomplete
                         size="small"
                         arrow={true}
@@ -574,7 +576,9 @@ const CustomerFilters = ({
                            mt: 0.25,
                         }}
                      >
-                        New = 1 or fewer valid orders · Returning = more than 1
+                        New = 1 or fewer valid orders · Returning = more than 1 ·
+                        High Value = top 20% by lifetime spend · Inactive = no
+                        valid order in the last 90 days
                      </Typography>
                   </Stack>
                </Grid>

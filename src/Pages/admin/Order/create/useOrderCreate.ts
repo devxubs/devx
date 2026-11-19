@@ -123,17 +123,35 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    // ── Lines ────────────────────────────────────────────────────────────────
    const lineSeqRef = useRef(0);
    const addProduct = useCallback(
-      (product: ApiProduct): string | null => {
+      (product: ApiProduct, preselectVariantId?: string | null): string | null => {
          const stock = Math.max(0, num(product.quantity));
          if (stock <= 0) return `${product.productName} is out of stock`;
          const variants = Array.isArray(product.variants) ? product.variants : [];
          const isVariable = product.productType === "Variable" && variants.length > 0;
+         // Barcode scans of a variant label preselect that variant
+         // (Phase 4, §4.1): the line is created already targeted at
+         // the variant, with the variant's own stock/price/SKU —
+         // exactly the fields the table's variant picker would set.
+         const preselect = preselectVariantId
+            ? variants.find((v) => v.id === preselectVariantId) || null
+            : null;
+         if (preselectVariantId && isVariable && !preselect) {
+            return `The scanned variant of ${product.productName} is no longer available`;
+         }
+         if (preselect) {
+            const variantStock = Math.max(0, num(preselect.quantity));
+            if (variantStock <= 0) {
+               return `${product.productName} (${preselect.variantName}) is out of stock`;
+            }
+         }
          let message: string | null = null;
          setForm((prev) => {
             // Simple products keep the one-line-per-product merge.
             // Variable products always append a fresh line (INV-02):
             // each row picks its own variant in the table, so two
-            // variants of one product can be sold side by side.
+            // variants of one product can be sold side by side. A
+            // preselected (scanned) variant merges into an existing
+            // line for the SAME variant instead of piling up rows.
             if (!isVariable) {
                const existing = prev.lines.find((l) => l.productId === product.id);
                if (existing) {
@@ -151,19 +169,43 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
                   };
                }
             }
-            const price = num(product.salePrice ?? product.regularPrice);
+            if (preselect) {
+               const variantStock = Math.max(0, num(preselect.quantity));
+               const existing = prev.lines.find(
+                  (l) => l.productId === product.id && l.variantId === preselect.id,
+               );
+               if (existing) {
+                  if (existing.quantity >= variantStock) {
+                     message = `Only ${variantStock} in stock for ${product.productName} (${preselect.variantName})`;
+                     return prev;
+                  }
+                  return {
+                     ...prev,
+                     lines: prev.lines.map((l) =>
+                        l === existing
+                           ? { ...l, quantity: l.quantity + 1, stock: variantStock }
+                           : l,
+                     ),
+                  };
+               }
+            }
+            const price = preselect
+               ? num(preselect.salePrice ?? preselect.regularPrice)
+               : num(product.salePrice ?? product.regularPrice);
             const line: OrderLine = {
                key: isVariable
                   ? `${product.id}::line-${++lineSeqRef.current}`
                   : product.id,
                productId: product.id,
-               variantId: null,
-               variantName: null,
+               variantId: preselect ? preselect.id : null,
+               variantName: preselect ? preselect.variantName : null,
                variants,
                name: product.productName,
-               code: product.productSku || product.productCode || "",
+               code: preselect
+                  ? preselect.sku || product.productSku || product.productCode || ""
+                  : product.productSku || product.productCode || "",
                image: Array.isArray(product.images) ? product.images[0] : null,
-               stock,
+               stock: preselect ? Math.max(0, num(preselect.quantity)) : stock,
                unit: product.salesUnit || product.baseUnit || "Piece",
                listPrice: price,
                quantity: 1,
@@ -176,6 +218,38 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          return message;
       },
       [],
+   );
+
+   // Barcode scan (Phase 4, §4.1): exact lookup via
+   // GET /api/products/barcode — one code, one answer. On a match the
+   // product (and its variant, for variant labels) is added through
+   // the same addProduct path as a manual pick. Returns an error
+   // message to surface, or null on success.
+   const scanBarcode = useCallback(
+      async (code: string): Promise<string | null> => {
+         const trimmed = code.trim();
+         if (!trimmed) return null;
+         try {
+            const res = await fetch(
+               `/api/products/barcode?code=${encodeURIComponent(trimmed)}`,
+            );
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.product) {
+               return (
+                  data?.error ||
+                  `No product found for code ${trimmed}`
+               );
+            }
+            const product = data.product as ApiProduct;
+            if (product.status && product.status !== "ACTIVE") {
+               return `${product.productName} is not an active product`;
+            }
+            return addProduct(product, data.variant?.id ?? null);
+         } catch {
+            return "Barcode lookup failed. Please try again.";
+         }
+      },
+      [addProduct],
    );
 
    const updateLine = useCallback((lineKey: string, partial: Partial<OrderLine>) => {
@@ -388,6 +462,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       searchCustomers,
       searchProducts,
       addProduct,
+      scanBarcode,
       updateLine,
       removeLine,
       validate,

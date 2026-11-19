@@ -4,6 +4,7 @@ import React from "react";
 import { Box, Typography, Stack, Divider, Table, TableHead, TableRow, TableCell, TableBody, Chip } from "@mui/material";
 import { InvoiceOrderData, InvoiceCustomization } from "./types";
 import { INVOICE_TEMPLATES } from "./templates";
+import { INVOICE_LABELS, BENGALI_FONT_STACK, resolveInvoiceLanguage } from "./labels";
 
 interface InvoiceRendererProps {
    order: InvoiceOrderData;
@@ -21,14 +22,18 @@ export default function InvoiceRenderer({
    const selectedId = templateId || customization.templateId || "classic-pro";
    const templateMeta = INVOICE_TEMPLATES.find((t) => t.id === selectedId) || INVOICE_TEMPLATES[0];
 
+   const lang = resolveInvoiceLanguage(customization.language);
+   const L = INVOICE_LABELS[lang];
+   const isBn = lang === "bn";
+
    const storeName = customization.storeName || "DevX POS";
    const storeTagline = customization.tagline || "Smart Point of Sale & ERP";
    const storePhone = customization.phone || "+880 1700-000000";
    const storeEmail = customization.email || "info@devxpos.com";
    const storeAddress = customization.address || "Banani, Dhaka-1213, Bangladesh";
-   const invoiceTitle = customization.invoiceTitle || "Sales Invoice";
-   const invoiceHeader = customization.invoiceHeader || "Official Sales Receipt";
-   const invoiceFooter = customization.invoiceFooter || "Thank you for shopping with us! Please come again.";
+   const invoiceTitle = customization.invoiceTitle || L.defaultTitle;
+   const invoiceHeader = customization.invoiceHeader || L.defaultHeader;
+   const invoiceFooter = customization.invoiceFooter || L.defaultFooter;
    const accentColor = customization.accentColor || templateMeta.accent || "#0F766E";
 
    const showCustomer = customization.showCustomerInfo !== false;
@@ -55,7 +60,7 @@ export default function InvoiceRenderer({
                maxWidth: "100%",
                mx: "auto",
                p: is58mm ? 1 : 2,
-               fontFamily: "'Courier New', Courier, monospace",
+               fontFamily: isBn ? BENGALI_FONT_STACK : "'Courier New', Courier, monospace",
                fontSize: is58mm ? "10px" : "12px",
                lineHeight: 1.3,
                bgcolor: "#FFFFFF",
@@ -73,7 +78,7 @@ export default function InvoiceRenderer({
                   {storeAddress}
                </Typography>
                <Typography variant="caption" sx={{ fontFamily: "inherit", display: "block" }}>
-                  Tel: {storePhone}
+                  {L.tel}: {storePhone}
                </Typography>
             </Box>
 
@@ -82,22 +87,22 @@ export default function InvoiceRenderer({
             {/* Receipt Metadata */}
             <Box sx={{ fontSize: "inherit", mb: 0.5 }}>
                <Stack direction="row" justifyContent="space-between">
-                  <span>Invoice:</span>
+                  <span>{L.invoiceNo}:</span>
                   <b>{order.invoiceNo || order.orderId}</b>
                </Stack>
                <Stack direction="row" justifyContent="space-between">
-                  <span>Date:</span>
+                  <span>{L.date}:</span>
                   <span>{order.date || (order.createdAt ? new Date(order.createdAt).toLocaleDateString() : new Date().toLocaleDateString())}</span>
                </Stack>
                {showCashier && order.employeeName && (
                   <Stack direction="row" justifyContent="space-between">
-                     <span>Server:</span>
+                     <span>{L.server}:</span>
                      <span>{order.employeeName}</span>
                   </Stack>
                )}
                {showCustomer && order.customer?.name && (
                   <Stack direction="row" justifyContent="space-between">
-                     <span>Customer:</span>
+                     <span>{L.customer}:</span>
                      <span>{order.customer.name}</span>
                   </Stack>
                )}
@@ -108,9 +113,9 @@ export default function InvoiceRenderer({
             {/* Items Table */}
             <Box mb={1}>
                <Stack direction="row" justifyContent="space-between" fontWeight={700} pb={0.5}>
-                  <span style={{ width: "55%" }}>Item</span>
-                  <span style={{ width: "15%", textAlign: "center" }}>Qty</span>
-                  <span style={{ width: "30%", textAlign: "right" }}>Total</span>
+                  <span style={{ width: "55%" }}>{L.item}</span>
+                  <span style={{ width: "15%", textAlign: "center" }}>{L.qty}</span>
+                  <span style={{ width: "30%", textAlign: "right" }}>{L.total}</span>
                </Stack>
                {order.items.map((it, idx) => (
                   <Box key={idx} sx={{ py: 0.25 }}>
@@ -131,35 +136,35 @@ export default function InvoiceRenderer({
             {/* Totals */}
             <Stack spacing={0.25} sx={{ fontSize: "inherit" }}>
                <Stack direction="row" justifyContent="space-between">
-                  <span>Subtotal:</span>
+                  <span>{L.subtotal}:</span>
                   <span>{formatMoney(order.subtotal)}</span>
                </Stack>
                {Boolean(order.deliveryCharge) && (
                   <Stack direction="row" justifyContent="space-between">
-                     <span>Delivery:</span>
+                     <span>{L.delivery}:</span>
                      <span>{formatMoney(order.deliveryCharge)}</span>
                   </Stack>
                )}
                {Boolean(order.discount) && (
                   <Stack direction="row" justifyContent="space-between">
-                     <span>Discount:</span>
+                     <span>{L.discount}:</span>
                      <span>-{formatMoney(order.discount)}</span>
                   </Stack>
                )}
                <Divider sx={{ my: 0.25, borderStyle: "dashed", borderColor: "#000" }} />
                <Stack direction="row" justifyContent="space-between" fontWeight={800} fontSize={is58mm ? "11px" : "13px"}>
-                  <span>TOTAL:</span>
+                  <span>{L.totalUpper}:</span>
                   <span>{formatMoney(order.total)}</span>
                </Stack>
                {order.advancePayment != null && (
                   <Stack direction="row" justifyContent="space-between">
-                     <span>Paid:</span>
+                     <span>{L.paid}:</span>
                      <span>{formatMoney(order.advancePayment)}</span>
                   </Stack>
                )}
                {Boolean(order.dueAmount) && (
                   <Stack direction="row" justifyContent="space-between" fontWeight={700}>
-                     <span>Due:</span>
+                     <span>{L.due}:</span>
                      <span>{formatMoney(order.dueAmount)}</span>
                   </Stack>
                )}
@@ -205,6 +210,7 @@ export default function InvoiceRenderer({
             id="printable-invoice"
             sx={{
                width: "100%",
+               ...(isBn ? { fontFamily: BENGALI_FONT_STACK } : {}),
                maxWidth: 650,
                mx: "auto",
                p: 2.5,
@@ -222,18 +228,18 @@ export default function InvoiceRenderer({
                      {storeName}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                     {storeAddress} | Tel: {storePhone}
+                     {storeAddress} | {L.tel}: {storePhone}
                   </Typography>
                </Box>
                <Box textAlign="right">
                   <Typography variant="subtitle2" fontWeight={800}>
-                     A5 BUSINESS INVOICE
+                     {L.a5Title}
                   </Typography>
                   <Typography variant="caption" fontWeight={700} color="primary.main">
                      #{order.invoiceNo || order.orderId}
                   </Typography>
                   <Typography variant="caption" display="block" color="text.secondary">
-                     Date: {order.date || new Date().toLocaleDateString()}
+                     {L.date}: {order.date || new Date().toLocaleDateString()}
                   </Typography>
                </Box>
             </Stack>
@@ -242,13 +248,13 @@ export default function InvoiceRenderer({
             {showCustomer && (
                <Box mb={2} p={1} bgcolor="#F8FAFC" borderRadius={1} border="1px solid #EDF2F7">
                   <Typography variant="caption" fontWeight={700} color="text.secondary" textTransform="uppercase">
-                     Bill To Customer:
+                     {L.billTo}
                   </Typography>
                   <Typography variant="body2" fontWeight={700}>
-                     {order.customer?.name || "Walk-in Customer"}
+                     {order.customer?.name || L.walkInCustomer}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                     {order.customer?.phone} | {order.customer?.address || "No address provided"}
+                     {order.customer?.phone} | {order.customer?.address || L.noAddress}
                   </Typography>
                </Box>
             )}
@@ -257,10 +263,10 @@ export default function InvoiceRenderer({
             <Table size="small" sx={{ mb: 2 }}>
                <TableHead>
                   <TableRow sx={{ bgcolor: accentColor }}>
-                     <TableCell sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>Item</TableCell>
-                     <TableCell align="center" sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>Qty</TableCell>
-                     <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>Rate</TableCell>
-                     <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>Total</TableCell>
+                     <TableCell sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>{L.item}</TableCell>
+                     <TableCell align="center" sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>{L.qty}</TableCell>
+                     <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>{L.rate}</TableCell>
+                     <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700, py: 0.75 }}>{L.total}</TableCell>
                   </TableRow>
                </TableHead>
                <TableBody>
@@ -279,7 +285,7 @@ export default function InvoiceRenderer({
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
                <Box maxWidth={300}>
                   <Typography variant="caption" color="text.secondary">
-                     Payment Method: <b>{order.paymentMethod || "Cash"}</b>
+                     {L.paymentMethod}: <b>{order.paymentMethod || "Cash"}</b>
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
                      {invoiceFooter}
@@ -287,24 +293,24 @@ export default function InvoiceRenderer({
                </Box>
                <Stack spacing={0.5} width={200}>
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="caption">Subtotal:</Typography>
+                     <Typography variant="caption">{L.subtotal}:</Typography>
                      <Typography variant="caption" fontWeight={600}>{formatMoney(order.subtotal)}</Typography>
                   </Stack>
                   {Boolean(order.deliveryCharge) && (
                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="caption">Delivery:</Typography>
+                        <Typography variant="caption">{L.delivery}:</Typography>
                         <Typography variant="caption">{formatMoney(order.deliveryCharge)}</Typography>
                      </Stack>
                   )}
                   {Boolean(order.discount) && (
                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="caption">Discount:</Typography>
+                        <Typography variant="caption">{L.discount}:</Typography>
                         <Typography variant="caption">-{formatMoney(order.discount)}</Typography>
                      </Stack>
                   )}
                   <Divider />
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="subtitle2" fontWeight={800} color={accentColor}>Total:</Typography>
+                     <Typography variant="subtitle2" fontWeight={800} color={accentColor}>{L.total}:</Typography>
                      <Typography variant="subtitle2" fontWeight={800} color={accentColor}>{formatMoney(order.total)}</Typography>
                   </Stack>
                </Stack>
@@ -313,7 +319,7 @@ export default function InvoiceRenderer({
             {showSign && (
                <Stack direction="row" justifyContent="flex-end" pt={2}>
                   <Box textAlign="center" width={160} borderTop="1px solid #CBD5E1">
-                     <Typography variant="caption" fontWeight={600}>Authorized Signature</Typography>
+                     <Typography variant="caption" fontWeight={600}>{L.authorizedSignature}</Typography>
                   </Box>
                </Stack>
             )}
@@ -330,6 +336,7 @@ export default function InvoiceRenderer({
             id="printable-invoice"
             sx={{
                width: "100%",
+               ...(isBn ? { fontFamily: BENGALI_FONT_STACK } : {}),
                maxWidth: 820,
                mx: "auto",
                p: 4,
@@ -342,31 +349,31 @@ export default function InvoiceRenderer({
          >
             {/* Ornate Header */}
             <Box textAlign="center" borderBottom="1px solid #E2E8F0" pb={2.5} mb={3}>
-               <Typography variant="h5" fontWeight={900} letterSpacing={2} textTransform="uppercase" color={accentColor}>
+               <Typography variant="h5" fontWeight={900} letterSpacing={isBn ? 0 : 2} textTransform="uppercase" color={accentColor}>
                   {storeName}
                </Typography>
                <Typography variant="body2" color="text.secondary" fontStyle="italic">
                   {storeTagline}
                </Typography>
                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                  {storeAddress} | Phone: {storePhone} | {storeEmail}
+                  {storeAddress} | {L.phone}: {storePhone} | {storeEmail}
                </Typography>
-               <Chip label="OFFICIAL INVOICE" size="small" sx={{ mt: 1.5, fontWeight: 700, letterSpacing: 1 }} />
+               <Chip label={L.officialInvoice} size="small" sx={{ mt: 1.5, fontWeight: 700, letterSpacing: 1 }} />
             </Box>
 
             {/* Bill Details */}
             <Stack direction="row" justifyContent="space-between" mb={3} px={1}>
                <Box>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">INVOICED TO:</Typography>
-                  <Typography variant="subtitle2" fontWeight={700}>{order.customer?.name || "Valued Customer"}</Typography>
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">{L.invoicedTo}</Typography>
+                  <Typography variant="subtitle2" fontWeight={700}>{order.customer?.name || L.valuedCustomer}</Typography>
                   <Typography variant="caption" display="block">{order.customer?.phone}</Typography>
                   <Typography variant="caption" display="block">{order.customer?.address}</Typography>
                </Box>
                <Box textAlign="right">
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">INVOICE DETAILS:</Typography>
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">{L.invoiceDetails}</Typography>
                   <Typography variant="subtitle2" fontWeight={700}>#{order.invoiceNo || order.orderId}</Typography>
-                  <Typography variant="caption" display="block">Date: {order.date || new Date().toLocaleDateString()}</Typography>
-                  <Typography variant="caption" display="block">Method: {order.paymentMethod || "Cash"}</Typography>
+                  <Typography variant="caption" display="block">{L.date}: {order.date || new Date().toLocaleDateString()}</Typography>
+                  <Typography variant="caption" display="block">{L.method}: {order.paymentMethod || "Cash"}</Typography>
                </Box>
             </Stack>
 
@@ -374,11 +381,11 @@ export default function InvoiceRenderer({
             <Table sx={{ mb: 3 }}>
                <TableHead>
                   <TableRow sx={{ borderTop: "2px solid #000", borderBottom: "2px solid #000" }}>
-                     <TableCell sx={{ fontWeight: 800 }}>Description</TableCell>
-                     {showSku && <TableCell align="center" sx={{ fontWeight: 800 }}>SKU</TableCell>}
-                     <TableCell align="center" sx={{ fontWeight: 800 }}>Quantity</TableCell>
-                     <TableCell align="right" sx={{ fontWeight: 800 }}>Price</TableCell>
-                     <TableCell align="right" sx={{ fontWeight: 800 }}>Amount</TableCell>
+                     <TableCell sx={{ fontWeight: 800 }}>{L.description}</TableCell>
+                     {showSku && <TableCell align="center" sx={{ fontWeight: 800 }}>{L.sku}</TableCell>}
+                     <TableCell align="center" sx={{ fontWeight: 800 }}>{L.quantity}</TableCell>
+                     <TableCell align="right" sx={{ fontWeight: 800 }}>{L.price}</TableCell>
+                     <TableCell align="right" sx={{ fontWeight: 800 }}>{L.amount}</TableCell>
                   </TableRow>
                </TableHead>
                <TableBody>
@@ -398,24 +405,24 @@ export default function InvoiceRenderer({
             <Stack direction="row" justifyContent="flex-end" mb={3}>
                <Stack spacing={1} width={260} borderTop="1px solid #CBD5E1" pt={1}>
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="body2">Subtotal:</Typography>
+                     <Typography variant="body2">{L.subtotal}:</Typography>
                      <Typography variant="body2" fontWeight={600}>{formatMoney(order.subtotal)}</Typography>
                   </Stack>
                   {Boolean(order.deliveryCharge) && (
                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2">Delivery Charge:</Typography>
+                        <Typography variant="body2">{L.deliveryCharge}:</Typography>
                         <Typography variant="body2">{formatMoney(order.deliveryCharge)}</Typography>
                      </Stack>
                   )}
                   {Boolean(order.discount) && (
                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2">Discount:</Typography>
+                        <Typography variant="body2">{L.discount}:</Typography>
                         <Typography variant="body2">-{formatMoney(order.discount)}</Typography>
                      </Stack>
                   )}
                   <Divider />
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="subtitle1" fontWeight={900} color={accentColor}>Total Amount:</Typography>
+                     <Typography variant="subtitle1" fontWeight={900} color={accentColor}>{L.totalAmount}:</Typography>
                      <Typography variant="subtitle1" fontWeight={900} color={accentColor}>{formatMoney(order.total)}</Typography>
                   </Stack>
                </Stack>
@@ -444,6 +451,7 @@ export default function InvoiceRenderer({
          id="printable-invoice"
          sx={{
             width: "100%",
+            ...(isBn ? { fontFamily: BENGALI_FONT_STACK } : {}),
             maxWidth: 850,
             mx: "auto",
             p: { xs: 2.5, sm: 4 },
@@ -468,7 +476,7 @@ export default function InvoiceRenderer({
                   </Box>
                   <Box textAlign="right">
                      <Typography variant="h6" fontWeight={800} color="#38BDF8">
-                        INVOICE
+                        {L.invoice}
                      </Typography>
                      <Typography variant="body2" sx={{ color: "#CBD5E1", fontFamily: "monospace" }}>
                         #{order.invoiceNo || order.orderId}
@@ -478,14 +486,14 @@ export default function InvoiceRenderer({
             </Box>
          ) : isCashMemo ? (
             <Box textAlign="center" borderBottom="2px solid #BE123C" pb={2} mb={3}>
-               <Typography variant="h5" fontWeight={900} color="#BE123C" letterSpacing={2}>
-                  CASH MEMO
+               <Typography variant="h5" fontWeight={900} color="#BE123C" letterSpacing={isBn ? 0 : 2}>
+                  {L.cashMemo}
                </Typography>
                <Typography variant="h6" fontWeight={700}>
                   {storeName}
                </Typography>
                <Typography variant="caption" color="text.secondary">
-                  {storeAddress} | Phone: {storePhone}
+                  {storeAddress} | {L.phone}: {storePhone}
                </Typography>
             </Box>
          ) : (
@@ -501,7 +509,7 @@ export default function InvoiceRenderer({
                      {storeAddress}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                     Tel: {storePhone} | {storeEmail}
+                     {L.tel}: {storePhone} | {storeEmail}
                   </Typography>
                </Box>
                <Box textAlign={{ sm: "right" }}>
@@ -509,10 +517,10 @@ export default function InvoiceRenderer({
                      {templateMeta.name.toUpperCase()}
                   </Typography>
                   <Typography variant="body2" fontWeight={700} sx={{ fontFamily: "monospace" }}>
-                     Invoice #{order.invoiceNo || order.orderId}
+                     {L.invoiceNo} #{order.invoiceNo || order.orderId}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                     Date: {order.date || new Date().toLocaleDateString()}
+                     {L.date}: {order.date || new Date().toLocaleDateString()}
                   </Typography>
                   {order.status && (
                      <Chip
@@ -531,35 +539,35 @@ export default function InvoiceRenderer({
             {showCustomer && (
                <Box>
                   <Typography variant="caption" fontWeight={700} color="text.secondary" textTransform="uppercase">
-                     Customer / Invoiced To:
+                     {L.customerInvoicedTo}
                   </Typography>
                   <Typography variant="subtitle2" fontWeight={700}>
-                     {order.customer?.name || "Walk-in Customer"}
+                     {order.customer?.name || L.walkInCustomer}
                   </Typography>
                   <Typography variant="caption" display="block" color="text.secondary">
-                     Phone: {order.customer?.phone || "N/A"}
+                     {L.phone}: {order.customer?.phone || "N/A"}
                   </Typography>
                   <Typography variant="caption" display="block" color="text.secondary">
-                     Address: {order.customer?.address || "No address provided"}
+                     {L.address}: {order.customer?.address || L.noAddress}
                   </Typography>
                </Box>
             )}
 
             <Box textAlign={{ sm: "right" }}>
                <Typography variant="caption" fontWeight={700} color="text.secondary" textTransform="uppercase">
-                  Order & Payment Details:
+                  {L.orderPaymentDetails}
                </Typography>
                <Typography variant="caption" display="block">
-                  Payment Method: <b>{order.paymentMethod || "Cash"}</b>
+                  {L.paymentMethod}: <b>{order.paymentMethod || "Cash"}</b>
                </Typography>
                {showCourier && order.courier && (
                   <Typography variant="caption" display="block">
-                     Courier: <b>{order.courier}</b> {order.courierTrackingId ? `(${order.courierTrackingId})` : ""}
+                     {L.courier}: <b>{order.courier}</b> {order.courierTrackingId ? `(${order.courierTrackingId})` : ""}
                   </Typography>
                )}
                {showCashier && order.employeeName && (
                   <Typography variant="caption" display="block">
-                     Served by: <b>{order.employeeName}</b>
+                     {L.servedBy}: <b>{order.employeeName}</b>
                   </Typography>
                )}
             </Box>
@@ -570,11 +578,11 @@ export default function InvoiceRenderer({
             <TableHead>
                <TableRow sx={{ bgcolor: isMonochrome ? "#000" : accentColor }}>
                   <TableCell sx={{ color: "#FFF", fontWeight: 700 }}>#</TableCell>
-                  <TableCell sx={{ color: "#FFF", fontWeight: 700 }}>Item Description</TableCell>
-                  {showSku && <TableCell align="center" sx={{ color: "#FFF", fontWeight: 700 }}>SKU</TableCell>}
-                  <TableCell align="center" sx={{ color: "#FFF", fontWeight: 700 }}>Qty</TableCell>
-                  <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700 }}>Unit Price</TableCell>
-                  <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700 }}>Subtotal</TableCell>
+                  <TableCell sx={{ color: "#FFF", fontWeight: 700 }}>{L.itemDescription}</TableCell>
+                  {showSku && <TableCell align="center" sx={{ color: "#FFF", fontWeight: 700 }}>{L.sku}</TableCell>}
+                  <TableCell align="center" sx={{ color: "#FFF", fontWeight: 700 }}>{L.qty}</TableCell>
+                  <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700 }}>{L.unitPrice}</TableCell>
+                  <TableCell align="right" sx={{ color: "#FFF", fontWeight: 700 }}>{L.subtotal}</TableCell>
                </TableRow>
             </TableHead>
             <TableBody>
@@ -596,15 +604,15 @@ export default function InvoiceRenderer({
             <Box maxWidth={400}>
                {order.notes && (
                   <Box mb={2}>
-                     <Typography variant="caption" fontWeight={700} color="text.secondary">Order Remarks:</Typography>
+                     <Typography variant="caption" fontWeight={700} color="text.secondary">{L.orderRemarks}</Typography>
                      <Typography variant="body2" color="text.secondary">{order.notes}</Typography>
                   </Box>
                )}
                {showTerms && (
                   <Box>
-                     <Typography variant="caption" fontWeight={700} color="text.secondary">Warranty & Return Terms:</Typography>
+                     <Typography variant="caption" fontWeight={700} color="text.secondary">{L.termsTitle}</Typography>
                      <Typography variant="caption" display="block" color="text.secondary">
-                        {customization.termsText || "Goods once sold can be exchanged within 7 days with original invoice. Preserve this slip."}
+                        {customization.termsText || L.termsDefault}
                      </Typography>
                   </Box>
                )}
@@ -612,31 +620,31 @@ export default function InvoiceRenderer({
 
             <Stack spacing={1} width={260} borderTop="1px solid #E2E8F0" pt={1}>
                <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="body2">Subtotal:</Typography>
+                  <Typography variant="body2">{L.subtotal}:</Typography>
                   <Typography variant="body2" fontWeight={600}>{formatMoney(order.subtotal)}</Typography>
                </Stack>
                {Boolean(order.deliveryCharge) && (
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="body2">Delivery Charge:</Typography>
+                     <Typography variant="body2">{L.deliveryCharge}:</Typography>
                      <Typography variant="body2">{formatMoney(order.deliveryCharge)}</Typography>
                   </Stack>
                )}
                {Boolean(order.discount) && (
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="body2">Discount:</Typography>
+                     <Typography variant="body2">{L.discount}:</Typography>
                      <Typography variant="body2">-{formatMoney(order.discount)}</Typography>
                   </Stack>
                )}
                {Boolean(order.tax) && (
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="body2">Tax / VAT:</Typography>
+                     <Typography variant="body2">{L.taxVat}:</Typography>
                      <Typography variant="body2">{formatMoney(order.tax)}</Typography>
                   </Stack>
                )}
                <Divider />
                <Stack direction="row" justifyContent="space-between">
                   <Typography variant="subtitle1" fontWeight={800} color={isMonochrome ? "#000" : accentColor}>
-                     Grand Total:
+                     {L.grandTotal}:
                   </Typography>
                   <Typography variant="subtitle1" fontWeight={800} color={isMonochrome ? "#000" : accentColor}>
                      {formatMoney(order.total)}
@@ -644,13 +652,13 @@ export default function InvoiceRenderer({
                </Stack>
                {order.advancePayment != null && (
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="body2">Paid Amount:</Typography>
+                     <Typography variant="body2">{L.paidAmount}:</Typography>
                      <Typography variant="body2" fontWeight={600}>{formatMoney(order.advancePayment)}</Typography>
                   </Stack>
                )}
                {Boolean(order.dueAmount) && (
                   <Stack direction="row" justifyContent="space-between">
-                     <Typography variant="body2" color="error.main" fontWeight={700}>Due Balance:</Typography>
+                     <Typography variant="body2" color="error.main" fontWeight={700}>{L.dueBalance}:</Typography>
                      <Typography variant="body2" color="error.main" fontWeight={700}>{formatMoney(order.dueAmount)}</Typography>
                   </Stack>
                )}
@@ -661,13 +669,13 @@ export default function InvoiceRenderer({
          {showSign && (
             <Stack direction="row" justifyContent="space-between" pt={4} mb={2}>
                <Box textAlign="center" width={180} borderTop="1px solid #94A3B8">
-                  <Typography variant="caption" fontWeight={600}>Cashier / Operator</Typography>
+                  <Typography variant="caption" fontWeight={600}>{L.cashierOperator}</Typography>
                </Box>
                <Box textAlign="center" width={180} borderTop="1px solid #94A3B8">
-                  <Typography variant="caption" fontWeight={600}>Customer Acceptance</Typography>
+                  <Typography variant="caption" fontWeight={600}>{L.customerAcceptance}</Typography>
                </Box>
                <Box textAlign="center" width={180} borderTop="1px solid #94A3B8">
-                  <Typography variant="caption" fontWeight={600}>Authorized Signature</Typography>
+                  <Typography variant="caption" fontWeight={600}>{L.authorizedSignature}</Typography>
                </Box>
             </Stack>
          )}

@@ -32,6 +32,7 @@ import CustomModal from "@src/components/Modal";
 import { useSettings } from "@src/lib/settingsContext";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import ExportProductModal from "./ExportProductModal";
+import BarcodeLabelsModal from "./BarcodeLabelsModal";
 
 export type ProductType = {
    id: string;
@@ -198,6 +199,7 @@ const Product = () => {
    );
    const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
    const [exportModalOpen, setExportModalOpen] = useState(false);
+   const [labelsModalOpen, setLabelsModalOpen] = useState(false);
    const [categories, setCategories] = useState<string[]>([]);
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
    const [viewProduct, setViewProduct] = useState<any>(null);
@@ -375,6 +377,11 @@ const Product = () => {
                           ],
                   productCode: p.productCode,
                   productSku: p.productSku,
+                  // Carried for the barcode label dialog (Phase 4,
+                  // §4.1): the raw barcode and live variants of the
+                  // product, straight from the list API payload.
+                  barcode: p.barcode || null,
+                  variants: Array.isArray(p.variants) ? p.variants : [],
                   stock: p.quantity,
                   quantity: p.quantity,
                   stockValue,
@@ -437,6 +444,15 @@ const Product = () => {
          <Stack spacing={2} py={2}>
             {/* Header */}
             <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
+               <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<Icon icon="solar:barcode-linear" />}
+                  onClick={() => setLabelsModalOpen(true)}
+                  sx={{ textTransform: "none", fontWeight: 600 }}
+               >
+                  Print Labels
+               </Button>
                <Button
                   variant="contained"
                   color="primary"
@@ -713,6 +729,15 @@ const Product = () => {
             open={exportModalOpen}
             onClose={() => setExportModalOpen(false)}
             selectedProducts={selectedProducts}
+         />
+
+         {/* Barcode label printing (Phase 4, §4.1) — seeded with the
+             table's current selection; more products can be added
+             inside the dialog. */}
+         <BarcodeLabelsModal
+            open={labelsModalOpen}
+            onClose={() => setLabelsModalOpen(false)}
+            initialProducts={selectedProducts}
          />
       </Scrollbar>
    );

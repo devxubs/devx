@@ -248,6 +248,21 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
 
                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
+                     select
+                     fullWidth
+                     label="Invoice Language"
+                     size="small"
+                     value={values.language || "en"}
+                     onChange={(e) => onChange("language", e.target.value)}
+                     helperText="Bengali renders all invoice labels in বাংলা with a Bengali-capable font; amounts keep ৳ formatting"
+                  >
+                     <MenuItem value="en">English</MenuItem>
+                     <MenuItem value="bn">বাংলা (Bengali)</MenuItem>
+                  </TextField>
+               </Grid>
+
+               <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
                      fullWidth
                      label="Invoice Header Subtitle"
                      size="small"

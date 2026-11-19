@@ -159,6 +159,15 @@ const Publish = () => {
       return message;
    };
 
+   // Barcode scan (Phase 4, §4.1): exact code lookup; a match is
+   // added (variant preselected for variant labels), anything else
+   // surfaces here as an error and the typed code stays in the field.
+   const handleScanBarcode = async (code: string) => {
+      const message = await oc.scanBarcode(code);
+      if (message) setSnackbar({ type: "error", message });
+      return message;
+   };
+
    const handleSubmit = async () => {
       const created = await oc.submit(editId || undefined);
       if (created) {
@@ -252,11 +261,12 @@ const Publish = () => {
                      />
                      <SectionCard
                         title="Products"
-                        subtitle="Search by name or SKU — quantities are checked against stock"
+                        subtitle="Search by name or SKU, or scan a barcode — quantities are checked against stock"
                      >
                         <ProductSearch
                            searchProducts={oc.searchProducts}
                            onAdd={handleAddProduct}
+                           onScan={handleScanBarcode}
                            currencySymbol={currencySymbol}
                         />
                         <ProductTable
