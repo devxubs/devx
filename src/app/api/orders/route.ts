@@ -395,6 +395,28 @@ export async function POST(request: NextRequest) {
          );
       }
 
+      // Phase 2 (2.5): notes + courier are accepted in the create
+      // request and stored inside the same transaction. Previously the
+      // client had to follow a successful POST with a separate PUT to
+      // persist the four order notes (Courier / Customer / Packing /
+      // Employee — kept as separate orderTags keys, exactly as the PUT
+      // handler merges them) and the courier, and a failed PUT silently
+      // lost them. The explicit note fields win over any same-named key
+      // inside a caller-supplied orderTags object, mirroring PUT.
+      const initialTags: Record<string, any> = {
+         ...(body.orderTags && typeof body.orderTags === "object"
+            ? body.orderTags
+            : {}),
+      };
+      if (body.courierNote !== undefined)
+         initialTags.courierNote = String(body.courierNote || "").trim();
+      if (body.customerNote !== undefined)
+         initialTags.customerNote = String(body.customerNote || "").trim();
+      if (body.packingNote !== undefined)
+         initialTags.packingNote = String(body.packingNote || "").trim();
+      if (body.employeeNote !== undefined)
+         initialTags.employeeNote = String(body.employeeNote || "").trim();
+
       // Compute authoritative server-side totals
       const totals = calculateOrderTotals(
          products.map((p: any) => ({
@@ -456,6 +478,9 @@ export async function POST(request: NextRequest) {
                status: (status?.toUpperCase() || "PENDING") as any,
                orderNote: orderNote || null,
                orderSource: orderSource || null,
+               courier: body.courier ? String(body.courier) : null,
+               orderTags:
+                  Object.keys(initialTags).length > 0 ? initialTags : undefined,
                paymentMethod: pricing?.paymentMethod || "Cash on Delivery",
                subtotal: totals.subtotal,
                deliveryCharge: totals.deliveryCharge,

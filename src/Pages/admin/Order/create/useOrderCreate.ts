@@ -11,9 +11,11 @@
 //     server-side "draft" (e.g. HOLD) would wrongly deduct stock, so drafts
 //     are implemented as localStorage form persistence on this page only;
 //   • the four order notes live in orderTags JSON (existing mechanism used by
-//     Order Details) — POST ignores them, so after a successful create they
-//     are saved with one follow-up PUT /api/orders/:id, together with the
-//     courier (delivery method) and the tax/discount breakdown.
+//     Order Details) — since Phase 2 (2.5) the POST accepts them directly
+//     (courierNote / customerNote / packingNote / employeeNote), together
+//     with the courier (delivery method) and the tax/discount breakdown in
+//     orderTags, all stored inside the create transaction. No follow-up
+//     PUT is needed, so notes can no longer be lost silently.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateOrderTotals, lineEffectiveUnitPrice, num } from "./orderCalculations";
 import {
@@ -225,6 +227,20 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          orderNote: form.notes.customer || "",
          orderSource: form.orderSource || "Direct",
          status: form.status || "Pending",
+         // Phase 2 (2.5): the four notes stay separate fields, the
+         // courier rides along, and the tax/discount breakdown goes in
+         // orderTags — all persisted by the POST in one transaction.
+         courierNote: form.notes.courier,
+         customerNote: form.notes.customer,
+         packingNote: form.notes.packing,
+         employeeNote: form.notes.employee,
+         ...(form.courier ? { courier: form.courier } : {}),
+         orderTags: {
+            taxRate: form.taxEnabled ? num(form.taxRate) : 0,
+            taxAmount: totals.taxAmount,
+            productDiscount: totals.productDiscount,
+            overallDiscount: totals.overallDiscount,
+         },
       }),
       [form, totals],
    );
@@ -236,38 +252,6 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       setDraftMeta(null);
       setRestorableDraft(null);
    }, []);
-
-   /** Persist notes / courier / financial breakdown via the existing PUT. */
-   const persistOrderExtras = useCallback(
-      async (orderId: string) => {
-         const hasNotes =
-            form.notes.customer || form.notes.courier || form.notes.packing || form.notes.employee;
-         if (!hasNotes && !form.courier && totals.taxAmount <= 0 && totals.productDiscount <= 0) return true;
-         try {
-            const res = await fetch(`/api/orders/${orderId}`, {
-               method: "PUT",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({
-                  courierNote: form.notes.courier,
-                  customerNote: form.notes.customer,
-                  packingNote: form.notes.packing,
-                  employeeNote: form.notes.employee,
-                  ...(form.courier ? { courier: form.courier } : {}),
-                  orderTags: {
-                     taxRate: form.taxEnabled ? num(form.taxRate) : 0,
-                     taxAmount: totals.taxAmount,
-                     productDiscount: totals.productDiscount,
-                     overallDiscount: totals.overallDiscount,
-                  },
-               }),
-            });
-            return res.ok;
-         } catch {
-            return false;
-         }
-      },
-      [form.notes, form.courier, form.taxEnabled, form.taxRate, totals],
-   );
 
    // ── Submit (create or update) ────────────────────────────────────────────
    const submit = useCallback(
@@ -291,15 +275,6 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
             if (!res.ok) {
                throw new Error(data.message || data.error || "Failed to save order");
             }
-            if (!editOrderId && data?.id) {
-               const extrasOk = await persistOrderExtras(data.id);
-               if (!extrasOk) {
-                  setNotice({
-                     type: "info",
-                     message: "Order created, but notes/extras could not be saved — add them from Order Details.",
-                  });
-               }
-            }
             clearDraft();
             setIsDirty(false);
             return data;
@@ -312,7 +287,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
             setSubmitting(false);
          }
       },
-      [validate, buildPayload, persistOrderExtras, clearDraft],
+      [validate, buildPayload, clearDraft],
    );
 
    // ── Drafts (localStorage only — see header note) ─────────────────────────
