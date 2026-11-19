@@ -7,6 +7,11 @@ import {
    addStockForPurchaseItems,
    InsufficientStockError,
 } from "@src/lib/stock";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    // R-2 fix (Final Review): Recycle Bin contents are deleted business
@@ -168,6 +173,21 @@ export async function POST(request: NextRequest) {
          return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
       }
 
+      // Phase 4 (D2): purchase returns are NEVER bin records — the
+      // Bin GET above does not enumerate them, and restoring one
+      // from here must not reapply its stock/settlement effects.
+      // A deleted return stays reversed; manage returns from the
+      // purchase detail instead.
+      if (type === "purchase_return" || type === "purchasereturn") {
+         return NextResponse.json(
+            {
+               error:
+                  "Purchase returns cannot be restored or permanently deleted from the Recycle Bin. A deleted return is fully reversed and stays reversed.",
+            },
+            { status: 400 },
+         );
+      }
+
       // 1. USER HANDLING
       if (type === "user") {
          if (action === "restore") {
@@ -228,13 +248,39 @@ export async function POST(request: NextRequest) {
                   where: { id },
                   data: { isDeleted: false, deletedAt: null },
                });
+
+               // Phase 4 (D1): audit in the same transaction.
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "ORDER",
+                  entityId: order.id,
+                  entityCustomId: order.orderId || order.customId,
+                  summary: `Order ${order.orderId || order.customId} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Order restored successfully" });
          } else if (action === "delete") {
-            await prisma.$transaction([
-               prisma.orderItem.deleteMany({ where: { orderId: id } }),
-               prisma.order.delete({ where: { id } }),
-            ]);
+            // Interactive form (was an array transaction) so the
+            // permanent deletion is audited in the same transaction.
+            await prisma.$transaction(async (tx) => {
+               const order = await tx.order.findUnique({
+                  where: { id },
+                  select: { id: true, orderId: true, customId: true },
+               });
+               await tx.orderItem.deleteMany({ where: { orderId: id } });
+               await tx.order.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "ORDER",
+                  entityId: id,
+                  entityCustomId: order?.orderId || order?.customId || null,
+                  summary: `Order ${order?.orderId || order?.customId || id} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Order permanently deleted" });
          }
       }
@@ -270,14 +316,40 @@ export async function POST(request: NextRequest) {
                   where: { id },
                   data: { isDeleted: false, deletedAt: null },
                });
+
+               // Phase 4 (D1): audit in the same transaction.
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "PURCHASE",
+                  entityId: purchase.id,
+                  entityCustomId: purchase.customId,
+                  summary: `Purchase ${purchase.customId} restored from bin — stock re-added`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Purchase restored successfully" });
          } else if (action === "delete") {
-            await prisma.$transaction([
-               prisma.purchaseAttachment.deleteMany({ where: { purchaseId: id } }),
-               prisma.purchaseItem.deleteMany({ where: { purchaseId: id } }),
-               prisma.purchase.delete({ where: { id } }),
-            ]);
+            // Interactive form (was an array transaction) so the
+            // permanent deletion is audited in the same transaction.
+            await prisma.$transaction(async (tx) => {
+               const purchase = await tx.purchase.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true },
+               });
+               await tx.purchaseAttachment.deleteMany({ where: { purchaseId: id } });
+               await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
+               await tx.purchase.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "PURCHASE",
+                  entityId: id,
+                  entityCustomId: purchase?.customId || null,
+                  summary: `Purchase ${purchase?.customId || id} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Purchase permanently deleted" });
          }
       }

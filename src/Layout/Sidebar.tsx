@@ -167,6 +167,16 @@ const items: NavItem[] = [
    },
    {
       headingId: "account",
+      icon: "solar:history-bold-duotone",
+      label: "Audit Logs",
+      url: "/admin/audit-logs",
+      // Phase 4 (D1): no role grants an "audit_logs" key, so this
+      // entry is visible to administrators only — matching the
+      // requireAdmin gate on GET /api/audit-logs.
+      adminKeys: ["audit_logs"],
+   },
+   {
+      headingId: "account",
       icon: "solar:wallet-money-bold-duotone",
       label: "Billing",
       url: "/admin/billing",

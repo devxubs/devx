@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+   buildChanges,
+} from "@src/lib/audit";
 
 export async function GET(
    request: NextRequest,
@@ -38,13 +44,33 @@ export async function PUT(
    const { id } = await params;
    try {
       const body = await request.json();
-      const expense = await prisma.expense.update({
-         where: { id },
-         data: {
-            type: body.type,
-            amount: body.amount !== undefined ? parseFloat(body.amount) : undefined,
-            note: body.note !== undefined ? body.note : undefined,
-         },
+      const auditCtx = requestAuditContext(request);
+      const expense = await prisma.$transaction(async (tx) => {
+         const before = await tx.expense.findUnique({ where: { id } });
+         const updated = await tx.expense.update({
+            where: { id },
+            data: {
+               type: body.type,
+               amount: body.amount !== undefined ? parseFloat(body.amount) : undefined,
+               note: body.note !== undefined ? body.note : undefined,
+            },
+         });
+
+         // Phase 4 (D1): audit in the same transaction.
+         if (before) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "UPDATE",
+               entityType: "EXPENSE",
+               entityId: updated.id,
+               entityCustomId: updated.customId,
+               summary: `Expense ${updated.customId || updated.id} updated`,
+               changes: buildChanges(before, updated, ["type", "amount", "note"]),
+               ...auditCtx,
+            });
+         }
+
+         return updated;
       });
       return NextResponse.json(expense);
    } catch {
@@ -64,9 +90,26 @@ export async function DELETE(
 
    const { id } = await params;
    try {
-      await prisma.expense.update({
-         where: { id },
-         data: { isDeleted: true, deletedAt: new Date() },
+      const auditCtx = requestAuditContext(request);
+      await prisma.$transaction(async (tx) => {
+         const before = await tx.expense.findUnique({ where: { id } });
+         await tx.expense.update({
+            where: { id },
+            data: { isDeleted: true, deletedAt: new Date() },
+         });
+
+         // Phase 4 (D1): audit in the same transaction.
+         if (before && !before.isDeleted) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "DELETE",
+               entityType: "EXPENSE",
+               entityId: before.id,
+               entityCustomId: before.customId,
+               summary: `Expense ${before.customId || before.id} moved to bin — ${before.type}, ৳${Number(before.amount).toFixed(2)}`,
+               ...auditCtx,
+            });
+         }
       });
       return NextResponse.json({ success: true });
    } catch {

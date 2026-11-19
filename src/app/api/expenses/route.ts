@@ -3,6 +3,11 @@ import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { parsePagination } from "@src/lib/pagination";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -76,16 +81,33 @@ export async function POST(request: NextRequest) {
          );
       }
 
-      const { customId } = await generateNextEntityId("EXPENSE");
+      const auditCtx = requestAuditContext(request);
 
-      const expense = await prisma.expense.create({
-         data: {
-            customId,
-            type,
-            amount: parsedAmount,
-            note: note || null,
-            createdById: session.id,
-         },
+      const expense = await prisma.$transaction(async (tx) => {
+         const { customId } = await generateNextEntityId("EXPENSE", tx);
+
+         const created = await tx.expense.create({
+            data: {
+               customId,
+               type,
+               amount: parsedAmount,
+               note: note || null,
+               createdById: session.id,
+            },
+         });
+
+         // Phase 4 (D1): audit in the same transaction.
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "EXPENSE",
+            entityId: created.id,
+            entityCustomId: created.customId,
+            summary: `Expense ${created.customId} created — ${type}, ৳${parsedAmount.toFixed(2)}`,
+            ...auditCtx,
+         });
+
+         return created;
       });
 
       return NextResponse.json(expense, { status: 201 });

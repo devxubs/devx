@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@src/lib/prisma";
 import { verifyPassword, signToken } from "@src/lib/auth";
 import { checkRateLimit, hitRateLimit, resetRateLimit } from "@src/lib/rateLimit";
+import { logAuditStandalone, requestAuditContext } from "@src/lib/audit";
 
 // Brute-force protection: at most 10 failed login attempts per
 // email+IP pair in a 15-minute window, then 429 until the window ends.
@@ -80,6 +81,19 @@ export async function POST(request: NextRequest) {
 
       // Successful login clears the failed-attempt counter.
       resetRateLimit(rateKey);
+
+      // Phase 4 (D1): LOGIN audit row — standalone insert AFTER
+      // successful authentication; logAuditStandalone swallows its
+      // own errors, so a failed audit write can never break login.
+      await logAuditStandalone({
+         actor: { id: user.id, label: user.name || user.email },
+         action: "LOGIN",
+         entityType: "USER",
+         entityId: user.id,
+         entityCustomId: user.customId,
+         summary: `${user.name || user.email} signed in`,
+         ...requestAuditContext(request),
+      });
 
       const token = signToken({
          id: user.id,

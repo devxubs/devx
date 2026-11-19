@@ -7,6 +7,11 @@ import {
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 // Phase 3A (3.2): manual stock adjustment for the Stock workspace.
 // Runs through the stock engine (adjustStock) inside a transaction so
@@ -57,13 +62,37 @@ export async function POST(request: NextRequest) {
 
       const result = await prisma.$transaction(async (tx) => {
          const settings = await loadStockSettings(tx);
-         return adjustStock(tx, {
+         const adjusted = await adjustStock(tx, {
             productId,
             variantId,
             delta,
             reason,
             settings,
          });
+
+         // Phase 4 (D1): manual stock adjustments are inventory
+         // mutations — audit in the same transaction.
+         const product = await tx.product.findUnique({
+            where: { id: productId },
+            select: { customId: true, productName: true },
+         });
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "STOCK",
+            entityType: "PRODUCT",
+            entityId: productId,
+            entityCustomId: product?.customId ?? null,
+            summary: `Stock adjusted for ${product?.productName || productId} by ${delta > 0 ? "+" : ""}${delta} — ${reason}`,
+            changes: {
+               quantity: {
+                  from: adjusted.productQuantity - delta,
+                  to: adjusted.productQuantity,
+               },
+            },
+            ...requestAuditContext(request),
+         });
+
+         return adjusted;
       });
 
       return NextResponse.json({
