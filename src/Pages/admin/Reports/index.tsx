@@ -11,17 +11,23 @@ import Purchases from "./Purchases";
 import Employees from "./Employees";
 import Products from "./Products";
 import Summary from "./Summary";
+import Payments from "./Payments";
+import Finance from "./Finance";
 
 const tabs = [
    "Summary",
    "Sales",
    "Courier",
+   // Phase 3B (3.6): daily payment reconciliation.
+   "Payments",
    "Customers",
    // Phase 1 (1.4): Expenses re-enabled — its table is fully wired to
    // GET /api/reports?tab=expenses. (The Suppliers tab stays disabled:
    // no such report module exists.)
    "Expenses",
    "Purchases",
+   // Phase 3B (3.8): P&L + receivables/payables worklists.
+   "Finance",
    // "Suppliers",
    "Employees",
    "Products",
@@ -129,12 +135,16 @@ const Report = () => {
                <Sales />
             ) : tabs[val] === "Courier" ? (
                <Courier />
+            ) : tabs[val] === "Payments" ? (
+               <Payments />
             ) : tabs[val] === "Customers" ? (
                <Customer />
             ) : tabs[val] === "Expenses" ? (
                <Expenses />
             ) : tabs[val] === "Purchases" ? (
                <Purchases />
+            ) : tabs[val] === "Finance" ? (
+               <Finance />
             ) : tabs[val] === "Employees" ? (
                <Employees />
             ) : tabs[val] === "Products" ? (

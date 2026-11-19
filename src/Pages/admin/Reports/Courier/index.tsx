@@ -129,6 +129,55 @@ const Courier = () => {
            { label: "RedX", value: 0 },
         ];
 
+   // Phase 3B (3.4): per-courier performance from the API's
+   // courierStats aggregates (complete filtered dataset, not just
+   // the displayed page). Definitions live in the reports route:
+   // dispatched = handed to courier, delivered = DELIVERED/COMPLETED,
+   // returned = courierStatus "Returned" or cancelled after dispatch,
+   // COD collected = delivered order totals, COD pending = dues of
+   // orders still in flight.
+   const courierStatRows = (report?.courierStats || []).map((s: any) => ({
+      id: s.courier,
+      ...s,
+   }));
+   const courierStatColumns = [
+      { field: "courier", headerName: "Courier", width: 160 },
+      { field: "orders", headerName: "Orders", width: 90 },
+      { field: "dispatched", headerName: "Dispatched", width: 110 },
+      { field: "delivered", headerName: "Delivered", width: 100 },
+      {
+         field: "deliveredPct",
+         headerName: "Delivered %",
+         width: 110,
+         renderCell: (p: any) => `${p.row.deliveredPct}%`,
+      },
+      { field: "returned", headerName: "Returned", width: 100 },
+      {
+         field: "returnedPct",
+         headerName: "Returned %",
+         width: 110,
+         renderCell: (p: any) => `${p.row.returnedPct}%`,
+      },
+      {
+         field: "codCollected",
+         headerName: "COD Collected",
+         width: 140,
+         renderCell: (p: any) => formatCurrency(p.row.codCollected),
+      },
+      {
+         field: "codPending",
+         headerName: "COD Pending",
+         width: 130,
+         renderCell: (p: any) => formatCurrency(p.row.codPending),
+      },
+      {
+         field: "courierCharges",
+         headerName: "Courier Charges",
+         width: 140,
+         renderCell: (p: any) => formatCurrency(p.row.courierCharges),
+      },
+   ];
+
    return (
       <Stack spacing={2}>
          <Grid container spacing={2}>
@@ -147,6 +196,46 @@ const Courier = () => {
                   title="Deliveries by Courier Partner"
                   data={distribution}
                />
+            </Grid>
+
+            <Grid size={{ xs: 12 }}>
+               <Stack
+                  spacing={2}
+                  bgcolor={"background.paper"}
+                  sx={{ borderRadius: 1.5 }}
+               >
+                  <Typography
+                     variant="h5"
+                     fontWeight={700}
+                     sx={{ px: 3, pt: 2, pb: 0 }}
+                  >
+                     Performance by courier
+                  </Typography>
+                  {courierStatRows.length === 0 ? (
+                     <Typography variant="body2" color="text.secondary" sx={{ px: 3, pb: 3 }}>
+                        No courier orders in this period yet.
+                     </Typography>
+                  ) : (
+                     <CustomTable
+                        rows={courierStatRows}
+                        columns={courierStatColumns}
+                        canExport={true}
+                        exportConfig={{
+                           filename: `Courier_Performance_${new Date().toISOString().split("T")[0]}`,
+                           title: "DevX POS - Courier Performance by Partner",
+                           fetchAllData: () =>
+                              fetchAllReportRows(
+                                 reportParams("courier", dateRange),
+                                 (d) =>
+                                    (d.courierStats || []).map((s: any) => ({
+                                       id: s.courier,
+                                       ...s,
+                                    })),
+                              ),
+                        }}
+                     />
+                  )}
+               </Stack>
             </Grid>
 
             <Grid size={{ xs: 12 }}>

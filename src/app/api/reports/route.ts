@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
          const whereOrder: any = { isDeleted: false };
          if (hasDate) whereOrder.createdAt = dateFilter;
 
-         const [orders, sourceDistribution] = await Promise.all([
+         const [orders, sourceDistribution, statsOrders] = await Promise.all([
             prisma.order.findMany({
                where: whereOrder,
                select: {
@@ -147,7 +147,88 @@ export async function GET(request: NextRequest) {
                where: whereOrder,
                _count: { id: true },
             }),
+            // Phase 3B (3.4): per-courier performance aggregates over
+            // the COMPLETE filtered dataset (light select, same
+            // pattern as the sales trend query). Definitions:
+            //  - dispatched: handed to the courier — courierSubmittedAt
+            //    is set, or the order has reached a post-dispatch
+            //    status (SHIPPED / OUT_FOR_DELIVERY / DELIVERED /
+            //    COMPLETED);
+            //  - delivered: status DELIVERED or COMPLETED;
+            //  - returned: courierStatus "Returned", or a CANCELLED
+            //    order that had already been dispatched;
+            //  - COD collected: order totals of delivered orders (the
+            //    amount the courier collects on delivery);
+            //  - COD pending: outstanding dueAmount of orders still
+            //    in flight (not delivered/cancelled/failed).
+            prisma.order.findMany({
+               where: whereOrder,
+               select: {
+                  courier: true,
+                  courierStatus: true,
+                  status: true,
+                  courierSubmittedAt: true,
+                  total: true,
+                  dueAmount: true,
+                  courierCharge: true,
+               },
+            }),
          ]);
+
+         const DISPATCHED_STATUSES = ["SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"];
+         const statsMap = new Map<string, any>();
+         for (const o of statsOrders) {
+            const key = o.courier || "Unassigned";
+            if (!statsMap.has(key)) {
+               statsMap.set(key, {
+                  courier: key,
+                  orders: 0,
+                  dispatched: 0,
+                  delivered: 0,
+                  returned: 0,
+                  codCollected: 0,
+                  codPending: 0,
+                  courierCharges: 0,
+               });
+            }
+            const s = statsMap.get(key);
+            const dispatched =
+               Boolean(o.courierSubmittedAt) || DISPATCHED_STATUSES.includes(o.status);
+            const delivered = o.status === "DELIVERED" || o.status === "COMPLETED";
+            s.orders += 1;
+            if (dispatched) s.dispatched += 1;
+            if (delivered) {
+               s.delivered += 1;
+               s.codCollected += Number(o.total || 0);
+            }
+            if (
+               o.courierStatus === "Returned" ||
+               (o.status === "CANCELLED" && dispatched)
+            ) {
+               s.returned += 1;
+            }
+            if (
+               !delivered &&
+               o.status !== "CANCELLED" &&
+               o.status !== "FAILED"
+            ) {
+               s.codPending += Number(o.dueAmount || 0);
+            }
+            s.courierCharges += Number(o.courierCharge || 0);
+         }
+         const courierStats = Array.from(statsMap.values())
+            .map((s) => ({
+               ...s,
+               deliveredPct:
+                  s.dispatched > 0
+                     ? Math.round((s.delivered / s.dispatched) * 1000) / 10
+                     : 0,
+               returnedPct:
+                  s.dispatched > 0
+                     ? Math.round((s.returned / s.dispatched) * 1000) / 10
+                     : 0,
+            }))
+            .sort((a, b) => b.orders - a.orders);
 
          const rows = orders.map((o) => {
             const sub = Number(o.subtotal || 0);
@@ -173,6 +254,7 @@ export async function GET(request: NextRequest) {
 
          return NextResponse.json({
             rows,
+            courierStats,
             distribution: sourceDistribution.map((s) => ({
                label: s.courier || "Direct",
                value: s._count.id,
@@ -432,6 +514,416 @@ export async function GET(request: NextRequest) {
                amount: Number(e.amount),
                note: e.note || "",
             })),
+         });
+      }
+
+      // 7B. PAYMENT RECONCILIATION (Phase 3B, roadmap 3.6)
+      if (tab === "payments") {
+         // Default period is today when the caller passes no dates —
+         // reconciliation is a daily routine. Explicit start/end
+         // dates widen the window (the UI passes one day by default).
+         const period: any = hasDate
+            ? { ...dateFilter }
+            : (() => {
+                 const start = new Date();
+                 start.setHours(0, 0, 0, 0);
+                 const end = new Date();
+                 end.setHours(23, 59, 59, 999);
+                 return { gte: start, lte: end };
+              })();
+         const whereOrder: any = { isDeleted: false, createdAt: period };
+         const txidQuery = searchParams.get("txid")?.trim() || "";
+
+         const [methodGroups, verificationGroups, unverifiedOrders, txidMatches] =
+            await Promise.all([
+               prisma.order.groupBy({
+                  by: ["paymentMethod"],
+                  where: whereOrder,
+                  _count: { id: true },
+                  _sum: { advancePayment: true, dueAmount: true, total: true },
+               }),
+               prisma.order.groupBy({
+                  by: ["paymentMethod", "paymentStatus"],
+                  where: whereOrder,
+                  _count: { id: true },
+               }),
+               prisma.order.findMany({
+                  where: { ...whereOrder, paymentStatus: { not: "VERIFIED" } },
+                  select: {
+                     id: true,
+                     orderId: true,
+                     customId: true,
+                     createdAt: true,
+                     paymentMethod: true,
+                     paymentTxId: true,
+                     paymentSenderNumber: true,
+                     paymentStatus: true,
+                     advancePayment: true,
+                     dueAmount: true,
+                     total: true,
+                     customer: { select: { name: true, phone: true } },
+                  },
+                  orderBy: { createdAt: "desc" },
+                  skip,
+                  take: limit,
+               }),
+               txidQuery
+                  ? prisma.order.findMany({
+                       where: {
+                          isDeleted: false,
+                          paymentTxId: { contains: txidQuery },
+                       },
+                       select: {
+                          id: true,
+                          orderId: true,
+                          customId: true,
+                          createdAt: true,
+                          paymentMethod: true,
+                          paymentTxId: true,
+                          paymentSenderNumber: true,
+                          paymentStatus: true,
+                          advancePayment: true,
+                          dueAmount: true,
+                          total: true,
+                          customer: { select: { name: true, phone: true } },
+                       },
+                       orderBy: { createdAt: "desc" },
+                       take: 20,
+                    })
+                  : Promise.resolve(null),
+            ]);
+
+         const verificationByMethod = new Map<string, Record<string, number>>();
+         for (const g of verificationGroups) {
+            const key = g.paymentMethod || "Not specified";
+            if (!verificationByMethod.has(key)) {
+               verificationByMethod.set(key, { VERIFIED: 0, UNVERIFIED: 0, MISMATCHED: 0 });
+            }
+            verificationByMethod.get(key)![g.paymentStatus] = g._count.id;
+         }
+
+         const methods = methodGroups
+            .map((g) => {
+               const label = g.paymentMethod || "Not specified";
+               const v = verificationByMethod.get(label) || {
+                  VERIFIED: 0,
+                  UNVERIFIED: 0,
+                  MISMATCHED: 0,
+               };
+               return {
+                  method: label,
+                  orders: g._count.id,
+                  advanceCollected: Number(g._sum.advancePayment || 0),
+                  dueExpected: Number(g._sum.dueAmount || 0),
+                  totalAmount: Number(g._sum.total || 0),
+                  verified: v.VERIFIED,
+                  unverified: v.UNVERIFIED,
+                  mismatched: v.MISMATCHED,
+               };
+            })
+            .sort((a, b) => b.orders - a.orders);
+
+         const totals = methods.reduce(
+            (acc, m) => ({
+               orders: acc.orders + m.orders,
+               advanceCollected: acc.advanceCollected + m.advanceCollected,
+               dueExpected: acc.dueExpected + m.dueExpected,
+               verified: acc.verified + m.verified,
+               unverified: acc.unverified + m.unverified,
+               mismatched: acc.mismatched + m.mismatched,
+            }),
+            {
+               orders: 0,
+               advanceCollected: 0,
+               dueExpected: 0,
+               verified: 0,
+               unverified: 0,
+               mismatched: 0,
+            },
+         );
+
+         const mapPaymentRow = (o: any) => ({
+            id: o.id,
+            orderId: o.orderId || o.customId || o.id,
+            createdAt: o.createdAt,
+            customer: o.customer?.name || "Walk-in Customer",
+            customerPhone: o.customer?.phone || "",
+            method: o.paymentMethod || "Not specified",
+            txId: o.paymentTxId || "",
+            senderNumber: o.paymentSenderNumber || "",
+            paymentStatus: o.paymentStatus,
+            advance: Number(o.advancePayment || 0),
+            due: Number(o.dueAmount || 0),
+            total: Number(o.total || 0),
+         });
+
+         return NextResponse.json({
+            periodStart: period.gte ? new Date(period.gte).toISOString() : null,
+            periodEnd: period.lte ? new Date(period.lte).toISOString() : null,
+            methods,
+            totals,
+            page,
+            limit,
+            unverifiedRows: unverifiedOrders.map(mapPaymentRow),
+            ...(txidMatches ? { txidMatches: txidMatches.map(mapPaymentRow) } : {}),
+         });
+      }
+
+      // 7C. FINANCE — P&L + WORKLISTS (Phase 3B, roadmap 3.8)
+      if (tab === "finance") {
+         const whereOrderPeriod: any = { isDeleted: false };
+         if (hasDate) whereOrderPeriod.createdAt = dateFilter;
+         const whereExpense: any = { isDeleted: false };
+         if (hasDate) whereExpense.createdAt = dateFilter;
+         const wherePurchase: any = { isDeleted: false };
+         if (hasDate) wherePurchase.createdAt = dateFilter;
+
+         const [
+            revenueAgg,
+            expenseAgg,
+            expensesByType,
+            purchaseAgg,
+            soldItems,
+            receivableGroups,
+            paymentMethodGroups,
+         ] = await Promise.all([
+            prisma.order.aggregate({
+               where: { ...whereOrderPeriod, status: { in: ["COMPLETED", "DELIVERED"] } },
+               _sum: { total: true },
+            }),
+            prisma.expense.aggregate({
+               where: whereExpense,
+               _sum: { amount: true },
+            }),
+            prisma.expense.groupBy({
+               by: ["type"],
+               where: whereExpense,
+               _sum: { amount: true },
+               orderBy: { _sum: { amount: "desc" } },
+            }),
+            prisma.purchase.aggregate({
+               where: wherePurchase,
+               _sum: { total: true },
+            }),
+            // Estimated COGS inputs: items on revenue orders in the
+            // period, with their product's current cost price.
+            prisma.orderItem.findMany({
+               where: {
+                  order: {
+                     ...whereOrderPeriod,
+                     status: { in: ["COMPLETED", "DELIVERED"] },
+                  },
+               },
+               select: {
+                  quantity: true,
+                  product: { select: { costPrice: true } },
+               },
+            }),
+            // Receivables are a CURRENT-state figure (all outstanding
+            // dues, not just this period's), grouped per customer.
+            prisma.order.groupBy({
+               by: ["customerId"],
+               where: { isDeleted: false, dueAmount: { gt: 0 } },
+               _sum: { dueAmount: true },
+               _count: { id: true },
+               orderBy: { _sum: { dueAmount: "desc" } },
+               take: 200,
+            }),
+            prisma.order.groupBy({
+               by: ["paymentMethod"],
+               where: whereOrderPeriod,
+               _count: { id: true },
+               _sum: { advancePayment: true, dueAmount: true },
+            }),
+         ]);
+
+         const revenue = Number(revenueAgg._sum.total || 0);
+         const expensesTotal = Number(expenseAgg._sum.amount || 0);
+         const purchasesTotal = Number(purchaseAgg._sum.total || 0);
+         // DB/API-07: the one shared profit definition (lib/finance) —
+         // revenue − expenses − purchases. It is NOT gross profit and
+         // NOT COGS-based; the UI labels it exactly as this formula.
+         const netProfit = calculateNetProfit(revenue, expensesTotal, purchasesTotal);
+
+         // Estimated COGS at CURRENT cost prices. Items whose product
+         // is gone or has no cost price recorded cannot be costed —
+         // they are excluded and counted so the UI can say so.
+         let estimatedCogs = 0;
+         let cogsExcludedItems = 0;
+         for (const item of soldItems) {
+            const cost = item.product?.costPrice;
+            if (cost === null || cost === undefined) {
+               cogsExcludedItems += 1;
+            } else {
+               estimatedCogs += item.quantity * Number(cost);
+            }
+         }
+
+         // Receivables detail: customer names + oldest open order.
+         const receivableCustomerIds = receivableGroups
+            .map((g) => g.customerId)
+            .filter((id): id is string => Boolean(id));
+         const [receivableCustomers, oldestDueOrders] = await Promise.all([
+            receivableCustomerIds.length
+               ? prisma.customer.findMany({
+                    where: { id: { in: receivableCustomerIds } },
+                    select: { id: true, customId: true, name: true, phone: true },
+                 })
+               : Promise.resolve([]),
+            receivableCustomerIds.length
+               ? prisma.order.findMany({
+                    where: {
+                       isDeleted: false,
+                       dueAmount: { gt: 0 },
+                       customerId: { in: receivableCustomerIds },
+                    },
+                    select: { customerId: true, createdAt: true },
+                    orderBy: { createdAt: "asc" },
+                 })
+               : Promise.resolve([]),
+         ]);
+         const customerById = new Map(receivableCustomers.map((c) => [c.id, c]));
+         const oldestByCustomer = new Map<string, Date>();
+         for (const o of oldestDueOrders) {
+            if (o.customerId && !oldestByCustomer.has(o.customerId)) {
+               oldestByCustomer.set(o.customerId, o.createdAt);
+            }
+         }
+         const receivables = receivableGroups.map((g) => {
+            const c = g.customerId ? customerById.get(g.customerId) : undefined;
+            return {
+               customerId: g.customerId,
+               customerCustomId: c?.customId || null,
+               customer: c?.name || "Walk-in / Unknown",
+               phone: c?.phone || "",
+               orders: g._count.id,
+               due: Number(g._sum.dueAmount || 0),
+               oldestDueAt: g.customerId
+                  ? (oldestByCustomer.get(g.customerId)?.toISOString() ?? null)
+                  : null,
+            };
+         });
+         const receivablesTotal = receivables.reduce((s, r) => s + r.due, 0);
+
+         // Payables (current state): per supplier — Σ purchase due,
+         // minus unallocated supplier-payment credit (Phase 3B §3 of
+         // the schema plan: allocated payments already reduced the
+         // purchase due when recorded, so only unallocated payments
+         // stand as credit). Oldest open purchase first.
+         const [dueGroups, creditGroups] = await Promise.all([
+            prisma.purchase.groupBy({
+               by: ["supplierId"],
+               where: { isDeleted: false, due: { gt: 0 } },
+               _sum: { due: true, total: true, paid: true },
+               _count: { id: true },
+            }),
+            prisma.supplierPayment.groupBy({
+               by: ["supplierId"],
+               where: { isDeleted: false, purchaseId: null },
+               _sum: { amount: true },
+            }),
+         ]);
+         const creditBySupplier = new Map(
+            creditGroups.map((g) => [g.supplierId, Number(g._sum.amount || 0)]),
+         );
+         const payableSupplierIds = Array.from(
+            new Set([
+               ...dueGroups.map((g) => g.supplierId).filter(Boolean),
+               ...creditGroups.map((g) => g.supplierId),
+            ]),
+         ) as string[];
+         const [payableSuppliers, oldestDuePurchases] = await Promise.all([
+            payableSupplierIds.length
+               ? prisma.supplier.findMany({
+                    where: { id: { in: payableSupplierIds } },
+                    select: { id: true, customId: true, name: true, phone: true },
+                 })
+               : Promise.resolve([]),
+            payableSupplierIds.length
+               ? prisma.purchase.findMany({
+                    where: {
+                       isDeleted: false,
+                       due: { gt: 0 },
+                       supplierId: { in: payableSupplierIds },
+                    },
+                    select: { supplierId: true, createdAt: true },
+                    orderBy: { createdAt: "asc" },
+                 })
+               : Promise.resolve([]),
+         ]);
+         const supplierById = new Map(payableSuppliers.map((s) => [s.id, s]));
+         const oldestPurchaseBySupplier = new Map<string, Date>();
+         for (const p of oldestDuePurchases) {
+            if (p.supplierId && !oldestPurchaseBySupplier.has(p.supplierId)) {
+               oldestPurchaseBySupplier.set(p.supplierId, p.createdAt);
+            }
+         }
+         const dueBySupplier = new Map(
+            dueGroups
+               .filter((g) => g.supplierId)
+               .map((g) => [
+                  g.supplierId as string,
+                  {
+                     due: Number(g._sum.due || 0),
+                     purchases: g._count.id,
+                  },
+               ]),
+         );
+         const payables = payableSupplierIds
+            .map((supplierId) => {
+               const s = supplierById.get(supplierId);
+               const dueInfo = dueBySupplier.get(supplierId) || { due: 0, purchases: 0 };
+               const credit = creditBySupplier.get(supplierId) || 0;
+               return {
+                  supplierId,
+                  supplierCustomId: s?.customId || null,
+                  supplier: s?.name || "Unknown supplier",
+                  phone: s?.phone || "",
+                  purchasesWithDue: dueInfo.purchases,
+                  totalDue: dueInfo.due,
+                  credit,
+                  netPayable: Math.max(0, dueInfo.due - credit),
+                  oldestDueAt:
+                     oldestPurchaseBySupplier.get(supplierId)?.toISOString() ?? null,
+               };
+            })
+            .filter((p) => p.totalDue > 0 || p.credit > 0)
+            .sort((a, b) => {
+               const at = a.oldestDueAt ? new Date(a.oldestDueAt).getTime() : Infinity;
+               const bt = b.oldestDueAt ? new Date(b.oldestDueAt).getTime() : Infinity;
+               return at - bt;
+            });
+         const payablesTotal = payables.reduce((s, p) => s + p.netPayable, 0);
+
+         return NextResponse.json({
+            revenue,
+            expensesTotal,
+            expensesByType: expensesByType.map((b) => ({
+               type: b.type,
+               amount: Number(b._sum.amount || 0),
+            })),
+            purchasesTotal,
+            netProfit,
+            estimatedCogs,
+            cogsExcludedItems,
+            paymentMethods: paymentMethodGroups
+               .map((g) => ({
+                  method: g.paymentMethod || "Not specified",
+                  orders: g._count.id,
+                  advanceCollected: Number(g._sum.advancePayment || 0),
+                  dueExpected: Number(g._sum.dueAmount || 0),
+               }))
+               .sort((a, b) => b.orders - a.orders),
+            receivables: {
+               total: receivablesTotal,
+               customers: receivables.length,
+               rows: receivables,
+            },
+            payables: {
+               total: payablesTotal,
+               suppliers: payables.length,
+               rows: payables,
+            },
          });
       }
 
