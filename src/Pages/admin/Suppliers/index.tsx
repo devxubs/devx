@@ -17,6 +17,7 @@ import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useSettings } from "@src/lib/settingsContext";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -316,23 +317,26 @@ const Suppliers = () => {
                   filename: `Suppliers_Directory_${new Date().toISOString().split("T")[0]}`,
                   title: "DevX POS - Suppliers Directory",
                   fetchAllData: async () => {
-                     try {
-                        const res = await fetch("/api/suppliers");
-                        if (!res.ok) return [];
-                        const data = await res.json();
-                        return (data || []).map((s: any, idx: number) => ({
-                           id: s.customId || `SUP_${idx + 1}`,
-                           name: s.name,
-                           number: s.phone || "-",
-                           address: s.address || "-",
-                           purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
-                           total: Number(s.totals?.total || 0),
-                           pay: Number(s.totals?.paid || 0),
-                           due: Number(s.totals?.netPayable ?? s.totals?.due ?? 0),
-                        }));
-                     } catch {
-                        return [];
-                     }
+                     // Chunked export (follow-up round, same pattern
+                     // as Assets): walk the suppliers API's optional
+                     // pagination instead of one unbounded fetch. A
+                     // failed page throws and the export dialog shows
+                     // the error — no silent partial export.
+                     const suppliers = await fetchAllPages(
+                        (page, limit) => `/api/suppliers?page=${page}&limit=${limit}`,
+                        (d) => d.suppliers || [],
+                        (d) => d.total,
+                     );
+                     return suppliers.map((s: any, idx: number) => ({
+                        id: s.customId || `SUP_${idx + 1}`,
+                        name: s.name,
+                        number: s.phone || "-",
+                        address: s.address || "-",
+                        purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
+                        total: Number(s.totals?.total || 0),
+                        pay: Number(s.totals?.paid || 0),
+                        due: Number(s.totals?.netPayable ?? s.totals?.due ?? 0),
+                     }));
                   },
                   summaryRows: (data: any[]) => [
                      { label: "Total Suppliers Count:", value: String(data.length) },

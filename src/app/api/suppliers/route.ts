@@ -2,18 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import { parsePagination } from "@src/lib/pagination";
 import { standingCreditOf } from "@src/lib/purchaseReturns";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
+   const { searchParams } = new URL(request.url);
+
    try {
+      // Optional server pagination for chunked export loaders
+      // (follow-up round, same pattern as /api/assets). The
+      // historical no-parameter response remains the bare enriched
+      // array, so the Suppliers page and other consumers are
+      // unchanged; with ?page=&limit= the aggregates below are
+      // computed for just the page's suppliers and the response is
+      // { suppliers, total, page, limit }.
+      const paginated = searchParams.has("page") || searchParams.has("limit");
+      const { page, limit, skip } = parsePagination(searchParams, 20);
+      const total = paginated
+         ? await prisma.supplier.count({ where: { isDeleted: false } })
+         : 0;
       const suppliers = await prisma.supplier.findMany({
          where: { isDeleted: false },
          include: { _count: { select: { purchases: true } } },
          orderBy: { name: "asc" },
+         ...(paginated ? { skip, take: limit } : {}),
       });
+      const pageSupplierIds = paginated ? suppliers.map((s) => s.id) : null;
 
       // Phase 2 (§2.5): real per-supplier purchase totals. The list UI
       // previously displayed hard-coded zeros for Total / Pay / Due
@@ -23,7 +40,10 @@ export async function GET(request: NextRequest) {
       // unaffected.
       const aggregates = await prisma.purchase.groupBy({
          by: ["supplierId"],
-         where: { isDeleted: false, supplierId: { not: null } },
+         where: {
+            isDeleted: false,
+            supplierId: pageSupplierIds ? { in: pageSupplierIds } : { not: null },
+         },
          _sum: { total: true, paid: true, due: true },
          _count: { id: true },
       });
@@ -39,7 +59,11 @@ export async function GET(request: NextRequest) {
       // due at return creation and is never subtracted again).
       const creditAggregates = await prisma.supplierPayment.groupBy({
          by: ["supplierId"],
-         where: { isDeleted: false, purchaseId: null },
+         where: {
+            isDeleted: false,
+            purchaseId: null,
+            ...(pageSupplierIds ? { supplierId: { in: pageSupplierIds } } : {}),
+         },
          _sum: { amount: true },
       });
       const creditBySupplier = new Map(
@@ -47,7 +71,10 @@ export async function GET(request: NextRequest) {
       );
       const returnCreditAggregates = await prisma.purchaseReturn.groupBy({
          by: ["supplierId"],
-         where: { isDeleted: false, supplierId: { not: null } },
+         where: {
+            isDeleted: false,
+            supplierId: pageSupplierIds ? { in: pageSupplierIds } : { not: null },
+         },
          _sum: { totalAmount: true, creditConsumed: true },
       });
       const returnCreditBySupplier = new Map(
@@ -80,24 +107,27 @@ export async function GET(request: NextRequest) {
          }),
       );
 
-      return NextResponse.json(
-         suppliers.map((s) => {
-            const credit = creditBySupplier.get(s.id) || 0;
-            const returnCredit = returnCreditBySupplier.get(s.id) || 0;
-            return {
-               ...s,
-               totals: totalsBySupplier.get(s.id) || {
-                  total: 0,
-                  paid: 0,
-                  due: 0,
-                  credit,
-                  returnCredit,
-                  netPayable: 0,
-                  purchases: 0,
-               },
-            };
-         }),
-      );
+      const enriched = suppliers.map((s) => {
+         const credit = creditBySupplier.get(s.id) || 0;
+         const returnCredit = returnCreditBySupplier.get(s.id) || 0;
+         return {
+            ...s,
+            totals: totalsBySupplier.get(s.id) || {
+               total: 0,
+               paid: 0,
+               due: 0,
+               credit,
+               returnCredit,
+               netPayable: 0,
+               purchases: 0,
+            },
+         };
+      });
+
+      if (paginated) {
+         return NextResponse.json({ suppliers: enriched, total, page, limit });
+      }
+      return NextResponse.json(enriched);
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch suppliers" },
