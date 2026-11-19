@@ -9,9 +9,12 @@ import {
    Avatar,
    Box,
    Button,
+   FormControl,
    IconButton,
    InputAdornment,
+   MenuItem,
    Paper,
+   Select,
    Stack,
    Table,
    TableBody,
@@ -29,15 +32,22 @@ import {
 } from "@mui/material";
 
 import Icon from "@src/components/Icon";
-import { formatBDT, lineDiscountAmount, lineTotal } from "./orderCalculations";
+import { formatBDT, lineDiscountAmount, lineTotal, num } from "./orderCalculations";
 import type { OrderLine } from "./types";
 
 interface ProductTableProps {
    lines: OrderLine[];
-   onUpdate: (productId: string, partial: Partial<OrderLine>) => void;
-   onRemove: (productId: string) => void;
+   /** Lines are addressed by their unique row key (INV-02). */
+   onUpdate: (lineKey: string, partial: Partial<OrderLine>) => void;
+   onRemove: (lineKey: string) => void;
    currencySymbol?: string;
 }
+
+/** "M · Black" style summary of a variant's attribute values. */
+const variantAttributesLabel = (attributes?: Record<string, string> | null) =>
+   attributes
+      ? Object.values(attributes).filter(Boolean).join(" · ")
+      : "";
 
 /** Compact input styling shared by Qty / Unit Price / Product Discount. */
 
@@ -79,6 +89,22 @@ const ProductTable = ({
    currencySymbol = "৳",
 }: ProductTableProps) => {
    const theme = useTheme();
+
+   // INV-02: picking a variant retargets the line at that variant's
+   // SKU, price and stock pool.
+   const handleVariantChange = (line: OrderLine, variantId: string) => {
+      const variant = line.variants.find((v) => v.id === variantId);
+      if (!variant) return;
+      const variantStock = Math.max(0, num(variant.quantity));
+      onUpdate(line.key, {
+         variantId: variant.id,
+         variantName: variant.variantName,
+         code: variant.sku || line.code,
+         stock: variantStock,
+         listPrice: num(variant.salePrice ?? variant.regularPrice),
+         quantity: Math.max(1, Math.min(line.quantity, Math.max(1, variantStock))),
+      });
+   };
 
    if (!lines.length) {
       return (
@@ -148,7 +174,7 @@ const ProductTable = ({
                   const overStock = line.quantity > line.stock;
 
                   return (
-                     <TableRow key={line.productId}>
+                     <TableRow key={line.key}>
                         {/* Product */}
                         <TableCell>
                            <Stack
@@ -191,22 +217,103 @@ const ProductTable = ({
                                     </Typography>
                                  </Tooltip>
 
-                                 <Typography
-                                    variant="caption"
-                                    color={
-                                       line.stock <= 5
-                                          ? "warning.main"
-                                          : "textSecondary"
-                                    }
-                                 >
-                                    Stock: {line.stock} {line.unit}
-                                    {lineDiscountAmount(line) > 0
-                                       ? ` · Disc −${formatBDT(
-                                            lineDiscountAmount(line),
-                                            currencySymbol,
-                                         )}`
-                                       : ""}
-                                 </Typography>
+                                 {line.variants.length > 0 && !line.variantId ? (
+                                    <Typography variant="caption" color="warning.main">
+                                       Select a variant below
+                                    </Typography>
+                                 ) : (
+                                    <Typography
+                                       variant="caption"
+                                       color={
+                                          line.stock <= 5
+                                             ? "warning.main"
+                                             : "textSecondary"
+                                       }
+                                    >
+                                       Stock: {line.stock} {line.unit}
+                                       {lineDiscountAmount(line) > 0
+                                          ? ` · Disc −${formatBDT(
+                                               lineDiscountAmount(line),
+                                               currencySymbol,
+                                            )}`
+                                          : ""}
+                                    </Typography>
+                                 )}
+
+                                 {line.variants.length > 0 && (
+                                    <FormControl
+                                       size="small"
+                                       sx={{ mt: 0.5, minWidth: 180, maxWidth: 220 }}
+                                    >
+                                       <Select
+                                          value={line.variantId || ""}
+                                          displayEmpty
+                                          onChange={(e) =>
+                                             handleVariantChange(
+                                                line,
+                                                String(e.target.value),
+                                             )
+                                          }
+                                          sx={{
+                                             height: 30,
+                                             fontSize: 13,
+                                             "& .MuiSelect-select": {
+                                                py: "4px",
+                                             },
+                                          }}
+                                          renderValue={(selected) => {
+                                             if (!selected) {
+                                                return (
+                                                   <Typography
+                                                      variant="body2"
+                                                      color="warning.main"
+                                                      fontSize={13}
+                                                   >
+                                                      Select variant
+                                                   </Typography>
+                                                );
+                                             }
+                                             const v = line.variants.find(
+                                                (x) => x.id === selected,
+                                             );
+                                             return v
+                                                ? `${v.variantName} (${v.sku})`
+                                                : "Select variant";
+                                          }}
+                                       >
+                                          {line.variants.map((v) => {
+                                             const attrs = variantAttributesLabel(
+                                                v.attributes,
+                                             );
+                                             const vStock = Math.max(
+                                                0,
+                                                num(v.quantity),
+                                             );
+                                             return (
+                                                <MenuItem
+                                                   key={v.id}
+                                                   value={v.id}
+                                                   disabled={vStock <= 0}
+                                                >
+                                                   <Box>
+                                                      <Typography variant="body2">
+                                                         {v.variantName}
+                                                         {attrs ? ` — ${attrs}` : ""}
+                                                      </Typography>
+                                                      <Typography
+                                                         variant="caption"
+                                                         color="textSecondary"
+                                                      >
+                                                         SKU: {v.sku} · Stock:{" "}
+                                                         {vStock}
+                                                      </Typography>
+                                                   </Box>
+                                                </MenuItem>
+                                             );
+                                          })}
+                                       </Select>
+                                    </FormControl>
+                                 )}
                               </Box>
                            </Stack>
                         </TableCell>
@@ -233,7 +340,7 @@ const ProductTable = ({
                                  overStock ? `Max ${line.stock}` : undefined
                               }
                               onChange={(e) =>
-                                 onUpdate(line.productId, {
+                                 onUpdate(line.key, {
                                     quantity: Number(e.target.value),
                                  })
                               }
@@ -256,7 +363,7 @@ const ProductTable = ({
                               size="small"
                               value={line.listPrice}
                               onChange={(e) =>
-                                 onUpdate(line.productId, {
+                                 onUpdate(line.key, {
                                     listPrice: Number(e.target.value),
                                  })
                               }
@@ -295,7 +402,7 @@ const ProductTable = ({
                               size="small"
                               value={line.discountValue}
                               onChange={(e) =>
-                                 onUpdate(line.productId, {
+                                 onUpdate(line.key, {
                                     discountValue: Number(e.target.value),
                                  })
                               }
@@ -323,7 +430,7 @@ const ProductTable = ({
                                           size="small"
                                           color="inherit"
                                           onClick={() =>
-                                             onUpdate(line.productId, {
+                                             onUpdate(line.key, {
                                                 discountType:
                                                    line.discountType ===
                                                    "amount"
@@ -417,7 +524,7 @@ const ProductTable = ({
                               <IconButton
                                  size="small"
                                  color="error"
-                                 onClick={() => onRemove(line.productId)}
+                                 onClick={() => onRemove(line.key)}
                               >
                                  <Icon
                                     icon="solar:trash-bin-trash-bold"

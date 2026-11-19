@@ -72,6 +72,8 @@ export function useOrderDetails(orderIdProp?: string) {
          id: it.product?.id || it.productId || it.id || "",
          productId: it.product?.id || it.productId || null,
          orderItemId: it.id,
+         variantId: it.variantId || null,
+         variantName: it.variant?.variantName || null,
          name: it.name || it.product?.productName || "Product Item",
          price: Number(it.price || 0),
          quantity: Number(it.quantity || 1),

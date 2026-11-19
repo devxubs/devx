@@ -45,6 +45,7 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
       handleUpdateQuantity,
       handleUpdatePrice,
       handleUpdateSubtotal,
+      handleUpdateVariant,
       handleRemoveItem,
       handleAddItem,
       calculatedSubtotal,
@@ -103,6 +104,10 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
       }
 
       for (const p of editableProducts) {
+         if (p.variants && p.variants.length > 0 && !p.variantId) {
+            setErrorMessage(`Select a variant for "${p.name}".`);
+            return;
+         }
          if (p.quantity < 1) {
             setErrorMessage(`Quantity for "${p.name}" must be at least 1.`);
             return;
@@ -149,6 +154,10 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
                   items: editableProducts.map((p) => ({
                      orderItemId: p.orderItemId || undefined,
                      productId: p.productId || null,
+                     // INV-02: send the variant explicitly when the
+                     // line carries one; when absent the API preserves
+                     // the stored variant for existing lines.
+                     ...(p.variantId ? { variantId: p.variantId } : {}),
                      name: p.name,
                      code: p.code || "",
                      quantity: Number(p.quantity) || 1,
@@ -242,6 +251,7 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
                   onUpdateQuantity={handleUpdateQuantity}
                   onUpdatePrice={handleUpdatePrice}
                   onUpdateSubtotal={handleUpdateSubtotal}
+                  onUpdateVariant={handleUpdateVariant}
                   onRemoveItem={onRemoveProduct}
                   onAddItem={onAddProduct}
                   disabled={isBusy}

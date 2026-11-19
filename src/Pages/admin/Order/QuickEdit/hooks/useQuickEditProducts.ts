@@ -8,6 +8,7 @@ export interface UseQuickEditProductsReturn {
    handleUpdateQuantity: (index: number, quantity: number) => void;
    handleUpdatePrice: (index: number, price: number) => void;
    handleUpdateSubtotal: (index: number, subtotal: number) => void;
+   handleUpdateVariant: (index: number, variantId: string) => void;
    handleRemoveItem: (index: number) => boolean;
    handleAddItem: (catalogProduct: any) => void;
    calculatedSubtotal: number;
@@ -98,6 +99,76 @@ export const useQuickEditProducts = (
       [],
    );
 
+   // INV-02: switch a line to another variant of the same product —
+   // SKU and price follow the variant, subtotal is recomputed.
+   const handleUpdateVariant = useCallback((index: number, variantId: string) => {
+      setEditableProducts((prev) =>
+         prev.map((item, idx) => {
+            if (idx !== index) return item;
+            const variant = (item.variants || []).find((v) => v.id === variantId);
+            if (!variant) return item;
+            const price = Number(variant.salePrice ?? variant.regularPrice ?? item.price) || 0;
+            return {
+               ...item,
+               variantId: variant.id,
+               variantName: variant.variantName,
+               code: variant.sku || item.code,
+               price,
+               subtotal: Number((item.quantity * price).toFixed(2)),
+            };
+         }),
+      );
+   }, []);
+
+   // INV-02: backfill variant option lists for lines that arrived
+   // without them (existing order lines), one fetch per product.
+   useEffect(() => {
+      const missing = Array.from(
+         new Set(
+            editableProducts
+               .filter((p) => p.productId && p.variants === undefined)
+               .map((p) => p.productId as string),
+         ),
+      );
+      if (missing.length === 0) return;
+      let cancelled = false;
+      (async () => {
+         const byProduct = new Map<string, ProductType["variants"]>();
+         await Promise.all(
+            missing.map(async (productId) => {
+               try {
+                  const res = await fetch(`/api/products/${productId}`);
+                  if (!res.ok) return;
+                  const data = await res.json();
+                  const product = data.product || data;
+                  if (product?.productType === "Variable" && Array.isArray(product.variants)) {
+                     byProduct.set(
+                        productId,
+                        product.variants.filter((v: any) => !v.isDeleted),
+                     );
+                  } else {
+                     byProduct.set(productId, []);
+                  }
+               } catch {
+                  byProduct.set(productId, []);
+               }
+            }),
+         );
+         if (cancelled || byProduct.size === 0) return;
+         setEditableProducts((prev) =>
+            prev.map((p) =>
+               p.productId && byProduct.has(p.productId) && p.variants === undefined
+                  ? { ...p, variants: byProduct.get(p.productId) }
+                  : p,
+            ),
+         );
+      })();
+      return () => {
+         cancelled = true;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [editableProducts.map((p) => `${p.productId}:${p.variants === undefined}`).join("|")]);
+
    // Remove product item (guard against removing the last remaining item)
    const handleRemoveItem = useCallback((index: number): boolean => {
       let removed = false;
@@ -121,8 +192,16 @@ export const useQuickEditProducts = (
          catalogProd.productCode || catalogProd.productSku || "",
       ).trim();
 
+      const catalogVariants =
+         catalogProd.productType === "Variable" && Array.isArray(catalogProd.variants)
+            ? catalogProd.variants.filter((v: any) => !v.isDeleted)
+            : undefined;
+
       setEditableProducts((prev) => {
-         // Check if already present in order items
+         // Check if already present in order items. INV-02: a
+         // variable product only merges with a line holding the SAME
+         // variant (both unset counts as same) — different variants
+         // of one product are separate lines.
          const existingIndex = prev.findIndex((p) => {
             const matchesId =
                Boolean(prodId) &&
@@ -131,7 +210,9 @@ export const useQuickEditProducts = (
                   (p as any).customId === prodId);
             const matchesCode =
                Boolean(prodCode) && Boolean(p.code) && p.code === prodCode;
-            return matchesId || matchesCode;
+            const sameVariant =
+               !catalogVariants || (p.variantId ?? null) === null;
+            return (matchesId || matchesCode) && sameVariant;
          });
 
          if (existingIndex >= 0) {
@@ -164,6 +245,9 @@ export const useQuickEditProducts = (
          const newItem: ProductType = {
             id: prodId,
             productId: prodId,
+            variantId: null,
+            variantName: null,
+            ...(catalogVariants ? { variants: catalogVariants } : {}),
             name: catalogProd.productName || catalogProd.name || "Product Item",
             code: prodCode,
             quantity: 1,
@@ -183,6 +267,7 @@ export const useQuickEditProducts = (
       handleUpdateQuantity,
       handleUpdatePrice,
       handleUpdateSubtotal,
+      handleUpdateVariant,
       handleRemoveItem,
       handleAddItem,
       calculatedSubtotal,

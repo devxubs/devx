@@ -33,7 +33,14 @@ export async function GET(request: NextRequest) {
             include: {
                supplier: true,
                createdBy: { select: { id: true, name: true, email: true } },
-               items: { include: { product: true } },
+               items: {
+                  include: {
+                     product: true,
+                     variant: {
+                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                     },
+                  },
+               },
                attachments: true,
             },
             orderBy: { createdAt: "desc" },
@@ -84,6 +91,7 @@ export async function POST(request: NextRequest) {
          const price = safeMoney(item.price);
          return {
             productId: item.productId || null,
+            variantId: item.variantId || null,
             name: item.name || "Unknown Item",
             code: item.code || null,
             quantity,
@@ -140,6 +148,36 @@ export async function POST(request: NextRequest) {
          }
       }
 
+      // INV-02: every variantId must name a live variant of the
+      // line's own product.
+      const itemVariantIds = Array.from(
+         new Set(
+            normalizedItems
+               .map((it) => it.variantId)
+               .filter((v): v is string => Boolean(v)),
+         ),
+      );
+      if (itemVariantIds.length > 0) {
+         const foundVariants = await prisma.productVariant.findMany({
+            where: { id: { in: itemVariantIds } },
+            select: { id: true, productId: true, variantName: true, isDeleted: true },
+         });
+         const variantById = new Map(foundVariants.map((v) => [v.id, v]));
+         for (const it of normalizedItems) {
+            if (!it.variantId) continue;
+            const variant = variantById.get(it.variantId);
+            if (!variant || variant.isDeleted || variant.productId !== it.productId) {
+               return NextResponse.json(
+                  {
+                     error: "Invalid variant",
+                     message: `Variant '${it.variantId}' does not belong to product '${it.name}'.`,
+                  },
+                  { status: 400 },
+               );
+            }
+         }
+      }
+
       const purchase = await prisma.$transaction(async (tx) => {
          const { customId } = await generateNextEntityId("PURCHASE", tx);
          // PUR-01 fix: never fabricate a supplier invoice number. The
@@ -182,6 +220,7 @@ export async function POST(request: NextRequest) {
                .map((it) => ({
                   productId: it.productId as string,
                   quantity: it.quantity,
+                  variantId: it.variantId,
                })),
             {
                purchaseId: newPurchase.id,

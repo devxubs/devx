@@ -11,10 +11,14 @@ export function normalizeOrderData(orders: any[]): NormalizedOrderRow[] {
            : [];
 
       const productNames = prods
-         .map((p: any) => p.name || p.title || p.product?.productName || "Item")
+         .map((p: any) => {
+            const base = p.name || p.title || p.product?.productName || "Item";
+            // INV-02: variant lines carry their variant in the name.
+            return p.variant?.variantName ? `${base} (${p.variant.variantName})` : base;
+         })
          .join(", ");
       const skus = prods
-         .map((p: any) => p.sku || p.code || p.product?.sku || "-")
+         .map((p: any) => p.variant?.sku || p.sku || p.code || p.product?.sku || "-")
          .filter((s: string) => s !== "-")
          .join(", ");
       const categories = prods

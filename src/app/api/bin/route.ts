@@ -215,6 +215,7 @@ export async function POST(request: NextRequest) {
                         .map((it) => ({
                            productId: it.productId as string,
                            quantity: it.quantity,
+                           variantId: it.variantId,
                         })),
                      {
                         settings: stockSettings,
@@ -257,6 +258,7 @@ export async function POST(request: NextRequest) {
                         .map((it) => ({
                            productId: it.productId as string,
                            quantity: it.quantity,
+                           variantId: it.variantId,
                         })),
                      {
                         purchaseId: purchase.id,

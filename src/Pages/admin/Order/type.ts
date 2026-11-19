@@ -15,11 +15,28 @@ export interface CustomerType {
    phone: string;
 }
 
+// ✅ Product variant option (INV-02)
+export interface ProductVariantOption {
+   id: string;
+   variantName: string;
+   sku: string;
+   quantity: number;
+   regularPrice: number | string;
+   salePrice?: number | string | null;
+   attributes?: Record<string, string> | null;
+   isDeleted?: boolean;
+}
+
 // ✅ Product type
 export interface ProductType {
    id: string;
    productId?: string | null;
    orderItemId?: string | null;
+   /** Selected variant for variable products (INV-02). */
+   variantId?: string | null;
+   variantName?: string | null;
+   /** Live variants of the product, when known (picker options). */
+   variants?: ProductVariantOption[];
    name: string;
    code: string;
    quantity: number;

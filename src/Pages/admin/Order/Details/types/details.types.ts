@@ -11,6 +11,8 @@ export interface QuickEditProduct {
    id: string;
    productId?: string | null;
    orderItemId?: string | null;
+   variantId?: string | null;
+   variantName?: string | null;
    name: string;
    price: number;
    quantity: number;

@@ -23,7 +23,14 @@ export async function GET(
          include: {
             supplier: true,
             createdBy: { select: { id: true, name: true, email: true } },
-            items: { include: { product: true } },
+            items: {
+               include: {
+                  product: true,
+                  variant: {
+                     select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                  },
+               },
+            },
             attachments: true,
          },
       });
@@ -88,6 +95,7 @@ export async function PUT(
       // are untouched; the capability exists for API clients.
       let normalizedItems: Array<{
          productId: string | null;
+         variantId: string | null;
          name: string;
          code: string | null;
          quantity: number;
@@ -101,6 +109,7 @@ export async function PUT(
             const price = safeMoney(item.price);
             return {
                productId: item.productId || null,
+               variantId: item.variantId || null,
                name: item.name || "Unknown Item",
                code: item.code || null,
                quantity,
@@ -134,6 +143,36 @@ export async function PUT(
                );
             }
          }
+
+         // INV-02: every variantId must name a live variant of the
+         // line's own product.
+         const itemVariantIds: string[] = Array.from(
+            new Set(
+               builtItems
+                  .map((it: any) => it.variantId)
+                  .filter((v: any): v is string => Boolean(v)),
+            ),
+         );
+         if (itemVariantIds.length > 0) {
+            const foundVariants = await prisma.productVariant.findMany({
+               where: { id: { in: itemVariantIds } },
+               select: { id: true, productId: true, variantName: true, isDeleted: true },
+            });
+            const variantById = new Map(foundVariants.map((v) => [v.id, v]));
+            for (const it of builtItems) {
+               if (!it.variantId) continue;
+               const variant = variantById.get(it.variantId);
+               if (!variant || variant.isDeleted || variant.productId !== it.productId) {
+                  return NextResponse.json(
+                     {
+                        error: "Invalid variant",
+                        message: `Variant '${it.variantId}' does not belong to product '${it.name}'.`,
+                     },
+                     { status: 400 },
+                  );
+               }
+            }
+         }
       }
 
       const itemsSnapshot = normalizedItems;
@@ -150,30 +189,48 @@ export async function PUT(
 
          if (itemsSnapshot) {
             const normalizedItems = itemsSnapshot;
-            // Net stock difference per product (new − old).
-            const diffMap = new Map<string, number>();
+            // Net stock difference per product + variant (new − old)
+            // — INV-02: variant lines net against their own variant
+            // pool, never against the product total or another variant.
+            const diffMap = new Map<
+               string,
+               { productId: string; variantId: string | null; diff: number }
+            >();
+            const addDiff = (
+               productId: string,
+               variantId: string | null,
+               delta: number,
+            ) => {
+               const key = `${productId}::${variantId ?? ""}`;
+               const current = diffMap.get(key);
+               if (current) current.diff += delta;
+               else diffMap.set(key, { productId, variantId, diff: delta });
+            };
             for (const oldItem of existing.items) {
                if (oldItem.productId) {
-                  diffMap.set(
-                     oldItem.productId,
-                     (diffMap.get(oldItem.productId) || 0) - oldItem.quantity,
-                  );
+                  addDiff(oldItem.productId, oldItem.variantId ?? null, -oldItem.quantity);
                }
             }
             for (const newItem of normalizedItems) {
                if (newItem.productId) {
-                  diffMap.set(
-                     newItem.productId,
-                     (diffMap.get(newItem.productId) || 0) + newItem.quantity,
-                  );
+                  addDiff(newItem.productId, newItem.variantId, newItem.quantity);
                }
             }
 
-            const increases: Array<{ productId: string; quantity: number }> = [];
-            const decreases: Array<{ productId: string; quantity: number }> = [];
-            for (const [productId, diff] of diffMap.entries()) {
-               if (diff > 0) increases.push({ productId, quantity: diff });
-               else if (diff < 0) decreases.push({ productId, quantity: -diff });
+            const increases: Array<{
+               productId: string;
+               variantId: string | null;
+               quantity: number;
+            }> = [];
+            const decreases: Array<{
+               productId: string;
+               variantId: string | null;
+               quantity: number;
+            }> = [];
+            for (const { productId, variantId, diff } of diffMap.values()) {
+               if (diff > 0) increases.push({ productId, variantId, quantity: diff });
+               else if (diff < 0)
+                  decreases.push({ productId, variantId, quantity: -diff });
             }
 
             if (decreases.length > 0) {
@@ -197,6 +254,7 @@ export async function PUT(
                data: normalizedItems.map((it) => ({
                   purchaseId: existing.id,
                   productId: it.productId,
+                  variantId: it.variantId,
                   name: it.name,
                   code: it.code,
                   quantity: it.quantity,
@@ -232,7 +290,14 @@ export async function PUT(
             include: {
                supplier: true,
                createdBy: { select: { id: true, name: true, email: true } },
-               items: { include: { product: true } },
+               items: {
+               include: {
+                  product: true,
+                  variant: {
+                     select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                  },
+               },
+            },
                attachments: true,
             },
          });
@@ -282,6 +347,7 @@ export async function DELETE(
                   .map((it) => ({
                      productId: it.productId as string,
                      quantity: it.quantity,
+                     variantId: it.variantId,
                   })),
                {
                   purchaseId: existing.id,

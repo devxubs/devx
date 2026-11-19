@@ -5,7 +5,10 @@ import {
    TextField,
    IconButton,
    Collapse,
+   FormControl,
    Grid,
+   MenuItem,
+   Select,
    alpha,
    Table,
    TableBody,
@@ -151,11 +154,17 @@ const Details = ({
                                           // Phase 2 (2.4): the line item
                                           // carries its productId so the
                                           // API can credit/debit the real
-                                          // product's stock.
+                                          // product's stock. INV-02: it
+                                          // also carries the product's
+                                          // variants so a variant can be
+                                          // picked per line below.
                                           return found
                                              ? {
                                                   id: found.id,
                                                   productId: found.id,
+                                                  variantId: null,
+                                                  variantName: null,
+                                                  variants: found.variants || [],
                                                   name: found.name,
                                                   code: found.code,
                                                   quantity: 1,
@@ -258,9 +267,121 @@ const Details = ({
                                  </TableRowMUI>
                               </TableHead>
                               <TableBody>
-                                 {allProducts.map((row: any, idx: number) => (
+                                 {allProducts.map((row: any, idx: number) => {
+                                    // INV-02: variants come from the line
+                                    // itself (set when the product was
+                                    // picked) or from the product option.
+                                    const opt = productOptions.find(
+                                       (o) =>
+                                          o.id === (row.productId || row.id),
+                                    );
+                                    const lineVariants: any[] =
+                                       row.variants?.length
+                                          ? row.variants
+                                          : opt?.variants || [];
+                                    return (
                                     <TableRowMUI key={idx}>
-                                       <TableCell>{row.name}</TableCell>
+                                       <TableCell>
+                                          <Stack spacing={0.5}>
+                                             <Typography variant="body2">
+                                                {row.name}
+                                             </Typography>
+                                             {lineVariants.length > 0 ? (
+                                                <FormControl
+                                                   size="small"
+                                                   sx={{ minWidth: 170, maxWidth: 230 }}
+                                                >
+                                                   <Select
+                                                      value={row.variantId || ""}
+                                                      displayEmpty
+                                                      onChange={(e) => {
+                                                         const v = lineVariants.find(
+                                                            (x: any) =>
+                                                               x.id ===
+                                                               String(e.target.value),
+                                                         );
+                                                         const updated = [
+                                                            ...allProducts,
+                                                         ];
+                                                         updated[idx] = {
+                                                            ...updated[idx],
+                                                            variantId: v ? v.id : null,
+                                                            variantName: v
+                                                               ? v.variantName
+                                                               : null,
+                                                            code: v
+                                                               ? v.sku
+                                                               : updated[idx].code,
+                                                            price: v
+                                                               ? Number(v.costPrice) || updated[idx].price
+                                                               : updated[idx].price,
+                                                         };
+                                                         field.onChange(updated);
+                                                      }}
+                                                      sx={{
+                                                         height: 28,
+                                                         fontSize: "0.78rem",
+                                                         "& .MuiSelect-select": {
+                                                            py: "3px",
+                                                         },
+                                                      }}
+                                                      renderValue={(selected) => {
+                                                         if (!selected) {
+                                                            return (
+                                                               <Typography
+                                                                  variant="body2"
+                                                                  color="warning.main"
+                                                                  fontSize="0.78rem"
+                                                               >
+                                                                  Select variant
+                                                               </Typography>
+                                                            );
+                                                         }
+                                                         const v = lineVariants.find(
+                                                            (x: any) => x.id === selected,
+                                                         );
+                                                         return v
+                                                            ? `${v.variantName} (${v.sku})`
+                                                            : row.variantName || "Select variant";
+                                                      }}
+                                                   >
+                                                      {lineVariants.map((v: any) => {
+                                                         const attrs = v.attributes
+                                                            ? Object.values(v.attributes)
+                                                                 .filter(Boolean)
+                                                                 .join(" · ")
+                                                            : "";
+                                                         return (
+                                                            <MenuItem key={v.id} value={v.id}>
+                                                               <Stack>
+                                                                  <Typography variant="body2">
+                                                                     {v.variantName}
+                                                                     {attrs ? ` — ${attrs}` : ""}
+                                                                  </Typography>
+                                                                  <Typography
+                                                                     variant="caption"
+                                                                     color="text.secondary"
+                                                                  >
+                                                                     SKU: {v.sku} · Stock:{" "}
+                                                                     {Number(v.quantity) || 0}
+                                                                  </Typography>
+                                                               </Stack>
+                                                            </MenuItem>
+                                                         );
+                                                      })}
+                                                   </Select>
+                                                </FormControl>
+                                             ) : row.variantName ? (
+                                                <Typography
+                                                   variant="caption"
+                                                   color="primary.main"
+                                                   fontWeight={600}
+                                                >
+                                                   Variant: {row.variantName}
+                                                </Typography>
+                                             ) : null}
+                                          </Stack>
+                                       </TableCell>
                                        <TableCell align="left">
                                           <TextField
                                              type="number"
@@ -329,7 +450,8 @@ const Details = ({
                                           </IconButton>
                                        </TableCell>
                                     </TableRowMUI>
-                                 ))}
+                                    );
+                                 })}
                               </TableBody>
                            </Table>
                         </TableContainer>

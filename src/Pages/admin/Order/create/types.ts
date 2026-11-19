@@ -10,6 +10,17 @@ export interface ApiCustomer {
    address?: string | null;
 }
 
+export interface ApiVariant {
+   id: string;
+   variantName: string;
+   sku: string;
+   barcode?: string | null;
+   quantity: number;
+   regularPrice: number | string;
+   salePrice?: number | string | null;
+   attributes?: Record<string, string> | null;
+}
+
 export interface ApiProduct {
    id: string;
    productName: string;
@@ -22,6 +33,9 @@ export interface ApiProduct {
    salesUnit?: string | null;
    images?: string[] | null;
    status?: string | null;
+   productType?: string | null;
+   /** Live variants (products list API includes them, deleted excluded). */
+   variants?: ApiVariant[] | null;
 }
 
 export interface CustomerFormState {
@@ -36,7 +50,19 @@ export interface CustomerFormState {
 export type DiscountType = "amount" | "percent";
 
 export interface OrderLine {
+   /**
+    * Unique row key used by update/remove. Simple products keep
+    * key === productId (one line per product, merged on re-add);
+    * variable products get one line per added row so different
+    * variants of the same product can coexist (INV-02).
+    */
+   key: string;
    productId: string;
+   /** Selected variant (variable products); null until picked. */
+   variantId: string | null;
+   variantName: string | null;
+   /** Live variants of the product; empty for simple products. */
+   variants: ApiVariant[];
    name: string;
    /** SKU shown in the table and submitted as the item code. */
    code: string;

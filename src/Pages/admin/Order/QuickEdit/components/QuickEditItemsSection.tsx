@@ -4,8 +4,11 @@ import {
    Box,
    Chip,
    CircularProgress,
+   FormControl,
    IconButton,
+   MenuItem,
    Paper,
+   Select,
    Stack,
    Table,
    TableBody,
@@ -26,6 +29,7 @@ interface QuickEditItemsSectionProps {
    onUpdateQuantity: (index: number, quantity: number) => void;
    onUpdatePrice: (index: number, price: number) => void;
    onUpdateSubtotal: (index: number, subtotal: number) => void;
+   onUpdateVariant: (index: number, variantId: string) => void;
    onRemoveItem: (index: number) => void;
    onAddItem: (product: any) => void;
    disabled?: boolean;
@@ -36,6 +40,7 @@ export const QuickEditItemsSection: React.FC<QuickEditItemsSectionProps> = ({
    onUpdateQuantity,
    onUpdatePrice,
    onUpdateSubtotal,
+   onUpdateVariant,
    onRemoveItem,
    onAddItem,
    disabled = false,
@@ -358,6 +363,91 @@ export const QuickEditItemsSection: React.FC<QuickEditItemsSectionProps> = ({
                                              SKU: {item.code}
                                           </Typography>
                                        )}
+                                       {/* INV-02: variant picker when the
+                                           product's variants are known;
+                                           otherwise show the stored
+                                           variant name read-only. */}
+                                       {item.variants && item.variants.length > 0 ? (
+                                          <FormControl
+                                             size="small"
+                                             sx={{ mt: 0.4, minWidth: 170, maxWidth: 230 }}
+                                          >
+                                             <Select
+                                                value={item.variantId || ""}
+                                                displayEmpty
+                                                disabled={disabled}
+                                                onChange={(e) =>
+                                                   onUpdateVariant(
+                                                      idx,
+                                                      String(e.target.value),
+                                                   )
+                                                }
+                                                sx={{
+                                                   height: 28,
+                                                   fontSize: "0.78rem",
+                                                   "& .MuiSelect-select": {
+                                                      py: "3px",
+                                                   },
+                                                }}
+                                                renderValue={(selected) => {
+                                                   if (!selected) {
+                                                      return (
+                                                         <Typography
+                                                            variant="body2"
+                                                            color="warning.main"
+                                                            fontSize="0.78rem"
+                                                         >
+                                                            Select variant
+                                                         </Typography>
+                                                      );
+                                                   }
+                                                   const v = (item.variants || []).find(
+                                                      (x) => x.id === selected,
+                                                   );
+                                                   return v
+                                                      ? `${v.variantName} (${v.sku})`
+                                                      : item.variantName || "Select variant";
+                                                }}
+                                             >
+                                                {item.variants.map((v) => {
+                                                   const attrs = v.attributes
+                                                      ? Object.values(v.attributes)
+                                                           .filter(Boolean)
+                                                           .join(" · ")
+                                                      : "";
+                                                   return (
+                                                      <MenuItem
+                                                         key={v.id}
+                                                         value={v.id}
+                                                         disabled={Number(v.quantity) <= 0}
+                                                      >
+                                                         <Box>
+                                                            <Typography variant="body2">
+                                                               {v.variantName}
+                                                               {attrs ? ` — ${attrs}` : ""}
+                                                            </Typography>
+                                                            <Typography
+                                                               variant="caption"
+                                                               color="text.secondary"
+                                                            >
+                                                               SKU: {v.sku} · Stock:{" "}
+                                                               {Number(v.quantity) || 0}
+                                                            </Typography>
+                                                         </Box>
+                                                      </MenuItem>
+                                                   );
+                                                })}
+                                             </Select>
+                                          </FormControl>
+                                       ) : item.variantName ? (
+                                          <Typography
+                                             variant="caption"
+                                             color="primary.main"
+                                             fontWeight={600}
+                                          >
+                                             Variant: {item.variantName}
+                                          </Typography>
+                                       ) : null}
                                     </Stack>
                                  </Stack>
                               </TableCell>

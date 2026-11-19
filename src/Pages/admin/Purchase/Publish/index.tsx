@@ -24,11 +24,24 @@ export interface SupplierOption {
    name: string;
 }
 
+export interface ProductVariantOption {
+   id: string;
+   variantName: string;
+   sku: string;
+   quantity: number;
+   costPrice: number;
+   attributes?: Record<string, any> | null;
+}
+
 export interface ProductOption {
    id: string;
    name: string;
    code: string;
    price: number;
+   // INV-02: variable products carry their live variants so purchase
+   // lines can target a variant.
+   productType?: string;
+   variants?: ProductVariantOption[];
 }
 
 export const purchaseSchema = yup.object({
@@ -62,6 +75,9 @@ export const purchaseSchema = yup.object({
             // stock can be credited/debited against the real product.
             id: yup.string().optional(),
             productId: yup.string().nullable().optional(),
+            // INV-02: optional variant target for variable products.
+            variantId: yup.string().nullable().optional(),
+            variantName: yup.string().nullable().optional(),
             code: yup.string().nullable().optional(),
             name: yup.string().required("Product name is required"),
             quantity: yup
@@ -184,6 +200,15 @@ const Publish = () => {
                   name: p.productName,
                   code: p.productCode || p.productSku || "",
                   price: Number(p.costPrice ?? p.regularPrice ?? 0),
+                  productType: p.productType || "simple",
+                  variants: (p.variants || []).map((v: any) => ({
+                     id: v.id,
+                     variantName: v.variantName,
+                     sku: v.sku || "",
+                     quantity: Number(v.quantity) || 0,
+                     costPrice: Number(v.costPrice ?? 0),
+                     attributes: v.attributes ?? null,
+                  })),
                })),
             );
          })
@@ -222,6 +247,9 @@ const Publish = () => {
                product: (p.items || []).map((it: any) => ({
                   id: it.productId || undefined,
                   productId: it.productId || null,
+                  // INV-02: keep the line's variant linkage in edit mode.
+                  variantId: it.variantId || null,
+                  variantName: it.variant?.variantName || null,
                   name: it.name,
                   code: it.code || null,
                   quantity: it.quantity,
@@ -241,10 +269,77 @@ const Publish = () => {
          .finally(() => setLoadingPurchase(false));
    }, [reset]);
 
+   // Phase 3A (3.3): draft prefill from the Stock → Low Stock view.
+   // `?prefill=<url-encoded JSON>` carries { supplierId, supplierName,
+   // items: [...] } — the form opens prefilled for MANUAL review; nothing
+   // is created or submitted automatically.
+   const [prefillNotice, setPrefillNotice] = useState<string | null>(null);
+   React.useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("id")) return; // edit mode wins
+      const raw = params.get("prefill");
+      if (!raw) return;
+      try {
+         const draft = JSON.parse(raw);
+         const items = Array.isArray(draft.items) ? draft.items : [];
+         if (!items.length) return;
+         if (draft.supplierId) setSupplierId(draft.supplierId);
+         const productAmount = items.reduce(
+            (sum: number, it: any) =>
+               sum + Number(it.price || 0) * Number(it.quantity || 0),
+            0,
+         );
+         reset({
+            id: 0,
+            date: new Date().toISOString().split("T")[0],
+            invoice: "",
+            supplier: draft.supplierName || "",
+            product: items.map((it: any) => ({
+               id: it.productId || undefined,
+               productId: it.productId || null,
+               variantId: it.variantId || null,
+               variantName: it.variantName || null,
+               name: it.name,
+               code: it.code || null,
+               quantity: Number(it.quantity) || 1,
+               price: Number(it.price) || 0,
+            })),
+            product_amount: productAmount,
+            others_cost: 0,
+            discount: 0,
+            pay: 0,
+            total: productAmount,
+            due: productAmount,
+            note: "",
+            attachments: [],
+         } as PurchaseFormValues);
+         setPrefillNotice(
+            "Draft prefilled from Low Stock — review the lines, then save manually. Nothing has been submitted.",
+         );
+      } catch {
+         // Malformed prefill — ignore and open a blank form.
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, []);
+
    const onSubmit: SubmitHandler<PurchaseFormValues> = async (formData) => {
       setSubmitting(true);
       setErrorMsg(null);
       try {
+         // INV-02: a line for a variable product must target a variant.
+         for (const p of (formData.product || []) as any[]) {
+            const opt = productOptions.find(
+               (o) => o.id === (p.productId || p.id),
+            );
+            const isVariable =
+               opt?.productType === "variable" ||
+               (opt?.variants && opt.variants.length > 0);
+            if (isVariable && !p.variantId) {
+               setErrorMsg(`Select a variant for "${p.name}".`);
+               setSubmitting(false);
+               return;
+            }
+         }
          // Line items now include their productId (Phase 2, 2.4) so the
          // API can net stock correctly; totals are recomputed on the
          // server for both POST and PUT — client totals are advisory.
@@ -253,6 +348,8 @@ const Publish = () => {
             invoice: formData.invoice?.trim() || undefined,
             items: (formData.product || []).map((p: any) => ({
                productId: p.productId || p.id || null,
+               // INV-02: variant target when the line has one.
+               variantId: p.variantId || null,
                name: p.name,
                code: p.code || null,
                quantity: p.quantity,
@@ -299,6 +396,20 @@ const Publish = () => {
          height={"100%"}
          component="form"
       >
+         {prefillNotice && (
+            <Typography
+               variant="body2"
+               color="primary"
+               sx={{
+                  mb: 2,
+                  p: 1.5,
+                  borderRadius: 1.5,
+                  bgcolor: "primary.lighter",
+               }}
+            >
+               {prefillNotice}
+            </Typography>
+         )}
          {editId && (
             <Stack spacing={0.5} mb={3}>
                <Typography variant="h6" fontWeight={700}>

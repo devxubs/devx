@@ -8,6 +8,7 @@ import {
    restoreStockForItems,
    orderHoldsStock,
    InsufficientStockError,
+   InvalidVariantError,
 } from "@src/lib/stock";
 
 export async function GET(
@@ -35,7 +36,14 @@ export async function GET(
                   role: { select: { name: true } },
                },
             },
-            items: { include: { product: true } },
+            items: {
+                  include: {
+                     product: true,
+                     variant: {
+                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                     },
+                  },
+               },
          },
       });
 
@@ -66,7 +74,14 @@ export async function PUT(
          where: {
             OR: [{ id }, { orderCode: id }, { customId: id }, { orderId: id }, { invoiceNo: id }],
          },
-         include: { items: { include: { product: true } } },
+         include: { items: {
+                  include: {
+                     product: true,
+                     variant: {
+                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                     },
+                  },
+               } },
       });
 
       if (!existingOrder) {
@@ -400,6 +415,7 @@ export async function PUT(
          const resolvedItems: Array<{
             orderItemId?: string;
             candidateProductId: string | null;
+            variantId: string | null;
             name: string;
             code: string | null;
             quantity: number;
@@ -449,9 +465,22 @@ export async function PUT(
                candidateId = matched?.productId || null;
             }
 
+            // INV-02: an explicitly-sent variantId wins (null clears
+            // the variant); when the field is absent on a line that
+            // maps to an existing item, the stored variant is kept.
+            let variantId: string | null = null;
+            if ((it as any).variantId !== undefined) {
+               variantId = (it as any).variantId
+                  ? String((it as any).variantId).trim()
+                  : null;
+            } else if (existingItem) {
+               variantId = existingItem.variantId ?? null;
+            }
+
             resolvedItems.push({
                orderItemId,
                candidateProductId: candidateId || null,
+               variantId,
                name,
                code,
                quantity: qty,
@@ -510,6 +539,7 @@ export async function PUT(
          const finalItemsData: Array<{
             orderItemId?: string;
             productId: string | null;
+            variantId: string | null;
             name: string;
             code: string | null;
             quantity: number;
@@ -542,12 +572,61 @@ export async function PUT(
             finalItemsData.push({
                orderItemId: it.orderItemId,
                productId: authoritativeProductId,
+               variantId: it.variantId,
                name: it.name,
                code: it.code,
                quantity: it.quantity,
                price: it.price,
                subtotal: it.subtotal,
             });
+         }
+
+         // Step 3b (INV-02): validate variant references against the
+         // authoritative product ids. A variant must exist and belong
+         // to the line's product. The isDeleted check applies only
+         // when the line is new or its variant actually changed — an
+         // unrelated edit must not fail because a variant on an old
+         // line was archived after the sale.
+         const requestedVariantIds = Array.from(
+            new Set(
+               finalItemsData
+                  .map((it) => it.variantId)
+                  .filter((v): v is string => Boolean(v)),
+            ),
+         );
+         if (requestedVariantIds.length > 0) {
+            const foundVariants = await prisma.productVariant.findMany({
+               where: { id: { in: requestedVariantIds } },
+               select: { id: true, productId: true, variantName: true, isDeleted: true },
+            });
+            const variantById = new Map(foundVariants.map((v) => [v.id, v]));
+            for (const it of finalItemsData) {
+               if (!it.variantId) continue;
+               const variant = variantById.get(it.variantId);
+               const existingItem = it.orderItemId
+                  ? existingItemsMap.get(it.orderItemId)
+                  : undefined;
+               const variantChanged =
+                  !existingItem || (existingItem.variantId ?? null) !== it.variantId;
+               if (!variant || variant.productId !== it.productId) {
+                  return NextResponse.json(
+                     {
+                        error: "Invalid variant",
+                        message: `Variant '${it.variantId}' does not belong to product '${it.name}'.`,
+                     },
+                     { status: 400 },
+                  );
+               }
+               if (variantChanged && variant.isDeleted) {
+                  return NextResponse.json(
+                     {
+                        error: "Variant unavailable",
+                        message: `Variant '${variant.variantName}' is archived/deleted and cannot be added to an order.`,
+                     },
+                     { status: 400 },
+                  );
+               }
+            }
          }
 
          // Step 4: Calculate net stock difference per product.
@@ -562,15 +641,31 @@ export async function PUT(
             body.status !== undefined ? body.status : existingOrder.status;
          const willHoldStock = nextStatus !== "CANCELLED";
 
-         const stockDiffMap = new Map<string, number>();
+         // INV-02: differences are netted per product + variant —
+         // moving a line from variant A to variant B of the same
+         // product must restore A and deduct B, not net to zero.
+         const stockDiffMap = new Map<
+            string,
+            { productId: string; variantId: string | null; diff: number }
+         >();
+         const addStockDiff = (
+            productId: string,
+            variantId: string | null,
+            delta: number,
+         ) => {
+            const key = `${productId}::${variantId ?? ""}`;
+            const current = stockDiffMap.get(key);
+            if (current) current.diff += delta;
+            else stockDiffMap.set(key, { productId, variantId, diff: delta });
+         };
 
          if (wasHoldingStock) {
             for (const existingIt of existingOrder.items) {
                if (existingIt.productId) {
-                  stockDiffMap.set(
+                  addStockDiff(
                      existingIt.productId,
-                     (stockDiffMap.get(existingIt.productId) || 0) -
-                        existingIt.quantity,
+                     existingIt.variantId ?? null,
+                     -existingIt.quantity,
                   );
                }
             }
@@ -579,10 +674,7 @@ export async function PUT(
          if (willHoldStock) {
             for (const newIt of finalItemsData) {
                if (newIt.productId) {
-                  stockDiffMap.set(
-                     newIt.productId,
-                     (stockDiffMap.get(newIt.productId) || 0) + newIt.quantity,
-                  );
+                  addStockDiff(newIt.productId, newIt.variantId, newIt.quantity);
                }
             }
          }
@@ -610,7 +702,8 @@ export async function PUT(
                existing.quantity === it.quantity &&
                Number(existing.price) === it.price &&
                Number(existing.subtotal) === it.subtotal &&
-               existing.productId === it.productId;
+               existing.productId === it.productId &&
+               (existing.variantId ?? null) === (it.variantId ?? null);
             return !isUnchanged;
          });
 
@@ -695,6 +788,7 @@ export async function PUT(
                      price: it.price,
                      subtotal: it.subtotal,
                      productId: it.productId,
+                     variantId: it.variantId,
                   },
                });
             }
@@ -710,6 +804,7 @@ export async function PUT(
                      price: it.price,
                      subtotal: it.subtotal,
                      productId: it.productId,
+                     variantId: it.variantId,
                   },
                });
             }
@@ -719,11 +814,12 @@ export async function PUT(
             // against available stock (ORD-01), warehouse stock is
             // mirrored (INV-01), and movements match the net change.
             const stockSettings = await loadStockSettings(tx);
-            for (const [productId, diff] of stockDiffMap.entries()) {
+            for (const { productId, variantId, diff } of stockDiffMap.values()) {
                if (diff === 0) continue;
                await applyStockDifference(tx, productId, diff, {
                   settings: stockSettings,
                   orderId: existingOrder.id,
+                  variantId,
                   increaseNote: (qty) =>
                      `Order ${existingOrder.orderId || existingOrder.orderCode} items updated (+${qty} ordered)`,
                   decreaseNote: (qty) =>
@@ -806,7 +902,14 @@ export async function PUT(
                         role: { select: { name: true } },
                      },
                   },
-                  items: { include: { product: true } },
+                  items: {
+                  include: {
+                     product: true,
+                     variant: {
+                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                     },
+                  },
+               },
                },
             });
 
@@ -878,6 +981,7 @@ export async function PUT(
             .map((it) => ({
                productId: it.productId as string,
                quantity: it.quantity,
+               variantId: it.variantId,
             }));
 
          if (wasHoldingStock && !willHoldStock) {
@@ -939,7 +1043,14 @@ export async function PUT(
                      role: { select: { name: true } },
                   },
                },
-               items: { include: { product: true } },
+               items: {
+                  include: {
+                     product: true,
+                     variant: {
+                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                     },
+                  },
+               },
             },
          });
       });
@@ -950,6 +1061,12 @@ export async function PUT(
       if (err instanceof InsufficientStockError) {
          return NextResponse.json(
             { error: "Insufficient stock", message: err.message },
+            { status: 400 },
+         );
+      }
+      if (err instanceof InvalidVariantError) {
+         return NextResponse.json(
+            { error: "Invalid variant", message: err.message },
             { status: 400 },
          );
       }
@@ -995,6 +1112,7 @@ export async function DELETE(
                      .map((it) => ({
                         productId: it.productId as string,
                         quantity: it.quantity,
+                        variantId: it.variantId,
                      })),
                   {
                      orderId: existing.id,

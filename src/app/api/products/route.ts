@@ -70,7 +70,16 @@ export async function GET(request: NextRequest) {
                primarySupplier: true,
                variants: {
                   where: { isDeleted: false },
-                  select: { id: true, variantName: true, sku: true, quantity: true, regularPrice: true },
+                  select: {
+                     id: true,
+                     variantName: true,
+                     sku: true,
+                     barcode: true,
+                     quantity: true,
+                     regularPrice: true,
+                     salePrice: true,
+                     attributes: true,
+                  },
                },
                _count: {
                   select: { variants: true, orderItems: true },

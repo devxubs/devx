@@ -93,11 +93,20 @@ const Publish = () => {
                },
                lines: (o.items || []).map((it: any) => ({
                   productId: it.productId || it.id,
+                  // INV-02: keep the line's variant linkage through an
+                  // edit — the picker list itself is not loaded here,
+                  // but variantId/variantName ride along so the PUT
+                  // preserves variant stock semantics.
+                  variantId: it.variantId || null,
+                  variantName: it.variant?.variantName || null,
+                  variants: [],
                   name: it.name,
-                  code: it.code || "",
+                  code: it.code || it.variant?.sku || "",
                   image: it.product?.images?.[0] || null,
                   stock:
-                     (Number(it.product?.quantity) || 0) +
+                     (it.variantId
+                        ? Number(it.variant?.quantity) || 0
+                        : Number(it.product?.quantity) || 0) +
                      (Number(it.quantity) || 0),
                   unit:
                      it.product?.salesUnit || it.product?.baseUnit || "Piece",

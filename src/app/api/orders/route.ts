@@ -7,6 +7,7 @@ import {
    loadStockSettings,
    deductStockForItems,
    InsufficientStockError,
+   InvalidVariantError,
 } from "@src/lib/stock";
 
 export async function GET(request: NextRequest) {
@@ -317,7 +318,14 @@ export async function GET(request: NextRequest) {
             include: {
                customer: true,
                employee: { select: { id: true, name: true, email: true, phoneNumber: true, customId: true } },
-               items: { include: { product: true } },
+               items: {
+                  include: {
+                     product: true,
+                     variant: {
+                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                     },
+                  },
+               },
             },
             orderBy: orderClause,
          }),
@@ -393,6 +401,37 @@ export async function POST(request: NextRequest) {
             { error: "At least one product is required for an order" },
             { status: 400 },
          );
+      }
+
+      // INV-02: validate variant references before writing anything —
+      // every variantId must name a live variant of the line's own
+      // product, otherwise the sale could never move the right stock.
+      const requestedVariantIds = Array.from(
+         new Set(
+            products
+               .map((p: any) => p.variantId)
+               .filter((v: any): v is string => Boolean(v)),
+         ),
+      );
+      if (requestedVariantIds.length > 0) {
+         const foundVariants = await prisma.productVariant.findMany({
+            where: { id: { in: requestedVariantIds } },
+            select: { id: true, productId: true, variantName: true, isDeleted: true },
+         });
+         const variantById = new Map(foundVariants.map((v) => [v.id, v]));
+         for (const p of products) {
+            if (!p.variantId) continue;
+            const variant = variantById.get(p.variantId);
+            if (!variant || variant.isDeleted || variant.productId !== p.id) {
+               return NextResponse.json(
+                  {
+                     error: "Invalid variant",
+                     message: `Variant '${p.variantId}' does not belong to product '${p.name || p.productName || p.id || "unknown"}'.`,
+                  },
+                  { status: 400 },
+               );
+            }
+         }
       }
 
       // Phase 2 (2.5): notes + courier are accepted in the create
@@ -493,6 +532,7 @@ export async function POST(request: NextRequest) {
                items: {
                   create: products.map((p: any) => ({
                      productId: p.id || null,
+                     variantId: p.variantId || null,
                      name: p.name || p.productName,
                      code: p.code || null,
                      quantity: Number(p.quantity) || 1,
@@ -523,6 +563,7 @@ export async function POST(request: NextRequest) {
                   .map((it) => ({
                      productId: it.productId as string,
                      quantity: it.quantity,
+                     variantId: it.variantId,
                   })),
                {
                   settings: stockSettings,
@@ -540,6 +581,12 @@ export async function POST(request: NextRequest) {
       if (err instanceof InsufficientStockError) {
          return NextResponse.json(
             { error: "Insufficient stock", message: err.message },
+            { status: 400 },
+         );
+      }
+      if (err instanceof InvalidVariantError) {
+         return NextResponse.json(
+            { error: "Invalid variant", message: err.message },
             { status: 400 },
          );
       }

@@ -68,7 +68,16 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    }, []);
 
    const hydrate = useCallback((state: OrderCreateFormState) => {
-      setForm(state);
+      // Normalise lines from older drafts / external state that
+      // predate the INV-02 line fields.
+      const lines = (state.lines || []).map((l: any, i: number) => ({
+         ...l,
+         key: l.key || `${l.productId}::restored-${i}`,
+         variantId: l.variantId ?? null,
+         variantName: l.variantName ?? null,
+         variants: Array.isArray(l.variants) ? l.variants : [],
+      }));
+      setForm({ ...state, lines });
       setIsDirty(false);
    }, []);
 
@@ -104,30 +113,45 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    }, []);
 
    // ── Lines ────────────────────────────────────────────────────────────────
+   const lineSeqRef = useRef(0);
    const addProduct = useCallback(
       (product: ApiProduct): string | null => {
          const stock = Math.max(0, num(product.quantity));
          if (stock <= 0) return `${product.productName} is out of stock`;
+         const variants = Array.isArray(product.variants) ? product.variants : [];
+         const isVariable = product.productType === "Variable" && variants.length > 0;
          let message: string | null = null;
          setForm((prev) => {
-            const existing = prev.lines.find((l) => l.productId === product.id);
-            if (existing) {
-               if (existing.quantity >= stock) {
-                  message = `Only ${stock} in stock for ${product.productName}`;
-                  return prev;
+            // Simple products keep the one-line-per-product merge.
+            // Variable products always append a fresh line (INV-02):
+            // each row picks its own variant in the table, so two
+            // variants of one product can be sold side by side.
+            if (!isVariable) {
+               const existing = prev.lines.find((l) => l.productId === product.id);
+               if (existing) {
+                  if (existing.quantity >= stock) {
+                     message = `Only ${stock} in stock for ${product.productName}`;
+                     return prev;
+                  }
+                  return {
+                     ...prev,
+                     lines: prev.lines.map((l) =>
+                        l.productId === product.id
+                           ? { ...l, quantity: l.quantity + 1, stock }
+                           : l,
+                     ),
+                  };
                }
-               return {
-                  ...prev,
-                  lines: prev.lines.map((l) =>
-                     l.productId === product.id
-                        ? { ...l, quantity: l.quantity + 1, stock }
-                        : l,
-                  ),
-               };
             }
             const price = num(product.salePrice ?? product.regularPrice);
             const line: OrderLine = {
+               key: isVariable
+                  ? `${product.id}::line-${++lineSeqRef.current}`
+                  : product.id,
                productId: product.id,
+               variantId: null,
+               variantName: null,
+               variants,
                name: product.productName,
                code: product.productSku || product.productCode || "",
                image: Array.isArray(product.images) ? product.images[0] : null,
@@ -146,11 +170,11 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       [],
    );
 
-   const updateLine = useCallback((productId: string, partial: Partial<OrderLine>) => {
+   const updateLine = useCallback((lineKey: string, partial: Partial<OrderLine>) => {
       setForm((prev) => ({
          ...prev,
          lines: prev.lines.map((l) => {
-            if (l.productId !== productId) return l;
+            if (l.key !== lineKey) return l;
             const next = { ...l, ...partial };
             next.quantity = Math.max(1, Math.min(Math.floor(num(next.quantity)) || 1, Math.max(1, next.stock)));
             next.listPrice = Math.max(0, num(next.listPrice));
@@ -162,8 +186,8 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       setIsDirty(true);
    }, []);
 
-   const removeLine = useCallback((productId: string) => {
-      setForm((prev) => ({ ...prev, lines: prev.lines.filter((l) => l.productId !== productId) }));
+   const removeLine = useCallback((lineKey: string) => {
+      setForm((prev) => ({ ...prev, lines: prev.lines.filter((l) => l.key !== lineKey) }));
       setIsDirty(true);
    }, []);
 
@@ -181,6 +205,9 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       }
       if (form.lines.length === 0) errors.push("Add at least one product");
       for (const line of form.lines) {
+         if (line.variants.length > 0 && !line.variantId) {
+            errors.push(`Select a variant for ${line.name}`);
+         }
          if (line.quantity < 1) errors.push(`Quantity for ${line.name} must be at least 1`);
          if (line.quantity > line.stock) errors.push(`Quantity for ${line.name} exceeds available stock (${line.stock})`);
          if (line.listPrice < 0) errors.push(`Price for ${line.name} cannot be negative`);
@@ -211,6 +238,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          products: form.lines.map((l) => ({
             id: l.productId,
             productId: l.productId,
+            ...(l.variantId ? { variantId: l.variantId } : {}),
             name: l.name,
             code: l.code,
             quantity: l.quantity,
@@ -314,12 +342,12 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    const restoreDraft = useCallback(() => {
       if (!restorableDraft) return;
       const { draftId, savedAt, ...state } = restorableDraft;
-      setForm(state);
+      hydrate(state as OrderCreateFormState);
       setDraftMeta({ draftId, savedAt });
       setRestorableDraft(null);
       setIsDirty(true);
       setNotice({ type: "info", message: "Draft restored." });
-   }, [restorableDraft]);
+   }, [restorableDraft, hydrate]);
 
    // Offer to restore a saved draft once, on mount.
    useEffect(() => {

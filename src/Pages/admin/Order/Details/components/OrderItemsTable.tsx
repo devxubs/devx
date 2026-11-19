@@ -136,6 +136,13 @@ export default function OrderItemsTable({
                {safeItems.map((item, idx) => {
                   const itemName = item.name || item.product?.productName || "Product Item";
                   const itemSku = item.code || item.sku || item.product?.sku;
+                  // INV-02: variant lines show their variant name +
+                  // attributes, and the variant SKU when present.
+                  const variantName = item.variant?.variantName || null;
+                  const variantSku = item.variant?.sku || null;
+                  const variantAttrs = item.variant?.attributes
+                     ? Object.values(item.variant.attributes).filter(Boolean).join(" · ")
+                     : "";
                   const itemQty = Number(item.quantity || 1);
                   const itemPrice = Number(item.price || 0);
                   const itemSubtotal = Number(item.subtotal || itemQty * itemPrice);
@@ -170,7 +177,17 @@ export default function OrderItemsTable({
                                  <Typography variant="body2" fontWeight={600} color="text.primary">
                                     {itemName}
                                  </Typography>
-                                 {itemSku && (
+                                 {variantName && (
+                                    <Typography
+                                       variant="caption"
+                                       color="primary.main"
+                                       sx={{ display: "block", fontWeight: 600 }}
+                                    >
+                                       Variant: {variantName}
+                                       {variantAttrs ? ` (${variantAttrs})` : ""}
+                                    </Typography>
+                                 )}
+                                 {(variantSku || itemSku) && (
                                     <Typography
                                        variant="caption"
                                        color="text.secondary"
@@ -185,7 +202,7 @@ export default function OrderItemsTable({
                                           mt: 0.25,
                                        }}
                                     >
-                                       SKU: {itemSku}
+                                       SKU: {variantSku || itemSku}
                                     </Typography>
                                  )}
                               </Box>
