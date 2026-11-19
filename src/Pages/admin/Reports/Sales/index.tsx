@@ -1,5 +1,5 @@
 "use client";
-import { Grid, Stack, Typography } from "@mui/material";
+import { Alert, Grid, Stack, Typography } from "@mui/material";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
@@ -11,6 +11,7 @@ import DateRangePickerCustom from "@src/components/DateRange";
 import { useSettings } from "@src/lib/settingsContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const statusColor: Record<
    string,
@@ -39,6 +40,7 @@ const Sales = () => {
    const { formatCurrency, settings } = useSettings();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
 
@@ -54,8 +56,13 @@ const Sales = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
+            setError(null);
+         } else {
+            setError("Failed to load the sales report. The figures below may be out of date.");
          }
-      } catch {}
+      } catch {
+         setError("Failed to load the sales report. The figures below may be out of date.");
+      }
       setLoading(false);
    }, [dateRange]);
 
@@ -118,37 +125,54 @@ const Sales = () => {
    // revenue card and the graph may use it — but the invented fallback
    // arrays and percentage labels are removed, and the revenue trend is
    // no longer presented as the "Total orders" trend.
+   // KPI cards use the shared compact formatter (lib/utils), like
+   // every other Reports tab; the table below keeps exact values.
+   // NOTE on the last card's title: the API's returnedCount counts
+   // CANCELLED + FAILED orders (there is no RETURNED order status),
+   // so the card is labelled "Cancelled / Failed", not "Returned".
    const analyticsCards = [
       {
          title: "Total orders",
-         value: report?.totalOrders ?? 0,
+         value: formatCompactNumber(report?.totalOrders ?? 0),
          isPositive: true,
       },
       {
          title: "Total revenue",
-         value: formatCurrency(report?.totalRevenue ?? 0),
+         value: formatCompactNumber(report?.totalRevenue ?? 0, {
+            currencySymbol: settings.currencySymbol || "৳",
+         }),
          isPositive: true,
          data: report?.trendData,
       },
       {
          title: "Completed orders",
-         value: report?.completedCount ?? 0,
+         value: formatCompactNumber(report?.completedCount ?? 0),
          isPositive: true,
       },
       {
-         title: "Returned / Failed",
-         value: report?.returnedCount ?? 0,
+         title: "Cancelled / Failed",
+         value: formatCompactNumber(report?.returnedCount ?? 0),
          isPositive: false,
       },
    ];
 
-   const graphData = (report?.trendData || []).map((y: number, idx: number) => ({
-      x: `Day ${idx + 1}`,
-      y,
-   }));
+   // The API's trendData is the 7-day revenue window ending at the
+   // selected range's end (or today). The graph is a datetime chart,
+   // so each point needs its real date — the previous "Day 1…7"
+   // strings parsed as 1 Jan 2001 and the graph's own month filter
+   // dropped every point, leaving an always-empty chart.
+   const trendEnd =
+      dateRange[1] && dateRange[1].getTime() < Date.now() ? dateRange[1] : new Date();
+   const trendValues: number[] = report?.trendData || [];
+   const graphData = trendValues.map((y: number, idx: number) => {
+      const d = new Date(trendEnd);
+      d.setDate(d.getDate() - (trendValues.length - 1 - idx));
+      return { x: d, y };
+   });
 
    return (
-      <Stack>
+      <Stack spacing={2}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             {analyticsCards.map((item, idx) => (
                <Grid size={{ xs: 12, sm: 6, md: 3 }} key={idx}>
@@ -159,13 +183,14 @@ const Sales = () => {
             <Grid size={{ xs: 12, md: 4 }}>
                <RadialBar
                   title={"Orders Status Breakdown"}
+                  value={String(report?.totalOrders ?? 0)}
                   data={[
                      {
                         label: "Completed",
                         value: report?.completedCount || 0,
                      },
                      {
-                        label: "Returned / Failed",
+                        label: "Cancelled / Failed",
                         value: report?.returnedCount || 0,
                      },
                      {
@@ -206,6 +231,7 @@ const Sales = () => {
                   <CustomTable
                      rows={report?.orders || []}
                      columns={columns}
+                     loading={loading}
                      checkBox={true}
                      canExport={true}
                      canPrint={true}

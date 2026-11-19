@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Typography } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import CustomTable from "@src/components/Table";
 import DateRangePicker from "@src/components/DateRange";
 import { useEffect, useState, useCallback } from "react";
@@ -17,6 +17,7 @@ const Expenses = () => {
    const { formatCurrency } = useSettings();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
 
@@ -32,8 +33,13 @@ const Expenses = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
+            setError(null);
+         } else {
+            setError("Failed to load the expenses report. The figures below may be out of date.");
          }
-      } catch {}
+      } catch {
+         setError("Failed to load the expenses report. The figures below may be out of date.");
+      }
       setLoading(false);
    }, [dateRange]);
 
@@ -73,6 +79,7 @@ const Expenses = () => {
 
    return (
       <Stack spacing={3}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Stack
             spacing={2}
             bgcolor={"background.paper"}
@@ -94,6 +101,7 @@ const Expenses = () => {
             <CustomTable
                rows={rows}
                columns={columns}
+               loading={loading}
                checkBox={true}
                canExport={true}
                canPrint={true}

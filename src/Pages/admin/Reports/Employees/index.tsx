@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Grid, Typography, Chip } from "@mui/material";
+import { Alert, Stack, Grid, Typography, Chip } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
@@ -10,21 +10,28 @@ import { GridCellParams } from "@mui/x-data-grid";
 import { useSettings } from "@src/lib/settingsContext";
 import { EmployeeDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const Employees = () => {
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
    const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
 
    useEffect(() => {
       setLoading(true);
       fetch("/api/reports?tab=employees")
-         .then((r) => (r.ok ? r.json() : null))
+         .then((r) => {
+            if (!r.ok) throw new Error("Failed to load employees report");
+            return r.json();
+         })
          .then((d) => {
             if (d) setReport(d);
          })
-         .catch(() => {})
+         .catch(() =>
+            setError("Failed to load the employees report. The figures below may be out of date."),
+         )
          .finally(() => setLoading(false));
    }, []);
 
@@ -93,26 +100,29 @@ const Employees = () => {
 
    return (
       <Stack spacing={3}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Employees"}
                   isPositive={true}
-                  value={totalEmployees}
+                  value={formatCompactNumber(totalEmployees)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Completed Sales"}
                   isPositive={true}
-                  value={totalCompletedSales}
+                  value={formatCompactNumber(totalCompletedSales)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Revenue Generated"}
                   isPositive={true}
-                  value={formatCurrency(totalGeneratedRevenue)}
+                  value={formatCompactNumber(totalGeneratedRevenue, {
+                     currencySymbol: settings.currencySymbol || "৳",
+                  })}
                />
             </Grid>
 
@@ -150,6 +160,7 @@ const Employees = () => {
                   <CustomTable
                      rows={rows}
                      columns={rankSalesmanColumns}
+                     loading={loading}
                      checkBox={true}
                      canExport={true}
                      canPrint={true}

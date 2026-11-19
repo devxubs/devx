@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Grid, Typography } from "@mui/material";
+import { Alert, Stack, Grid, Typography } from "@mui/material";
 import React, { useState, useEffect, useCallback } from "react";
 import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
@@ -10,12 +10,20 @@ import RadialBar from "@cmp/RadialBar";
 import { useSettings } from "@src/lib/settingsContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const Courier = () => {
    const theme = useTheme();
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+   // KPI totals over the COMPLETE filtered dataset (see loader).
+   const [cardTotals, setCardTotals] = useState<{
+      count: number;
+      payout: number;
+      fees: number;
+   } | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
 
@@ -31,8 +39,42 @@ const Courier = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
+            setError(null);
+            // The main fetch returns one page (100 rows), so card
+            // totals summed from it silently described only that
+            // page. Page through the complete filtered row set with
+            // the same loader the exports use; if that fails, the
+            // cards fall back to the displayed page (previous
+            // behaviour) rather than showing nothing.
+            try {
+               const allRows = await fetchAllReportRows(
+                  reportParams("courier", dateRange),
+                  (d) => d.rows || [],
+               );
+               if (allRows.length > 0 || (data.rows || []).length === 0) {
+                  setCardTotals({
+                     count: allRows.length,
+                     payout: allRows.reduce(
+                        (s: number, r: any) => s + Number(r.courier_pay_to_you || 0),
+                        0,
+                     ),
+                     fees: allRows.reduce(
+                        (s: number, r: any) => s + Number(r.courier_charge || 0),
+                        0,
+                     ),
+                  });
+               } else {
+                  setCardTotals(null);
+               }
+            } catch {
+               setCardTotals(null);
+            }
+         } else {
+            setError("Failed to load the courier report. The figures below may be out of date.");
          }
-      } catch {}
+      } catch {
+         setError("Failed to load the courier report. The figures below may be out of date.");
+      }
       setLoading(false);
    }, [dateRange]);
 
@@ -64,7 +106,9 @@ const Courier = () => {
       },
       {
          field: "total_price",
-         headerName: "Total Price",
+         // The API's total_price is the order SUBTOTAL (before the
+         // shipping charge shown in the next column) — label it so.
+         headerName: "Subtotal",
          width: 150,
          renderCell: (params: any) => formatCurrency(params.row.total_price),
       },
@@ -95,28 +139,42 @@ const Courier = () => {
    ];
 
    const rows = report?.rows || [];
-   const totalSubmitted = rows.length;
-   const totalPaidToYou = rows.reduce((s: number, r: any) => s + Number(r.courier_pay_to_you || 0), 0);
-   const totalCharges = rows.reduce((s: number, r: any) => s + Number(r.courier_charge || 0), 0);
+   // Card totals come from the complete filtered dataset (cardTotals,
+   // loaded above); the displayed-page sums remain only as a fallback
+   // if the complete fetch failed. NOTE on the first card's title:
+   // the courier report's rows cover ALL orders in the period —
+   // including direct/walk-in orders with no courier (see the
+   // distribution chart's "Direct" segment) — so the count is
+   // labelled "Total Orders", not "Total In Courier".
+   const totalSubmitted = cardTotals?.count ?? rows.length;
+   const totalPaidToYou =
+      cardTotals?.payout ??
+      rows.reduce((s: number, r: any) => s + Number(r.courier_pay_to_you || 0), 0);
+   const totalCharges =
+      cardTotals?.fees ??
+      rows.reduce((s: number, r: any) => s + Number(r.courier_charge || 0), 0);
 
    // Phase 1: card values are computed from the fetched report rows.
    // The invented percentage changes, sparkline arrays, and the
    // hard-coded "Courier Success Rate" (96%/100% — no delivery-outcome
    // data backs it) have been removed.
+   // KPI cards use the shared compact formatter (lib/utils); the
+   // tables below keep exact values.
+   const currencySymbol = settings.currencySymbol || "৳";
    const courierData = [
       {
-         title: "Total In Courier",
-         value: totalSubmitted,
+         title: "Total Orders",
+         value: formatCompactNumber(totalSubmitted),
          isPositive: true,
       },
       {
          title: "Courier Net Payout",
-         value: formatCurrency(totalPaidToYou),
+         value: formatCompactNumber(totalPaidToYou, { currencySymbol }),
          isPositive: true,
       },
       {
          title: "Total Courier Fees",
-         value: formatCurrency(totalCharges),
+         value: formatCompactNumber(totalCharges, { currencySymbol }),
          isPositive: false,
       },
    ];
@@ -180,6 +238,7 @@ const Courier = () => {
 
    return (
       <Stack spacing={2}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             {courierData.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>
@@ -195,6 +254,12 @@ const Courier = () => {
                <RadialBar
                   title="Deliveries by Courier Partner"
                   data={distribution}
+                  value={String(
+                     distribution.reduce(
+                        (s: number, d: any) => s + Number(d.value || 0),
+                        0,
+                     ),
+                  )}
                />
             </Grid>
 
@@ -211,7 +276,7 @@ const Courier = () => {
                   >
                      Performance by courier
                   </Typography>
-                  {courierStatRows.length === 0 ? (
+                  {courierStatRows.length === 0 && !loading ? (
                      <Typography variant="body2" color="text.secondary" sx={{ px: 3, pb: 3 }}>
                         No courier orders in this period yet.
                      </Typography>
@@ -219,6 +284,7 @@ const Courier = () => {
                      <CustomTable
                         rows={courierStatRows}
                         columns={courierStatColumns}
+                        loading={loading}
                         canExport={true}
                         exportConfig={{
                            filename: `Courier_Performance_${new Date().toISOString().split("T")[0]}`,
@@ -260,6 +326,7 @@ const Courier = () => {
                   <CustomTable
                      rows={rows}
                      columns={columns}
+                     loading={loading}
                      checkBox={true}
                      canExport={true}
                      canPrint={true}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Grid from "@mui/material/Grid";
-import { Stack, Typography } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import RadialBar from "@cmp/RadialBar";
@@ -12,22 +12,59 @@ import { Stock } from "../../Product";
 import { useSettings } from "@src/lib/settingsContext";
 import { ProductDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const Products = () => {
    const { formatCurrency, settings } = useSettings();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+   // Product counts by availability status over the COMPLETE
+   // catalogue (see the effect below) for the distribution chart.
+   const [stockCounts, setStockCounts] = useState<{
+      inStock: number;
+      low: number;
+      out: number;
+      total: number;
+   } | null>(null);
    const [detailProductId, setDetailProductId] = useState<string | null>(null);
 
    useEffect(() => {
       setLoading(true);
       fetch("/api/reports?tab=products")
-         .then((r) => (r.ok ? r.json() : null))
+         .then((r) => {
+            if (!r.ok) throw new Error("Failed to load products report");
+            return r.json();
+         })
          .then((d) => {
             if (d) setReport(d);
          })
-         .catch(() => {})
+         .catch(() =>
+            setError("Failed to load the products report. The figures below may be out of date."),
+         )
          .finally(() => setLoading(false));
+   }, []);
+
+   // The main response's availabilityRows are one page (100 rows,
+   // sorted by quantity ascending — a biased sample), so chart counts
+   // are taken from the complete row set via the export loader, using
+   // the API's own per-row status. The previous chart computed its
+   // "In Stock" segment as totalInStock − outOfStockCount −
+   // lowStockCount, which subtracts PRODUCT counts from a QUANTITY
+   // sum (units) and produced a meaningless distribution.
+   useEffect(() => {
+      fetchAllReportRows(reportParams("products"), (d) => d.availabilityRows || [])
+         .then((all) => {
+            if (all.length > 0) {
+               setStockCounts({
+                  inStock: all.filter((r: any) => r.status === "In stock").length,
+                  low: all.filter((r: any) => r.status === "Low stock").length,
+                  out: all.filter((r: any) => r.status === "Out of stock").length,
+                  total: all.length,
+               });
+            }
+         })
+         .catch(() => {});
    }, []);
 
    const lowStockColumns = [
@@ -77,43 +114,57 @@ const Products = () => {
 
    return (
       <Stack spacing={3}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
                   title={"Total Items in Stock"}
                   isPositive={true}
-                  value={totalInStock}
+                  value={formatCompactNumber(totalInStock)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
                   title={"Low Stock Alerts"}
                   isPositive={false}
-                  value={lowStockCount}
+                  value={formatCompactNumber(lowStockCount)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
                   title={"Out of Stock"}
                   isPositive={false}
-                  value={outOfStockCount}
+                  value={formatCompactNumber(outOfStockCount)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
-                  title={"Top Product Sales"}
+                  // The value is the top product's units sold (the
+                  // API's topProducts[0].sold), not a sales amount.
+                  title={"Top Product Units Sold"}
                   isPositive={true}
-                  value={topProducts[0]?.sold || 0}
+                  value={formatCompactNumber(topProducts[0]?.sold || 0)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
                <RadialBar
                   title={"Inventory Distribution"}
-                  data={[
-                     { label: "In Stock", value: Math.max(totalInStock - outOfStockCount - lowStockCount, 0) },
-                     { label: "Low Stock", value: lowStockCount },
-                     { label: "Out of Stock", value: outOfStockCount },
-                  ]}
+                  value={stockCounts ? String(stockCounts.total) : undefined}
+                  data={
+                     stockCounts
+                        ? [
+                             { label: "In Stock", value: stockCounts.inStock },
+                             { label: "Low Stock", value: stockCounts.low },
+                             { label: "Out of Stock", value: stockCounts.out },
+                          ]
+                        : [
+                             // Complete counts not loaded (fetch failed):
+                             // show only the two API headline counts
+                             // rather than a fabricated "In Stock" value.
+                             { label: "Low Stock", value: lowStockCount },
+                             { label: "Out of Stock", value: outOfStockCount },
+                          ]
+                  }
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 8 }}>
@@ -146,6 +197,7 @@ const Products = () => {
                   <CustomTable
                      rows={lowStockRows}
                      columns={lowStockColumns}
+                     loading={loading}
                      checkBox={true}
                      canExport={true}
                      canPrint={true}

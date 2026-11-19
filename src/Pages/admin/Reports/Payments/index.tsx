@@ -24,6 +24,7 @@ import CustomTable from "@src/components/Table";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import { useSettings } from "@src/lib/settingsContext";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const todayInputValue = () => {
    const d = new Date();
@@ -39,10 +40,11 @@ const STATUS_META: Record<string, { label: string; color: "success" | "warning" 
 
 const Payments = () => {
    const router = useRouter();
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
    const [date, setDate] = useState(todayInputValue());
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
    const [txid, setTxid] = useState("");
    const [txidResults, setTxidResults] = useState<any[] | null>(null);
    const [searching, setSearching] = useState(false);
@@ -64,8 +66,15 @@ const Payments = () => {
          if (start) params.set("startDate", start.toISOString());
          if (end) params.set("endDate", end.toISOString());
          const res = await fetch(`/api/reports?${params.toString()}`);
-         if (res.ok) setReport(await res.json());
-      } catch {}
+         if (res.ok) {
+            setReport(await res.json());
+            setError(null);
+         } else {
+            setError("Failed to load the reconciliation report. The figures below may be out of date.");
+         }
+      } catch {
+         setError("Failed to load the reconciliation report. The figures below may be out of date.");
+      }
       setLoading(false);
    }, [dayRange]);
 
@@ -85,8 +94,12 @@ const Payments = () => {
          if (res.ok) {
             const data = await res.json();
             setTxidResults(data.txidMatches || []);
+         } else {
+            setFeedback("Transaction search failed. Please try again.");
          }
-      } catch {}
+      } catch {
+         setFeedback("Transaction search failed. Please try again.");
+      }
       setSearching(false);
    };
 
@@ -118,12 +131,15 @@ const Payments = () => {
       mismatched: 0,
    };
 
+   // KPI cards use the shared compact formatter (lib/utils); the
+   // tables below keep exact values.
+   const currencySymbol = settings.currencySymbol || "৳";
    const cards = [
-      { title: "Orders (selected day)", value: totals.orders, isPositive: true },
-      { title: "Advance Collected", value: formatCurrency(totals.advanceCollected), isPositive: true },
-      { title: "Due / COD Expected", value: formatCurrency(totals.dueExpected), isPositive: true },
-      { title: "Verified Payments", value: totals.verified, isPositive: true },
-      { title: "Awaiting Verification", value: totals.unverified + totals.mismatched, isPositive: false },
+      { title: "Orders (selected day)", value: formatCompactNumber(totals.orders), isPositive: true },
+      { title: "Advance Collected", value: formatCompactNumber(totals.advanceCollected, { currencySymbol }), isPositive: true },
+      { title: "Due / COD Expected", value: formatCompactNumber(totals.dueExpected, { currencySymbol }), isPositive: true },
+      { title: "Verified Payments", value: formatCompactNumber(totals.verified), isPositive: true },
+      { title: "Awaiting Verification", value: formatCompactNumber(totals.unverified + totals.mismatched), isPositive: false },
    ];
 
    const methodColumns = [
@@ -256,6 +272,8 @@ const Payments = () => {
             </Stack>
          </Stack>
 
+         {error && <Alert severity="error">{error}</Alert>}
+
          {feedback && (
             <Alert severity="info" onClose={() => setFeedback(null)}>
                {feedback}
@@ -330,6 +348,7 @@ const Payments = () => {
                <CustomTable
                   rows={methodRows}
                   columns={methodColumns}
+                  loading={loading}
                   canExport={true}
                   exportConfig={{
                      filename: `Payment_Reconciliation_${date}`,
@@ -360,6 +379,7 @@ const Payments = () => {
                <CustomTable
                   rows={queueRows}
                   columns={queueColumns}
+                  loading={loading}
                   canExport={true}
                   exportConfig={{
                      filename: `Unverified_Payments_${date}`,

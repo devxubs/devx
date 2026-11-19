@@ -1,6 +1,6 @@
 "use client";
 
-import { Stack, Grid, Typography } from "@mui/material";
+import { Alert, Stack, Grid, Typography } from "@mui/material";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import CustomTable from "@src/components/Table";
@@ -8,11 +8,16 @@ import DateRangePickerCustom from "@src/components/DateRange";
 import { useSettings } from "@src/lib/settingsContext";
 import { PurchaseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const Purchases = () => {
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+   // Distinct-supplier count over the COMPLETE filtered dataset
+   // (see loader) — counting only the displayed page undercounts.
+   const [supplierCount, setSupplierCount] = useState<number | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailPurchaseId, setDetailPurchaseId] = useState<string | null>(null);
 
@@ -28,8 +33,26 @@ const Purchases = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
+            setError(null);
+            try {
+               const allRows = await fetchAllReportRows(
+                  reportParams("purchases", dateRange),
+                  (d) => d.rows || [],
+               );
+               if (allRows.length > 0 || (data.rows || []).length === 0) {
+                  setSupplierCount(new Set(allRows.map((r: any) => r.supplier)).size);
+               } else {
+                  setSupplierCount(null);
+               }
+            } catch {
+               setSupplierCount(null);
+            }
+         } else {
+            setError("Failed to load the purchases report. The figures below may be out of date.");
          }
-      } catch {}
+      } catch {
+         setError("Failed to load the purchases report. The figures below may be out of date.");
+      }
       setLoading(false);
    }, [dateRange]);
 
@@ -71,26 +94,34 @@ const Purchases = () => {
 
    return (
       <Stack spacing={3}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Purchases"}
                   isPositive={true}
-                  value={totalCount}
+                  value={formatCompactNumber(totalCount)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Spending"}
                   isPositive={true}
-                  value={formatCurrency(totalAmount)}
+                  value={formatCompactNumber(totalAmount, {
+                     currencySymbol: settings.currencySymbol || "৳",
+                  })}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
-                  title={"Suppliers Active"}
+                  // Was "Suppliers Active": the value is the distinct
+                  // suppliers appearing in the filtered purchases, not
+                  // a count of currently-active suppliers.
+                  title={"Distinct Suppliers"}
                   isPositive={true}
-                  value={new Set(rows.map((r: any) => r.supplier)).size}
+                  value={formatCompactNumber(
+                     supplierCount ?? new Set(rows.map((r: any) => r.supplier)).size,
+                  )}
                />
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -116,6 +147,7 @@ const Purchases = () => {
                   <CustomTable
                      rows={rows}
                      columns={columns}
+                     loading={loading}
                      checkBox={true}
                      canExport={true}
                      canPrint={true}

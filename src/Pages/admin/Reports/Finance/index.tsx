@@ -12,6 +12,7 @@
 // figures (everything outstanding today), independent of the
 // selected period. All data comes from GET /api/reports?tab=finance.
 import {
+   Alert,
    Button,
    Grid,
    Stack,
@@ -25,12 +26,14 @@ import AnalyticsCard from "@cmp/AnalyticsCard";
 import { useSettings } from "@src/lib/settingsContext";
 import { DEFAULT_FILTERS } from "@src/Pages/admin/Customers/components/customerFilterUtils";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 const Finance = () => {
    const router = useRouter();
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
    const loadReport = useCallback(async () => {
@@ -38,8 +41,15 @@ const Finance = () => {
       try {
          const params = reportParams("finance", dateRange);
          const res = await fetch(`/api/reports?${params.toString()}`);
-         if (res.ok) setReport(await res.json());
-      } catch {}
+         if (res.ok) {
+            setReport(await res.json());
+            setError(null);
+         } else {
+            setError("Failed to load the finance report. The figures below may be out of date.");
+         }
+      } catch {
+         setError("Failed to load the finance report. The figures below may be out of date.");
+      }
       setLoading(false);
    }, [dateRange]);
 
@@ -61,13 +71,17 @@ const Finance = () => {
       router.push(`/admin/customers?filter=${filterParam}`);
    };
 
+   // KPI cards use the shared compact formatter (lib/utils), like
+   // every other Reports tab; the tables and worklist totals below
+   // keep exact values.
+   const currencySymbol = settings.currencySymbol || "৳";
    const cards = [
-      { title: "Revenue (completed/delivered)", value: formatCurrency(report?.revenue ?? 0), isPositive: true },
-      { title: "Expenses", value: formatCurrency(report?.expensesTotal ?? 0), isPositive: false },
-      { title: "Purchases", value: formatCurrency(report?.purchasesTotal ?? 0), isPositive: false },
+      { title: "Revenue (completed/delivered)", value: formatCompactNumber(report?.revenue ?? 0, { currencySymbol }), isPositive: true },
+      { title: "Expenses", value: formatCompactNumber(report?.expensesTotal ?? 0, { currencySymbol }), isPositive: false },
+      { title: "Purchases", value: formatCompactNumber(report?.purchasesTotal ?? 0, { currencySymbol }), isPositive: false },
       {
-         title: "Net Profit",
-         value: formatCurrency(report?.netProfit ?? 0),
+         title: "Net Profit (Revenue − Expenses − Purchases)",
+         value: formatCompactNumber(report?.netProfit ?? 0, { currencySymbol }),
          isPositive: Number(report?.netProfit ?? 0) >= 0,
       },
    ];
@@ -198,6 +212,7 @@ const Finance = () => {
 
    return (
       <Stack spacing={2}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Stack direction="row" justifyContent="flex-end">
             <DateRange
                title="Filter by period"
@@ -236,7 +251,7 @@ const Finance = () => {
                         No expenses recorded for this period.
                      </Typography>
                   ) : (
-                     <CustomTable rows={expenseTypeRows} columns={expenseColumns} />
+                     <CustomTable rows={expenseTypeRows} columns={expenseColumns} loading={loading} />
                   )}
                </Stack>
             </Grid>
@@ -250,7 +265,7 @@ const Finance = () => {
                         No orders recorded for this period.
                      </Typography>
                   ) : (
-                     <CustomTable rows={methodRows} columns={methodColumns} />
+                     <CustomTable rows={methodRows} columns={methodColumns} loading={loading} />
                   )}
                </Stack>
             </Grid>
@@ -271,6 +286,10 @@ const Finance = () => {
                   Open in Customers (Due &gt; 0)
                </Button>
             </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ px: 3 }}>
+               Current outstanding balances — this worklist is NOT limited to the selected
+               period above.
+            </Typography>
             {receivableRows.length === 0 && !loading ? (
                <Typography variant="body2" color="text.secondary" sx={{ px: 3, pb: 3 }}>
                   No customer has an outstanding due right now.
@@ -279,6 +298,7 @@ const Finance = () => {
                <CustomTable
                   rows={receivableRows}
                   columns={receivableColumns}
+                  loading={loading}
                   canExport={true}
                   exportConfig={{
                      filename: `Customer_Receivables_${new Date().toISOString().split("T")[0]}`,
@@ -317,7 +337,7 @@ const Finance = () => {
             <Typography variant="caption" color="text.secondary" sx={{ px: 3 }}>
                Net Payable = total purchase due − unallocated supplier credit (payments recorded
                against a purchase already reduced that purchase&apos;s due). Oldest due purchase
-               first.
+               first. Current outstanding balances — NOT limited to the selected period above.
             </Typography>
             {payableRows.length === 0 && !loading ? (
                <Typography variant="body2" color="text.secondary" sx={{ px: 3, pb: 3 }}>
@@ -327,6 +347,7 @@ const Finance = () => {
                <CustomTable
                   rows={payableRows}
                   columns={payableColumns}
+                  loading={loading}
                   canExport={true}
                   exportConfig={{
                      filename: `Supplier_Payables_${new Date().toISOString().split("T")[0]}`,

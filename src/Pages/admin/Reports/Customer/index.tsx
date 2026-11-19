@@ -1,18 +1,20 @@
 "use client";
 
-import { Grid, Stack, Typography } from "@mui/material";
+import { Alert, Grid, Stack, Typography } from "@mui/material";
 import CustomerInfo from "@src/Pages/admin/Customers/CustomerInfo";
 import CustomTable from "@src/components/Table";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { formatCompactNumber } from "@src/lib/utils";
 
 export const customerOrderData: any[] = [];
 
 const Customer = () => {
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
    const loadCustomerReport = useCallback(async () => {
@@ -22,8 +24,13 @@ const Customer = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
+            setError(null);
+         } else {
+            setError("Failed to load the customer report. The figures below may be out of date.");
          }
-      } catch {}
+      } catch {
+         setError("Failed to load the customer report. The figures below may be out of date.");
+      }
       setLoading(false);
    }, []);
 
@@ -104,27 +111,28 @@ const Customer = () => {
    const repeatCustomers = report?.returningCustomers || rows.filter((r: any) => r.totalOrders > 1).length;
 
    return (
-      <Stack>
+      <Stack spacing={2}>
+         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Customers"}
                   isPositive={true}
-                  value={totalCustomers}
+                  value={formatCompactNumber(totalCustomers)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Active Customers"}
                   isPositive={true}
-                  value={activeCustomers}
+                  value={formatCompactNumber(activeCustomers)}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Repeat Customers"}
                   isPositive={true}
-                  value={repeatCustomers}
+                  value={formatCompactNumber(repeatCustomers)}
                />
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -150,6 +158,7 @@ const Customer = () => {
                   <CustomTable
                      rows={rows}
                      columns={columns}
+                     loading={loading}
                      checkBox={true}
                      canExport={true}
                      canPrint={true}
