@@ -6,6 +6,7 @@ import {
 } from "@src/lib/audit";
 import {
    checkRateLimit,
+   getClientIp,
    hitRateLimit,
    resetRateLimit,
 } from "@src/lib/rateLimit";
@@ -101,6 +102,70 @@ describe("login rate limiter", () => {
          allowed: true,
          remaining: 2,
       });
+   });
+
+   it("blocks the IP-only bucket across different email+IP pair keys", () => {
+      // Follow-up round: the login route hits BOTH buckets per
+      // failure. Two failures spread over two different accounts
+      // from one address exhaust the IP bucket while each pair
+      // bucket still has room — the route 429s on either bucket.
+      const stamp = Date.now();
+      const ipKey = `login-ip:test-${stamp}`;
+      const pairA = `login:a-${stamp}@example.test:203.0.113.9`;
+      const pairB = `login:b-${stamp}@example.test:203.0.113.9`;
+      hitRateLimit(ipKey, 2, 60_000);
+      hitRateLimit(pairA, 2, 60_000);
+      hitRateLimit(ipKey, 2, 60_000);
+      hitRateLimit(pairB, 2, 60_000);
+      expect(checkRateLimit(ipKey, 2, 60_000).allowed).toBe(false);
+      expect(checkRateLimit(pairB, 2, 60_000).allowed).toBe(true);
+      // Resetting a pair bucket (successful login) must not clear
+      // the IP bucket — the route only resets the pair key.
+      resetRateLimit(pairB);
+      expect(checkRateLimit(ipKey, 2, 60_000).allowed).toBe(false);
+   });
+
+   it("starts a fresh window once a bucket's window has expired", () => {
+      // Expired buckets are swept lazily on access (memory bound);
+      // behaviourally the key must behave as never seen once its
+      // window has passed.
+      const key = `evict-test-${Date.now()}`;
+      const t0 = Date.now();
+      const spy = vi.spyOn(Date, "now").mockReturnValue(t0);
+      try {
+         hitRateLimit(key, 1, 1_000);
+         expect(checkRateLimit(key, 1, 1_000).allowed).toBe(false);
+         spy.mockReturnValue(t0 + 1_500);
+         expect(hitRateLimit(key, 1, 1_000)).toMatchObject({
+            allowed: true,
+            remaining: 0,
+         });
+         expect(checkRateLimit(key, 1, 1_000).allowed).toBe(false);
+      } finally {
+         spy.mockRestore();
+      }
+   });
+
+   it("derives the client IP from proxy-asserted headers only", () => {
+      const req = (headers: Record<string, string>) => ({
+         headers: {
+            get: (name: string) => headers[name.toLowerCase()] ?? null,
+         },
+      });
+      // x-real-ip wins over any forwarded chain.
+      expect(
+         getClientIp(
+            req({ "x-real-ip": "203.0.113.7", "x-forwarded-for": "1.1.1.1" }),
+         ),
+      ).toBe("203.0.113.7");
+      // Without x-real-ip, the LAST forwarded hop is used — never
+      // the first, which any client can spoof.
+      expect(
+         getClientIp(
+            req({ "x-forwarded-for": "1.1.1.1, 198.51.100.2, 203.0.113.9" }),
+         ),
+      ).toBe("203.0.113.9");
+      expect(getClientIp(req({}))).toBe("unknown");
    });
 });
 

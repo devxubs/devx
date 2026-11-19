@@ -1,20 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@src/lib/prisma";
 import { verifyPassword, signToken } from "@src/lib/auth";
-import { checkRateLimit, hitRateLimit, resetRateLimit } from "@src/lib/rateLimit";
+import {
+   checkRateLimit,
+   getClientIp,
+   hitRateLimit,
+   resetRateLimit,
+} from "@src/lib/rateLimit";
 import { logAuditStandalone, requestAuditContext } from "@src/lib/audit";
 
 // Brute-force protection: at most 10 failed login attempts per
 // email+IP pair in a 15-minute window, then 429 until the window ends.
+// Follow-up round: a second, IP-only bucket with the same threshold
+// runs alongside the pair bucket, so rotating through many email
+// addresses from one address is throttled too. The client IP comes
+// from getClientIp (proxy-asserted headers; the client-controlled
+// first x-forwarded-for hop is never trusted).
 const LOGIN_MAX_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 function loginRateLimitKey(request: NextRequest, email: string): string {
-   const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      "unknown";
-   return `login:${email.toLowerCase().trim()}:${ip}`;
+   return `login:${email.toLowerCase().trim()}:${getClientIp(request)}`;
+}
+
+function loginIpRateLimitKey(request: NextRequest): string {
+   return `login-ip:${getClientIp(request)}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -30,13 +40,20 @@ export async function POST(request: NextRequest) {
       }
 
       const rateKey = loginRateLimitKey(request, email);
-      const limitState = checkRateLimit(rateKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
-      if (!limitState.allowed) {
+      const ipRateKey = loginIpRateLimitKey(request);
+      // Either bucket can block; when both do, the longer wait wins.
+      const pairState = checkRateLimit(rateKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+      const ipState = checkRateLimit(ipRateKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+      if (!pairState.allowed || !ipState.allowed) {
+         const retryAfterSeconds = Math.max(
+            pairState.allowed ? 0 : pairState.retryAfterSeconds,
+            ipState.allowed ? 0 : ipState.retryAfterSeconds,
+         );
          return NextResponse.json(
             { error: "Too many failed login attempts. Please try again later." },
             {
                status: 429,
-               headers: { "Retry-After": String(limitState.retryAfterSeconds) },
+               headers: { "Retry-After": String(retryAfterSeconds) },
             },
          );
       }
@@ -48,6 +65,7 @@ export async function POST(request: NextRequest) {
 
       if (!user || !user.passwordHash) {
          hitRateLimit(rateKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+         hitRateLimit(ipRateKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
          return NextResponse.json(
             { error: "Invalid email or password" },
             { status: 401 },
@@ -57,6 +75,7 @@ export async function POST(request: NextRequest) {
       const isValid = await verifyPassword(password, user.passwordHash);
       if (!isValid) {
          hitRateLimit(rateKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+         hitRateLimit(ipRateKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
          return NextResponse.json(
             { error: "Invalid email or password" },
             { status: 401 },
@@ -79,7 +98,10 @@ export async function POST(request: NextRequest) {
          );
       }
 
-      // Successful login clears the failed-attempt counter.
+      // Successful login clears the PAIR bucket's failed-attempt
+      // counter. The IP-only bucket is deliberately NOT reset: it
+      // decays by window only, so one success cannot launder a
+      // distributed guessing run from the same address.
       resetRateLimit(rateKey);
 
       // Phase 4 (D1): LOGIN audit row — standalone insert AFTER
