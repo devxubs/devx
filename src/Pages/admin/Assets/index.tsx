@@ -297,31 +297,31 @@ const Asset = () => {
                   filename: `Assets_Inventory_${new Date().toISOString().split("T")[0]}`,
                   title: "DevX POS - Fixed & Current Assets Inventory",
                   fetchAllData: async () => {
-                     try {
-                        // Chunked export: walk the assets API in
-                        // bounded pages rather than one full response.
-                        const assets = await fetchAllPages(
-                           (page, limit) =>
-                              `/api/assets?page=${page}&limit=${limit}`,
-                           (d) => (Array.isArray(d) ? d : d.assets || []),
-                           (d) => d.total,
-                        );
-                        // Real Asset fields (value/createdAt) — the old
-                        // mapping read non-existent amount/purchaseDate/
-                        // status fields, so exports always showed 0.
-                        return assets.map((a: any) => ({
-                           // ID-02: exports show the business id or a
-                           // dash — never the raw database id.
-                           id: a.customId || "—",
-                           name: a.name,
-                           category: a.category || "-",
-                           value: Number(a.value || 0),
-                           date: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : "-",
-                           description: a.description || "-",
-                        }));
-                     } catch {
-                        return [];
-                     }
+                     // Chunked export: walk the assets API in
+                     // bounded pages rather than one full response.
+                     // A failed page makes fetchAllPages throw, and
+                     // the export dialog shows that error — the old
+                     // catch-and-return-[] presented failures (and
+                     // partial data) as a complete export.
+                     const assets = await fetchAllPages(
+                        (page, limit) =>
+                           `/api/assets?page=${page}&limit=${limit}`,
+                        (d) => (Array.isArray(d) ? d : d.assets || []),
+                        (d) => d.total,
+                     );
+                     // Real Asset fields (value/createdAt) — the old
+                     // mapping read non-existent amount/purchaseDate/
+                     // status fields, so exports always showed 0.
+                     return assets.map((a: any) => ({
+                        // ID-02: exports show the business id or a
+                        // dash — never the raw database id.
+                        id: a.customId || "—",
+                        name: a.name,
+                        category: a.category || "-",
+                        value: Number(a.value || 0),
+                        date: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : "-",
+                        description: a.description || "-",
+                     }));
                   },
                   summaryRows: (data: any[]) => {
                      const totalValue = data.reduce((acc, row) => acc + (Number(row.value) || 0), 0);

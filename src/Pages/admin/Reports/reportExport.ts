@@ -8,6 +8,10 @@
 // with the tab's ACTIVE params (tab + date range) and returns the
 // complete filtered row set for export — in bounded pages of the API's
 // maximum page size (1000), never one unbounded request.
+//
+// Failure contract (follow-up round): a failed page request THROWS,
+// like fetchAllPages. The previous break-on-error behaviour returned
+// partial rows that the export UI labelled as the complete set.
 
 export async function fetchAllReportRows(
    baseParams: URLSearchParams,
@@ -23,7 +27,11 @@ export async function fetchAllReportRows(
       params.set("page", String(page));
       params.set("limit", String(pageSize));
       const res = await fetch(`/api/reports?${params.toString()}`);
-      if (!res.ok) break;
+      if (!res.ok) {
+         throw new Error(
+            `Failed to load page ${page} of the report export data (HTTP ${res.status}). Export stopped — no partial data was used.`,
+         );
+      }
       const data = await res.json();
       const rows = pick(data) || [];
       all.push(...rows);

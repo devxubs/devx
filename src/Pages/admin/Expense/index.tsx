@@ -282,29 +282,27 @@ const Expense = () => {
                   filename: `Expenses_Report_${new Date().toISOString().split("T")[0]}`,
                   title: "DevX POS - Operating Expenses Report",
                   fetchAllData: async () => {
-                     try {
-                        // PERF-03: page through the list API in
-                        // bounded chunks instead of one ?all=true
-                        // mega-response; same rows, same order.
-                        const expenses = await fetchAllPages(
-                           (page, limit) => `/api/expenses?page=${page}&limit=${limit}`,
-                           (d) => d.expenses || [],
-                           (d) => d.total,
-                        );
-                        return expenses.map((ex: any) => ({
-                           // Real identity only — the old fallback
-                           // fabricated EXP_<row index> when customId
-                           // was missing (same anti-pattern removed
-                           // from Reports in the runtime-fix round).
-                           id: ex.customId || ex.id,
-                           type: ex.type || "-",
-                           amount: Number(ex.amount || 0),
-                           date: ex.date ? new Date(ex.date).toLocaleDateString() : "-",
-                           note: ex.note || "-",
-                        }));
-                     } catch {
-                        return [];
-                     }
+                     // PERF-03: page through the list API in
+                     // bounded chunks; same rows, same order. A
+                     // failed page makes fetchAllPages throw and the
+                     // export dialog shows the error instead of
+                     // exporting partial data as the complete set.
+                     const expenses = await fetchAllPages(
+                        (page, limit) => `/api/expenses?page=${page}&limit=${limit}`,
+                        (d) => d.expenses || [],
+                        (d) => d.total,
+                     );
+                     return expenses.map((ex: any) => ({
+                        // Real identity only — the old fallback
+                        // fabricated EXP_<row index> when customId
+                        // was missing (same anti-pattern removed
+                        // from Reports in the runtime-fix round).
+                        id: ex.customId || ex.id,
+                        type: ex.type || "-",
+                        amount: Number(ex.amount || 0),
+                        date: ex.date ? new Date(ex.date).toLocaleDateString() : "-",
+                        note: ex.note || "-",
+                     }));
                   },
                   summaryRows: (data: any[]) => {
                      const totalAmount = data.reduce((acc, row) => acc + (Number(row.amount) || 0), 0);

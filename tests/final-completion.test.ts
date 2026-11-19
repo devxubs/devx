@@ -14,6 +14,7 @@ import {
    lockPurchaseRow,
 } from "@src/lib/purchaseReturns";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
+import { fetchAllReportRows } from "@src/Pages/admin/Reports/reportExport";
 
 // Final Phase 4/5 completion coverage for pure helpers that sit
 // behind route-level behaviour: audit-row shaping, login throttling,
@@ -154,8 +155,8 @@ describe("fetchAllPages export loader", () => {
       expect(fetchImpl).toHaveBeenCalledTimes(3);
    });
 
-   it("stops instead of looping forever when an endpoint fails", async () => {
-      const fetchImpl = vi.fn(async () => ({ ok: false, json: async () => [] }));
+   it("throws on a failed page instead of returning partial data as complete", async () => {
+      const fetchImpl = vi.fn(async () => ({ ok: false, status: 500, json: async () => [] }));
       vi.stubGlobal("fetch", fetchImpl);
       await expect(
          fetchAllPages(
@@ -164,7 +165,36 @@ describe("fetchAllPages export loader", () => {
             undefined,
             { pageSize: 100, maxPages: 3 },
          ),
-      ).resolves.toEqual([]);
+      ).rejects.toThrow(/HTTP 500/);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+   });
+
+   it("throws mid-walk when a later page fails — accumulated rows are discarded", async () => {
+      const fetchImpl = vi.fn(async (url: string) => {
+         const page = Number(new URL(url, "https://local.test").searchParams.get("page"));
+         if (page === 1) {
+            return { ok: true, status: 200, json: async () => ({ rows: [1, 2], total: 4 }) };
+         }
+         return { ok: false, status: 503, json: async () => ({}) };
+      });
+      vi.stubGlobal("fetch", fetchImpl);
+      await expect(
+         fetchAllPages(
+            (page, limit) => `https://local.test/items?page=${page}&limit=${limit}`,
+            (data) => data.rows,
+            (data) => data.total,
+            { pageSize: 2, maxPages: 5 },
+         ),
+      ).rejects.toThrow(/HTTP 503/);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+   });
+
+   it("fetchAllReportRows throws on a failed page too", async () => {
+      const fetchImpl = vi.fn(async () => ({ ok: false, status: 502, json: async () => ({}) }));
+      vi.stubGlobal("fetch", fetchImpl);
+      await expect(
+         fetchAllReportRows(new URLSearchParams({ tab: "sales" }), (d) => d.rows || []),
+      ).rejects.toThrow(/HTTP 502/);
       expect(fetchImpl).toHaveBeenCalledTimes(1);
    });
 });

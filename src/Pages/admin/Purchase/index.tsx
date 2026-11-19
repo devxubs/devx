@@ -342,32 +342,30 @@ const Purchase = () => {
                   filename: `Purchases_Summary_${new Date().toISOString().split("T")[0]}`,
                   title: "DevX POS - Purchases Summary",
                   fetchAllData: async () => {
-                     try {
-                        // PERF-03: page through the list API in
-                        // bounded chunks instead of one ?all=true
-                        // mega-response; same rows, same order.
-                        const purchases = await fetchAllPages(
-                           (page, limit) => `/api/purchases?page=${page}&limit=${limit}`,
-                           (d) => d.purchases || [],
-                           (d) => d.total,
-                        );
-                        return purchases.map((p: any) => ({
-                           // Real identity only — the old fallback
-                           // fabricated PUR_<row index> when customId
-                           // was missing (same anti-pattern removed
-                           // from Reports in the runtime-fix round).
-                           id: p.customId || p.id,
-                           invoice: p.invoice || "-",
-                           date: p.purchaseDate ? new Date(p.purchaseDate).toLocaleDateString() : "-",
-                           supplier: p.supplier?.name || "-",
-                           total: Number(p.totalAmount || 0),
-                           paid: Number(p.paid || 0),
-                           due: Number(p.due || 0),
-                           status: p.status || "RECEIVED",
-                        }));
-                     } catch {
-                        return [];
-                     }
+                     // PERF-03: page through the list API in
+                     // bounded chunks; same rows, same order. A
+                     // failed page makes fetchAllPages throw and the
+                     // export dialog shows the error instead of
+                     // exporting partial data as the complete set.
+                     const purchases = await fetchAllPages(
+                        (page, limit) => `/api/purchases?page=${page}&limit=${limit}`,
+                        (d) => d.purchases || [],
+                        (d) => d.total,
+                     );
+                     return purchases.map((p: any) => ({
+                        // Real identity only — the old fallback
+                        // fabricated PUR_<row index> when customId
+                        // was missing (same anti-pattern removed
+                        // from Reports in the runtime-fix round).
+                        id: p.customId || p.id,
+                        invoice: p.invoice || "-",
+                        date: p.purchaseDate ? new Date(p.purchaseDate).toLocaleDateString() : "-",
+                        supplier: p.supplier?.name || "-",
+                        total: Number(p.totalAmount || 0),
+                        paid: Number(p.paid || 0),
+                        due: Number(p.due || 0),
+                        status: p.status || "RECEIVED",
+                     }));
                   },
                   summaryRows: (data: any[]) => {
                      const totalSum = data.reduce((acc, row) => acc + (Number(row.total) || 0), 0);
