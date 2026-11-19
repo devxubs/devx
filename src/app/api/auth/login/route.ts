@@ -69,6 +69,15 @@ export async function POST(request: NextRequest) {
          );
       }
 
+      // Phase 1 (S-2): INACTIVE accounts (the users API's soft-delete /
+      // deactivation state) must not be able to sign in either.
+      if (user.status === "INACTIVE") {
+         return NextResponse.json(
+            { error: "Account inactive. Contact administrator." },
+            { status: 403 },
+         );
+      }
+
       // Successful login clears the failed-attempt counter.
       resetRateLimit(rateKey);
 

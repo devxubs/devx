@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
       let warehouses = await prisma.warehouse.findMany({
@@ -40,10 +38,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["products", "product", "product_create", "product_update"]);
+   if (gate instanceof NextResponse) return gate;
 
    try {
       const body = await request.json();

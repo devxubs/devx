@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 export async function GET(
@@ -7,10 +7,8 @@ export async function GET(
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
       const category = await prisma.category.findUnique({
@@ -32,10 +30,8 @@ export async function PUT(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["categories", "category", "category_update"]);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
 
@@ -62,10 +58,8 @@ export async function DELETE(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["categories", "category", "category_delete"]);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
 

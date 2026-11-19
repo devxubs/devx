@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, requirePermission } from "@src/lib/auth";
+import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 const ROLE_UPDATE_KEYS = ["roles", "role", "role_update_role", "role_update"];
@@ -9,10 +9,8 @@ export async function GET(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["roles", "role", "role_view", "role_view_role"]);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
    try {

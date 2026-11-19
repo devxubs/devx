@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { adjustWarehouseStock } from "@src/lib/stock";
 
@@ -8,10 +8,8 @@ export async function GET(
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
 
    const product = await prisma.product.findFirst({
       where: {
@@ -61,10 +59,9 @@ export async function PUT(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["products", "product", "product_update"]);
+   if (gate instanceof NextResponse) return gate;
+   const session = gate.session;
 
    const { id } = await params;
 
@@ -293,10 +290,8 @@ export async function DELETE(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["products", "product", "product_delete"]);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
    try {

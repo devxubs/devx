@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
+const UNIT_UPDATE_KEYS = ["units", "unit", "unit_update"];
+const UNIT_DELETE_KEYS = ["units", "unit", "unit_delete"];
+
 export async function GET(
-   _request: NextRequest,
+   request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
+   // S-1 fix (Phase 1): this was the only data route with no
+   // authentication at all. Require a valid, still-active session,
+   // matching every sibling route.
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
+
    const { id } = await params;
    try {
       const unit = await prisma.unit.findFirst({
@@ -28,10 +37,8 @@ async function handleUpdate(
    request: NextRequest,
    params: Promise<{ id: string }>,
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, UNIT_UPDATE_KEYS);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
 
@@ -138,10 +145,8 @@ export async function DELETE(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, UNIT_DELETE_KEYS);
+   if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
 

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { calculateNetProfit } from "@src/lib/finance";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["reports", "report", "report_view", "report_view_report"]);
+   if (gate instanceof NextResponse) return gate;
 
    const { searchParams } = new URL(request.url);
    const tab = searchParams.get("tab")?.toLowerCase() || "summary";

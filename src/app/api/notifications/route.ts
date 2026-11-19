@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
+   const session = sessionGate.session;
 
    try {
       // NOTIF-01 fix: notifications are per-user. A user sees their own
@@ -38,10 +37,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
+   const session = sessionGate.session;
 
    try {
       const body = await request.json();

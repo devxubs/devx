@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);
    const isExportAll = searchParams.get("all") === "true" || searchParams.get("export") === "true";
@@ -93,10 +91,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["products", "product", "product_create"]);
+   if (gate instanceof NextResponse) return gate;
+   const session = gate.session;
 
    try {
       const body = await request.json();

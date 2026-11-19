@@ -210,6 +210,34 @@ export async function getAuthContext(
 }
 
 /**
+ * Guard for endpoints that need a signed-in user whose account is
+ * still valid (S-2/S-4 Phase 1 fix). Unlike the bare getSessionUser()
+ * token check, this verifies against the database via getAuthContext()
+ * that the user still exists and is ACTIVE — so a suspended, inactive
+ * or deleted account's unexpired token stops working immediately, and
+ * role/permission changes apply on the next request. Returns the
+ * AuthContext on success, or a ready-to-return NextResponse (401 when
+ * there is no session, 403 when the account is no longer active) —
+ * check with `instanceof NextResponse`, same contract as requireAdmin().
+ */
+export async function requireActiveSession(
+   request: NextRequest,
+): Promise<AuthContext | NextResponse> {
+   const session = getSessionUser(request);
+   if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   }
+   const ctx = await getAuthContext(request);
+   if (!ctx) {
+      return NextResponse.json(
+         { error: "Forbidden: account is not active" },
+         { status: 403 },
+      );
+   }
+   return ctx;
+}
+
+/**
  * Guard for administrator-only endpoints (user/role management,
  * settings, recycle bin mutations, system export, ...).
  * Returns the AuthContext on success, or a ready-to-return

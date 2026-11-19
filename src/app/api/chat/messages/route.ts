@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser } from "@src/lib/auth";
+import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 /**
@@ -22,10 +22,9 @@ async function requireMembership(conversationId: string, userId: string) {
 }
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
+   const session = sessionGate.session;
 
    const { searchParams } = new URL(request.url);
    const conversationId = searchParams.get("conversationId");
@@ -55,10 +54,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
+   const session = sessionGate.session;
 
    try {
       const body = await request.json();

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, requirePermission } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 
 /**
@@ -61,10 +61,8 @@ const DEFAULT_SETTINGS = {
 export async function GET(request: NextRequest) {
    // SET-02 fix: settings are business configuration — authentication
    // required (previously any anonymous caller could read them).
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
       const settings = await prisma.storeSetting.findUnique({

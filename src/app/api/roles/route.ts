@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, requirePermission } from "@src/lib/auth";
+import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 
 export async function GET(request: NextRequest) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const gate = await requirePermission(request, ["roles", "role", "role_view", "role_view_role", "users", "user", "user_view", "user_view_user"]);
+   if (gate instanceof NextResponse) return gate;
 
    try {
       const roles = await prisma.role.findMany({

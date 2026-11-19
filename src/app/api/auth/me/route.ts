@@ -26,6 +26,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
    }
 
+   // Phase 1 (S-2): a suspended/inactive account's unexpired token must
+   // not keep a working session — /me is the client's session probe.
+   if (user.status !== "ACTIVE") {
+      return NextResponse.json(
+         { error: "Account is not active" },
+         { status: 403 },
+      );
+   }
+
    return NextResponse.json({
       user: {
          ...user,

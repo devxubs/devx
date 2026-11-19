@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-   getSessionUser,
    hashPassword,
+   requireActiveSession,
    requirePermission,
 } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
@@ -14,10 +14,8 @@ export async function GET(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { id } = await params;
    try {
@@ -35,6 +33,14 @@ export async function GET(
          return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
+      // Phase 1 (S-8): a single-user record exposes salary and contact
+      // details — readable by the account owner or by user managers,
+      // not by any signed-in account.
+      if (user.id !== sessionGate.userId) {
+         const gate = await requirePermission(request, USER_UPDATE_KEYS);
+         if (gate instanceof NextResponse) return gate;
+      }
+
       const { passwordHash: _, role, ...rest } = user;
       return NextResponse.json({
          ...rest,
@@ -50,10 +56,9 @@ export async function PUT(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   const session = getSessionUser(request);
-   if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   }
+   const sessionGate = await requireActiveSession(request);
+   if (sessionGate instanceof NextResponse) return sessionGate;
+   const session = sessionGate.session;
 
    const { id } = await params;
 
