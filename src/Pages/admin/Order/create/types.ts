@@ -94,6 +94,9 @@ export interface OrderCreateFormState {
    courier: string;
    paymentMethod: string;
    advancePayment: number;
+   /** Phase 3B (3.6): mobile-money reconciliation references. */
+   paymentTxId: string;
+   paymentSenderNumber: string;
    discountType: DiscountType;
    discountValue: number;
    taxEnabled: boolean;

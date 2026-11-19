@@ -9,6 +9,7 @@ import {
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import { findOrderWithTxId, duplicateTxIdMessage } from "@src/lib/payments";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -456,6 +457,31 @@ export async function POST(request: NextRequest) {
       if (body.employeeNote !== undefined)
          initialTags.employeeNote = String(body.employeeNote || "").trim();
 
+      // Phase 3B (3.6): payment reconciliation fields. The TxID and
+      // sender number ride in the pricing payload (top-level fields
+      // are also accepted). A non-empty TxID must not already belong
+      // to another non-deleted order — app-level 409 per schema plan
+      // §2 (no DB unique constraint, so the error can name the other
+      // order instead of surfacing as a raw database failure).
+      const paymentTxId = String(
+         pricing?.paymentTxId ?? body.paymentTxId ?? "",
+      ).trim();
+      const paymentSenderNumber = String(
+         pricing?.paymentSenderNumber ?? body.paymentSenderNumber ?? "",
+      ).trim();
+      if (paymentTxId) {
+         const clash = await findOrderWithTxId(paymentTxId);
+         if (clash) {
+            return NextResponse.json(
+               {
+                  error: "Duplicate transaction ID",
+                  message: duplicateTxIdMessage(paymentTxId, clash),
+               },
+               { status: 409 },
+            );
+         }
+      }
+
       // Compute authoritative server-side totals
       const totals = calculateOrderTotals(
          products.map((p: any) => ({
@@ -521,6 +547,8 @@ export async function POST(request: NextRequest) {
                orderTags:
                   Object.keys(initialTags).length > 0 ? initialTags : undefined,
                paymentMethod: pricing?.paymentMethod || "Cash on Delivery",
+               paymentTxId: paymentTxId || null,
+               paymentSenderNumber: paymentSenderNumber || null,
                subtotal: totals.subtotal,
                deliveryCharge: totals.deliveryCharge,
                discount: totals.discount,

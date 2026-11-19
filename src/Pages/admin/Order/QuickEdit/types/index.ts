@@ -15,6 +15,9 @@ export interface QuickEditPricingData {
    total: number;
    dueAmount: number;
    paymentMethod: string;
+   /** Phase 3B (3.6): mobile-money reconciliation references. */
+   paymentTxId: string;
+   paymentSenderNumber: string;
 }
 
 export interface OrderNoteItem {

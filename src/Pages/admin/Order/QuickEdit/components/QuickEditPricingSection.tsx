@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import Icon from "@src/components/Icon";
+import { isMobilePaymentMethod } from "../../paymentMethods";
 import { QuickEditPricingData } from "../types";
 
 interface QuickEditPricingSectionProps {
@@ -31,6 +32,7 @@ export const QuickEditPricingSection: React.FC<
    QuickEditPricingSectionProps
 > = ({ pricing, onChangeField, disabled = false }) => {
    const isPaidInFull = Number(pricing.dueAmount) <= 0;
+   const showTxFields = isMobilePaymentMethod(pricing.paymentMethod);
 
    return (
       <Paper
@@ -155,6 +157,40 @@ export const QuickEditPricingSection: React.FC<
                      }}
                   />
                </Grid>
+
+               {/* Phase 3B (3.6): mobile-money reconciliation
+                   references — shown only for bKash / Nagad / Rocket,
+                   where a transaction ID actually exists. */}
+               {showTxFields && (
+                  <>
+                     <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextField
+                           label="Transaction ID (optional)"
+                           size="small"
+                           fullWidth
+                           disabled={disabled}
+                           value={pricing.paymentTxId}
+                           placeholder="e.g. 9HX7K2LM1P"
+                           onChange={(e) =>
+                              onChangeField("paymentTxId", e.target.value)
+                           }
+                        />
+                     </Grid>
+                     <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                        <TextField
+                           label="Sender Number (optional)"
+                           size="small"
+                           fullWidth
+                           disabled={disabled}
+                           value={pricing.paymentSenderNumber}
+                           placeholder="01XXXXXXXXX"
+                           onChange={(e) =>
+                              onChangeField("paymentSenderNumber", e.target.value)
+                           }
+                        />
+                     </Grid>
+                  </>
+               )}
             </Grid>
 
             {/* Live Financial Breakdown Summary Panel */}

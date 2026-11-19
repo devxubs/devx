@@ -54,6 +54,8 @@ export const useQuickEditOrder = ({
       total: 0,
       dueAmount: 0,
       paymentMethod: "Cash on Delivery",
+      paymentTxId: "",
+      paymentSenderNumber: "",
    });
 
    const [status, setStatus] = useState<string>("PENDING");
@@ -102,6 +104,9 @@ export const useQuickEditOrder = ({
             data.pricing?.paymentMethod ||
             data.paymentMethod ||
             "Cash on Delivery",
+         paymentTxId: data.paymentTxId || data.pricing?.paymentTxId || "",
+         paymentSenderNumber:
+            data.paymentSenderNumber || data.pricing?.paymentSenderNumber || "",
       });
 
       setStatus(data.status || "PENDING");

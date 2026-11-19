@@ -42,6 +42,8 @@ const initialForm = (defaults?: Partial<OrderCreateFormState>): OrderCreateFormS
    courier: "",
    paymentMethod: "Cash on Delivery",
    advancePayment: 0,
+   paymentTxId: "",
+   paymentSenderNumber: "",
    discountType: "amount",
    discountValue: 0,
    taxEnabled: false,
@@ -77,7 +79,13 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          variantName: l.variantName ?? null,
          variants: Array.isArray(l.variants) ? l.variants : [],
       }));
-      setForm({ ...state, lines });
+      setForm({
+         ...state,
+         lines,
+         // Drafts saved before Phase 3B have no TxID fields.
+         paymentTxId: state.paymentTxId ?? "",
+         paymentSenderNumber: state.paymentSenderNumber ?? "",
+      });
       setIsDirty(false);
    }, []);
 
@@ -249,6 +257,10 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
             deliveryCharge: totals.deliveryCharge,
             discount: totals.submittedDiscount,
             advancePayment: totals.advancePayment,
+            // Phase 3B (3.6): reconciliation references (optional;
+            // the API trims and stores null when empty).
+            paymentTxId: (form.paymentTxId || "").trim(),
+            paymentSenderNumber: (form.paymentSenderNumber || "").trim(),
          },
          // The customer note doubles as the generic order note (existing
          // convention: Order Details falls back to orderNote for it).

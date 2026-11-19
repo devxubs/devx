@@ -20,7 +20,13 @@ export function mapOrderToInvoiceData(order: any): InvoiceOrderData {
          : new Date().toLocaleDateString(),
       createdAt: order.createdAt || new Date().toISOString(),
       paymentMethod: order.pricing?.paymentMethod || order.paymentMethod || "Cash On Delivery",
-      paymentStatus: order.paymentStatus || "PAID",
+      // Phase 3B: derived paid/due label — order.paymentStatus is
+      // the verification enum (UNVERIFIED/VERIFIED/MISMATCHED) and
+      // must never be printed on an invoice as the payment state.
+      paymentStatus:
+         Number(order.pricing?.dueAmount ?? order.dueAmount ?? 0) > 0
+            ? "DUE"
+            : "PAID",
       status: order.status || "COMPLETED",
       courier: order.courier,
       courierTrackingId: order.courierTrackingId,

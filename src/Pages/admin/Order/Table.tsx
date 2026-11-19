@@ -307,6 +307,10 @@ const OrderTable = () => {
                })),
                pricing: {
                   paymentMethod: o.paymentMethod || "Cash on Delivery",
+                  // Phase 3B (3.6): carried so Quick Edit hydrates the
+                  // reconciliation fields instead of clearing them.
+                  paymentTxId: o.paymentTxId || "",
+                  paymentSenderNumber: o.paymentSenderNumber || "",
                   subtotal: Number(o.subtotal),
                   deliveryCharge: Number(o.deliveryCharge),
                   discount: Number(o.discount),

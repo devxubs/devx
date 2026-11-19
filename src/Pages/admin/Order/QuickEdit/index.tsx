@@ -171,6 +171,8 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
                   discount: pricing.discount,
                   advancePayment: pricing.advancePayment,
                   paymentMethod: pricing.paymentMethod,
+                  paymentTxId: pricing.paymentTxId,
+                  paymentSenderNumber: pricing.paymentSenderNumber,
                   status,
                   orderSource,
                   orderNote: customerNote,

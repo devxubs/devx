@@ -15,6 +15,7 @@ import {
 import React from "react";
 import SectionCard from "./SectionCard";
 import { formatBDT } from "./orderCalculations";
+import { isMobilePaymentMethod } from "../paymentMethods";
 import type { OrderTotals } from "./types";
 
 /** Existing methods (data.ts) plus the mobile-banking methods used in BD. */
@@ -34,12 +35,15 @@ export const PAYMENT_METHODS = [
 interface PaymentSectionProps {
    paymentMethod: string;
    advancePayment: number;
+   paymentTxId?: string;
+   paymentSenderNumber?: string;
    totals: OrderTotals;
-   onChange: (partial: { paymentMethod?: string; advancePayment?: number }) => void;
+   onChange: (partial: { paymentMethod?: string; advancePayment?: number; paymentTxId?: string; paymentSenderNumber?: string }) => void;
    currencySymbol?: string;
 }
 
-const PaymentSection = ({ paymentMethod, advancePayment, totals, onChange, currencySymbol = "৳" }: PaymentSectionProps) => {
+const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", paymentSenderNumber = "", totals, onChange, currencySymbol = "৳" }: PaymentSectionProps) => {
+   const showTxFields = isMobilePaymentMethod(paymentMethod);
    const statusColor =
       totals.paymentStatus === "Paid" ? "success" : totals.paymentStatus === "Partial" ? "warning" : "error";
    const overpaid = advancePayment > totals.grandTotal;
@@ -90,6 +94,38 @@ const PaymentSection = ({ paymentMethod, advancePayment, totals, onChange, curre
                   />
                </Stack>
             </Grid>
+            {showTxFields && (
+               <>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                     <Stack spacing={1}>
+                        <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+                           Transaction ID (optional)
+                        </Typography>
+                        <TextField
+                           size="small"
+                           fullWidth
+                           value={paymentTxId}
+                           placeholder="e.g. 9HX7K2LM1P"
+                           onChange={(e) => onChange({ paymentTxId: e.target.value })}
+                        />
+                     </Stack>
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                     <Stack spacing={1}>
+                        <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+                           Sender Number (optional)
+                        </Typography>
+                        <TextField
+                           size="small"
+                           fullWidth
+                           value={paymentSenderNumber}
+                           placeholder="01XXXXXXXXX"
+                           onChange={(e) => onChange({ paymentSenderNumber: e.target.value })}
+                        />
+                     </Stack>
+                  </Grid>
+               </>
+            )}
             <Grid size={{ xs: 12 }}>
                <Stack direction="row" spacing={1} alignItems="center">
                   <Typography variant="body2" color="textSecondary">

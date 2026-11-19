@@ -10,6 +10,9 @@ import {
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import { findOrderWithTxId, duplicateTxIdMessage } from "@src/lib/payments";
+
+const PAYMENT_STATUS_VALUES = ["UNVERIFIED", "VERIFIED", "MISMATCHED"];
 
 export async function GET(
    request: NextRequest,
@@ -305,6 +308,78 @@ export async function PUT(
             badgeLabel: body.courier || existingOrder.courier || "Courier",
             isImportant: true,
          });
+      }
+
+      // 5. Phase 3B (3.6): payment reconciliation fields — TxID,
+      // sender number, and the verification status. The duplicate
+      // check excludes this order itself, so re-saving an unchanged
+      // TxID never collides with its own record. The verification
+      // status is only ever set explicitly here (staff action in
+      // Order Details / the reconciliation report) — nothing in the
+      // system auto-marks a payment VERIFIED.
+      // The fields are read at the top level (Quick Edit, Order
+      // Details) or inside the pricing object (Order Create's edit
+      // mode submits the same payload shape as its create mode).
+      const rawTxId =
+         body.paymentTxId !== undefined ? body.paymentTxId : body.pricing?.paymentTxId;
+      const rawSender =
+         body.paymentSenderNumber !== undefined
+            ? body.paymentSenderNumber
+            : body.pricing?.paymentSenderNumber;
+      let paymentTxIdUpdate: string | null | undefined;
+      if (rawTxId !== undefined) {
+         paymentTxIdUpdate = String(rawTxId || "").trim() || null;
+         if (paymentTxIdUpdate) {
+            const clash = await findOrderWithTxId(
+               paymentTxIdUpdate,
+               existingOrder.id,
+            );
+            if (clash) {
+               return NextResponse.json(
+                  {
+                     error: "Duplicate transaction ID",
+                     message: duplicateTxIdMessage(paymentTxIdUpdate, clash),
+                  },
+                  { status: 409 },
+               );
+            }
+         }
+      }
+      const paymentSenderUpdate: string | null | undefined =
+         rawSender !== undefined
+            ? String(rawSender || "").trim() || null
+            : undefined;
+      let paymentStatusUpdate: string | undefined;
+      if (body.paymentStatus !== undefined) {
+         const candidate = String(body.paymentStatus).toUpperCase();
+         if (!PAYMENT_STATUS_VALUES.includes(candidate)) {
+            return NextResponse.json(
+               {
+                  error: "Validation error",
+                  message: `paymentStatus must be one of ${PAYMENT_STATUS_VALUES.join(", ")}.`,
+               },
+               { status: 400 },
+            );
+         }
+         paymentStatusUpdate = candidate;
+         if (candidate !== existingOrder.paymentStatus) {
+            newAuditEvents.push({
+               id: `act-audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+               action: `Payment ${candidate === "VERIFIED" ? "Verified" : candidate === "MISMATCHED" ? "Flagged Mismatched" : "Marked Unverified"}`,
+               category: "payment",
+               actor: auditActor,
+               details: `Payment verification changed from ${existingOrder.paymentStatus} to ${candidate}${existingOrder.paymentTxId ? ` (TxID ${existingOrder.paymentTxId})` : ""}`,
+               diff: {
+                  field: "paymentStatus",
+                  previous: existingOrder.paymentStatus,
+                  new: candidate,
+               },
+               timestamp: nowIso,
+               icon: "solar:shield-check-bold",
+               badgeLabel: "Payment Verification",
+               isImportant: true,
+            });
+         }
       }
 
       // Compile updated tags
@@ -874,6 +949,9 @@ export async function PUT(
                      body.paymentMethod !== undefined
                         ? body.paymentMethod
                         : undefined,
+                  paymentTxId: paymentTxIdUpdate,
+                  paymentSenderNumber: paymentSenderUpdate,
+                  paymentStatus: paymentStatusUpdate as any,
                   courier:
                      body.courier !== undefined ? body.courier : undefined,
                   courierStatus:
@@ -1010,6 +1088,9 @@ export async function PUT(
                   body.paymentMethod !== undefined
                      ? body.paymentMethod
                      : undefined,
+               paymentTxId: paymentTxIdUpdate,
+               paymentSenderNumber: paymentSenderUpdate,
+               paymentStatus: paymentStatusUpdate as any,
                courier: body.courier !== undefined ? body.courier : undefined,
                courierStatus:
                   body.courierStatus !== undefined

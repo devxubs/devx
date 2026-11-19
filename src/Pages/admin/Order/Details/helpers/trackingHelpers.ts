@@ -191,13 +191,14 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
          metadata: [
             { label: "Payment", value: order.paymentMethod || "Cash" },
             {
+               // Phase 3B: order.paymentStatus is the payment
+               // VERIFICATION enum (UNVERIFIED/VERIFIED/MISMATCHED),
+               // not the paid/due state — the paid/due label is
+               // derived from dueAmount, as it was before the
+               // verification field existed.
                label: "Payment Status",
-               value:
-                  order.paymentStatus ||
-                  (Number(order.dueAmount || 0) <= 0 ? "PAID" : "DUE"),
-               highlight:
-                  order.paymentStatus === "PAID" ||
-                  Number(order.dueAmount || 0) <= 0,
+               value: Number(order.dueAmount || 0) <= 0 ? "PAID" : "DUE",
+               highlight: Number(order.dueAmount || 0) <= 0,
             },
          ],
       });
@@ -345,13 +346,14 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
          metadata: [
             { label: "Payment", value: order.paymentMethod || "Cash on Delivery" },
             {
+               // Phase 3B: order.paymentStatus is the payment
+               // VERIFICATION enum (UNVERIFIED/VERIFIED/MISMATCHED),
+               // not the paid/due state — the paid/due label is
+               // derived from dueAmount, as it was before the
+               // verification field existed.
                label: "Payment Status",
-               value:
-                  order.paymentStatus ||
-                  (Number(order.dueAmount || 0) <= 0 ? "PAID" : "DUE"),
-               highlight:
-                  order.paymentStatus === "PAID" ||
-                  Number(order.dueAmount || 0) <= 0,
+               value: Number(order.dueAmount || 0) <= 0 ? "PAID" : "DUE",
+               highlight: Number(order.dueAmount || 0) <= 0,
             },
          ],
       });

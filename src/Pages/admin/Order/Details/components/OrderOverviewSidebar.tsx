@@ -22,17 +22,58 @@ import { formatEmployeeCode } from "../helpers/trackingHelpers";
 interface OrderOverviewSidebarProps {
    order: any;
    onOpenCustomerProfile?: (customerId: string) => void;
+   /** Phase 3B: called with the fresh order after a payment
+    * verification change so the page state stays in sync. */
+   onOrderUpdated?: (order: any) => void;
 }
+
+const PAYMENT_VERIFICATION_META: Record<
+   string,
+   { label: string; color: "success" | "warning" | "error" }
+> = {
+   VERIFIED: { label: "Verified", color: "success" },
+   MISMATCHED: { label: "Mismatched", color: "error" },
+   UNVERIFIED: { label: "Unverified", color: "warning" },
+};
 
 export default function OrderOverviewSidebar({
    order,
    onOpenCustomerProfile,
+   onOrderUpdated,
 }: OrderOverviewSidebarProps) {
    const theme = useTheme();
    const { formatCurrency } = useSettings();
 
    const [copiedPhone, setCopiedPhone] = useState(false);
    const [copiedTracking, setCopiedTracking] = useState(false);
+   const [verificationSaving, setVerificationSaving] = useState(false);
+   const [verificationError, setVerificationError] = useState<string | null>(null);
+
+   const verificationStatus = String(order?.paymentStatus || "UNVERIFIED");
+   const verificationMeta =
+      PAYMENT_VERIFICATION_META[verificationStatus] || PAYMENT_VERIFICATION_META.UNVERIFIED;
+
+   const handleVerificationChange = async (next: string) => {
+      if (!order?.id || verificationSaving) return;
+      setVerificationSaving(true);
+      setVerificationError(null);
+      try {
+         const res = await fetch(`/api/orders/${order.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paymentStatus: next }),
+         });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) {
+            throw new Error(data.message || data.error || "Failed to update verification");
+         }
+         onOrderUpdated?.(data);
+      } catch (err: any) {
+         setVerificationError(err?.message || "Failed to update verification");
+      } finally {
+         setVerificationSaving(false);
+      }
+   };
 
    const customer = order?.customer;
    const employee = order?.employee;
@@ -351,6 +392,89 @@ export default function OrderOverviewSidebar({
                         {isCancelledOrder && " (Void)"}
                      </Typography>
                   </Stack>
+
+                  {/* Phase 3B (3.6): reconciliation references +
+                      verification state. Verification is a manual
+                      staff action — nothing auto-verifies a payment. */}
+                  {(order?.paymentTxId || order?.paymentSenderNumber) && (
+                     <>
+                        {order?.paymentTxId ? (
+                           <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="caption" color="text.secondary">
+                                 Transaction ID:
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600} sx={{ fontFamily: "monospace" }}>
+                                 {order.paymentTxId}
+                              </Typography>
+                           </Stack>
+                        ) : null}
+                        {order?.paymentSenderNumber ? (
+                           <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="caption" color="text.secondary">
+                                 Sender Number:
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                 {order.paymentSenderNumber}
+                              </Typography>
+                           </Stack>
+                        ) : null}
+                     </>
+                  )}
+
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                     <Typography variant="caption" color="text.secondary">
+                        Payment Verification:
+                     </Typography>
+                     <Chip
+                        label={verificationMeta.label}
+                        size="small"
+                        color={verificationMeta.color}
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700 }}
+                     />
+                  </Stack>
+                  {!isCancelledOrder && (
+                     <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        {verificationStatus !== "VERIFIED" && (
+                           <Button
+                              size="small"
+                              variant="outlined"
+                              color="success"
+                              disabled={verificationSaving}
+                              onClick={() => handleVerificationChange("VERIFIED")}
+                           >
+                              Mark Verified
+                           </Button>
+                        )}
+                        {verificationStatus !== "MISMATCHED" && (
+                           <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              disabled={verificationSaving}
+                              onClick={() => handleVerificationChange("MISMATCHED")}
+                           >
+                              Flag Mismatch
+                           </Button>
+                        )}
+                        {verificationStatus !== "UNVERIFIED" && (
+                           <Button
+                              size="small"
+                              variant="text"
+                              color="inherit"
+                              disabled={verificationSaving}
+                              onClick={() => handleVerificationChange("UNVERIFIED")}
+                           >
+                              Reset
+                           </Button>
+                        )}
+                     </Stack>
+                  )}
+                  {verificationError && (
+                     <Typography variant="caption" color="error.main">
+                        {verificationError}
+                     </Typography>
+                  )}
 
                   <Divider sx={{ my: 0.5, borderColor: "divider" }} />
 

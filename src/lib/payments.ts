@@ -1,0 +1,54 @@
+import { prisma } from "./prisma";
+
+/**
+ * Payment reconciliation helpers (Phase 3B, roadmap 3.6 / schema
+ * plan §2).
+ *
+ * An order carries at most one mobile-money transaction reference
+ * (`paymentTxId` + `paymentSenderNumber`, added in Phase 3A) and a
+ * verification state (`paymentStatus`: UNVERIFIED / VERIFIED /
+ * MISMATCHED). Duplicate TxIDs are rejected at the application level
+ * with a 409 — deliberately NOT a database unique constraint, so a
+ * staff typo surfaces as a readable error naming the other order
+ * instead of a raw DB failure mid-sale, and one payment legitimately
+ * covering two orders can still be recorded after review (the check
+ * only fires on the write paths that set a TxID).
+ */
+
+/** Methods for which a TxID / sender number is meaningful. */
+export const MOBILE_PAYMENT_METHODS = ["bKash", "Nagad", "Rocket"];
+
+export function isMobilePaymentMethod(method?: string | null): boolean {
+   if (!method) return false;
+   const normalized = method.trim().toLowerCase();
+   return MOBILE_PAYMENT_METHODS.some((m) => m.toLowerCase() === normalized);
+}
+
+/**
+ * Find a non-deleted order (other than `excludeOrderId`) that already
+ * carries the given non-empty transaction ID. Returns null when the
+ * TxID is empty or unused.
+ */
+export async function findOrderWithTxId(
+   txId: string,
+   excludeOrderId?: string,
+) {
+   const clean = String(txId || "").trim();
+   if (!clean) return null;
+   return prisma.order.findFirst({
+      where: {
+         paymentTxId: clean,
+         isDeleted: false,
+         ...(excludeOrderId ? { id: { not: excludeOrderId } } : {}),
+      },
+      select: { id: true, orderId: true, orderCode: true, customId: true },
+   });
+}
+
+export function duplicateTxIdMessage(
+   txId: string,
+   clash: { id?: string; orderId?: string | null; orderCode?: string | null; customId?: string | null },
+): string {
+   const label = clash.orderId || clash.orderCode || clash.customId || clash.id;
+   return `Transaction ID "${txId}" is already recorded on order ${label}. Check for a duplicate entry before saving.`;
+}

@@ -120,6 +120,8 @@ const Publish = () => {
                courier: o.courier || "",
                paymentMethod: o.paymentMethod || "Cash on Delivery",
                advancePayment: Number(o.advancePayment) || 0,
+               paymentTxId: o.paymentTxId || "",
+               paymentSenderNumber: o.paymentSenderNumber || "",
                discountType: "amount",
                discountValue: Number(o.discount) || 0,
                taxEnabled: Number(tags.taxAmount) > 0,
@@ -283,6 +285,8 @@ const Publish = () => {
                      <PaymentSection
                         paymentMethod={form.paymentMethod}
                         advancePayment={form.advancePayment}
+                        paymentTxId={form.paymentTxId}
+                        paymentSenderNumber={form.paymentSenderNumber}
                         totals={totals}
                         onChange={(p) => patch(p)}
                         currencySymbol={currencySymbol}

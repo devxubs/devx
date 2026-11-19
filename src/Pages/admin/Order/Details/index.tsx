@@ -159,6 +159,13 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
                   <OrderOverviewSidebar
                      order={order}
                      onOpenCustomerProfile={(cusId) => setSelectedCustomerId(cusId)}
+                     onOrderUpdated={(updated) => {
+                        setOrder(updated);
+                        setFeedback({
+                           type: "success",
+                           message: "Payment verification updated",
+                        });
+                     }}
                   />
                </Grid>
             </Grid>
