@@ -403,7 +403,7 @@ export default function OrderTracking({
                                        </Typography>
 
                                        {meta.label === "Tracking ID" && (
-                                          <Tooltip
+                                          <Tooltip disableInteractive
                                              title={
                                                 copiedId === meta.value
                                                    ? "Copied!"

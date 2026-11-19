@@ -126,7 +126,7 @@ export default function CustomerDetailModal({
                                     <Typography variant="body2" fontWeight={500}>
                                        {customer.phone}
                                     </Typography>
-                                    <Tooltip title={copyText}>
+                                    <Tooltip disableInteractive title={copyText}>
                                        <Button
                                           size="small"
                                           variant="text"
@@ -137,7 +137,7 @@ export default function CustomerDetailModal({
                                           <Icon icon="solar:copy-bold-duotone" size="14px" />
                                        </Button>
                                     </Tooltip>
-                                    <Tooltip title="Call now">
+                                    <Tooltip disableInteractive title="Call now">
                                        <Button
                                           size="small"
                                           variant="text"

@@ -172,7 +172,7 @@ const NotificationDrawer = ({ open, onClose, onOpen, onUnreadChange }: Notificat
                   )}
                </Stack>
                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Tooltip title="Mark all as read">
+                  <Tooltip disableInteractive title="Mark all as read">
                      <IconButton onClick={handleMarkAllAsRead} size="small">
                         <Icon icon="solar:list-check-bold-duotone" />
                      </IconButton>

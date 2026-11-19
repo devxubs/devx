@@ -127,7 +127,7 @@ const Header = ({ user, conversation, onClose, open, onConversationUpdated }: He
                      {user && !user.id ? "Select a user to chat" : user.name}
                   </Typography>
                   {isMuted && (
-                     <Tooltip title="Muted">
+                     <Tooltip disableInteractive title="Muted">
                         <span style={{ display: "inline-flex" }}>
                            <Icon
                               icon="solar:muted-bold"
@@ -159,7 +159,7 @@ const Header = ({ user, conversation, onClose, open, onConversationUpdated }: He
                {/* Edit Group Profile Option */}
                {isGroup && (
                   <>
-                     <Tooltip title="Edit Group Profile">
+                     <Tooltip disableInteractive title="Edit Group Profile">
                         <IconButton
                            size="small"
                            onClick={() => setOpenEditGroup(true)}
@@ -251,7 +251,7 @@ const Header = ({ user, conversation, onClose, open, onConversationUpdated }: He
                </CustomModal>
 
                {/* Mute Button */}
-               <Tooltip title={isMuted ? "Unmute Chat" : "Mute Chat"}>
+               <Tooltip disableInteractive title={isMuted ? "Unmute Chat" : "Mute Chat"}>
                   <IconButton
                      size="small"
                      onClick={() => setOpenModal(true)}

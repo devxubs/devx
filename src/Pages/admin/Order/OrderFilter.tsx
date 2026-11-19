@@ -19,7 +19,7 @@ export const OrderFilterComponent = ({
 
    return (
       <Box>
-         <Tooltip title="Filter">
+         <Tooltip disableInteractive title="Filter">
             <IconButton
                data-testid="order-filter-btn"
                sx={{ color: "text.secondary" }}

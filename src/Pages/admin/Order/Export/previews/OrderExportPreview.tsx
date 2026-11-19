@@ -111,7 +111,7 @@ export const OrderExportPreview: React.FC<OrderExportPreviewProps> = ({
                   role="radiogroup"
                   aria-label="Preview Theme"
                >
-                  <Tooltip title="Preview Light Theme" arrow>
+                  <Tooltip disableInteractive title="Preview Light Theme" arrow>
                      <IconButton
                         size="small"
                         role="radio"
@@ -146,7 +146,7 @@ export const OrderExportPreview: React.FC<OrderExportPreviewProps> = ({
                      </IconButton>
                   </Tooltip>
 
-                  <Tooltip title="Preview Dark Theme" arrow>
+                  <Tooltip disableInteractive title="Preview Dark Theme" arrow>
                      <IconButton
                         size="small"
                         role="radio"

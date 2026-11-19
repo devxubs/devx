@@ -318,7 +318,7 @@ export default function CustomerOrderHistoryTable({
 
                            {/* Actions */}
                            <TableCell align="right">
-                              <Tooltip title="View Order Details Page">
+                              <Tooltip disableInteractive title="View Order Details Page">
                                  <Button
                                     size="small"
                                     variant="outlined"

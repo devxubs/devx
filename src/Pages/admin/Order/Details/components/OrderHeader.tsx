@@ -213,7 +213,7 @@ export default function OrderHeader({
                }}
             >
                {/* Quick Edit in Modal */}
-               <Tooltip title="Quick Edit" arrow>
+               <Tooltip disableInteractive title="Quick Edit" arrow>
                   <IconButton
                      color="inherit"
                      onClick={onOpenQuickEdit}
@@ -224,7 +224,7 @@ export default function OrderHeader({
                </Tooltip>
 
                {/* Full Order Edit */}
-               <Tooltip title="Edit Order" arrow>
+               <Tooltip disableInteractive title="Edit Order" arrow>
                   <IconButton
                      color="inherit"
                      onClick={() =>
@@ -237,7 +237,7 @@ export default function OrderHeader({
                </Tooltip>
 
                {/* Print Invoice */}
-               <Tooltip title="Print Invoice" arrow>
+               <Tooltip disableInteractive title="Print Invoice" arrow>
                   <IconButton
                      color="primary"
                      onClick={onPrintInvoice}

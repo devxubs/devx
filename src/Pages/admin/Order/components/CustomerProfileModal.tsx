@@ -265,7 +265,7 @@ export default function CustomerProfileModal({
                                     </Typography>
 
                                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: 0.5 }}>
-                                       <Tooltip title={copyText} arrow>
+                                       <Tooltip disableInteractive title={copyText} arrow>
                                           <IconButton
                                              size="small"
                                              onClick={handleCopyPhone}
@@ -284,7 +284,7 @@ export default function CustomerProfileModal({
                                           </IconButton>
                                        </Tooltip>
 
-                                       <Tooltip title="Call Now" arrow>
+                                       <Tooltip disableInteractive title="Call Now" arrow>
                                           <IconButton
                                              size="small"
                                              color="primary"
@@ -970,7 +970,7 @@ export default function CustomerProfileModal({
 
                                        {/* Action button */}
                                        <TableCell align="right">
-                                          <Tooltip title="View Order Details Page">
+                                          <Tooltip disableInteractive title="View Order Details Page">
                                              <Button
                                                 size="small"
                                                 variant="outlined"

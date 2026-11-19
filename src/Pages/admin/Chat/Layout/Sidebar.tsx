@@ -110,7 +110,7 @@ const Sidebar = ({
 
                <Stack spacing={0.5} direction="row" alignItems="center">
                   {open && (
-                     <Tooltip title="Create Group Chat">
+                     <Tooltip disableInteractive title="Create Group Chat">
                         <IconButton
                            data-testid="create-group-btn"
                            size="small"

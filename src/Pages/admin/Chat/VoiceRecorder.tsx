@@ -155,13 +155,13 @@ const VoiceRecorder = () => {
             justifyContent="space-between"
             alignItems="center"
          >
-            <Tooltip title="Clear Recording">
+            <Tooltip disableInteractive title="Clear Recording">
                <IconButton size="small" onClick={handleClear}>
                   <Icon icon="solar:trash-bin-trash-bold" size="small" />
                </IconButton>
             </Tooltip>
 
-            <Tooltip
+            <Tooltip disableInteractive
                title={
                   !audioUrl
                      ? state.get("isRecording")
@@ -197,7 +197,7 @@ const VoiceRecorder = () => {
                </IconButton>
             </Tooltip>
 
-            <Tooltip title="Send Recording">
+            <Tooltip disableInteractive title="Send Recording">
                <IconButton size="small">
                   <SendIcon fontSize="small" />
                </IconButton>

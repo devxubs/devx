@@ -293,7 +293,7 @@ export default function OrderNotesCard({
                                  </Stack>
 
                                  {!isEditing && (
-                                    <Tooltip title={`Edit ${cfg.title}`} arrow>
+                                    <Tooltip disableInteractive title={`Edit ${cfg.title}`} arrow>
                                        <IconButton
                                           size="small"
                                           onClick={() => handleStartEdit(cfg.type, cfg.value)}

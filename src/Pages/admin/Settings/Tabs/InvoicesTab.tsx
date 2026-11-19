@@ -198,7 +198,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                               >
                                  {isSelected ? "Selected" : "Set as Default"}
                               </Button>
-                              <Tooltip title="Live Preview with Sample Data">
+                              <Tooltip disableInteractive title="Live Preview with Sample Data">
                                  <IconButton
                                     size="small"
                                     color="primary"

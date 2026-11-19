@@ -93,7 +93,7 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                >
                   <Typography variant="h6">Settings</Typography>
                   <Stack direction="row" alignItems="center" spacing={1}>
-                     <Tooltip
+                     <Tooltip disableInteractive
                         title={
                            isFullscreen ? "Exit full screen" : "Full screen"
                         }
@@ -106,7 +106,7 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                            )}
                         </IconButton>
                      </Tooltip>
-                     <Tooltip title="Close">
+                     <Tooltip disableInteractive title="Close">
                         <IconButton onClick={onClose}>
                            <Icon icon="eva:close-fill" />
                         </IconButton>

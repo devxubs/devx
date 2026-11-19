@@ -87,7 +87,7 @@ const Profile = ({ open, onClose, onOpen }: ProfileProps) => {
                   >
                      <Typography variant="h6">Profile</Typography>
                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Tooltip title="Close">
+                        <Tooltip disableInteractive title="Close">
                            <IconButton onClick={onClose}>
                               <Icon icon="eva:close-fill" />
                            </IconButton>

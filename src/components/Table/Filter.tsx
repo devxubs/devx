@@ -488,7 +488,7 @@ const Filter: React.FC<FilterProps> = ({
 
             {/* Clear Selection Button */}
             {!hideSelectionActions && onClearSelection && (
-               <Tooltip title="Clear selection">
+               <Tooltip disableInteractive title="Clear selection">
                   <IconButton
                      size="small"
                      onClick={onClearSelection}

@@ -209,7 +209,7 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
             showSelectionIndicators={false}
             hideSelectionActions
             filter={() => (
-               <Tooltip title="Filter">
+               <Tooltip disableInteractive title="Filter">
                   <Badge badgeContent={countActive(filters)} color="primary">
                      <IconButton
                         data-testid="stock-movements-filter-btn"
