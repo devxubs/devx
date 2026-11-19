@@ -280,8 +280,13 @@ export async function PUT(
             { status: 409 },
          );
       }
+      // Phase 5 (§5.4): don't echo raw driver/ORM error text to the
+      // client on a 500 — it can carry schema/column details. The
+      // detail stays in the server log; the client gets the generic
+      // message. (Domain errors elsewhere keep their safe messages.)
+      console.error("Product update failed:", error);
       return NextResponse.json(
-         { error: error?.message || "Failed to update product" },
+         { error: "Failed to update product" },
          { status: 500 },
       );
    }
