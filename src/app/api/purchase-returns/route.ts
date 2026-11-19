@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveSession } from "@src/lib/auth";
+import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { parsePagination } from "@src/lib/pagination";
 import { standingCreditOf } from "@src/lib/purchaseReturns";
 
 // Purchase returns — read side (Phase 4, D2).
@@ -11,14 +12,32 @@ import { standingCreditOf } from "@src/lib/purchaseReturns";
 // under /api/purchase-returns/[id]. Deleted returns disappear from
 // lists exactly like voided supplier payments do; the audit log
 // keeps the permanent trail.
+//
+// Follow-up round: the read side carries the SAME permission gate
+// as the create/reverse routes (it was previously open to any
+// active session) and is bounded through the shared pagination
+// parser. The per-purchase / per-supplier lists are small, so the
+// parser is called with a 100-row default/cap: existing consumers
+// (purchase detail, return form) send no page params and receive
+// the same { returns: [...] } shape as before, while a pathological
+// filter can no longer pull an unbounded result set.
+
+const RETURN_GATE = [
+   "suppliers",
+   "supplier",
+   "supplier_update",
+   "purchases",
+   "purchase_update",
+];
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
-   if (sessionGate instanceof NextResponse) return sessionGate;
+   const gate = await requirePermission(request, RETURN_GATE);
+   if (gate instanceof NextResponse) return gate;
 
    const { searchParams } = new URL(request.url);
    const purchaseId = searchParams.get("purchaseId")?.trim() || "";
    const supplierId = searchParams.get("supplierId")?.trim() || "";
+   const { limit, skip } = parsePagination(searchParams, 100, 100);
 
    if (!purchaseId && !supplierId) {
       return NextResponse.json(
@@ -41,6 +60,8 @@ export async function GET(request: NextRequest) {
             createdBy: { select: { id: true, name: true, customId: true } },
          },
          orderBy: { createdAt: "desc" },
+         skip,
+         take: limit,
       });
 
       return NextResponse.json({
