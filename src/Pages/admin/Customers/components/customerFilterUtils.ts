@@ -154,6 +154,12 @@ export function resolveDateRange(
    preset: RegPreset | LastOrderPreset,
    customRange: [Date | null, Date | null],
 ): [Date, Date] | null {
+   if (customRange && customRange[0] && customRange[1]) {
+      return [
+         dayjs(customRange[0]).startOf("day").toDate(),
+         dayjs(customRange[1]).endOf("day").toDate(),
+      ];
+   }
    const now = dayjs();
    switch (preset) {
       case "today":
@@ -417,14 +423,21 @@ function dateRangeLabel(
    name: string,
    preset: RegPreset | LastOrderPreset,
    customRange: [Date | null, Date | null],
-   presetOptions: { value: string; label: string }[],
+   presetOptions?: { value: string; label: string }[],
 ): string | null {
    const range = resolveDateRange(preset, customRange);
    if (!range) return null;
-   if (preset === "custom") {
+   if (
+      preset === "custom" ||
+      (customRange && customRange[0] && customRange[1])
+   ) {
+      if (dayjs(range[0]).isSame(range[1], "day")) {
+         return `${name}: ${dayjs(range[0]).format("DD MMM YYYY")}`;
+      }
       return `${name}: ${dayjs(range[0]).format("DD MMM YYYY")} – ${dayjs(range[1]).format("DD MMM YYYY")}`;
    }
-   const label = presetOptions.find((o) => o.value === preset)?.label || preset;
+   const label =
+      presetOptions?.find((o) => o.value === preset)?.label || preset;
    return `${name}: ${label}`;
 }
 

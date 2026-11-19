@@ -21,13 +21,9 @@ import DateRange from "@src/components/DateRange";
 import {
    CustomerFilterErrors,
    CustomerFilterState,
-   LAST_ORDER_PRESET_OPTIONS,
-   LastOrderPreset,
    NumericRange,
    ORDER_STATUS_OPTIONS,
-   REG_PRESET_OPTIONS,
    RangeOp,
-   RegPreset,
    StatusFilter,
 } from "./customerFilterUtils";
 
@@ -394,51 +390,6 @@ const RangeFilterField = ({
    );
 };
 
-/** Preset dropdown (CustomAutocomplete) + shared DateRange for Custom. */
-const DatePresetField = ({
-   label,
-   presetValue,
-   presetOptions,
-   onPresetChange,
-   range,
-   onRangeChange,
-   error,
-}: {
-   label: string;
-   presetValue: string;
-   presetOptions: { value: string; label: string }[];
-   onPresetChange: (v: string) => void;
-   range: [Date | null, Date | null];
-   onRangeChange: (r: [Date | null, Date | null]) => void;
-   error?: string;
-}) => (
-   <Stack spacing={0.75}>
-      <FieldLabel>{label}</FieldLabel>
-      <CustomAutocomplete
-         size="small"
-         arrow={true}
-         placeholder="Select preset"
-         options={presetOptions.map((o) => o.label)}
-         value={presetOptions.find((o) => o.value === presetValue)?.label || ""}
-         onChange={(v: any) => {
-            const found = presetOptions.find((o) => o.label === v);
-            if (found) onPresetChange(found.value);
-         }}
-      />
-      {presetValue === "custom" && (
-         <Box sx={{ mt: 1 }}>
-            <DateRange
-               size="small"
-               title={label}
-               value={range}
-               onChange={onRangeChange}
-            />
-         </Box>
-      )}
-      <FieldError message={error} />
-   </Stack>
-);
-
 /** Label row with compact, neatly aligned Exclude checkbox on the right. */
 const ExcludeLabel = ({
    label,
@@ -630,30 +581,46 @@ const CustomerFilters = ({
 
                {/* Registration Date */}
                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                  <DatePresetField
-                     label="Registration Date"
-                     presetValue={value.regPreset}
-                     presetOptions={REG_PRESET_OPTIONS}
-                     onPresetChange={(v) => set({ regPreset: v as RegPreset })}
-                     range={value.regRange}
-                     onRangeChange={(range) => set({ regRange: range })}
-                     error={err("reg")}
-                  />
+                  <Stack spacing={0.75}>
+                     <FieldLabel>Registration Date</FieldLabel>
+                     <Box sx={{ width: "100%", "& > *": { width: "100%" } }}>
+                        <DateRange
+                           size="small"
+                           title="All Time"
+                           value={value.regRange}
+                           onChange={(range) =>
+                              set({
+                                 regRange: range,
+                                 regPreset:
+                                    range[0] && range[1] ? "custom" : "all",
+                              })
+                           }
+                        />
+                     </Box>
+                     <FieldError message={err("reg")} />
+                  </Stack>
                </Grid>
 
                {/* Last Order Date */}
                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                  <DatePresetField
-                     label="Last Order Date"
-                     presetValue={value.lastPreset}
-                     presetOptions={LAST_ORDER_PRESET_OPTIONS}
-                     onPresetChange={(v) =>
-                        set({ lastPreset: v as LastOrderPreset })
-                     }
-                     range={value.lastRange}
-                     onRangeChange={(range) => set({ lastRange: range })}
-                     error={err("last")}
-                  />
+                  <Stack spacing={0.75}>
+                     <FieldLabel>Last Order Date</FieldLabel>
+                     <Box sx={{ width: "100%", "& > *": { width: "100%" } }}>
+                        <DateRange
+                           size="small"
+                           title="Any Time"
+                           value={value.lastRange}
+                           onChange={(range) =>
+                              set({
+                                 lastRange: range,
+                                 lastPreset:
+                                    range[0] && range[1] ? "custom" : "all",
+                              })
+                           }
+                        />
+                     </Box>
+                     <FieldError message={err("last")} />
+                  </Stack>
                </Grid>
             </Grid>
          </Box>
