@@ -18,6 +18,7 @@ import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import { useSettings } from "@src/lib/settingsContext";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
@@ -282,11 +283,20 @@ const Expense = () => {
                   title: "DevX POS - Operating Expenses Report",
                   fetchAllData: async () => {
                      try {
-                        const res = await fetch("/api/expenses?all=true");
-                        if (!res.ok) return [];
-                        const d = await res.json();
-                        return (d.expenses || []).map((ex: any, idx: number) => ({
-                           id: ex.customId || `EXP_${idx + 1}`,
+                        // PERF-03: page through the list API in
+                        // bounded chunks instead of one ?all=true
+                        // mega-response; same rows, same order.
+                        const expenses = await fetchAllPages(
+                           (page, limit) => `/api/expenses?page=${page}&limit=${limit}`,
+                           (d) => d.expenses || [],
+                           (d) => d.total,
+                        );
+                        return expenses.map((ex: any) => ({
+                           // Real identity only — the old fallback
+                           // fabricated EXP_<row index> when customId
+                           // was missing (same anti-pattern removed
+                           // from Reports in the runtime-fix round).
+                           id: ex.customId || ex.id,
                            type: ex.type || "-",
                            amount: Number(ex.amount || 0),
                            date: ex.date ? new Date(ex.date).toLocaleDateString() : "-",

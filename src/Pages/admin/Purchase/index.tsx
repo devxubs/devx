@@ -17,6 +17,7 @@ import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig, MenuItem } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { PurchaseDetailModal, SupplierDetailModal } from "@src/components/EntityDetailModals/EntityModals";
@@ -342,11 +343,20 @@ const Purchase = () => {
                   title: "DevX POS - Purchases Summary",
                   fetchAllData: async () => {
                      try {
-                        const res = await fetch("/api/purchases?all=true");
-                        if (!res.ok) return [];
-                        const d = await res.json();
-                        return (d.purchases || []).map((p: any, idx: number) => ({
-                           id: p.customId || `PUR_${idx + 1}`,
+                        // PERF-03: page through the list API in
+                        // bounded chunks instead of one ?all=true
+                        // mega-response; same rows, same order.
+                        const purchases = await fetchAllPages(
+                           (page, limit) => `/api/purchases?page=${page}&limit=${limit}`,
+                           (d) => d.purchases || [],
+                           (d) => d.total,
+                        );
+                        return purchases.map((p: any) => ({
+                           // Real identity only — the old fallback
+                           // fabricated PUR_<row index> when customId
+                           // was missing (same anti-pattern removed
+                           // from Reports in the runtime-fix round).
+                           id: p.customId || p.id,
                            invoice: p.invoice || "-",
                            date: p.purchaseDate ? new Date(p.purchaseDate).toLocaleDateString() : "-",
                            supplier: p.supplier?.name || "-",

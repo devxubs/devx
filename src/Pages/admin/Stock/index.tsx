@@ -12,6 +12,7 @@ import {
    useTheme,
 } from "@mui/material";
 import { useSettings } from "@src/lib/settingsContext";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 import MovementsTab from "./MovementsTab";
 import AdjustTab from "./AdjustTab";
 import WarehousesTab from "./WarehousesTab";
@@ -55,11 +56,17 @@ const Stock = () => {
    const loadProducts = useCallback(async () => {
       setLoadingProducts(true);
       try {
-         const res = await fetch("/api/products?all=true");
-         if (res.ok) {
-            const data = await res.json();
-            setProducts(
-               (data.products || []).map((p: any) => ({
+         // PERF-03: the overview + low-stock tabs need the whole
+         // catalogue (per-product thresholds can't be filtered
+         // server-side), but it is now fetched in bounded pages of
+         // 100 instead of one ?all=true response (up to 10,000 rows
+         // in a single payload).
+         const allProducts = await fetchAllPages(
+            (page, limit) => `/api/products?page=${page}&limit=${limit}`,
+            (d) => d.products || [],
+            (d) => d.total,
+         );
+         const mapped: StockProduct[] = allProducts.map((p: any) => ({
                   id: p.id,
                   productName: p.productName,
                   productSku: p.productSku || p.productCode || "",
@@ -86,9 +93,13 @@ const Stock = () => {
                         v.costPrice != null ? Number(v.costPrice) : null,
                      attributes: v.attributes ?? null,
                   })),
-               })),
-            );
-         }
+               }));
+         // A failed load (empty result on a refresh) keeps the
+         // previous list, matching the old behaviour; a genuinely
+         // empty catalogue still clears it.
+         setProducts((prev) =>
+            mapped.length > 0 || prev.length === 0 ? mapped : prev,
+         );
       } catch {
          // Keep the previous list; tabs show their own empty states.
       } finally {
