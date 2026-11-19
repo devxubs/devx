@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@src/lib/auth";
+import { sniffImageType } from "@src/lib/imageSignature";
 import { saveFile } from "@src/lib/storage";
 
 // Phase 5, §5.3 (IMG-01): real file storage for NEW uploads.
@@ -27,6 +28,10 @@ import { saveFile } from "@src/lib/storage";
 // extension derived from the validated MIME type (never from the
 // client-supplied filename), 5 MB cap matching the product form's
 // stated limit, random filename (no user input in the path).
+// Follow-up round: the declared MIME type and size are
+// client-supplied, so the payload's magic bytes are additionally
+// verified against the declared type (src/lib/imageSignature.ts)
+// and the 5 MB cap is re-checked against the actual buffer length.
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -86,9 +91,25 @@ export async function POST(request: NextRequest) {
       );
    }
 
+   const buffer = Buffer.from(await file.arrayBuffer());
+   // Follow-up round: enforce the cap on the ACTUAL buffer length
+   // (the declared size checked above is client-supplied) and
+   // require the payload's magic bytes to match the declared type.
+   if (buffer.length > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+         { error: "Image is too large — the limit is 5 MB." },
+         { status: 400 },
+      );
+   }
+   if (sniffImageType(buffer) !== file.type) {
+      return NextResponse.json(
+         { error: "File content does not match its declared image type." },
+         { status: 400 },
+      );
+   }
+
    let stored: Awaited<ReturnType<typeof saveFile>>;
    try {
-      const buffer = Buffer.from(await file.arrayBuffer());
       stored = await saveFile(buffer, ext);
    } catch (error) {
       console.error("Upload failed:", error);
@@ -102,7 +123,7 @@ export async function POST(request: NextRequest) {
       {
          url: stored.url,
          filename: stored.filename,
-         size: file.size,
+         size: buffer.length,
          type: file.type,
       },
       { status: 201 },
