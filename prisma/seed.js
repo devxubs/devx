@@ -4,6 +4,53 @@ const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
+// ID-02 fix: this seeder previously created units, categories, users,
+// customers and assets with NO customId, so those records showed a
+// blank/raw database id in the UI while app- and demo-seeded records
+// carried proper EP_/CUS_/CAT_/UNIT_/AST_ ids. Assign ids at create
+// time through the same atomic EntitySequence counter the app uses
+// (src/lib/idGenerator.ts), with the same collision check — mirroring
+// prisma/seed-demo.js. Prefixes are the built-in defaults; the app
+// reads any owner-configured prefix from StoreSetting at runtime.
+const SEED_PREFIXES = {
+   USER: "EP_",
+   CUSTOMER: "CUS_",
+   CATEGORY: "CAT_",
+   UNIT: "UNIT_",
+   ASSET: "AST_",
+};
+const SEED_MODELS = {
+   USER: () => prisma.user,
+   CUSTOMER: () => prisma.customer,
+   CATEGORY: () => prisma.category,
+   UNIT: () => prisma.unit,
+   ASSET: () => prisma.asset,
+};
+
+async function nextId(entityType) {
+   const prefix = SEED_PREFIXES[entityType];
+   const seq = await prisma.entitySequence.upsert({
+      where: { entityType },
+      update: { currentSeq: { increment: 1 } },
+      create: { entityType, currentSeq: 1 },
+   });
+   let n = seq.currentSeq;
+   let candidate = `${prefix}${n}`;
+   const model = SEED_MODELS[entityType]();
+   for (;;) {
+      const clash = await model.findFirst({ where: { customId: candidate } });
+      if (!clash) break;
+      const bumped = await prisma.entitySequence.upsert({
+         where: { entityType },
+         update: { currentSeq: { increment: 1 } },
+         create: { entityType, currentSeq: n + 1 },
+      });
+      n = bumped.currentSeq;
+      candidate = `${prefix}${n}`;
+   }
+   return candidate;
+}
+
 async function main() {
    console.log("🌱 Starting DevX POS database seed...");
 
@@ -46,11 +93,12 @@ async function main() {
    console.log("Seeding units...");
    const unitNames = ["Piece", "Kilogram", "Gram", "Liter", "Dozen", "Box", "Carton", "Bottle", "Bag", "Pair", "Set"];
    for (const name of unitNames) {
-      await prisma.unit.upsert({
-         where: { name },
-         update: {},
-         create: { name },
-      });
+      const existing = await prisma.unit.findFirst({ where: { name } });
+      if (!existing) {
+         await prisma.unit.create({
+            data: { name, customId: await nextId("UNIT") },
+         });
+      }
    }
 
    // 3. Categories
@@ -58,11 +106,12 @@ async function main() {
    const categoriesData = ["Beverages", "Snacks", "Dairy", "Electronics", "Footwear", "Apparel", "Personal Care"];
    const createdCategories = {};
    for (const name of categoriesData) {
-      const category = await prisma.category.upsert({
-         where: { name },
-         update: {},
-         create: { name },
-      });
+      let category = await prisma.category.findFirst({ where: { name } });
+      if (!category) {
+         category = await prisma.category.create({
+            data: { name, customId: await nextId("CATEGORY") },
+         });
+      }
       createdCategories[name] = category;
    }
 
@@ -97,6 +146,7 @@ async function main() {
       const hashedPassword = await bcrypt.hash(adminPassword, 12);
       adminUser = await prisma.user.create({
          data: {
+            customId: await nextId("USER"),
             email: "devxub@gmail.com",
             name: "jubayer",
             passwordHash: hashedPassword,
@@ -116,20 +166,24 @@ async function main() {
       );
    }
    const cashierHashedPassword = await bcrypt.hash(cashierPassword, 12);
-   await prisma.user.upsert({
+   const existingCashier = await prisma.user.findFirst({
       where: { email: "cashier@devxpos.com" },
-      update: {},
-      create: {
-         email: "cashier@devxpos.com",
-         name: "Demo Cashier",
-         passwordHash: cashierHashedPassword,
-         phoneNumber: "+8801800000001",
-         address: "Dhaka Outlet",
-         status: "ACTIVE",
-         roleId: createdRoles["Cashier"].id,
-         salary: "25000",
-      },
    });
+   if (!existingCashier) {
+      await prisma.user.create({
+         data: {
+            customId: await nextId("USER"),
+            email: "cashier@devxpos.com",
+            name: "Demo Cashier",
+            passwordHash: cashierHashedPassword,
+            phoneNumber: "+8801800000001",
+            address: "Dhaka Outlet",
+            status: "ACTIVE",
+            roleId: createdRoles["Cashier"].id,
+            salary: "25000",
+         },
+      });
+   }
 
    // 5. Products
    console.log("Seeding products...");
@@ -251,7 +305,9 @@ async function main() {
    for (const c of customersData) {
       let cust = await prisma.customer.findFirst({ where: { phone: c.phone } });
       if (!cust) {
-         cust = await prisma.customer.create({ data: c });
+         cust = await prisma.customer.create({
+            data: { ...c, customId: await nextId("CUSTOMER") },
+         });
       }
       createdCustomers.push(cust);
    }
@@ -398,7 +454,7 @@ async function main() {
 
    for (const a of sampleAssets) {
       await prisma.asset.create({
-         data: a,
+         data: { ...a, customId: await nextId("ASSET") },
       });
    }
 

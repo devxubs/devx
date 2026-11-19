@@ -217,7 +217,10 @@ const Users = () => {
                sx={{ fontFamily: "monospace", cursor: "pointer" }}
                onClick={() => setDetailUser(params.row.id)}
             >
-               {params.row.customId || params.row.id}
+               {/* ID-02: never show the raw database id as the employee
+                   id — records without a customId (e.g. older seeds)
+                   show a dash until repaired. */}
+               {params.row.customId || "—"}
             </Typography>
          ),
       },
@@ -303,7 +306,10 @@ const Users = () => {
             const data = await res.json();
             const mapped = (Array.isArray(data) ? data : []).map((u: any) => ({
                id: u.id,
-               customId: u.customId || u.id,
+               // ID-02: keep customId null when the record has none —
+               // substituting the raw database id here is what made
+               // un-numbered employees display a cuid as their ID.
+               customId: u.customId || "",
                name: u.name || "User",
                phoneNumber: u.phoneNumber || "-",
                email: u.email,

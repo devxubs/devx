@@ -147,7 +147,9 @@ const Categories = () => {
          flex: 0,
          renderCell: (params: GridRenderCellParams) => (
             <Typography variant="body2" fontWeight={600} color="primary.main">
-               {params.row.customId || params.row.id}
+               {/* ID-02: dash instead of the raw database id when a
+                   record has no customId yet. */}
+               {params.row.customId || "—"}
             </Typography>
          ),
       },

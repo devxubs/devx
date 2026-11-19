@@ -83,7 +83,9 @@ const Asset = () => {
                sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
                onClick={() => setDetailAssetId(params.row.customId || params.row.id)}
             >
-               {params.row.customId || params.row.id}
+               {/* ID-02: dash instead of the raw database id when a
+                   record has no customId yet (lookup still uses id). */}
+               {params.row.customId || "—"}
             </Typography>
          ),
       },
@@ -302,7 +304,9 @@ const Asset = () => {
                         // mapping read non-existent amount/purchaseDate/
                         // status fields, so exports always showed 0.
                         return (Array.isArray(d) ? d : []).map((a: any) => ({
-                           id: a.customId || a.id,
+                           // ID-02: exports show the business id or a
+                           // dash — never the raw database id.
+                           id: a.customId || "—",
                            name: a.name,
                            category: a.category || "-",
                            value: Number(a.value || 0),

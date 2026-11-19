@@ -70,7 +70,7 @@ export const UnitDeleteDialog: React.FC<UnitDeleteDialogProps> = ({
                      Delete Unit
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                     ID: {unit.customId || unit.id}
+                     ID: {unit.customId || "—"}
                   </Typography>
                </Box>
             </Stack>
