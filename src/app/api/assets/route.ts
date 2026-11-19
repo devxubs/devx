@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import { parsePagination } from "@src/lib/pagination";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -20,6 +21,23 @@ export async function GET(request: NextRequest) {
    }
 
    try {
+      // Optional server pagination for chunked export loaders. The
+      // historical no-parameter response remains a bare array, so
+      // the Assets page and other existing consumers are unchanged.
+      if (searchParams.has("page") || searchParams.has("limit")) {
+         const { page, limit, skip } = parsePagination(searchParams, 20);
+         const [assets, total] = await Promise.all([
+            prisma.asset.findMany({
+               where,
+               skip,
+               take: limit,
+               orderBy: { createdAt: "desc" },
+            }),
+            prisma.asset.count({ where }),
+         ]);
+         return NextResponse.json({ assets, total, page, limit });
+      }
+
       const assets = await prisma.asset.findMany({
          where,
          orderBy: { createdAt: "desc" },

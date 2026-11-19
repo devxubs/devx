@@ -18,6 +18,7 @@ import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { AssetDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { useSettings } from "@src/lib/settingsContext";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -297,13 +298,18 @@ const Asset = () => {
                   title: "DevX POS - Fixed & Current Assets Inventory",
                   fetchAllData: async () => {
                      try {
-                        const res = await fetch("/api/assets");
-                        if (!res.ok) return [];
-                        const d = await res.json();
+                        // Chunked export: walk the assets API in
+                        // bounded pages rather than one full response.
+                        const assets = await fetchAllPages(
+                           (page, limit) =>
+                              `/api/assets?page=${page}&limit=${limit}`,
+                           (d) => (Array.isArray(d) ? d : d.assets || []),
+                           (d) => d.total,
+                        );
                         // Real Asset fields (value/createdAt) — the old
                         // mapping read non-existent amount/purchaseDate/
                         // status fields, so exports always showed 0.
-                        return (Array.isArray(d) ? d : []).map((a: any) => ({
+                        return assets.map((a: any) => ({
                            // ID-02: exports show the business id or a
                            // dash — never the raw database id.
                            id: a.customId || "—",

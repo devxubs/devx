@@ -288,51 +288,95 @@ export async function GET(request: NextRequest) {
          // placed inside the selected range when one is given.
          const orderRangeWhere = hasDate ? { createdAt: dateFilter } : {};
          const customers = await prisma.customer.findMany({
-            include: {
-               orders: {
-                  // Row counts must exclude soft-deleted orders, the
-                  // same filter the headline groupBy below already
-                  // uses — otherwise a customer's Total/Completed/
-                  // Failed counts disagree with Active/Returning.
-                  where: { isDeleted: false, ...orderRangeWhere },
-                  select: { status: true, createdAt: true },
-                  orderBy: { createdAt: "desc" },
-               },
-               _count: { select: { orders: true } },
-            },
             orderBy: { createdAt: "desc" },
             skip,
             take: limit,
          });
 
+         // Per-row order figures are aggregated in the database for
+         // just this page's customers. The previous nested include
+         // loaded every matching order row for up to `limit`
+         // customers merely to count statuses and find the latest
+         // date. Row counts exclude soft-deleted orders, matching
+         // the headline groupBy below.
+         const pageCustomerIds = customers.map((c) => c.id);
          // Headline counts describe ALL customers, not just this page.
-         const [totalCustomersAll, orderGroups] = await Promise.all([
-            prisma.customer.count(),
-            prisma.order.groupBy({
-               by: ["customerId"],
-               where: {
-                  isDeleted: false,
-                  customerId: { not: null },
-                  ...orderRangeWhere,
-               },
-               _count: { id: true },
-            }),
-         ]);
+         const [totalCustomersAll, orderGroups, pageOrderStats] =
+            await Promise.all([
+               prisma.customer.count(),
+               prisma.order.groupBy({
+                  by: ["customerId"],
+                  where: {
+                     isDeleted: false,
+                     customerId: { not: null },
+                     ...orderRangeWhere,
+                  },
+                  _count: { id: true },
+               }),
+               pageCustomerIds.length
+                  ? prisma.order.groupBy({
+                       by: ["customerId", "status"],
+                       where: {
+                          isDeleted: false,
+                          customerId: { in: pageCustomerIds },
+                          ...orderRangeWhere,
+                       },
+                       _count: { id: true },
+                       _max: { createdAt: true },
+                    })
+                  : Promise.resolve([]),
+            ]);
+         const statsByCustomer = new Map<
+            string,
+            {
+               totalOrders: number;
+               completedOrders: number;
+               failedOrders: number;
+               lastOrderAt: Date | null;
+            }
+         >();
+         for (const group of pageOrderStats as any[]) {
+            if (!group.customerId) continue;
+            const stats = statsByCustomer.get(group.customerId) || {
+               totalOrders: 0,
+               completedOrders: 0,
+               failedOrders: 0,
+               lastOrderAt: null,
+            };
+            const count = Number(group._count?.id || 0);
+            stats.totalOrders += count;
+            if (group.status === "COMPLETED" || group.status === "DELIVERED") {
+               stats.completedOrders += count;
+            }
+            if (group.status === "CANCELLED" || group.status === "FAILED") {
+               stats.failedOrders += count;
+            }
+            const groupLast = group._max?.createdAt
+               ? new Date(group._max.createdAt)
+               : null;
+            if (
+               groupLast &&
+               (!stats.lastOrderAt || groupLast > stats.lastOrderAt)
+            ) {
+               stats.lastOrderAt = groupLast;
+            }
+            statsByCustomer.set(group.customerId, stats);
+         }
          const activeCustomersAll = orderGroups.length;
          const returningCustomersAll = orderGroups.filter(
             (g) => g._count.id > 1,
          ).length;
 
          const rows = customers.map((c) => {
-            const totalOrders = c.orders.length;
-            const completedOrders = c.orders.filter(
-               (o) => o.status === "COMPLETED" || o.status === "DELIVERED",
-            ).length;
-            const failedOrders = c.orders.filter(
-               (o) => o.status === "CANCELLED" || o.status === "FAILED",
-            ).length;
-            const lastOrderAt = c.orders[0]?.createdAt
-               ? new Date(c.orders[0].createdAt).toLocaleDateString()
+            const stats = statsByCustomer.get(c.id) || {
+               totalOrders: 0,
+               completedOrders: 0,
+               failedOrders: 0,
+               lastOrderAt: null,
+            };
+            const { totalOrders, completedOrders, failedOrders } = stats;
+            const lastOrderAt = stats.lastOrderAt
+               ? stats.lastOrderAt.toLocaleDateString()
                : "-";
 
             return {
@@ -410,30 +454,62 @@ export async function GET(request: NextRequest) {
          // — completed sales, cancels, revenue, ranking — counts only
          // orders handled inside the selected range when one is given.
          const users = await prisma.user.findMany({
-            include: {
-               role: true,
-               ordersHandled: {
-                  where: {
-                     isDeleted: false,
-                     ...(hasDate ? { createdAt: dateFilter } : {}),
-                  },
-                  select: { status: true, total: true },
-               },
-            },
+            include: { role: true },
          });
+
+         // Aggregate handled orders in the database instead of
+         // loading every handled order for every employee merely to
+         // count statuses and sum completed revenue.
+         const handledOrderStats = await prisma.order.groupBy({
+            by: ["employeeId", "status"],
+            where: {
+               isDeleted: false,
+               employeeId: { not: null },
+               ...(hasDate ? { createdAt: dateFilter } : {}),
+            },
+            _count: { id: true },
+            _sum: { total: true },
+         });
+         const handledByEmployee = new Map<
+            string,
+            {
+               ordersHandled: number;
+               completedSales: number;
+               cancelledCount: number;
+               revenue: number;
+            }
+         >();
+         for (const group of handledOrderStats as any[]) {
+            if (!group.employeeId) continue;
+            const stats = handledByEmployee.get(group.employeeId) || {
+               ordersHandled: 0,
+               completedSales: 0,
+               cancelledCount: 0,
+               revenue: 0,
+            };
+            const count = Number(group._count?.id || 0);
+            stats.ordersHandled += count;
+            if (group.status === "COMPLETED" || group.status === "DELIVERED") {
+               stats.completedSales += count;
+               stats.revenue += Number(group._sum?.total || 0);
+            }
+            if (group.status === "CANCELLED" || group.status === "FAILED") {
+               stats.cancelledCount += count;
+            }
+            handledByEmployee.set(group.employeeId, stats);
+         }
 
          const ranks = users
             .map((u) => {
-               const ordersHandled = u.ordersHandled.length;
-               const completedSales = u.ordersHandled.filter(
-                  (o: any) => o.status === "COMPLETED" || o.status === "DELIVERED",
-               ).length;
-               const cancelledCount = u.ordersHandled.filter(
-                  (o: any) => o.status === "CANCELLED" || o.status === "FAILED",
-               ).length;
-               const revenue = u.ordersHandled
-                  .filter((o: any) => o.status === "COMPLETED" || o.status === "DELIVERED")
-                  .reduce((sum: number, o: any) => sum + Number(o.total || 0), 0);
+               const handled = handledByEmployee.get(u.id) || {
+                  ordersHandled: 0,
+                  completedSales: 0,
+                  cancelledCount: 0,
+                  revenue: 0,
+               };
+               const completedSales = handled.completedSales;
+               const cancelledCount = handled.cancelledCount;
+               const revenue = handled.revenue;
 
                return {
                   // Real primary key as row identity (detail modal

@@ -221,10 +221,6 @@ export async function GET(request: NextRequest) {
       // pagination happens after all filters, keeping `total` accurate.
       const matched = await prisma.customer.findMany({
          where,
-         include: {
-            orders: { select: { status: true } },
-            _count: { select: { orders: true } },
-         },
          orderBy: { createdAt: "desc" },
       });
 
