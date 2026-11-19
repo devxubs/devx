@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
-import crypto from "crypto";
 import { requirePermission } from "@src/lib/auth";
+import { saveFile } from "@src/lib/storage";
 
 // Phase 5, §5.3 (IMG-01): real file storage for NEW uploads.
 //
@@ -88,14 +86,10 @@ export async function POST(request: NextRequest) {
       );
    }
 
-   const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
-   const uploadDir =
-      process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
-
+   let stored: Awaited<ReturnType<typeof saveFile>>;
    try {
-      await fs.mkdir(uploadDir, { recursive: true });
       const buffer = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(path.join(uploadDir, filename), buffer);
+      stored = await saveFile(buffer, ext);
    } catch (error) {
       console.error("Upload failed:", error);
       return NextResponse.json(
@@ -106,8 +100,8 @@ export async function POST(request: NextRequest) {
 
    return NextResponse.json(
       {
-         url: `/uploads/${filename}`,
-         filename,
+         url: stored.url,
+         filename: stored.filename,
          size: file.size,
          type: file.type,
       },
