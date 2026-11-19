@@ -11,6 +11,8 @@ import {
    Chip,
    Snackbar,
    Alert,
+   Autocomplete,
+   MenuItem,
 } from "@mui/material";
 import { GridRenderCellParams } from "@mui/x-data-grid";
 import { useRouter } from "next/navigation";
@@ -78,6 +80,50 @@ const statusLabelToApi: Record<string, string> = {
    Failed: "FAILED",
 };
 
+// Phase 3B (3.4): courier pipeline stages, mapped onto the EXISTING
+// order lifecycle — no new statuses. The stages partition the whole
+// OrderStatus enum exactly once, so stage counts (from the API's
+// ordersByStatus aggregates) always sum to the total order count.
+//   Packed            = PROCESSING (being prepared/packed)
+//   With Courier      = SHIPPED (handed to courier) + OUT_FOR_DELIVERY
+//   Delivered         = DELIVERED + COMPLETED
+//   Returned/Cancelled = CANCELLED + FAILED (there is no RETURNED
+//   order status; courier-level returns are tracked via
+//   courierStatus = "Returned" and reported in the Courier report)
+interface PipelineStage {
+   key: string;
+   label: string;
+   statuses: string[];
+}
+const PIPELINE_STAGES: PipelineStage[] = [
+   { key: "pending", label: "Pending", statuses: ["PENDING"] },
+   { key: "confirmed", label: "Confirmed", statuses: ["CONFIRMED"] },
+   { key: "packed", label: "Packed", statuses: ["PROCESSING"] },
+   { key: "courier", label: "With Courier", statuses: ["SHIPPED", "OUT_FOR_DELIVERY"] },
+   { key: "delivered", label: "Delivered", statuses: ["DELIVERED", "COMPLETED"] },
+   { key: "returned", label: "Returned / Cancelled", statuses: ["CANCELLED", "FAILED"] },
+   { key: "hold", label: "On Hold", statuses: ["HOLD"] },
+];
+
+const BULK_COURIERS = [
+   "Pathao",
+   "Steadfast",
+   "RedX",
+   "Paperfly",
+   "Sundarban",
+   "SA Paribahan",
+   "E-Courier",
+   "Manual/Direct",
+];
+const BULK_COURIER_STATUSES = [
+   "Pending",
+   "In Courier",
+   "Delivered",
+   "Returned",
+   "Hold",
+   "Cancelled",
+];
+
 const OrderTable = () => {
    const router = useRouter();
    const { formatCurrency, settings } = useSettings();
@@ -108,6 +154,15 @@ const OrderTable = () => {
       null,
    );
    const [selectedOrders, setSelectedOrders] = useState<any[]>([]);
+   // Phase 3B (3.4): active courier-pipeline stage filter.
+   const [pipelineStage, setPipelineStage] = useState<PipelineStage | null>(null);
+   // Phase 3B (3.5): bulk action state.
+   const [bulkStatusAnchor, setBulkStatusAnchor] = useState<HTMLElement | null>(null);
+   const [courierModalOpen, setCourierModalOpen] = useState(false);
+   const [bulkCourier, setBulkCourier] = useState("");
+   const [bulkCourierStatus, setBulkCourierStatus] = useState("");
+   const [bulkWorking, setBulkWorking] = useState(false);
+   const [bulkResults, setBulkResults] = useState<any>(null);
    const [exportModalOpen, setExportModalOpen] = useState(false);
    const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
    const [feedback, setFeedback] = useState<{
@@ -162,11 +217,20 @@ const OrderTable = () => {
 
          const f = (filterQueryData.orderData || {}) as any;
 
+         // Phase 3B (3.4): an active pipeline stage wins over the
+         // status tab — it sends the stage's API status values
+         // (comma-separated; the API already supports status lists).
+         // Tab/filter labels are mapped through statusLabelToApi:
+         // the API uppercases what it receives, so a raw label like
+         // "Out for Delivery" never matched the OUT_FOR_DELIVERY
+         // enum value.
          const currentStatus = orderStatus[orderTab]?.label;
-         if (currentStatus && currentStatus !== "All") {
-            params.set("status", currentStatus);
+         if (pipelineStage) {
+            params.set("status", pipelineStage.statuses.join(","));
+         } else if (currentStatus && currentStatus !== "All") {
+            params.set("status", statusLabelToApi[currentStatus] || currentStatus);
          } else if (f.status && f.status !== "All") {
-            params.set("status", f.status);
+            params.set("status", statusLabelToApi[f.status] || f.status);
          }
 
          if (filterQueryData.searchText) {
@@ -327,7 +391,7 @@ const OrderTable = () => {
       } finally {
          setLoading(false);
       }
-   }, [orderTab, filterQueryData, paginationModel]);
+   }, [orderTab, filterQueryData, paginationModel, pipelineStage]);
 
    // Any tab / filter / search change returns to the first page so the
    // requested page can never point past the filtered result set.
@@ -335,11 +399,46 @@ const OrderTable = () => {
       setPaginationModel((prev) =>
          prev.page === 0 ? prev : { ...prev, page: 0 },
       );
-   }, [orderTab, filterQueryData]);
+   }, [orderTab, filterQueryData, pipelineStage]);
 
    useEffect(() => {
       loadOrders();
    }, [loadOrders]);
+
+   // Phase 3B (3.5): run a bulk action through POST /api/orders/bulk.
+   // The endpoint processes each order with the single-order PUT's
+   // stock semantics and returns per-order results; the summary
+   // dialog shows exactly which orders failed and why.
+   const runBulk = React.useCallback(
+      async (payload: Record<string, any>, rows: any[]) => {
+         if (!rows || rows.length === 0 || bulkWorking) return;
+         setBulkWorking(true);
+         try {
+            const res = await fetch("/api/orders/bulk", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({
+                  ...payload,
+                  orderIds: rows.map((r) => r.id),
+               }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+               throw new Error(data.message || data.error || "Bulk action failed");
+            }
+            setBulkResults(data);
+            loadOrders();
+         } catch (err: any) {
+            setFeedback({
+               type: "error",
+               message: err?.message || "Bulk action failed",
+            });
+         } finally {
+            setBulkWorking(false);
+         }
+      },
+      [bulkWorking, loadOrders],
+   );
 
    // note info
    const [noteModal, setNoteModal] = useState<OrderType | null>(null);
@@ -527,12 +626,65 @@ const OrderTable = () => {
             overflow: "hidden",
          }}
       >
+         {/* Phase 3B (3.4): courier pipeline — stage chips with real
+             counts from the API's ordersByStatus aggregates. Stages
+             map onto the existing order lifecycle (see PIPELINE_STAGES)
+             and filter the list through the same status parameter, so
+             counts and rows always agree. Picking a status tab clears
+             the stage, and vice versa. */}
+         <Stack
+            direction="row"
+            spacing={1}
+            flexWrap="wrap"
+            alignItems="center"
+            sx={{ px: 2, pt: 2 }}
+         >
+            <Typography
+               variant="caption"
+               fontWeight={700}
+               color="text.secondary"
+               letterSpacing="0.04em"
+            >
+               PIPELINE
+            </Typography>
+            {PIPELINE_STAGES.map((stage) => {
+               const count = statusCounts
+                  ? stage.statuses.reduce(
+                       (sum, st) => sum + (statusCounts[st] || 0),
+                       0,
+                    )
+                  : undefined;
+               const active = pipelineStage?.key === stage.key;
+               return (
+                  <Chip
+                     key={stage.key}
+                     label={
+                        count !== undefined
+                           ? `${stage.label} (${count})`
+                           : stage.label
+                     }
+                     color={active ? "primary" : "default"}
+                     variant={active ? "filled" : "outlined"}
+                     clickable
+                     onClick={() =>
+                        setPipelineStage(active ? null : stage)
+                     }
+                  />
+               );
+            })}
+            {pipelineStage && (
+               <Button size="small" onClick={() => setPipelineStage(null)}>
+                  Clear stage
+               </Button>
+            )}
+         </Stack>
          {/* Order tab */}
          <Stack>
             <OrderTab
                status={orderStatusWithCounts}
                value={orderTab}
                onChange={(s) => {
+                  setPipelineStage(null);
                   setFilterQueryData({
                      orderData: { status: s.label !== "All" ? s.label : null },
                   });
@@ -582,6 +734,35 @@ const OrderTable = () => {
                            icon="solar:printer-minimalistic-bold"
                            size="small"
                         />
+                     </IconButton>
+                  </Tooltip>
+                  {/* Phase 3B (3.5): bulk status change + courier
+                      assignment via POST /api/orders/bulk. */}
+                  <Tooltip title="Bulk status change" disableInteractive>
+                     <IconButton
+                        aria-label="Bulk status change"
+                        disabled={bulkWorking}
+                        onClick={(e) => {
+                           setSelectedOrders(selectedRows);
+                           setBulkStatusAnchor(e.currentTarget);
+                        }}
+                     >
+                        <Icon
+                           icon="solar:refresh-circle-bold"
+                           size="small"
+                        />
+                     </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Assign courier to selected" disableInteractive>
+                     <IconButton
+                        aria-label="Assign courier to selected"
+                        disabled={bulkWorking}
+                        onClick={() => {
+                           setSelectedOrders(selectedRows);
+                           setCourierModalOpen(true);
+                        }}
+                     >
+                        <Icon icon="solar:delivery-bold" size="small" />
                      </IconButton>
                   </Tooltip>
                </Stack>
@@ -677,6 +858,147 @@ const OrderTable = () => {
                }
             />
          </CustomPopover>
+
+         {/* Phase 3B (3.5): bulk status menu */}
+         <CustomPopover
+            anchorEl={bulkStatusAnchor}
+            onClose={() => setBulkStatusAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+         >
+            <Menu
+               item={orderStatuses.map((s) => ({
+                  label: s,
+                  onClick: () => {
+                     setBulkStatusAnchor(null);
+                     runBulk(
+                        { action: "status", status: statusLabelToApi[s] || s.toUpperCase() },
+                        selectedOrders,
+                     );
+                  },
+               }))}
+               onClose={() => setBulkStatusAnchor(null)}
+            />
+         </CustomPopover>
+
+         {/* Phase 3B (3.5): bulk courier assignment */}
+         <CustomModal
+            open={courierModalOpen}
+            onClose={() => setCourierModalOpen(false)}
+            sx={{ borderRadius: 1, width: 420 }}
+            title={`Assign courier (${selectedOrders.length} orders)`}
+         >
+            <Stack spacing={2}>
+               <Autocomplete
+                  freeSolo
+                  options={BULK_COURIERS}
+                  value={bulkCourier || null}
+                  onChange={(_, v) => setBulkCourier(v || "")}
+                  onInputChange={(_, v) => setBulkCourier(v)}
+                  renderInput={(params) => (
+                     <TextField {...params} label="Courier" size="small" />
+                  )}
+               />
+               <TextField
+                  select
+                  label="Courier status (optional)"
+                  size="small"
+                  value={bulkCourierStatus}
+                  onChange={(e) => setBulkCourierStatus(e.target.value)}
+               >
+                  <MenuItem value="">— Keep current —</MenuItem>
+                  {BULK_COURIER_STATUSES.map((s) => (
+                     <MenuItem key={s} value={s}>
+                        {s}
+                     </MenuItem>
+                  ))}
+               </TextField>
+               {bulkCourierStatus === "In Courier" && (
+                  <Typography variant="caption" color="text.secondary">
+                     Orders without a submission time will be stamped as
+                     handed to the courier now.
+                  </Typography>
+               )}
+               <Stack direction="row" spacing={2} justifyContent="flex-end">
+                  <Button
+                     variant="text"
+                     color="inherit"
+                     onClick={() => setCourierModalOpen(false)}
+                  >
+                     Cancel
+                  </Button>
+                  <Button
+                     variant="contained"
+                     color="primary"
+                     disabled={!bulkCourier.trim() || bulkWorking}
+                     onClick={() => {
+                        setCourierModalOpen(false);
+                        runBulk(
+                           {
+                              action: "courier",
+                              courier: bulkCourier.trim(),
+                              ...(bulkCourierStatus
+                                 ? { courierStatus: bulkCourierStatus }
+                                 : {}),
+                           },
+                           selectedOrders,
+                        );
+                     }}
+                  >
+                     Assign
+                  </Button>
+               </Stack>
+            </Stack>
+         </CustomModal>
+
+         {/* Phase 3B (3.5): bulk result summary — per-order outcomes,
+             failures are never silent. */}
+         <CustomModal
+            open={Boolean(bulkResults)}
+            onClose={() => setBulkResults(null)}
+            sx={{ borderRadius: 1, width: 480 }}
+            title="Bulk action results"
+         >
+            <Stack spacing={1.5}>
+               <Typography variant="body2">
+                  <b>{bulkResults?.succeeded ?? 0}</b> succeeded,{" "}
+                  <b>{bulkResults?.failed ?? 0}</b> failed.
+               </Typography>
+               <Stack spacing={0.75} sx={{ maxHeight: 320, overflowY: "auto" }}>
+                  {(bulkResults?.results || []).map((r: any) => (
+                     <Stack
+                        key={r.id}
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent="space-between"
+                     >
+                        <Typography variant="body2" fontWeight={600}>
+                           {r.orderId}
+                        </Typography>
+                        {r.ok ? (
+                           <Typography variant="caption" color="success.main">
+                              {r.note || "Updated"}
+                           </Typography>
+                        ) : (
+                           <Typography variant="caption" color="error.main">
+                              {r.error || "Failed"}
+                           </Typography>
+                        )}
+                     </Stack>
+                  ))}
+               </Stack>
+               <Stack direction="row" justifyContent="flex-end">
+                  <Button
+                     variant="contained"
+                     color="primary"
+                     onClick={() => setBulkResults(null)}
+                  >
+                     Done
+                  </Button>
+               </Stack>
+            </Stack>
+         </CustomModal>
 
          {/* note modal */}
          <CustomModal
