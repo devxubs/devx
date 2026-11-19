@@ -3,13 +3,68 @@ import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { calculateNetProfit } from "@src/lib/finance";
 
+// Dashboard API (Phase 3B, roadmap 3.9 / PERF-02).
+//
+// All period figures are bounded by the requested range
+// (`startDate`/`endDate`; a legacy `year` param still maps to that
+// calendar year; default = last 30 days) and come from Prisma
+// count/aggregate queries. The previous implementation aggregated a
+// full year of order/expense rows in memory no matter what the UI
+// asked for; the series is now bucketed from range-bounded rows only
+// (daily buckets up to 62 days, monthly beyond). Current-state
+// figures (low stock, pending orders, total customer due, recent
+// orders, category stock distribution) describe "now" and are
+// intentionally not range-bounded. The response shape is unchanged
+// apart from the added `kpis`, `seriesLabels` and `range` fields.
+
+function startOfDay(d: Date) {
+   const x = new Date(d);
+   x.setHours(0, 0, 0, 0);
+   return x;
+}
+function endOfDay(d: Date) {
+   const x = new Date(d);
+   x.setHours(23, 59, 59, 999);
+   return x;
+}
+
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);
+   const now = new Date();
+   let rangeStart = startOfDay(new Date(now.getTime() - 29 * 86400000));
+   let rangeEnd = endOfDay(now);
+   const sd = searchParams.get("startDate");
+   const ed = searchParams.get("endDate");
    const yearParam = searchParams.get("year");
-   const targetYear = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
+   if (sd || ed) {
+      if (sd) {
+         const d = new Date(sd);
+         if (!Number.isNaN(d.getTime())) rangeStart = startOfDay(d);
+      }
+      if (ed) {
+         const d = new Date(ed);
+         if (!Number.isNaN(d.getTime())) rangeEnd = endOfDay(d);
+      }
+   } else if (yearParam) {
+      const y = parseInt(yearParam, 10);
+      if (!Number.isNaN(y)) {
+         rangeStart = new Date(y, 0, 1);
+         rangeEnd = new Date(y, 11, 31, 23, 59, 59, 999);
+      }
+   }
+   if (rangeEnd < rangeStart) rangeEnd = endOfDay(rangeStart);
+   const rangeWhere = { gte: rangeStart, lte: rangeEnd };
+   const daySpan =
+      Math.round(
+         (startOfDay(rangeEnd).getTime() - startOfDay(rangeStart).getTime()) /
+            86400000,
+      ) + 1;
+   const bucketMode = daySpan <= 62 ? "day" : "month";
+   const todayStart = startOfDay(now);
+   const todayEnd = endOfDay(now);
 
    try {
       const [
@@ -25,32 +80,47 @@ export async function GET(request: NextRequest) {
          lowStockProducts,
          recentOrders,
          allEmployees,
-         ordersForYear,
-         expensesForYear,
+         ordersInRange,
+         expensesInRange,
          categoryDistribution,
+         pendingOrders,
+         todaysOrders,
+         customerDueAgg,
       ] = await Promise.all([
-         prisma.order.count({ where: { isDeleted: false } }),
-         prisma.order.count({ where: { status: "COMPLETED", isDeleted: false } }),
-         prisma.order.count({ where: { status: "CANCELLED", isDeleted: false } }),
-         prisma.order.count({ where: { status: "HOLD", isDeleted: false } }),
+         prisma.order.count({
+            where: { isDeleted: false, createdAt: rangeWhere },
+         }),
+         prisma.order.count({
+            where: { status: "COMPLETED", isDeleted: false, createdAt: rangeWhere },
+         }),
+         prisma.order.count({
+            where: { status: "CANCELLED", isDeleted: false, createdAt: rangeWhere },
+         }),
+         prisma.order.count({
+            where: { status: "HOLD", isDeleted: false, createdAt: rangeWhere },
+         }),
          prisma.order.aggregate({
-            where: { isDeleted: false, status: { in: ["COMPLETED", "DELIVERED"] } },
+            where: {
+               isDeleted: false,
+               status: { in: ["COMPLETED", "DELIVERED"] },
+               createdAt: rangeWhere,
+            },
             _sum: { total: true },
          }),
          prisma.expense.aggregate({
-            where: { isDeleted: false },
+            where: { isDeleted: false, createdAt: rangeWhere },
             _sum: { amount: true },
          }),
          prisma.purchase.aggregate({
-            where: { isDeleted: false },
+            where: { isDeleted: false, createdAt: rangeWhere },
             _sum: { total: true },
          }),
          prisma.order.aggregate({
-            where: { isDeleted: false, status: "CANCELLED" },
+            where: { isDeleted: false, status: "CANCELLED", createdAt: rangeWhere },
             _sum: { total: true },
          }),
          prisma.billingTransaction.aggregate({
-            where: { status: "COMPLETED" },
+            where: { status: "COMPLETED", createdAt: rangeWhere },
             _sum: { amount: true },
          }),
          // Phase 1: low stock is defined per product by its own
@@ -75,29 +145,18 @@ export async function GET(request: NextRequest) {
                image: true,
                role: { select: { name: true } },
                ordersHandled: {
-                  where: { isDeleted: false },
+                  where: { isDeleted: false, createdAt: rangeWhere },
                   select: { status: true, total: true },
                },
             },
          }),
+         // Series source rows — bounded by the range (PERF-02).
          prisma.order.findMany({
-            where: {
-               isDeleted: false,
-               createdAt: {
-                  gte: new Date(targetYear, 0, 1),
-                  lte: new Date(targetYear, 11, 31, 23, 59, 59),
-               },
-            },
+            where: { isDeleted: false, createdAt: rangeWhere },
             select: { total: true, status: true, createdAt: true },
          }),
          prisma.expense.findMany({
-            where: {
-               isDeleted: false,
-               createdAt: {
-                  gte: new Date(targetYear, 0, 1),
-                  lte: new Date(targetYear, 11, 31, 23, 59, 59),
-               },
-            },
+            where: { isDeleted: false, createdAt: rangeWhere },
             select: { amount: true, createdAt: true },
          }),
          prisma.category.findMany({
@@ -109,6 +168,23 @@ export async function GET(request: NextRequest) {
                },
             },
             take: 4,
+         }),
+         // Phase 3B owner KPIs — current state, not range-bounded.
+         prisma.order.count({ where: { isDeleted: false, status: "PENDING" } }),
+         prisma.order.count({
+            where: {
+               isDeleted: false,
+               status: { notIn: ["CANCELLED", "FAILED"] },
+               createdAt: { gte: todayStart, lte: todayEnd },
+            },
+         }),
+         prisma.order.aggregate({
+            where: {
+               isDeleted: false,
+               status: { notIn: ["CANCELLED", "FAILED"] },
+               dueAmount: { gt: 0 },
+            },
+            _sum: { dueAmount: true },
          }),
       ]);
 
@@ -126,21 +202,57 @@ export async function GET(request: NextRequest) {
       const netProfit = calculateNetProfit(totalRevenue, totalExpenses, totalPurchases);
       const currentBalance = Math.max(totalRevenue - totalExpenses - settledPayouts, 0);
 
-      // Monthly sales vs expenses array (12 months)
-      const monthlyIncome = new Array(12).fill(0);
-      const monthlyExpenses = new Array(12).fill(0);
-
-      ordersForYear.forEach((ord) => {
-         const m = new Date(ord.createdAt).getMonth();
+      // Range-bucketed income vs expenses series (replaces the fixed
+      // 12-month in-memory aggregation). Income counts COMPLETED /
+      // DELIVERED orders only, as before.
+      const buckets = new Map<string, { label: string; income: number; expenses: number }>();
+      const cursor = new Date(rangeStart);
+      if (bucketMode === "day") {
+         while (cursor <= rangeEnd) {
+            const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+            buckets.set(key, {
+               label: cursor.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+               }),
+               income: 0,
+               expenses: 0,
+            });
+            cursor.setDate(cursor.getDate() + 1);
+         }
+      } else {
+         cursor.setDate(1);
+         while (cursor <= rangeEnd) {
+            const key = `${cursor.getFullYear()}-${cursor.getMonth()}`;
+            buckets.set(key, {
+               label: cursor.toLocaleDateString("en-US", {
+                  month: "short",
+                  year: "numeric",
+               }),
+               income: 0,
+               expenses: 0,
+            });
+            cursor.setMonth(cursor.getMonth() + 1);
+         }
+      }
+      const keyOf = (d: Date) =>
+         bucketMode === "day"
+            ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+            : `${d.getFullYear()}-${d.getMonth()}`;
+      ordersInRange.forEach((ord) => {
          if (ord.status === "COMPLETED" || ord.status === "DELIVERED") {
-            monthlyIncome[m] += Number(ord.total);
+            const b = buckets.get(keyOf(new Date(ord.createdAt)));
+            if (b) b.income += Number(ord.total);
          }
       });
-
-      expensesForYear.forEach((exp) => {
-         const m = new Date(exp.createdAt).getMonth();
-         monthlyExpenses[m] += Number(exp.amount);
+      expensesInRange.forEach((exp) => {
+         const b = buckets.get(keyOf(new Date(exp.createdAt)));
+         if (b) b.expenses += Number(exp.amount);
       });
+      const seriesBuckets = [...buckets.values()];
+      const monthlyIncome = seriesBuckets.map((b) => b.income);
+      const monthlyExpenses = seriesBuckets.map((b) => b.expenses);
+      const seriesLabels = seriesBuckets.map((b) => b.label);
 
       // Employee Ranking Calculation with deterministic tie-breaking
       const calculatedRankings = allEmployees.map((emp) => {
@@ -254,6 +366,18 @@ export async function GET(request: NextRequest) {
          recentOrders,
          monthlyIncome,
          monthlyExpenses,
+         seriesLabels,
+         range: {
+            startDate: rangeStart.toISOString(),
+            endDate: rangeEnd.toISOString(),
+            bucket: bucketMode,
+         },
+         kpis: {
+            pendingOrders,
+            todaysOrders,
+            totalCustomerDue: Number(customerDueAgg._sum?.dueAmount || 0),
+            lowStockCount,
+         },
          rankedEmployees,
          distribution: {
             labels: distributionLabels,

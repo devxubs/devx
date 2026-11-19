@@ -15,29 +15,43 @@ interface YearlySalesChartProps {
    incomeData?: number[];
    expenseData?: number[];
    onYearChange?: (year: string) => void;
+   // Phase 3B (3.9): range mode — when the dashboard API returns
+   // bucket labels for the selected range, the chart uses them
+   // verbatim (any bucket count) and the year picker is replaced by
+   // the range caption. Without labels the legacy 12-month/year
+   // behaviour is kept.
+   labels?: string[];
+   rangeLabel?: string;
 }
 
 const YearlySalesChart = ({
    incomeData,
    expenseData,
    onYearChange,
+   labels,
+   rangeLabel,
 }: YearlySalesChartProps) => {
    const theme = useTheme();
    const { formatCurrency } = useSettings();
    const currentYear = new Date().getFullYear().toString();
    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
    const [year, setYear] = useState(currentYear);
+   const rangeMode = Array.isArray(labels) && labels.length > 0;
 
    // Phase 1 (NEW-04): the hard-coded fallback series (invented
    // monthly income/expenses) have been removed. Missing data renders
    // as an empty state below, never as fabricated figures.
-   const defaultIncome = incomeData && incomeData.length === 12
-      ? incomeData
-      : new Array(12).fill(0);
+   const defaultIncome = rangeMode
+      ? incomeData || []
+      : incomeData && incomeData.length === 12
+        ? incomeData
+        : new Array(12).fill(0);
 
-   const defaultExpenses = expenseData && expenseData.length === 12
-      ? expenseData
-      : new Array(12).fill(0);
+   const defaultExpenses = rangeMode
+      ? expenseData || []
+      : expenseData && expenseData.length === 12
+        ? expenseData
+        : new Array(12).fill(0);
 
    const hasData =
       defaultIncome.some((v) => v > 0) || defaultExpenses.some((v) => v > 0);
@@ -113,20 +127,22 @@ const YearlySalesChart = ({
       dataLabels: { enabled: false },
       stroke: { curve: "smooth", width: 2.5 },
       xaxis: {
-         categories: [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-         ],
+         categories: rangeMode
+            ? labels
+            : [
+                 "Jan",
+                 "Feb",
+                 "Mar",
+                 "Apr",
+                 "May",
+                 "Jun",
+                 "Jul",
+                 "Aug",
+                 "Sep",
+                 "Oct",
+                 "Nov",
+                 "Dec",
+              ],
          axisBorder: { show: false },
          axisTicks: { show: false },
          labels: {
@@ -160,42 +176,47 @@ const YearlySalesChart = ({
    };
 
    return (
-      <CustomCard title="Yearly sales & expenses" subtitle="Monthly revenue trends">
-         <Stack direction="row" justifyContent="flex-end" mb={1}>
-            <CustomPopover
-               anchorEl={anchorEl}
-               onClose={() => setAnchorEl(null)}
-               anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-               transformOrigin={{ vertical: "top", horizontal: "right" }}
-            >
-               <Menu
-                  item={[
-                     {
-                        label: currentYear,
-                        onClick: () => handleSelectYear(currentYear),
-                     },
-                     {
-                        label: (parseInt(currentYear) - 1).toString(),
-                        onClick: () => handleSelectYear((parseInt(currentYear) - 1).toString()),
-                     },
-                     {
-                        label: (parseInt(currentYear) - 2).toString(),
-                        onClick: () => handleSelectYear((parseInt(currentYear) - 2).toString()),
-                     },
-                  ]}
+      <CustomCard
+         title={rangeMode ? "Sales & expenses" : "Yearly sales & expenses"}
+         subtitle={rangeMode ? rangeLabel || "Selected range" : "Monthly revenue trends"}
+      >
+         {!rangeMode && (
+            <Stack direction="row" justifyContent="flex-end" mb={1}>
+               <CustomPopover
+                  anchorEl={anchorEl}
+                  onClose={() => setAnchorEl(null)}
+                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                  transformOrigin={{ vertical: "top", horizontal: "right" }}
+               >
+                  <Menu
+                     item={[
+                        {
+                           label: currentYear,
+                           onClick: () => handleSelectYear(currentYear),
+                        },
+                        {
+                           label: (parseInt(currentYear) - 1).toString(),
+                           onClick: () => handleSelectYear((parseInt(currentYear) - 1).toString()),
+                        },
+                        {
+                           label: (parseInt(currentYear) - 2).toString(),
+                           onClick: () => handleSelectYear((parseInt(currentYear) - 2).toString()),
+                        },
+                     ]}
+                     size="small"
+                  />
+               </CustomPopover>
+               <Button
+                  variant="outlined"
                   size="small"
-               />
-            </CustomPopover>
-            <Button
-               variant="outlined"
-               size="small"
-               onClick={(e: React.MouseEvent<HTMLElement>) =>
-                  setAnchorEl(e.currentTarget)
-               }
-            >
-               Year: {year}
-            </Button>
-         </Stack>
+                  onClick={(e: React.MouseEvent<HTMLElement>) =>
+                     setAnchorEl(e.currentTarget)
+                  }
+               >
+                  Year: {year}
+               </Button>
+            </Stack>
+         )}
 
          <Stack direction="row" spacing={4} mb={2}>
             <Stat label="Total income" value={formatCurrency(totalIncomeSum)} color="#30D987" />
@@ -219,7 +240,9 @@ const YearlySalesChart = ({
                justifyContent="center"
             >
                <Typography variant="body2" color="text.secondary">
-                  No income or expense data recorded for {year}.
+                  {rangeMode
+                     ? `No income or expense data recorded for ${rangeLabel || "the selected range"}.`
+                     : `No income or expense data recorded for ${year}.`}
                </Typography>
             </Box>
          )}
