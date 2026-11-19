@@ -123,7 +123,7 @@ export const AuditFilterComponent = ({
 
    return (
       <Box>
-         <Tooltip title="Filter">
+         <Tooltip title="Filter" disableInteractive>
             <Badge
                badgeContent={countAuditChips(data.customerData)}
                color="primary"

@@ -229,7 +229,7 @@ const AuditLogs = () => {
          width: 60,
          sortable: false,
          renderCell: (params: any) => (
-            <Tooltip title="View details">
+            <Tooltip title="View details" disableInteractive>
                <IconButton
                   size="small"
                   onClick={() => setSelected(params.row)}

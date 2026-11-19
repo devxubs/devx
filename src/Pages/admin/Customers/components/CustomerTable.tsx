@@ -212,7 +212,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
             canPrint={false}
             canExport={false}
             filter={() => (
-               <Tooltip title="Filter">
+               <Tooltip title="Filter" disableInteractive>
                   <Badge badgeContent={activeCount} color="primary">
                      <IconButton
                         data-testid="customer-filter-btn"

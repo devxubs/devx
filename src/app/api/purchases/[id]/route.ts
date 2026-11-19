@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import {
-   addStockForPurchaseItems,
    reverseStockForPurchaseItems,
    findVariantlessVariableLine,
    StockReversalUnsafeError,

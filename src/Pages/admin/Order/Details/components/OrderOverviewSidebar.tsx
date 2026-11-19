@@ -277,7 +277,7 @@ export default function OrderOverviewSidebar({
                         </Stack>
 
                         <Stack direction="row" spacing={0.5}>
-                           <Tooltip title={copiedPhone ? "Copied!" : "Copy phone"}>
+                           <Tooltip title={copiedPhone ? "Copied!" : "Copy phone"} disableInteractive>
                               <IconButton size="small" onClick={handleCopyPhone} sx={{ p: 0.5 }}>
                                  <Icon
                                     icon={copiedPhone ? "solar:check-read-bold" : "solar:copy-bold"}
@@ -286,7 +286,7 @@ export default function OrderOverviewSidebar({
                                  />
                               </IconButton>
                            </Tooltip>
-                           <Tooltip title="Call now">
+                           <Tooltip title="Call now" disableInteractive>
                               <IconButton
                                  size="small"
                                  color="primary"
@@ -629,7 +629,7 @@ export default function OrderOverviewSidebar({
                            >
                               {trackingRef}
                            </Typography>
-                           <Tooltip title={copiedTracking ? "Copied!" : "Copy Tracking ID"}>
+                           <Tooltip title={copiedTracking ? "Copied!" : "Copy Tracking ID"} disableInteractive>
                               <IconButton size="small" onClick={handleCopyTracking} sx={{ p: 0.25 }}>
                                  <Icon
                                     icon={copiedTracking ? "solar:check-read-bold" : "solar:copy-bold"}
