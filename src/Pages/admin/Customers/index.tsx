@@ -1,67 +1,42 @@
 "use client";
 
-// Customer Page (upgraded) — analytics table with server-driven advanced
-// filters, sorting, bulk selection and selection-only CSV/Excel export.
-// Statistics come from GET /api/customers (see route): valid orders are
-// non-deleted orders that are not CANCELLED/FAILED; Total Paid/Due use the
-// orders' advancePayment/dueAmount fields, matching the detail modal's
-// analytics conventions.
+// Customer Page — clean, modular architecture.
+// Page-level composition, state coordination, and data fetching.
 import {
    Alert,
-   Badge,
-   Box,
    Button,
-   Chip,
-   CircularProgress,
-   FormControl,
-   InputLabel,
-   MenuItem,
-   Select,
    Snackbar,
    Stack,
-   Tooltip,
    Typography,
 } from "@mui/material";
-import CustomModal from "@src/components/Modal";
-import AlertDialog from "@src/components/AlertDialog";
-import CustomTable, { ColumnConfig } from "@src/components/Table";
-import { TableSkeleton } from "@src/components/SkeletonLoader";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dayjs from "dayjs";
-import Icon from "@src/components/Icon";
+import React, {
+   useCallback,
+   useEffect,
+   useMemo,
+   useRef,
+   useState,
+} from "react";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { useSettings } from "@src/lib/settingsContext";
-import Customer from "./CustomerInfo";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
-import CustomerFilters from "./components/CustomerFilters";
+import AlertDialog from "@src/components/AlertDialog";
+import CustomerTable from "./components/CustomerTable";
+import CustomerFilterModal from "./components/CustomerFilterModal";
 import {
+   buildCustomerFilterChips,
    buildCustomerQuery,
-   clearFilterGroup,
    countActiveFilters,
    CustomerFilterState,
    CustomerRow,
    DEFAULT_FILTERS,
-   describeFilters,
-   FilterChipKey,
+   syncFiltersFromCustomerData,
    validateCustomerFilters,
 } from "./components/customerFilterUtils";
 import {
    exportCustomersToCsv,
    exportCustomersToExcel,
 } from "./components/customerExport";
-
-const SORT_OPTIONS: { value: string; label: string }[] = [
-   { value: "createdAt", label: "Registration Date" },
-   { value: "name", label: "Customer Name" },
-   { value: "customId", label: "Customer ID" },
-   { value: "totalOrders", label: "Total Orders" },
-   { value: "totalPurchase", label: "Total Purchase" },
-   { value: "totalPaid", label: "Total Paid" },
-   { value: "totalDue", label: "Total Due" },
-   { value: "lastOrderAt", label: "Last Order Date" },
-];
-
-type SnackState = { severity: "success" | "error"; message: string } | null;
+import { SnackState } from "./types";
 
 const Customers = () => {
    const { formatCurrency, settings } = useSettings();
@@ -73,22 +48,29 @@ const Customers = () => {
    const [total, setTotal] = useState(0);
    const [loading, setLoading] = useState(true);
    const [loadedOnce, setLoadedOnce] = useState(false);
-   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-   const [customerToDelete, setCustomerToDelete] = useState<CustomerRow | null>(null);
+   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+      null,
+   );
+   const [customerToDelete, setCustomerToDelete] =
+      useState<CustomerRow | null>(null);
    const [snack, setSnack] = useState<SnackState>(null);
    const [exporting, setExporting] = useState(false);
 
    const [filterModalOpen, setFilterModalOpen] = useState(false);
    const [showFilterErrors, setShowFilterErrors] = useState(false);
-   const [draftFilters, setDraftFilters] = useState<CustomerFilterState>(DEFAULT_FILTERS);
-   const [appliedFilters, setAppliedFilters] = useState<CustomerFilterState>(DEFAULT_FILTERS);
+   const [draftFilters, setDraftFilters] =
+      useState<CustomerFilterState>(DEFAULT_FILTERS);
+   const [appliedFilters, setAppliedFilters] =
+      useState<CustomerFilterState>(DEFAULT_FILTERS);
    const draftErrors = useMemo(
       () => validateCustomerFilters(draftFilters),
       [draftFilters],
    );
    const draftValid = Object.keys(draftErrors).length === 0;
-   const [sortBy, setSortBy] = useState("createdAt");
-   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+   // Preserved default sorting state for query builder
+   const [sortBy] = useState("createdAt");
+   const [sortDir] = useState<"asc" | "desc">("desc");
 
    const [debouncedSearch, setDebouncedSearch] = useState(searchText);
    useEffect(() => {
@@ -97,11 +79,18 @@ const Customers = () => {
    }, [searchText]);
 
    const requestRef = useRef(0);
+   const lastLoadOkRef = useRef(true);
+
    const loadCustomers = useCallback(async () => {
       const req = ++requestRef.current;
       setLoading(true);
       try {
-         const q = buildCustomerQuery(appliedFilters, debouncedSearch, sortBy, sortDir);
+         const q = buildCustomerQuery(
+            appliedFilters,
+            debouncedSearch,
+            sortBy,
+            sortDir,
+         );
          const res = await fetch(`/api/customers?${q.toString()}`);
          if (!res.ok) throw new Error("Failed to load customers");
          const data = await res.json();
@@ -152,29 +141,71 @@ const Customers = () => {
       () => countActiveFilters(appliedFilters),
       [appliedFilters],
    );
-   const chips = useMemo(() => describeFilters(appliedFilters), [appliedFilters]);
    const filtersActive = activeCount > 0 || debouncedSearch.trim() !== "";
+
+   const initialRestoredRef = useRef(false);
+
+   // Restore active filters from URL on initial page mount if present
+   useEffect(() => {
+      if (initialRestoredRef.current) return;
+      initialRestoredRef.current = true;
+      const custData = filterQueryData.customerData;
+      if (custData?._raw) {
+         setAppliedFilters(custData._raw);
+         setDraftFilters(custData._raw);
+      }
+   }, [filterQueryData.customerData]);
+
+   // Synchronize applied filters when chips are removed or cleared from Table Filter toolbar
+   useEffect(() => {
+      if (!initialRestoredRef.current) return;
+      const custData = filterQueryData.customerData;
+
+      // Table Clear button clicked: customerData is empty
+      if (!custData || Object.keys(custData).length === 0) {
+         if (countActiveFilters(appliedFilters) > 0) {
+            setAppliedFilters(DEFAULT_FILTERS);
+            setDraftFilters(DEFAULT_FILTERS);
+         }
+         return;
+      }
+
+      // Check if any filter was removed from the Table Filter toolbar
+      const synced = syncFiltersFromCustomerData(appliedFilters, custData);
+      if (JSON.stringify(synced) !== JSON.stringify(appliedFilters)) {
+         setAppliedFilters(synced);
+         setDraftFilters(synced);
+         setFilterQueryData(
+            {
+               customerData: {
+                  ...custData,
+                  _raw: synced,
+               },
+            },
+            0,
+         );
+      }
+   }, [filterQueryData.customerData, appliedFilters, setFilterQueryData]);
 
    const handleReset = useCallback(() => {
       setDraftFilters(DEFAULT_FILTERS);
       setAppliedFilters(DEFAULT_FILTERS);
-      setSortBy("createdAt");
-      setSortDir("desc");
-      if (searchText) setFilterQueryData({ searchText: "" });
-   }, [searchText, setFilterQueryData]);
+      setFilterQueryData(
+         {
+            customerData: {},
+            searchText: "",
+         },
+         0,
+      );
+   }, [setFilterQueryData]);
 
-   /** Modal Reset: reset the DRAFT only — nothing is applied until the
-       user presses Apply Filters; the modal stays open for review. */
    const handleResetFilters = useCallback(() => {
       setDraftFilters(DEFAULT_FILTERS);
       setShowFilterErrors(false);
    }, []);
 
    const [applyingFilters, setApplyingFilters] = useState(false);
-   const lastLoadOkRef = useRef(true);
 
-   /** Modal Apply: validate first; the modal closes only after the
-       customer list has loaded successfully with the new filters. */
    const handleApplyFilters = useCallback(() => {
       if (!draftValid) {
          setShowFilterErrors(true);
@@ -183,19 +214,24 @@ const Customers = () => {
       setShowFilterErrors(false);
       setApplyingFilters(true);
       setAppliedFilters(draftFilters);
-   }, [draftValid, draftFilters]);
+
+      const chipsMap = buildCustomerFilterChips(draftFilters);
+      setFilterQueryData(
+         {
+            customerData: {
+               ...chipsMap,
+               _raw: draftFilters,
+            },
+         },
+         0,
+      );
+   }, [draftValid, draftFilters, setFilterQueryData]);
 
    useEffect(() => {
       if (!applyingFilters || loading) return;
       setApplyingFilters(false);
       if (lastLoadOkRef.current) setFilterModalOpen(false);
    }, [applyingFilters, loading]);
-
-   const handleChipDelete = (key: FilterChipKey) => {
-      const next = clearFilterGroup(appliedFilters, key);
-      setAppliedFilters(next);
-      setDraftFilters(next);
-   };
 
    const handleExport = async (
       format: "csv" | "excel",
@@ -213,244 +249,48 @@ const Customers = () => {
       } catch {
          setSnack({
             severity: "error",
-            message: "Export failed. Your selection is unchanged — please try again.",
+            message:
+               "Export failed. Your selection is unchanged — please try again.",
          });
       } finally {
          setExporting(false);
       }
    };
 
+   const handleDeleteCustomer = async (row: CustomerRow) => {
+      try {
+         const res = await fetch(`/api/customers/${row.id}`, {
+            method: "DELETE",
+         });
+         if (!res.ok) throw new Error("Delete failed");
+         setSnack({
+            severity: "success",
+            message: "Customer deleted.",
+         });
+         loadCustomers();
+      } catch {
+         setSnack({
+            severity: "error",
+            message: "Failed to delete the customer.",
+         });
+      }
+   };
+
+   const handleOpenFilter = () => {
+      setDraftFilters(appliedFilters);
+      setShowFilterErrors(false);
+      setFilterModalOpen(true);
+   };
+
    const openDetails = (row: CustomerRow) =>
       setSelectedCustomerId(row.customId || row.id);
 
-   const columns: ColumnConfig[] = [
-      {
-         field: "customId",
-         headerName: "ID",
-         width: 110,
-         renderCell: (p: any) => (
-            <Typography
-               variant="body2"
-               fontWeight={600}
-               color="primary.main"
-               sx={{
-                  fontFamily: "monospace",
-                  cursor: "pointer",
-                  "&:hover": { textDecoration: "underline" },
-               }}
-               onClick={() => openDetails(p.row)}
-            >
-               {p.row.customId || "—"}
-            </Typography>
-         ),
-      },
-      {
-         field: "customer",
-         headerName: "Customer",
-         flex: 1,
-         minWidth: 230,
-         renderCell: (p: any) => (
-            <Box sx={{ cursor: "pointer" }} onClick={() => openDetails(p.row)}>
-               <Customer
-                  name={p.row.name}
-                  email={p.row.email}
-                  phone={p.row.phone || "-"}
-               />
-            </Box>
-         ),
-      },
-      {
-         field: "totalOrders",
-         headerName: "Total Orders",
-         type: "number",
-         width: 120,
-         align: "right",
-         headerAlign: "right",
-         renderCell: (p: any) => (
-            <Typography
-               variant="body2"
-               fontWeight={600}
-               sx={{
-                  cursor: "pointer",
-                  "&:hover": { textDecoration: "underline", color: "primary.main" },
-               }}
-               onClick={() => openDetails(p.row)}
-            >
-               {p.row.totalOrders}
-            </Typography>
-         ),
-      },
-      {
-         field: "totalPurchase",
-         headerName: "Total Purchase",
-         type: "number",
-         width: 145,
-         align: "right",
-         headerAlign: "right",
-         renderCell: (p: any) => (
-            <Typography variant="body2">{formatCurrency(p.row.totalPurchase)}</Typography>
-         ),
-      },
-      {
-         field: "totalPaid",
-         headerName: "Total Paid",
-         type: "number",
-         width: 135,
-         align: "right",
-         headerAlign: "right",
-         renderCell: (p: any) => (
-            <Typography variant="body2">{formatCurrency(p.row.totalPaid)}</Typography>
-         ),
-      },
-      {
-         field: "totalDue",
-         headerName: "Total Due",
-         type: "number",
-         width: 135,
-         align: "right",
-         headerAlign: "right",
-         renderCell: (p: any) =>
-            p.row.totalDue > 0 ? (
-               <Typography variant="body2" fontWeight={700} color="error.main">
-                  {formatCurrency(p.row.totalDue)}
-               </Typography>
-            ) : (
-               <Typography variant="body2" color="text.secondary">
-                  {formatCurrency(0)}
-               </Typography>
-            ),
-      },
-      {
-         field: "lastOrderAt",
-         headerName: "Last Order",
-         width: 125,
-         renderCell: (p: any) =>
-            p.row.lastOrderAt ? (
-               <Typography variant="body2">
-                  {dayjs(p.row.lastOrderAt).format("DD MMM YYYY")}
-               </Typography>
-            ) : (
-               <Typography variant="body2" color="text.secondary">
-                  Never
-               </Typography>
-            ),
-      },
-      {
-         field: "status",
-         headerName: "Status",
-         width: 120,
-         chip: true,
-         color: (p: any) => (p.value === "Returning" ? "info" : "success"),
-      },
-      { field: "@actions", headerName: "", width: 50 },
-   ];
-
-   // ── Table toolbar content (rendered inside the shared table toolbar
-   // via CustomTable's `filter` slot, next to the toolbar's own search):
-   // Sort By + direction, the Filters button (opens the shared CustomModal),
-   // and the active-filter chips. ─────────────────────────────────────────
-   const toolbarContent = (
-      <Stack spacing={1} alignItems={{ xs: "stretch", sm: "flex-end" }}>
-         <Stack
-            direction="row"
-            spacing={1.5}
-            alignItems="center"
-            flexWrap="wrap"
-         >
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-               <InputLabel>Sort By</InputLabel>
-               <Select
-                  label="Sort By"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-               >
-                  {SORT_OPTIONS.map((o) => (
-                     <MenuItem key={o.value} value={o.value}>
-                        {o.label}
-                     </MenuItem>
-                  ))}
-               </Select>
-            </FormControl>
-            <Tooltip
-               title={sortDir === "desc" ? "Descending — click for ascending" : "Ascending — click for descending"}
-               disableInteractive
-            >
-               <Button
-                  size="small"
-                  variant="outlined"
-                  color="inherit"
-                  onClick={() =>
-                     setSortDir((d) => (d === "desc" ? "asc" : "desc"))
-                  }
-                  startIcon={
-                     <Icon
-                        icon={
-                           sortDir === "desc"
-                              ? "eva:arrow-downward-fill"
-                              : "eva:arrow-upward-fill"
-                        }
-                        size="small"
-                     />
-                  }
-                  sx={{ textTransform: "none", fontWeight: 600, height: 40 }}
-               >
-                  {sortDir === "desc" ? "Desc" : "Asc"}
-               </Button>
-            </Tooltip>
-            <Badge badgeContent={activeCount} color="primary">
-               <Button
-                  variant="outlined"
-                  onClick={() => {
-                     setDraftFilters(appliedFilters);
-                     setShowFilterErrors(false);
-                     setFilterModalOpen(true);
-                  }}
-                  startIcon={<Icon icon="solar:filter-bold" size="small" />}
-                  sx={{ textTransform: "none", fontWeight: 600, height: 40 }}
-               >
-                  Filters
-               </Button>
-            </Badge>
-         </Stack>
-         {chips.length > 0 && (
-            <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
-               {chips.map((chip) => (
-                  <Chip
-                     key={chip.key}
-                     label={chip.label}
-                     size="small"
-                     onDelete={() => handleChipDelete(chip.key)}
-                     sx={{ fontWeight: 600 }}
-                  />
-               ))}
-               <Button
-                  size="small"
-                  variant="text"
-                  color="error"
-                  onClick={handleReset}
-                  sx={{ textTransform: "none", fontWeight: 600 }}
-               >
-                  Clear all
-               </Button>
-            </Stack>
-         )}
-      </Stack>
-   );
-
    return (
-      <Stack spacing={2}>
-         {/* Page title only — search, sort, filters and chips all live in
-             the table toolbar below. */}
-         <Stack>
-            <Typography variant="h5" fontWeight={700}>
-               Customers
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-               {total} customer{total === 1 ? "" : "s"} found
-            </Typography>
-         </Stack>
-
-         {/* Empty-result guidance (the grid also shows its No Data overlay) */}
+      <Stack
+         spacing={2}
+         sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
+      >
+         {/* Empty-result guidance */}
          {loadedOnce && !loading && rows.length === 0 && (
             <Stack
                direction="row"
@@ -484,163 +324,45 @@ const Customers = () => {
             </Stack>
          )}
 
-         {/* Table */}
-         {!loadedOnce && loading ? (
-            <TableSkeleton rows={5} cols={5} />
-         ) : (
-            <CustomTable
-               rows={rows}
-               columns={columns}
-               checkBox={true}
-               canPrint={false}
-               canExport={false}
-               filter={() => toolbarContent}
-               customSelectionToolbar={(selectedRows, onClearSelection) => (
-                  <Stack
-                     direction="row"
-                     spacing={1}
-                     alignItems="center"
-                     flexWrap="wrap"
-                     useFlexGap
-                  >
-                     <Chip
-                        size="small"
-                        color="primary"
-                        label={`${selectedRows.length} customer${selectedRows.length === 1 ? "" : "s"} selected`}
-                        sx={{ fontWeight: 700, borderRadius: 1 }}
-                     />
-                     <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={exporting}
-                        onClick={() =>
-                           handleExport("csv", selectedRows as CustomerRow[])
-                        }
-                        startIcon={
-                           <Icon icon="solar:file-download-bold" size="small" />
-                        }
-                        sx={{ textTransform: "none", fontWeight: 600 }}
-                     >
-                        Export CSV
-                     </Button>
-                     <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={exporting}
-                        onClick={() =>
-                           handleExport("excel", selectedRows as CustomerRow[])
-                        }
-                        startIcon={
-                           <Icon icon="solar:file-download-bold" size="small" />
-                        }
-                        sx={{ textTransform: "none", fontWeight: 600 }}
-                     >
-                        Export Excel
-                     </Button>
-                     <Button
-                        size="small"
-                        variant="text"
-                        color="inherit"
-                        disabled={exporting}
-                        onClick={onClearSelection}
-                        sx={{ textTransform: "none", fontWeight: 600 }}
-                     >
-                        Clear Selection
-                     </Button>
-                  </Stack>
-               )}
-               menuItems={[
-                  {
-                     label: "View Details & Print",
-                     onClick: (p) => openDetails(p.row as CustomerRow),
-                  },
-                  {
-                     label: "Delete",
-                     color: "error",
-                     // Phase 1 (1.5): this was the only destructive
-                     // action in the app with no confirmation — it fired
-                     // the DELETE immediately. It now opens the standard
-                     // AlertDialog (Categories pattern) first.
-                     onClick: (p) => {
-                        setCustomerToDelete(p.row as CustomerRow);
-                     },
-                  },
-               ]}
-            />
-         )}
+         {/* Modular Customer Table */}
+         <CustomerTable
+            rows={rows}
+            loading={loading}
+            loadedOnce={loadedOnce}
+            activeCount={activeCount}
+            exporting={exporting}
+            formatCurrency={formatCurrency}
+            onOpenFilter={handleOpenFilter}
+            onOpenDetails={openDetails}
+            // Phase 1 (1.5): Delete asks for confirmation first (the
+            // standard AlertDialog, Categories pattern) instead of
+            // deleting immediately — see the dialog below.
+            onDeleteCustomer={(row) => setCustomerToDelete(row)}
+            onExport={handleExport}
+         />
 
-         {/* Advanced filters — shared CustomModal shell, hosted exactly
-             like the Order Filter modal (OrderFilter.tsx): same width,
-             max-height, radius and scroll structure. Buttons mirror the
-             Order filter: Reset (inherit, applies immediately), Cancel
-             (error, discards the draft), Apply (contained primary). */}
-         <CustomModal
+         {/* Modular Customer Filter Modal */}
+         <CustomerFilterModal
             open={filterModalOpen}
             onClose={() => setFilterModalOpen(false)}
-            title="Customer Filters"
-            sx={{
-               width: { xs: "100%", md: 950 },
-               maxHeight: { xs: "100vh", md: "88vh" },
-               borderRadius: { xs: 0, md: 2 },
-               display: "flex",
-               flexDirection: "column",
-            }}
-         >
-            <Box sx={{ flex: 1, overflowY: "auto", pr: 1 }}>
-               <Stack height={"100%"} spacing={2.5} p={1}>
-                  <CustomerFilters
-                     value={draftFilters}
-                     onChange={setDraftFilters}
-                     errors={draftErrors}
-                     showErrors={showFilterErrors}
-                     currencySymbol={currencySymbol}
-                  />
-                  <Stack
-                     direction={{ xs: "column", sm: "row" }}
-                     justifyContent={{ xs: "flex-start", sm: "flex-end" }}
-                     spacing={2}
-                     pt={2}
-                     pb={{ xs: 6, sm: 0 }}
-                     flexWrap="wrap"
-                  >
-                     <Button
-                        color="inherit"
-                        disabled={applyingFilters}
-                        onClick={handleResetFilters}
-                     >
-                        Reset Filters
-                     </Button>
-                     <Button
-                        color="error"
-                        disabled={applyingFilters}
-                        onClick={() => setFilterModalOpen(false)}
-                     >
-                        Cancel
-                     </Button>
-                     <Button
-                        variant="contained"
-                        color="primary"
-                        disabled={applyingFilters}
-                        onClick={handleApplyFilters}
-                        startIcon={
-                           applyingFilters ? (
-                              <CircularProgress size={16} color="inherit" />
-                           ) : undefined
-                        }
-                     >
-                        {applyingFilters ? "Applying…" : "Apply Filters"}
-                     </Button>
-                  </Stack>
-               </Stack>
-            </Box>
-         </CustomModal>
+            draftFilters={draftFilters}
+            onDraftChange={setDraftFilters}
+            onApply={handleApplyFilters}
+            onReset={handleResetFilters}
+            applying={applyingFilters}
+            errors={draftErrors}
+            showErrors={showFilterErrors}
+            currencySymbol={currencySymbol}
+         />
 
+         {/* Customer Detail & Print Modal */}
          <CustomerDetailModal
             open={Boolean(selectedCustomerId)}
             onClose={() => setSelectedCustomerId(null)}
             customerId={selectedCustomerId}
          />
 
+         {/* Delete confirmation (Phase 1, 1.5) */}
          <AlertDialog
             type="delete"
             open={Boolean(customerToDelete)}
@@ -648,28 +370,12 @@ const Customers = () => {
             title={`Are you sure want to delete "${customerToDelete?.name || "this customer"}"?`}
             onConfirm={async () => {
                if (!customerToDelete) return;
-               try {
-                  const res = await fetch(
-                     `/api/customers/${customerToDelete.id}`,
-                     { method: "DELETE" },
-                  );
-                  if (!res.ok) throw new Error("Delete failed");
-                  setSnack({
-                     severity: "success",
-                     message: "Customer deleted.",
-                  });
-                  loadCustomers();
-               } catch {
-                  setSnack({
-                     severity: "error",
-                     message: "Failed to delete the customer.",
-                  });
-               } finally {
-                  setCustomerToDelete(null);
-               }
+               await handleDeleteCustomer(customerToDelete);
+               setCustomerToDelete(null);
             }}
          />
 
+         {/* Feedback Snackbar */}
          <Snackbar
             open={Boolean(snack)}
             autoHideDuration={4000}

@@ -10,6 +10,7 @@ export const useFilterQuery = () => {
    const filterQueryData: FilterData = useMemo(() => {
       let getFilterData: FilterData = {
          orderData: {},
+         customerData: {},
          reportData: {},
       };
       if (filterRaw) {
@@ -18,14 +19,18 @@ export const useFilterQuery = () => {
                decodeURIComponent(filterRaw) || "{}",
             );
          } catch {
-            getFilterData = { orderData: {}, reportData: {} };
+            getFilterData = {
+               orderData: {},
+               customerData: {},
+               reportData: {},
+            };
          }
       }
       return getFilterData;
    }, [filterRaw]);
 
    const setFilterQueryData = useCallback((data: FilterData, millisecond?: number) => {
-      millisecond = millisecond || 500;
+      const delay = millisecond !== undefined ? millisecond : 500;
       delayExecute(() => {
          query.set(
             "filter",
@@ -34,10 +39,22 @@ export const useFilterQuery = () => {
                   ...filterQueryData,
                   ...data,
 
-                  orderData: {
-                     ...filterQueryData?.orderData,
-                     ...data.orderData,
-                  },
+                  orderData:
+                     data.orderData !== undefined &&
+                     Object.keys(data.orderData).length === 0
+                        ? {}
+                        : {
+                             ...filterQueryData?.orderData,
+                             ...data.orderData,
+                          },
+                  customerData:
+                     data.customerData !== undefined &&
+                     Object.keys(data.customerData).length === 0
+                        ? {}
+                        : {
+                             ...filterQueryData?.customerData,
+                             ...data.customerData,
+                          },
                   reportData: {
                      ...filterQueryData?.reportData,
                      ...data.reportData,
@@ -46,7 +63,7 @@ export const useFilterQuery = () => {
             ),
             false,
          );
-      }, millisecond);
+      }, delay);
    }, [query, filterQueryData]);
 
    return {

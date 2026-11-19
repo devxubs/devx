@@ -154,6 +154,12 @@ export function resolveDateRange(
    preset: RegPreset | LastOrderPreset,
    customRange: [Date | null, Date | null],
 ): [Date, Date] | null {
+   if (customRange && customRange[0] && customRange[1]) {
+      return [
+         dayjs(customRange[0]).startOf("day").toDate(),
+         dayjs(customRange[1]).endOf("day").toDate(),
+      ];
+   }
    const now = dayjs();
    switch (preset) {
       case "today":
@@ -417,14 +423,21 @@ function dateRangeLabel(
    name: string,
    preset: RegPreset | LastOrderPreset,
    customRange: [Date | null, Date | null],
-   presetOptions: { value: string; label: string }[],
+   presetOptions?: { value: string; label: string }[],
 ): string | null {
    const range = resolveDateRange(preset, customRange);
    if (!range) return null;
-   if (preset === "custom") {
+   if (
+      preset === "custom" ||
+      (customRange && customRange[0] && customRange[1])
+   ) {
+      if (dayjs(range[0]).isSame(range[1], "day")) {
+         return `${name}: ${dayjs(range[0]).format("DD MMM YYYY")}`;
+      }
       return `${name}: ${dayjs(range[0]).format("DD MMM YYYY")} – ${dayjs(range[1]).format("DD MMM YYYY")}`;
    }
-   const label = presetOptions.find((o) => o.value === preset)?.label || preset;
+   const label =
+      presetOptions?.find((o) => o.value === preset)?.label || preset;
    return `${name}: ${label}`;
 }
 
@@ -536,4 +549,158 @@ export function clearFilterGroup(
       default:
          return f;
    }
+}
+
+export const CUSTOMER_KEY_TO_CHIP_KEY: Record<string, FilterChipKey> = {
+   status: "status",
+   registered: "reg",
+   orders: "orders",
+   purchase: "purchase",
+   paid: "paid",
+   due: "due",
+   last_order: "last",
+   delivered_orders: "delivered",
+   item_qty: "itemQty",
+   order_status: "orderStatuses",
+   order_status_excl: "orderStatuses",
+   order_source: "orderSources",
+   order_source_excl: "orderSources",
+   product: "product",
+   category: "category",
+   employee: "employee",
+   phone: "phone",
+};
+
+function rangeValueOnly(r: NumericRange): string {
+   if (r.op === "between")
+      return `${fmtNum(r.value)} – ${fmtNum(r.value2)}`;
+   return `${OP_SYMBOL[r.op]} ${fmtNum(r.value)}`;
+}
+
+/** Converts active CustomerFilterState into key-value chip strings for Table Filter toolbar */
+export function buildCustomerFilterChips(
+   f: CustomerFilterState,
+): Record<string, any> {
+   const data: Record<string, any> = {};
+
+   for (const key of Object.keys(CUSTOMER_KEY_TO_CHIP_KEY)) {
+      data[key] = "";
+   }
+
+   if (f.status !== "all") {
+      data.status = f.status === "new" ? "New" : "Returning";
+   }
+
+   const reg = dateRangeLabel(
+      "Registered",
+      f.regPreset,
+      f.regRange,
+      REG_PRESET_OPTIONS,
+   );
+   if (reg) {
+      data.registered = reg.replace(/^Registered:\s*/, "");
+   }
+
+   if (isRangeActive(f.orders)) {
+      data.orders = rangeValueOnly(f.orders);
+   }
+
+   if (isRangeActive(f.purchase)) {
+      data.purchase = rangeValueOnly(f.purchase);
+   }
+
+   if (isRangeActive(f.paid)) {
+      data.paid = rangeValueOnly(f.paid);
+   }
+
+   if (isRangeActive(f.due)) {
+      data.due = rangeValueOnly(f.due);
+   }
+
+   if (f.lastPreset === "never") {
+      data.last_order = "Never";
+   } else {
+      const last = dateRangeLabel(
+         "Last Order",
+         f.lastPreset,
+         f.lastRange,
+         LAST_ORDER_PRESET_OPTIONS,
+      );
+      if (last) {
+         data.last_order = last.replace(/^Last Order:\s*/, "");
+      }
+   }
+
+   if (isRangeActive(f.delivered)) {
+      data.delivered_orders = rangeValueOnly(f.delivered);
+   }
+
+   if (isRangeActive(f.itemQty)) {
+      data.item_qty = rangeValueOnly(f.itemQty);
+   }
+
+   if (f.orderStatuses.length > 0) {
+      if (f.orderStatusExclude) {
+         data.order_status_excl = f.orderStatuses.join(", ");
+      } else {
+         data.order_status = f.orderStatuses.join(", ");
+      }
+   }
+
+   if (f.orderSources.length > 0) {
+      if (f.orderSourceExclude) {
+         data.order_source_excl = f.orderSources.join(", ");
+      } else {
+         data.order_source = f.orderSources.join(", ");
+      }
+   }
+
+   if (f.productId) {
+      data.product = f.productLabel || f.productId;
+   }
+
+   if (f.categoryId) {
+      data.category = f.categoryLabel || f.categoryId;
+   }
+
+   if (f.employeeId) {
+      data.employee = f.employeeLabel || f.employeeId;
+   }
+
+   if (f.phoneNumber.trim() !== "") {
+      data.phone = f.phoneNumber.trim();
+   }
+
+   return data;
+}
+
+/** Synchronizes CustomerFilterState when chips are deleted or cleared from the Table Filter toolbar */
+export function syncFiltersFromCustomerData(
+   currentFilters: CustomerFilterState,
+   customerData: Record<string, any> | undefined,
+): CustomerFilterState {
+   if (!customerData || Object.keys(customerData).length === 0) {
+      return DEFAULT_FILTERS;
+   }
+
+   if (customerData._raw && countActiveFilters(currentFilters) === 0) {
+      return customerData._raw;
+   }
+
+   let next = { ...currentFilters };
+
+   for (const [key, chipKey] of Object.entries(CUSTOMER_KEY_TO_CHIP_KEY)) {
+      const val = customerData[key];
+      const isActive =
+         val !== undefined &&
+         val !== null &&
+         val !== "" &&
+         val !== "All" &&
+         val !== "Any";
+      if (!isActive) {
+         next = clearFilterGroup(next, chipKey);
+      }
+   }
+
+   return next;
 }

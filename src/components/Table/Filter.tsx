@@ -86,6 +86,7 @@ export type FilterData = {
    productStock?: string;
    searchText?: string;
    orderData?: OrderFilter;
+   customerData?: Record<string, any>;
    reportData?: {
       report_type?:
          | "default"
@@ -308,15 +309,27 @@ const Filter: React.FC<FilterProps> = ({
       filterQueryData.reportData || {},
    ).filter(([key, value]) => key !== "report_type" && isActive(value));
 
+   const activeCustomerFilters = Object.entries(
+      filterQueryData.customerData || {},
+   ).filter(([key, value]) => key !== "_raw" && isActive(value));
+
    const hasAnyFilter = useMemo(() => {
       return (
          isActive(filterQueryData.searchText) ||
          isActive(filterQueryData.userRole) ||
          isActive(filterQueryData.productStock) ||
          activeOrderFilters.length > 0 ||
-         activeReportFilters.length > 0
+         activeReportFilters.length > 0 ||
+         activeCustomerFilters.length > 0
       );
-   }, [filterQueryData, activeOrderFilters, activeReportFilters]);
+   }, [
+      filterQueryData.searchText,
+      filterQueryData.userRole,
+      filterQueryData.productStock,
+      activeOrderFilters,
+      activeReportFilters,
+      activeCustomerFilters,
+   ]);
 
    const handleClearAll = () => {
       setFilterQueryData({
@@ -324,6 +337,7 @@ const Filter: React.FC<FilterProps> = ({
          userRole: "",
          productStock: "",
          orderData: {},
+         customerData: {},
          reportData: {
             report_type: "default",
             date: [null, null],
@@ -727,6 +741,25 @@ const Filter: React.FC<FilterProps> = ({
                   </FilterChipWrapper>
                ))}
 
+               {/* Customer */}
+               {activeCustomerFilters.map(([key, value]) => (
+                  <FilterChipWrapper key={key} title={formatLabel(key)}>
+                     <Chip
+                        label={String(value)}
+                        size="small"
+                        onDelete={() =>
+                           setFilterQueryData({
+                              customerData: {
+                                 ...filterQueryData.customerData,
+                                 [key]: "",
+                              },
+                           })
+                        }
+                        sx={chipStyle(theme)}
+                     />
+                  </FilterChipWrapper>
+               ))}
+
                {/* CLEAR ALL BUTTON */}
                {hasAnyFilter && (
                   <Button
@@ -788,8 +821,11 @@ const chipStyle = (theme: any) => ({
 });
 
 // Convert snake_case → Normal Label
-const formatLabel = (str: string) =>
-   str
+const formatLabel = (str: string) => {
+   if (str === "order_status_excl") return "Order Status (Excl)";
+   if (str === "order_source_excl") return "Order Source (Excl)";
+   return str
       .split("_")
       .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
       .join(" ");
+};
