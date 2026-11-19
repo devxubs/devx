@@ -27,15 +27,17 @@ export function isMobilePaymentMethod(method?: string | null): boolean {
 /**
  * Find a non-deleted order (other than `excludeOrderId`) that already
  * carries the given non-empty transaction ID. Returns null when the
- * TxID is empty or unused.
+ * TxID is empty or unused. Accepts any Prisma-like client so write
+ * paths can re-run the check inside their transaction (QA fix S1).
  */
 export async function findOrderWithTxId(
    txId: string,
    excludeOrderId?: string,
+   db: any = prisma,
 ) {
    const clean = String(txId || "").trim();
    if (!clean) return null;
-   return prisma.order.findFirst({
+   return db.order.findFirst({
       where: {
          paymentTxId: clean,
          isDeleted: false,
@@ -43,6 +45,25 @@ export async function findOrderWithTxId(
       },
       select: { id: true, orderId: true, orderCode: true, customId: true },
    });
+}
+
+/**
+ * Thrown by order write paths when the in-transaction duplicate-TxID
+ * re-check finds a clash; handlers map it to the same 409 body the
+ * pre-transaction check returns.
+ */
+export class DuplicateTxIdError extends Error {
+   txId: string;
+   clash: { id?: string; orderId?: string | null; orderCode?: string | null; customId?: string | null };
+   constructor(
+      txId: string,
+      clash: { id?: string; orderId?: string | null; orderCode?: string | null; customId?: string | null },
+   ) {
+      super(duplicateTxIdMessage(txId, clash));
+      this.name = "DuplicateTxIdError";
+      this.txId = txId;
+      this.clash = clash;
+   }
 }
 
 export function duplicateTxIdMessage(

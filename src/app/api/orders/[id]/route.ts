@@ -7,10 +7,15 @@ import {
    deductStockForItems,
    restoreStockForItems,
    orderHoldsStock,
+   findVariantlessVariableLine,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
-import { findOrderWithTxId, duplicateTxIdMessage } from "@src/lib/payments";
+import {
+   findOrderWithTxId,
+   duplicateTxIdMessage,
+   DuplicateTxIdError,
+} from "@src/lib/payments";
 
 const PAYMENT_STATUS_VALUES = ["UNVERIFIED", "VERIFIED", "MISMATCHED"];
 
@@ -704,6 +709,29 @@ export async function PUT(
             }
          }
 
+         // Step 3c (QA fix B1): reject any final line that names a
+         // variable product without a variant. A variant-less line
+         // nets against the product pool only and silently breaks
+         // the Product.quantity = Σ variant quantities invariant.
+         // This also heals pre-fix orders on their next item edit:
+         // the message names the product that needs a variant picked.
+         const variantless = await findVariantlessVariableLine(
+            prisma,
+            finalItemsData.map((it) => ({
+               productId: it.productId,
+               variantId: it.variantId,
+            })),
+         );
+         if (variantless) {
+            return NextResponse.json(
+               {
+                  error: "Variant required",
+                  message: `Product '${variantless.productName}' has variants — select a variant for this line before saving.`,
+               },
+               { status: 400 },
+            );
+         }
+
          // Step 4: Calculate net stock difference per product.
          // ORD-02 fix: the difference is computed between the stock
          // the order EFFECTIVELY held before and after this update.
@@ -847,6 +875,18 @@ export async function PUT(
          }
 
          const updated = await prisma.$transaction(async (tx) => {
+            // QA fix (S1, partial): re-run the duplicate-TxID check
+            // inside the transaction (see the create path for the
+            // rationale — the race narrows, it does not vanish).
+            if (paymentTxIdUpdate) {
+               const clash = await findOrderWithTxId(
+                  paymentTxIdUpdate,
+                  existingOrder.id,
+                  tx,
+               );
+               if (clash) throw new DuplicateTxIdError(paymentTxIdUpdate, clash);
+            }
+
             // 1. Delete removed order items
             for (const it of itemsToDelete) {
                await tx.orderItem.delete({ where: { id: it.id } });
@@ -1030,6 +1070,17 @@ export async function PUT(
       const willHoldStock = nextStatus !== "CANCELLED";
 
       const updated = await prisma.$transaction(async (tx) => {
+         // QA fix (S1, partial): in-transaction duplicate-TxID
+         // re-check, same as the items path above.
+         if (paymentTxIdUpdate) {
+            const clash = await findOrderWithTxId(
+               paymentTxIdUpdate,
+               existingOrder.id,
+               tx,
+            );
+            if (clash) throw new DuplicateTxIdError(paymentTxIdUpdate, clash);
+         }
+
          if (body.customer && existingOrder.customerId) {
             await tx.customer.update({
                where: { id: existingOrder.customerId },
@@ -1149,6 +1200,12 @@ export async function PUT(
          return NextResponse.json(
             { error: "Invalid variant", message: err.message },
             { status: 400 },
+         );
+      }
+      if (err instanceof DuplicateTxIdError) {
+         return NextResponse.json(
+            { error: "Duplicate transaction ID", message: err.message },
+            { status: 409 },
          );
       }
       // ORD-06 fix: do not leak raw internal error messages to clients.

@@ -75,6 +75,66 @@ export class InvalidVariantError extends Error {
    }
 }
 
+/**
+ * QA fix (B1): find the first line that names a variable product
+ * without naming one of its variants. A variant-less line is deducted
+ * from the product pool only, which silently breaks the product-save
+ * invariant (Product.quantity = Σ variant quantities) and overstates
+ * every variant's stock — so the order/purchase write paths reject
+ * such lines with a 400 before writing anything.
+ *
+ * "Variable" is decided exactly as the rest of the codebase decides
+ * it (Order Create's useOrderCreate, Quick Edit's product hook, the
+ * product save handlers): `productType === "Variable"` AND the
+ * product has at least one live (not soft-deleted) variant — the
+ * same variant set the products API returns to the pickers.
+ *
+ * Works with any Prisma-like client (root client or transaction
+ * client). Returns the offending product's id + name, or null.
+ */
+export async function findVariantlessVariableLine(
+   db: any,
+   lines: Array<{ productId: string | null | undefined; variantId?: string | null }>,
+): Promise<{ productId: string; productName: string } | null> {
+   const candidateIds = Array.from(
+      new Set(
+         lines
+            .filter((l) => l.productId && !l.variantId)
+            .map((l) => l.productId as string),
+      ),
+   );
+   if (candidateIds.length === 0) return null;
+
+   const products = await db.product.findMany({
+      where: { id: { in: candidateIds } },
+      select: { id: true, productName: true, productType: true },
+   });
+   const variableIds = products
+      .filter((p: any) => p.productType === "Variable")
+      .map((p: any) => p.id as string);
+   if (variableIds.length === 0) return null;
+
+   const liveVariants = await db.productVariant.findMany({
+      where: { productId: { in: variableIds }, isDeleted: false },
+      select: { productId: true },
+   });
+   const withLiveVariants = new Set(liveVariants.map((v: any) => v.productId));
+   const productById = new Map<string, any>(
+      products.map((p: any) => [p.id, p] as [string, any]),
+   );
+
+   for (const line of lines) {
+      if (!line.productId || line.variantId) continue;
+      if (!withLiveVariants.has(line.productId)) continue;
+      const product = productById.get(line.productId);
+      return {
+         productId: line.productId,
+         productName: product?.productName || line.productId,
+      };
+   }
+   return null;
+}
+
 export interface StockSettings {
    enableStockValidation: boolean;
    enableLowStockAlert: boolean;

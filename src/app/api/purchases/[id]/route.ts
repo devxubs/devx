@@ -4,6 +4,7 @@ import { prisma } from "@src/lib/prisma";
 import {
    addStockForPurchaseItems,
    reverseStockForPurchaseItems,
+   findVariantlessVariableLine,
    StockReversalUnsafeError,
 } from "@src/lib/stock";
 
@@ -172,6 +173,29 @@ export async function PUT(
                   );
                }
             }
+         }
+      }
+
+      // QA fix (B1): reject any replacement line that names a
+      // variable product without a variant — it would net against
+      // the product pool only and break the variant-stock
+      // invariant (same rule as purchase create).
+      if (hasItems && normalizedItems) {
+         const variantless = await findVariantlessVariableLine(
+            prisma,
+            normalizedItems.map((it) => ({
+               productId: it.productId,
+               variantId: it.variantId,
+            })),
+         );
+         if (variantless) {
+            return NextResponse.json(
+               {
+                  error: "Variant required",
+                  message: `Product '${variantless.productName}' has variants — select a variant for this line before saving.`,
+               },
+               { status: 400 },
+            );
          }
       }
 

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { parsePagination } from "@src/lib/pagination";
 import { generateNextEntityId } from "@src/lib/idGenerator";
-import { addStockForPurchaseItems } from "@src/lib/stock";
+import {
+   addStockForPurchaseItems,
+   findVariantlessVariableLine,
+} from "@src/lib/stock";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -10,8 +14,8 @@ export async function GET(request: NextRequest) {
 
    const { searchParams } = new URL(request.url);
    const isExportAll = searchParams.get("all") === "true" || searchParams.get("export") === "true";
-   const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
-   const limit = isExportAll ? 10000 : Math.min(parseInt(searchParams.get("limit") || "20"), 100);
+   const { page, limit: parsedLimit } = parsePagination(searchParams, 20);
+   const limit = isExportAll ? 10000 : parsedLimit;
    const search = searchParams.get("search")?.trim() || "";
    const skip = isExportAll ? 0 : (page - 1) * limit;
 
@@ -176,6 +180,27 @@ export async function POST(request: NextRequest) {
                );
             }
          }
+      }
+
+      // QA fix (B1): a variant-less line for a variable product
+      // would credit the product pool only and silently break the
+      // Product.quantity = Σ variant quantities invariant — reject
+      // it; the caller must pick the variant being purchased.
+      const variantless = await findVariantlessVariableLine(
+         prisma,
+         normalizedItems.map((it) => ({
+            productId: it.productId,
+            variantId: it.variantId,
+         })),
+      );
+      if (variantless) {
+         return NextResponse.json(
+            {
+               error: "Variant required",
+               message: `Product '${variantless.productName}' has variants — select a variant for this line before saving.`,
+            },
+            { status: 400 },
+         );
       }
 
       const purchase = await prisma.$transaction(async (tx) => {

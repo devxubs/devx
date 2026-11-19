@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { parsePagination } from "@src/lib/pagination";
 import { calculateOrderTotals } from "@src/lib/utils";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import {
    loadStockSettings,
    deductStockForItems,
+   findVariantlessVariableLine,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
-import { findOrderWithTxId, duplicateTxIdMessage } from "@src/lib/payments";
+import {
+   findOrderWithTxId,
+   duplicateTxIdMessage,
+   DuplicateTxIdError,
+} from "@src/lib/payments";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -17,8 +23,8 @@ export async function GET(request: NextRequest) {
 
    const { searchParams } = new URL(request.url);
    const isExportAll = searchParams.get("all") === "true" || searchParams.get("export") === "true";
-   const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
-   const limit = isExportAll ? 10000 : Math.min(parseInt(searchParams.get("limit") || "20"), 100);
+   const { page, limit: parsedLimit } = parsePagination(searchParams, 20);
+   const limit = isExportAll ? 10000 : parsedLimit;
    const search = searchParams.get("search")?.trim() || "";
    const status = searchParams.get("status") || undefined;
    const excludeStatus = searchParams.get("excludeStatus") === "true";
@@ -435,6 +441,28 @@ export async function POST(request: NextRequest) {
          }
       }
 
+      // QA fix (B1): the mirror image of the check above — a line
+      // naming a variable product but NO variant would be deducted
+      // from the product pool only, silently breaking the
+      // Product.quantity = Σ variant quantities invariant. Reject it;
+      // the caller must pick the variant being sold.
+      const variantless = await findVariantlessVariableLine(
+         prisma,
+         products.map((p: any) => ({
+            productId: p.id || null,
+            variantId: p.variantId || null,
+         })),
+      );
+      if (variantless) {
+         return NextResponse.json(
+            {
+               error: "Variant required",
+               message: `Product '${variantless.productName}' has variants — select a variant for this line before saving.`,
+            },
+            { status: 400 },
+         );
+      }
+
       // Phase 2 (2.5): notes + courier are accepted in the create
       // request and stored inside the same transaction. Previously the
       // client had to follow a successful POST with a separate PUT to
@@ -495,6 +523,18 @@ export async function POST(request: NextRequest) {
 
       // Execute order creation + inventory deduction in an atomic transaction
       const order = await prisma.$transaction(async (tx) => {
+         // QA fix (S1, partial): re-run the duplicate-TxID check
+         // inside the transaction, narrowing the window in which two
+         // concurrent creates could both pass the pre-check above.
+         // The schema plan deliberately rejected a DB unique
+         // constraint, so a narrow race remains by design — a
+         // duplicate that does slip through stays visible in the
+         // Payments reconciliation tab.
+         if (paymentTxId) {
+            const clash = await findOrderWithTxId(paymentTxId, undefined, tx);
+            if (clash) throw new DuplicateTxIdError(paymentTxId, clash);
+         }
+
          let customerId: string | null = null;
          if (customer?.name) {
             if (customer.id) {
@@ -616,6 +656,12 @@ export async function POST(request: NextRequest) {
          return NextResponse.json(
             { error: "Invalid variant", message: err.message },
             { status: 400 },
+         );
+      }
+      if (err instanceof DuplicateTxIdError) {
+         return NextResponse.json(
+            { error: "Duplicate transaction ID", message: err.message },
+            { status: 409 },
          );
       }
       return NextResponse.json(
