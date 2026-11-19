@@ -4,17 +4,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
    Alert,
    Badge,
+   Box,
    Chip,
-   Dialog,
-   DialogContent,
-   DialogTitle,
    Divider,
-   FormControl,
+   Grid,
    IconButton,
-   InputLabel,
-   MenuItem,
    Paper,
-   Select,
    Stack,
    Table,
    TableBody,
@@ -24,6 +19,8 @@ import {
    Typography,
 } from "@mui/material";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
+import CustomAutocomplete from "@src/components/Autocomplete";
+import CustomModal from "@src/components/Modal";
 import DateRange from "@src/components/DateRange";
 import FilterModalShell from "@src/components/FilterModalShell";
 import Icon from "@src/components/Icon";
@@ -101,6 +98,38 @@ const formatValue = (value: any): string => {
    if (typeof value === "object") return JSON.stringify(value);
    return String(value);
 };
+
+// Section/field labels mirroring the Customers filter modal
+// (CustomerFilters) so all filter modals share one visual language.
+const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+   <Typography
+      variant="subtitle2"
+      sx={{
+         fontWeight: 700,
+         fontSize: "0.85rem",
+         letterSpacing: "0.03em",
+         textTransform: "uppercase",
+         color: "text.primary",
+         mb: 1.5,
+      }}
+   >
+      {children}
+   </Typography>
+);
+
+const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+   <Typography
+      variant="body2"
+      sx={{
+         fontSize: "0.8125rem",
+         fontWeight: 600,
+         color: "text.secondary",
+         letterSpacing: "0.01em",
+      }}
+   >
+      {children}
+   </Typography>
+);
 
 const AuditLogs = () => {
    const { filterQueryData } = useFilterQuery();
@@ -253,6 +282,22 @@ const AuditLogs = () => {
          ? Object.entries(selected.changes)
          : [];
 
+   // Filter option lists for the shared Autocomplete pickers. The
+   // empty-string option is the "All …" choice, exactly matching the
+   // previous Select semantics ("" = no filter).
+   const entityTypeOptions = [
+      { label: "All types", value: "" },
+      ...ENTITY_TYPE_OPTIONS.map((t) => ({ label: t, value: t })),
+   ];
+   const actionOptions = [
+      { label: "All actions", value: "" },
+      ...ACTION_OPTIONS.map((a) => ({ label: a, value: a })),
+   ];
+   const actorOptions = [
+      { label: "All actors", value: "" },
+      ...actors.map((a) => ({ label: a.label, value: a.id })),
+   ];
+
    return (
       <Stack spacing={2.5} p={1} height="100%">
          <Stack spacing={0.5}>
@@ -315,76 +360,120 @@ const AuditLogs = () => {
             }}
             onReset={() => setDraft(EMPTY_FILTERS)}
          >
-            <FormControl size="small" fullWidth>
-               <InputLabel>Entity Type</InputLabel>
-               <Select
-                  label="Entity Type"
-                  value={draft.entityType}
-                  onChange={(e) =>
-                     setDraft({ ...draft, entityType: String(e.target.value) })
-                  }
-               >
-                  <MenuItem value="">All types</MenuItem>
-                  {ENTITY_TYPE_OPTIONS.map((t) => (
-                     <MenuItem key={t} value={t}>
-                        {t}
-                     </MenuItem>
-                  ))}
-               </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-               <InputLabel>Action</InputLabel>
-               <Select
-                  label="Action"
-                  value={draft.action}
-                  onChange={(e) =>
-                     setDraft({ ...draft, action: String(e.target.value) })
-                  }
-               >
-                  <MenuItem value="">All actions</MenuItem>
-                  {ACTION_OPTIONS.map((a) => (
-                     <MenuItem key={a} value={a}>
-                        {a}
-                     </MenuItem>
-                  ))}
-               </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-               <InputLabel>Actor</InputLabel>
-               <Select
-                  label="Actor"
-                  value={draft.actorId}
-                  onChange={(e) =>
-                     setDraft({ ...draft, actorId: String(e.target.value) })
-                  }
-               >
-                  <MenuItem value="">All actors</MenuItem>
-                  {actors.map((a) => (
-                     <MenuItem key={a.id} value={a.id}>
-                        {a.label}
-                     </MenuItem>
-                  ))}
-               </Select>
-            </FormControl>
-            <DateRange
-               size="small"
-               title="Date Range"
-               value={draft.range}
-               onChange={(v: any) => setDraft({ ...draft, range: v })}
-            />
+            <Box>
+               <SectionTitle>Event</SectionTitle>
+               <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                     <Stack spacing={0.75}>
+                        <FieldLabel>Entity Type</FieldLabel>
+                        <CustomAutocomplete
+                           size="small"
+                           arrow={true}
+                           placeholder="All types"
+                           options={entityTypeOptions}
+                           value={
+                              entityTypeOptions.find(
+                                 (o) => o.value === draft.entityType,
+                              ) ?? entityTypeOptions[0]
+                           }
+                           isOptionEqualToValue={(option: any, val: any) =>
+                              option.value === val?.value
+                           }
+                           onChange={(opt: any) =>
+                              setDraft({
+                                 ...draft,
+                                 entityType: opt?.value ?? "",
+                              })
+                           }
+                        />
+                     </Stack>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                     <Stack spacing={0.75}>
+                        <FieldLabel>Action</FieldLabel>
+                        <CustomAutocomplete
+                           size="small"
+                           arrow={true}
+                           placeholder="All actions"
+                           options={actionOptions}
+                           value={
+                              actionOptions.find(
+                                 (o) => o.value === draft.action,
+                              ) ?? actionOptions[0]
+                           }
+                           isOptionEqualToValue={(option: any, val: any) =>
+                              option.value === val?.value
+                           }
+                           onChange={(opt: any) =>
+                              setDraft({ ...draft, action: opt?.value ?? "" })
+                           }
+                        />
+                     </Stack>
+                  </Grid>
+               </Grid>
+            </Box>
+            <Box>
+               <SectionTitle>Actor & Date</SectionTitle>
+               <Stack spacing={2}>
+                  <Stack spacing={0.75}>
+                     <FieldLabel>Actor</FieldLabel>
+                     <CustomAutocomplete
+                        size="small"
+                        arrow={true}
+                        placeholder="All actors"
+                        options={actorOptions}
+                        value={
+                           actorOptions.find(
+                              (o) => o.value === draft.actorId,
+                           ) ?? actorOptions[0]
+                        }
+                        isOptionEqualToValue={(option: any, val: any) =>
+                           option.value === val?.value
+                        }
+                        onChange={(opt: any) =>
+                           setDraft({ ...draft, actorId: opt?.value ?? "" })
+                        }
+                     />
+                  </Stack>
+                  <DateRange
+                     size="small"
+                     title="Date Range"
+                     value={draft.range}
+                     onChange={(v: any) => setDraft({ ...draft, range: v })}
+                  />
+               </Stack>
+            </Box>
          </FilterModalShell>
 
-         <Dialog
+         <CustomModal
             open={!!selected}
             onClose={() => setSelected(null)}
-            maxWidth="sm"
-            fullWidth
+            title="Audit Entry"
+            closeIcon={true}
+            size="md"
+            sx={{
+               maxHeight: "92vh",
+               display: "flex",
+               flexDirection: "column",
+               overflow: "hidden",
+            }}
          >
-            <DialogTitle>Audit Entry</DialogTitle>
-            <DialogContent dividers>
-               {selected && (
+            {selected && (
+               <Box
+                  sx={{
+                     maxHeight: "calc(92vh - 120px)",
+                     overflowY: "auto",
+                     overflowX: "hidden",
+                     pr: { xs: 0.5, sm: 1 },
+                  }}
+               >
                   <Stack spacing={1.5}>
-                     <Typography variant="body2">{selected.summary}</Typography>
+                     <Typography
+                        variant="body2"
+                        sx={{ overflowWrap: "anywhere" }}
+                     >
+                        {selected.summary}
+                     </Typography>
                      <Divider />
                      <Table size="small">
                         <TableBody>
@@ -448,11 +537,21 @@ const AuditLogs = () => {
                                        >
                                           {field}
                                        </TableCell>
-                                       <TableCell>
+                                       <TableCell
+                                          sx={{
+                                             wordBreak: "break-word",
+                                             overflowWrap: "anywhere",
+                                          }}
+                                       >
                                           {formatValue(diff?.from)}
                                        </TableCell>
                                        <TableCell>→</TableCell>
-                                       <TableCell>
+                                       <TableCell
+                                          sx={{
+                                             wordBreak: "break-word",
+                                             overflowWrap: "anywhere",
+                                          }}
+                                       >
                                           {formatValue(diff?.to)}
                                        </TableCell>
                                     </TableRow>
@@ -462,9 +561,9 @@ const AuditLogs = () => {
                         </>
                      )}
                   </Stack>
-               )}
-            </DialogContent>
-         </Dialog>
+               </Box>
+            )}
+         </CustomModal>
       </Stack>
    );
 };
