@@ -16,6 +16,11 @@ import {
    duplicateTxIdMessage,
    DuplicateTxIdError,
 } from "@src/lib/payments";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -640,6 +645,17 @@ export async function POST(request: NextRequest) {
                },
             );
          }
+
+         // Phase 4 (D1): audit in the same transaction.
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "ORDER",
+            entityId: createdOrder.id,
+            entityCustomId: orderId,
+            summary: `Order ${orderId} created — total ৳${totals.total.toFixed(2)}, due ৳${totals.dueAmount.toFixed(2)}`,
+            ...requestAuditContext(request),
+         });
 
          return createdOrder;
       });

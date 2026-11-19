@@ -14,6 +14,7 @@ import {
    alpha,
    useTheme,
    Divider,
+   TextField,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import { useSettings } from "@src/lib/settingsContext";
@@ -72,6 +73,54 @@ export default function OrderOverviewSidebar({
          setVerificationError(err?.message || "Failed to update verification");
       } finally {
          setVerificationSaving(false);
+      }
+   };
+
+   // Phase 4 (D3): courier booking identifiers — manual edit via
+   // the same order PUT the verification control above uses.
+   const [courierEditing, setCourierEditing] = useState(false);
+   const [courierDraft, setCourierDraft] = useState({
+      consignmentId: "",
+      trackingCode: "",
+      providerStatus: "",
+   });
+   const [courierSaving, setCourierSaving] = useState(false);
+   const [courierError, setCourierError] = useState<string | null>(null);
+
+   const startCourierEdit = () => {
+      setCourierDraft({
+         consignmentId: order?.courierConsignmentId || "",
+         trackingCode: order?.courierTrackingCode || "",
+         providerStatus: order?.courierProviderStatus || "",
+      });
+      setCourierError(null);
+      setCourierEditing(true);
+   };
+
+   const handleCourierSave = async () => {
+      if (!order?.id || courierSaving) return;
+      setCourierSaving(true);
+      setCourierError(null);
+      try {
+         const res = await fetch(`/api/orders/${order.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+               courierConsignmentId: courierDraft.consignmentId,
+               courierTrackingCode: courierDraft.trackingCode,
+               courierProviderStatus: courierDraft.providerStatus,
+            }),
+         });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) {
+            throw new Error(data.message || data.error || "Failed to save courier details");
+         }
+         onOrderUpdated?.(data);
+         setCourierEditing(false);
+      } catch (err: any) {
+         setCourierError(err?.message || "Failed to save courier details");
+      } finally {
+         setCourierSaving(false);
       }
    };
 
@@ -610,6 +659,130 @@ export default function OrderOverviewSidebar({
                         {formatCurrency(Number(order?.deliveryCharge || 0))}
                      </Typography>
                   </Stack>
+
+                  <Divider />
+
+                  {/* Phase 4 (D3): the courier provider's own booking
+                      identifiers (Order columns) — manual entry only,
+                      no live integration. Kept distinct from the
+                      legacy Tracking ID row above, which reads the
+                      orderTags reference. courierLastSyncAt is
+                      stamped by the API whenever these fields are
+                      saved; it is captioned "Courier updated" here
+                      because edits are manual. */}
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                     <Typography variant="caption" color="text.secondary" fontWeight={700} letterSpacing="0.04em">
+                        COURIER BOOKING
+                     </Typography>
+                     {!courierEditing && (
+                        <Button
+                           size="small"
+                           variant="text"
+                           onClick={startCourierEdit}
+                           sx={{ minWidth: 0, px: 0.5, fontSize: "0.72rem" }}
+                        >
+                           {order?.courierConsignmentId ||
+                           order?.courierTrackingCode ||
+                           order?.courierProviderStatus
+                              ? "Edit"
+                              : "Add"}
+                        </Button>
+                     )}
+                  </Stack>
+
+                  {!courierEditing ? (
+                     <>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                           <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                              Consignment ID:
+                           </Typography>
+                           <Typography variant="caption" fontWeight={700} sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                              {order?.courierConsignmentId || "—"}
+                           </Typography>
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                           <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                              Tracking Code:
+                           </Typography>
+                           <Typography variant="caption" fontWeight={700} sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                              {order?.courierTrackingCode || "—"}
+                           </Typography>
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                           <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                              Provider Status:
+                           </Typography>
+                           <Typography variant="caption" fontWeight={700} color="text.primary">
+                              {order?.courierProviderStatus || "—"}
+                           </Typography>
+                        </Stack>
+                        {order?.courierLastSyncAt && (
+                           <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                                 Courier updated:
+                              </Typography>
+                              <Typography variant="caption" color="text.primary">
+                                 {new Date(order.courierLastSyncAt).toLocaleString()}
+                              </Typography>
+                           </Stack>
+                        )}
+                     </>
+                  ) : (
+                     <Stack spacing={1}>
+                        <TextField
+                           label="Consignment ID"
+                           size="small"
+                           fullWidth
+                           value={courierDraft.consignmentId}
+                           onChange={(e) =>
+                              setCourierDraft((d) => ({ ...d, consignmentId: e.target.value }))
+                           }
+                        />
+                        <TextField
+                           label="Tracking Code"
+                           size="small"
+                           fullWidth
+                           value={courierDraft.trackingCode}
+                           onChange={(e) =>
+                              setCourierDraft((d) => ({ ...d, trackingCode: e.target.value }))
+                           }
+                        />
+                        <TextField
+                           label="Provider Status"
+                           size="small"
+                           fullWidth
+                           value={courierDraft.providerStatus}
+                           onChange={(e) =>
+                              setCourierDraft((d) => ({ ...d, providerStatus: e.target.value }))
+                           }
+                           placeholder="e.g. In Transit, Delivered"
+                        />
+                        {courierError && (
+                           <Typography variant="caption" color="error.main">
+                              {courierError}
+                           </Typography>
+                        )}
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                           <Button
+                              size="small"
+                              variant="outlined"
+                              color="inherit"
+                              disabled={courierSaving}
+                              onClick={() => setCourierEditing(false)}
+                           >
+                              Cancel
+                           </Button>
+                           <Button
+                              size="small"
+                              variant="contained"
+                              disabled={courierSaving}
+                              onClick={handleCourierSave}
+                           >
+                              {courierSaving ? "Saving…" : "Save"}
+                           </Button>
+                        </Stack>
+                     </Stack>
+                  )}
                </Stack>
             </Box>
          </Paper>

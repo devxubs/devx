@@ -9,6 +9,7 @@ import {
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import { logAudit, requestAuditContext } from "@src/lib/audit";
 
 // Bulk order actions (Phase 3B, roadmap 3.5).
 //
@@ -123,6 +124,8 @@ export async function POST(request: NextRequest) {
          email: authUser?.email || session.email,
       };
       const nowIso = new Date().toISOString();
+      const auditCtx = requestAuditContext(request);
+      const auditActorRef = { id: auditActor.id, label: auditActor.name };
 
       const results: BulkResult[] = [];
 
@@ -210,6 +213,20 @@ export async function POST(request: NextRequest) {
                         },
                      },
                   });
+
+                  // Phase 4 (D1): audit in the same transaction.
+                  await logAudit(tx, {
+                     actor: auditActorRef,
+                     action: "STATUS_CHANGE",
+                     entityType: "ORDER",
+                     entityId: order.id,
+                     entityCustomId: displayId,
+                     summary: `Order ${displayId} status changed from ${order.status} to ${target} (bulk)`,
+                     changes: {
+                        status: { from: order.status, to: target },
+                     },
+                     ...auditCtx,
+                  });
                   return { ok: true, displayId };
                }
 
@@ -247,6 +264,20 @@ export async function POST(request: NextRequest) {
                         auditHistory: [auditEvent, ...existingHistory],
                      },
                   },
+               });
+
+               // Phase 4 (D1): audit in the same transaction.
+               await logAudit(tx, {
+                  actor: auditActorRef,
+                  action: "UPDATE",
+                  entityType: "ORDER",
+                  entityId: order.id,
+                  entityCustomId: displayId,
+                  summary: `Order ${displayId} courier set to ${courierName} (bulk)`,
+                  changes: {
+                     courier: { from: order.courier || null, to: courierName },
+                  },
+                  ...auditCtx,
                });
                return { ok: true, displayId };
             });

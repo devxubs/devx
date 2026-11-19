@@ -16,6 +16,12 @@ import {
    duplicateTxIdMessage,
    DuplicateTxIdError,
 } from "@src/lib/payments";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+   buildChanges,
+} from "@src/lib/audit";
 
 const PAYMENT_STATUS_VALUES = ["UNVERIFIED", "VERIFIED", "MISMATCHED"];
 
@@ -386,6 +392,59 @@ export async function PUT(
             });
          }
       }
+
+      // 6. Phase 4 (D3): courier booking identifiers — manual entry
+      // only (no live provider integration). The three fields join
+      // the update whitelist below; whenever any of them is saved
+      // through this edit flow, courierLastSyncAt is stamped to now
+      // (it records when the courier details were last updated —
+      // the UI captions it "Courier updated").
+      const courierTextUpdate = (value: unknown) =>
+         value !== undefined ? String(value || "").trim() || null : undefined;
+      const courierConsignmentUpdate = courierTextUpdate(
+         body.courierConsignmentId,
+      );
+      const courierTrackingUpdate = courierTextUpdate(body.courierTrackingCode);
+      const courierProviderStatusUpdate = courierTextUpdate(
+         body.courierProviderStatus,
+      );
+      const courierStamp =
+         body.courierConsignmentId !== undefined ||
+         body.courierTrackingCode !== undefined ||
+         body.courierProviderStatus !== undefined
+            ? new Date()
+            : undefined;
+
+      // Phase 4 (D1): one AuditLog row per order update, written
+      // inside whichever transaction path performs the update (the
+      // legacy orderTags auditHistory above is unchanged).
+      const statusChanged =
+         body.status !== undefined && body.status !== existingOrder.status;
+      const writeOrderAudit = async (tx: any, updatedOrder: any) => {
+         await logAudit(tx, {
+            actor: { id: auditActor.id, label: auditActor.name },
+            action: statusChanged ? "STATUS_CHANGE" : "UPDATE",
+            entityType: "ORDER",
+            entityId: existingOrder.id,
+            entityCustomId:
+               existingOrder.orderId || existingOrder.customId || existingOrder.id,
+            summary: statusChanged
+               ? `Order ${existingOrder.orderId || existingOrder.customId} status changed from ${existingOrder.status} to ${body.status}`
+               : `Order ${existingOrder.orderId || existingOrder.customId} updated`,
+            changes: buildChanges(existingOrder, updatedOrder, [
+               "status",
+               "paymentStatus",
+               "paymentTxId",
+               "total",
+               "dueAmount",
+               "advancePayment",
+               "courierConsignmentId",
+               "courierTrackingCode",
+               "courierProviderStatus",
+            ]),
+            ...requestAuditContext(request),
+         });
+      };
 
       // Compile updated tags
       const existingAuditHistory = Array.isArray(existingTags.auditHistory)
@@ -998,6 +1057,10 @@ export async function PUT(
                      body.courierStatus !== undefined
                         ? body.courierStatus
                         : undefined,
+                  courierConsignmentId: courierConsignmentUpdate,
+                  courierTrackingCode: courierTrackingUpdate,
+                  courierProviderStatus: courierProviderStatusUpdate,
+                  courierLastSyncAt: courierStamp,
                   advancePayment:
                      body.advancePayment !== undefined ? advance : undefined,
                   cancellationReason:
@@ -1030,6 +1093,8 @@ export async function PUT(
                },
                },
             });
+
+            await writeOrderAudit(tx, updatedOrder);
 
             return updatedOrder;
          });
@@ -1127,7 +1192,7 @@ export async function PUT(
             });
          }
 
-         return tx.order.update({
+         const updatedOrder = await tx.order.update({
             where: { id: existingOrder.id },
             data: {
                status: body.status !== undefined ? body.status : undefined,
@@ -1147,6 +1212,10 @@ export async function PUT(
                   body.courierStatus !== undefined
                      ? body.courierStatus
                      : undefined,
+               courierConsignmentId: courierConsignmentUpdate,
+               courierTrackingCode: courierTrackingUpdate,
+               courierProviderStatus: courierProviderStatusUpdate,
+               courierLastSyncAt: courierStamp,
                deliveryCharge:
                   body.deliveryCharge !== undefined ? effectiveDelivery : undefined,
                discount:
@@ -1185,6 +1254,10 @@ export async function PUT(
                },
             },
          });
+
+         await writeOrderAudit(tx, updatedOrder);
+
+         return updatedOrder;
       });
 
       return NextResponse.json(updated);
@@ -1259,10 +1332,23 @@ export async function DELETE(
                );
             }
 
-            return tx.order.update({
+            const deleted = await tx.order.update({
                where: { id },
                data: { isDeleted: true, deletedAt: new Date() },
             });
+
+            // Phase 4 (D1): audit in the same transaction.
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "DELETE",
+               entityType: "ORDER",
+               entityId: existing.id,
+               entityCustomId: existing.orderId || existing.customId,
+               summary: `Order ${existing.orderId || existing.customId} moved to bin — stock restored`,
+               ...requestAuditContext(request),
+            });
+
+            return deleted;
          }
 
          return existing;
