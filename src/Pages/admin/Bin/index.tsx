@@ -1,7 +1,10 @@
 "use client";
 
 import {
+   Alert,
+   Button,
    IconButton,
+   Snackbar,
    Stack,
    Tab,
    Tabs,
@@ -50,18 +53,32 @@ const Bin = () => {
 
    const [binItems, setBinItems] = useState<any[]>([]);
    const [loading, setLoading] = useState(false);
+   // Phase 2 (2.6): standard list feedback states — a failed load must
+   // be visible with a retry, and restore/delete must confirm via
+   // Snackbar instead of failing silently.
+   const [loadError, setLoadError] = useState<string | null>(null);
+   const [snackbar, setSnackbar] = useState<{
+      open: boolean;
+      message: string;
+      severity: "success" | "error";
+   }>({ open: false, message: "", severity: "success" });
    const [deleteConfirmItem, setDeleteConfirmItem] = useState<any | null>(null);
    const [selectedDetail, setSelectedDetail] = useState<{ type: string; id: string } | null>(null);
 
    const loadBinItems = React.useCallback(async () => {
       setLoading(true);
+      setLoadError(null);
       try {
          const res = await fetch("/api/bin");
          if (res.ok) {
             const data = await res.json();
             setBinItems(data);
+         } else {
+            setLoadError("Failed to load deleted items.");
          }
-      } catch {}
+      } catch {
+         setLoadError("Failed to load deleted items.");
+      }
       setLoading(false);
    }, []);
 
@@ -71,13 +88,31 @@ const Bin = () => {
 
    const handleAction = async (item: any, action: "restore" | "delete") => {
       try {
-         await fetch("/api/bin", {
+         const res = await fetch("/api/bin", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ type: item.type, id: item.id, action }),
          });
+         if (!res.ok) throw new Error("request failed");
+         setSnackbar({
+            open: true,
+            message:
+               action === "restore"
+                  ? "Item restored successfully."
+                  : "Item permanently deleted.",
+            severity: "success",
+         });
          loadBinItems();
-      } catch {}
+      } catch {
+         setSnackbar({
+            open: true,
+            message:
+               action === "restore"
+                  ? "Failed to restore the item."
+                  : "Failed to delete the item.",
+            severity: "error",
+         });
+      }
    };
 
    // Map active tab to item type safely
@@ -255,7 +290,35 @@ const Bin = () => {
             </Tabs>
          </Stack>
 
+         {loadError && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={loadBinItems}>
+                     Retry
+                  </Button>
+               }
+            >
+               {loadError}
+            </Alert>
+         )}
+
          <CustomTable rows={filteredItems} columns={tableColumns} />
+
+         <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3000}
+            onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+         >
+            <Alert
+               severity={snackbar.severity}
+               onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+               sx={{ width: "100%" }}
+            >
+               {snackbar.message}
+            </Alert>
+         </Snackbar>
 
          {/* Permanent delete confirmation dialog */}
          <AlertDialog

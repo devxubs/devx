@@ -2,7 +2,9 @@
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
+   Alert,
    Button,
+   Snackbar,
    Stack,
    useTheme,
    Grid,
@@ -15,34 +17,51 @@ import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { AssetDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { useSettings } from "@src/lib/settingsContext";
 import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 
+// Phase 2 (2.9): rows and the form now carry the actual Asset fields
+// (name, category, value, description). The previous expense-shaped
+// form (type/amount/note) hard-coded the category to "Store Asset" on
+// every save and destroyed the real category on edit, because the row
+// only kept `description || category` as its "note".
 type AssetsItem = {
    id: number | string;
    customId?: string;
-   type: string;
+   name: string;
+   category: string;
+   value: number;
+   description: string;
    date: string;
-   amount: string;
-   note: string;
 };
 type AssetForm = {
-   type: string;
-   amount: string;
-   note: string;
+   name: string;
+   category: string;
+   value: string;
+   description: string;
 };
 
 export const assetsData: AssetsItem[] = [];
 
 const AssetsSchema = yup.object({
-   type: yup.string().required("Type is required"),
-   amount: yup.string().required("Amount is required"),
-   note: yup.string().required("Note is required"),
+   name: yup.string().required("Name is required"),
+   // Category/description are optional content-wise but always present
+   // as strings in the form state (hence .defined(), not .optional()).
+   category: yup.string().defined(),
+   value: yup
+      .string()
+      .required("Value is required")
+      .test("is-number", "Value must be a number", (v) =>
+         v === undefined || v === "" ? false : !Number.isNaN(Number(v)),
+      ),
+   description: yup.string().defined(),
 });
 
 const Asset = () => {
    const theme = useTheme();
+   const { formatCurrency } = useSettings();
    const [detailAssetId, setDetailAssetId] = useState<string | null>(null);
 
    // Phase 2 (2.3): global-search deep link — /admin/assets?asset=<id>
@@ -68,10 +87,16 @@ const Asset = () => {
             </Typography>
          ),
       },
-      { field: "type", headerName: "Type", flex: 1 },
+      { field: "name", headerName: "Name", flex: 1 },
+      { field: "category", headerName: "Category", width: 160 },
+      {
+         field: "value",
+         headerName: "Value",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(Number(params.row.value || 0)),
+      },
+      { field: "description", headerName: "Description", flex: 1 },
       { field: "date", headerName: "Date", width: 150 },
-      { field: "amount", headerName: "Amount", width: 150 },
-      { field: "note", headerName: "Note", flex: 1 },
       {
          field: "@actions",
          headerName: "",
@@ -80,9 +105,17 @@ const Asset = () => {
 
    const [assets, setAssets] = useState<AssetsItem[]>([]);
    const [loading, setLoading] = useState(false);
+   // Phase 2 (2.6): standard list feedback states.
+   const [loadError, setLoadError] = useState<string | null>(null);
+   const [snackbar, setSnackbar] = useState<{
+      open: boolean;
+      message: string;
+      severity: "success" | "error";
+   }>({ open: false, message: "", severity: "success" });
 
    const loadAssets = React.useCallback(async () => {
       setLoading(true);
+      setLoadError(null);
       try {
          const res = await fetch("/api/assets");
          if (res.ok) {
@@ -90,15 +123,18 @@ const Asset = () => {
             const mapped = (Array.isArray(data) ? data : []).map((a: any) => ({
                id: a.id,
                customId: a.customId,
-               type: a.name,
+               name: a.name,
+               category: a.category || "",
+               value: Number(a.value || 0),
+               description: a.description || "",
                date: a.createdAt ? new Date(a.createdAt).toISOString().split("T")[0] : "",
-               amount: String(a.value),
-               note: a.description || a.category || "",
             }));
             setAssets(mapped);
+         } else {
+            setLoadError("Failed to load assets.");
          }
       } catch {
-         // fallback
+         setLoadError("Failed to load assets.");
       } finally {
          setLoading(false);
       }
@@ -124,55 +160,67 @@ const Asset = () => {
    } = useForm<AssetForm>({
       resolver: yupResolver(AssetsSchema),
       defaultValues: {
-         type: "",
-         amount: "",
-         note: "",
+         name: "",
+         category: "",
+         value: "",
+         description: "",
       },
    });
 
    useEffect(() => {
       if (editItem) {
          reset({
-            type: editItem.type,
-            amount: editItem.amount,
-            note: editItem.note,
+            name: editItem.name,
+            category: editItem.category || "",
+            value: String(editItem.value ?? ""),
+            description: editItem.description || "",
          });
       } else {
          reset({
-            type: "",
-            amount: "",
-            note: "",
+            name: "",
+            category: "",
+            value: "",
+            description: "",
          });
       }
    }, [editItem, reset]);
 
    const onSubmit: SubmitHandler<AssetForm> = async (formData) => {
+      const payload = {
+         name: formData.name,
+         category: formData.category || null,
+         value: Number(formData.value || 0),
+         description: formData.description || null,
+      };
       try {
-         if (editItem) {
-            await fetch(`/api/assets/${editItem.id}`, {
-               method: "PUT",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({
-                  name: formData.type,
-                  category: "Store Asset",
-                  value: formData.amount,
-                  description: formData.note,
-               }),
-            });
-         } else {
-            await fetch("/api/assets", {
-               method: "POST",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({
-                  name: formData.type,
-                  category: "Store Asset",
-                  value: formData.amount,
-                  description: formData.note,
-               }),
-            });
-         }
+         const res = editItem
+            ? await fetch(`/api/assets/${editItem.id}`, {
+                 method: "PUT",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify(payload),
+              })
+            : await fetch("/api/assets", {
+                 method: "POST",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify(payload),
+              });
+         if (!res.ok) throw new Error("request failed");
+         setSnackbar({
+            open: true,
+            message: editItem
+               ? "Asset updated successfully."
+               : "Asset added successfully.",
+            severity: "success",
+         });
          loadAssets();
-      } catch {}
+      } catch {
+         setSnackbar({
+            open: true,
+            message: "Failed to save the asset.",
+            severity: "error",
+         });
+         return;
+      }
 
       reset();
       setEditItem(null);
@@ -180,6 +228,34 @@ const Asset = () => {
    };
    return (
       <Stack spacing={2} py={2}>
+         {loadError && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={loadAssets}>
+                     Retry
+                  </Button>
+               }
+            >
+               {loadError}
+            </Alert>
+         )}
+
+         <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3000}
+            onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+         >
+            <Alert
+               severity={snackbar.severity}
+               onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+               sx={{ width: "100%" }}
+            >
+               {snackbar.message}
+            </Alert>
+         </Snackbar>
+
          {/* Header */}
          <Stack direction="row" justifyContent="flex-end" spacing={2}>
             <Button
@@ -193,7 +269,10 @@ const Asset = () => {
                      }}
                   />
                }
-               onClick={() => setOpenModal(true)}
+               onClick={() => {
+                  setEditItem(null);
+                  setOpenModal(true);
+               }}
             >
                Add Asset
             </Button>
@@ -219,13 +298,15 @@ const Asset = () => {
                         const res = await fetch("/api/assets");
                         if (!res.ok) return [];
                         const d = await res.json();
-                        return (d || []).map((a: any, idx: number) => ({
-                           id: a.customId || `AST_${idx + 1}`,
+                        // Real Asset fields (value/createdAt) — the old
+                        // mapping read non-existent amount/purchaseDate/
+                        // status fields, so exports always showed 0.
+                        return (Array.isArray(d) ? d : []).map((a: any) => ({
+                           id: a.customId || a.id,
                            name: a.name,
                            category: a.category || "-",
-                           amount: Number(a.amount || 0),
-                           date: a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString() : "-",
-                           status: a.status || "ACTIVE",
+                           value: Number(a.value || 0),
+                           date: a.createdAt ? new Date(a.createdAt).toLocaleDateString() : "-",
                            description: a.description || "-",
                         }));
                      } catch {
@@ -233,10 +314,10 @@ const Asset = () => {
                      }
                   },
                   summaryRows: (data: any[]) => {
-                     const totalValue = data.reduce((acc, row) => acc + (Number(row.amount) || 0), 0);
+                     const totalValue = data.reduce((acc, row) => acc + (Number(row.value) || 0), 0);
                      return [
                         { label: "Total Assets Tracked:", value: String(data.length) },
-                        { label: "Grand Total Valuation:", value: `৳ ${totalValue.toFixed(2)}`, isTotal: true },
+                        { label: "Grand Total Valuation:", value: formatCurrency(totalValue), isTotal: true },
                      ];
                   },
                }}
@@ -283,7 +364,7 @@ const Asset = () => {
          <CustomModal
             open={openModal}
             onClose={() => setOpenModal(false)}
-            title="Add Asset"
+            title={editItem ? "Edit Asset" : "Add Asset"}
          >
             <Stack
                width={600}
@@ -298,19 +379,19 @@ const Asset = () => {
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
-                           Type
+                           Name
                         </Typography>
                         <Controller
-                           name="type"
+                           name="name"
                            control={control}
                            render={({ field }) => (
                               <TextField
                                  {...field}
                                  fullWidth
-                                 placeholder="Type"
-                                 label="Type"
-                                 error={!!errors.type}
-                                 helperText={errors.type?.message}
+                                 placeholder="e.g. Delivery Van"
+                                 label="Name"
+                                 error={!!errors.name}
+                                 helperText={errors.name?.message}
                               />
                            )}
                         />
@@ -323,19 +404,44 @@ const Asset = () => {
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
-                           Amount
+                           Category
                         </Typography>
                         <Controller
-                           name="amount"
+                           name="category"
                            control={control}
                            render={({ field }) => (
                               <TextField
                                  {...field}
                                  fullWidth
-                                 placeholder="Amount"
-                                 label="Amount"
-                                 error={!!errors.amount}
-                                 helperText={errors.amount?.message}
+                                 placeholder="e.g. Equipment"
+                                 label="Category"
+                                 error={!!errors.category}
+                                 helperText={errors.category?.message}
+                              />
+                           )}
+                        />
+                     </Stack>
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                     <Stack spacing={1.5}>
+                        <Typography
+                           variant="h6"
+                           fontSize={"13px!important"}
+                           fontWeight={500}
+                        >
+                           Value
+                        </Typography>
+                        <Controller
+                           name="value"
+                           control={control}
+                           render={({ field }) => (
+                              <TextField
+                                 {...field}
+                                 fullWidth
+                                 placeholder="Value"
+                                 label="Value"
+                                 error={!!errors.value}
+                                 helperText={errors.value?.message}
                                  type="number"
                               />
                            )}
@@ -349,10 +455,10 @@ const Asset = () => {
                            fontSize={"13px!important"}
                            fontWeight={500}
                         >
-                           Note
+                           Description
                         </Typography>
                         <Controller
-                           name="note"
+                           name="description"
                            control={control}
                            render={({ field }) => (
                               <TextField
@@ -361,10 +467,10 @@ const Asset = () => {
                                  multiline
                                  minRows={3}
                                  maxRows={4}
-                                 placeholder="Note"
-                                 label="Note"
-                                 error={!!errors.note}
-                                 helperText={errors.note?.message}
+                                 placeholder="Description"
+                                 label="Description"
+                                 error={!!errors.description}
+                                 helperText={errors.description?.message}
                               />
                            )}
                         />
@@ -417,16 +523,28 @@ const Asset = () => {
             onConfirm={async () => {
                if (deleteItem) {
                   try {
-                     await fetch(`/api/assets/${deleteItem.id}`, { method: "DELETE" });
-                  } catch {}
-                  setAssets((prev) =>
-                     prev.filter((item) => item.id !== deleteItem.id),
-                  );
+                     const res = await fetch(`/api/assets/${deleteItem.id}`, { method: "DELETE" });
+                     if (!res.ok) throw new Error("request failed");
+                     setAssets((prev) =>
+                        prev.filter((item) => item.id !== deleteItem.id),
+                     );
+                     setSnackbar({
+                        open: true,
+                        message: "Asset deleted successfully.",
+                        severity: "success",
+                     });
+                  } catch {
+                     setSnackbar({
+                        open: true,
+                        message: "Failed to delete the asset.",
+                        severity: "error",
+                     });
+                  }
                   setDeleteItem(null);
                }
             }}
             type={"error"}
-            title={`Are you sure want to delete "${deleteItem?.type}"?`}
+            title={`Are you sure want to delete "${deleteItem?.name}"?`}
          />
       </Stack>
    );

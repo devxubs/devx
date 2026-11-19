@@ -16,6 +16,8 @@ import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import CustomAutocomplete from "@src/components/Autocomplete";
+import { useSettings } from "@src/lib/settingsContext";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
@@ -90,6 +92,37 @@ const Expense = () => {
 
    const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
    const [loading, setLoading] = useState(false);
+
+   // Phase 2 (2.10): expense-category suggestions — the distinct types
+   // already present in the data, plus the Settings default category.
+   const { settings } = useSettings();
+   const [knownTypes, setKnownTypes] = useState<string[]>([]);
+   useEffect(() => {
+      fetch("/api/expenses?limit=100")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => {
+            const rows = d?.data || d?.expenses || [];
+            const types = Array.from(
+               new Set(
+                  (Array.isArray(rows) ? rows : [])
+                     .map((e: any) => String(e.type || "").trim())
+                     .filter(Boolean),
+               ),
+            ) as string[];
+            setKnownTypes(types);
+         })
+         .catch(() => {});
+   }, []);
+   const categoryOptions = React.useMemo(() => {
+      const set = new Set<string>();
+      const def = (settings as any)?.customConfig?.defaultExpenseCategory;
+      if (def) set.add(String(def));
+      knownTypes.forEach((t) => set.add(t));
+      expenses.forEach((e) => {
+         if (e.type) set.add(e.type);
+      });
+      return Array.from(set).map((t) => ({ label: t, value: t }));
+   }, [knownTypes, expenses, settings]);
 
    const loadExpenses = React.useCallback(async () => {
       setLoading(true);
@@ -335,11 +368,23 @@ const Expense = () => {
                            name="type"
                            control={control}
                            render={({ field }) => (
-                              <TextField
-                                 {...field}
-                                 fullWidth
-                                 placeholder="Type"
+                              // Phase 2 (2.10): category is now an
+                              // autocomplete over the categories already
+                              // in use (plus the Settings default),
+                              // instead of blind free text. freeSolo —
+                              // a brand-new category can still be typed.
+                              <CustomAutocomplete
                                  label="Type"
+                                 placeholder="Select or type a category"
+                                 options={categoryOptions}
+                                 value={field.value || null}
+                                 onChange={(v: any) =>
+                                    field.onChange(
+                                       typeof v === "string"
+                                          ? v
+                                          : v?.value || v?.label || "",
+                                    )
+                                 }
                                  error={!!errors.type}
                                  helperText={errors.type?.message}
                               />

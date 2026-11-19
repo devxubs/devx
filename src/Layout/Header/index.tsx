@@ -35,6 +35,14 @@ const Header = () => {
    const [unreadCount, setUnreadCount] = useState(0);
    const [openProfile, setOpenProfile] = useState(false);
    const [openSettings, setOpenSettings] = useState(false);
+
+   // Phase 2 (2.11): the Settings → Appearance tab delegates to this
+   // drawer (the single appearance editor) via a window event.
+   React.useEffect(() => {
+      const open = () => setOpenSettings(true);
+      window.addEventListener("devx:open-appearance", open);
+      return () => window.removeEventListener("devx:open-appearance", open);
+   }, []);
    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
    const [openSearch, setOpenSearch] = useState(false);
 

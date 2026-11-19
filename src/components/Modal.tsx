@@ -4,6 +4,20 @@ import { Box, Typography, Fade, IconButton } from "@mui/material";
 import Modal, { ModalProps } from "@mui/material/Modal";
 import Icon from "./Icon";
 
+// Phase 2 (2.12): shared modal size tokens. Callers used to hand-write
+// the same responsive widths at every call site ({ xs: "95%", sm:
+// "90%", md: 950 } and friends). `size` supplies the standard width;
+// an explicit `sx.width` from the caller still wins (sx is spread
+// after the token), so existing modals are unaffected unless they opt
+// in. Omitting `size` keeps the previous behaviour exactly.
+export type CustomModalSize = "sm" | "md" | "lg";
+
+const sizeWidths: Record<CustomModalSize, any> = {
+   sm: { xs: "95%", sm: 440 },
+   md: { xs: "95%", sm: "90%", md: 640 },
+   lg: { xs: "95%", sm: "90%", md: 950 },
+};
+
 interface CustomModalProps extends Omit<
    ModalProps,
    "open" | "onClose" | "children"
@@ -14,6 +28,7 @@ interface CustomModalProps extends Omit<
    sx?: SxProps;
    title?: string;
    closeIcon?: boolean;
+   size?: CustomModalSize;
 }
 
 export default function CustomModal({
@@ -23,6 +38,7 @@ export default function CustomModal({
    sx,
    title,
    closeIcon = false,
+   size,
    ...rest
 }: CustomModalProps) {
    return (
@@ -51,6 +67,7 @@ export default function CustomModal({
                      sm: 3,
                   },
                   borderRadius: 2,
+                  ...(size ? { width: sizeWidths[size] } : {}),
                   ...sx,
                }}
             >

@@ -13,6 +13,8 @@ import {
    Grid,
    Chip,
    CircularProgress,
+   Alert,
+   Snackbar,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
@@ -283,8 +285,18 @@ const Users = () => {
    // suspended dialog
    const [suspendedUser, setSuspendedUser] = useState<UserProps | null>(null);
 
+   // Phase 2 (2.6): standard list feedback states — load errors are
+   // visible with a retry; saves/deletes confirm via Snackbar.
+   const [loadError, setLoadError] = useState<string | null>(null);
+   const [snackbar, setSnackbar] = useState<{
+      open: boolean;
+      message: string;
+      severity: "success" | "error";
+   }>({ open: false, message: "", severity: "success" });
+
    const loadUsers = React.useCallback(async () => {
       setLoading(true);
+      setLoadError(null);
       try {
          const res = await fetch("/api/users");
          if (res.ok) {
@@ -302,9 +314,11 @@ const Users = () => {
                status: (u.status ? u.status.toLowerCase() : "active") as any,
             }));
             setUsers(mapped);
+         } else {
+            setLoadError("Failed to load users.");
          }
       } catch {
-         // fallback
+         setLoadError("Failed to load users.");
       } finally {
          setLoading(false);
       }
@@ -360,6 +374,34 @@ const Users = () => {
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
          <Stack spacing={2} py={2}>
+            {loadError && (
+               <Alert
+                  severity="error"
+                  action={
+                     <Button color="inherit" size="small" onClick={loadUsers}>
+                        Retry
+                     </Button>
+                  }
+               >
+                  {loadError}
+               </Alert>
+            )}
+
+            <Snackbar
+               open={snackbar.open}
+               autoHideDuration={3000}
+               onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+               anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+               <Alert
+                  severity={snackbar.severity}
+                  onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+                  sx={{ width: "100%" }}
+               >
+                  {snackbar.message}
+               </Alert>
+            </Snackbar>
+
             {/* Header */}
             <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
                <Button
@@ -458,7 +500,7 @@ const Users = () => {
                editUserData={editableUser || {}}
                onAddUser={async (d) => {
                   try {
-                     await fetch("/api/users", {
+                     const res = await fetch("/api/users", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -471,18 +513,42 @@ const Users = () => {
                            status: "ACTIVE",
                         }),
                      });
+                     if (!res.ok) throw new Error("request failed");
+                     setSnackbar({
+                        open: true,
+                        message: "User added successfully.",
+                        severity: "success",
+                     });
                      loadUsers();
-                  } catch {}
+                  } catch {
+                     setSnackbar({
+                        open: true,
+                        message: "Failed to add the user.",
+                        severity: "error",
+                     });
+                  }
                }}
                onEditUser={async (newData) => {
                   try {
-                     await fetch(`/api/users/${editableUser.id}`, {
+                     const res = await fetch(`/api/users/${editableUser.id}`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(newData),
                      });
+                     if (!res.ok) throw new Error("request failed");
+                     setSnackbar({
+                        open: true,
+                        message: "User updated successfully.",
+                        severity: "success",
+                     });
                      loadUsers();
-                  } catch {}
+                  } catch {
+                     setSnackbar({
+                        open: true,
+                        message: "Failed to update the user.",
+                        severity: "error",
+                     });
+                  }
                }}
             />
          </CustomModal>
@@ -498,13 +564,25 @@ const Users = () => {
             onConfirm={async () => {
                if (!deleteUser) return;
                try {
-                  await fetch(`/api/users/${deleteUser.id}`, {
+                  const res = await fetch(`/api/users/${deleteUser.id}`, {
                      method: "DELETE",
                   });
-               } catch {}
-               setUsers((prev) =>
-                  prev.filter((user) => user.id !== deleteUser.id),
-               );
+                  if (!res.ok) throw new Error("request failed");
+                  setUsers((prev) =>
+                     prev.filter((user) => user.id !== deleteUser.id),
+                  );
+                  setSnackbar({
+                     open: true,
+                     message: "User deleted successfully.",
+                     severity: "success",
+                  });
+               } catch {
+                  setSnackbar({
+                     open: true,
+                     message: "Failed to delete the user.",
+                     severity: "error",
+                  });
+               }
                setDeleteUser(null);
             }}
          />
@@ -520,19 +598,31 @@ const Users = () => {
             onConfirm={async () => {
                if (!suspendedUser) return;
                try {
-                  await fetch(`/api/users/${suspendedUser.id}`, {
+                  const res = await fetch(`/api/users/${suspendedUser.id}`, {
                      method: "PUT",
                      headers: { "Content-Type": "application/json" },
                      body: JSON.stringify({ status: "SUSPENDED" }),
                   });
-               } catch {}
-               setUsers((prev) =>
-                  prev.map((user) =>
-                     user.id === suspendedUser.id
-                        ? { ...user, status: "suspended" }
-                        : user,
-                  ),
-               );
+                  if (!res.ok) throw new Error("request failed");
+                  setUsers((prev) =>
+                     prev.map((user) =>
+                        user.id === suspendedUser.id
+                           ? { ...user, status: "suspended" }
+                           : user,
+                     ),
+                  );
+                  setSnackbar({
+                     open: true,
+                     message: "User suspended.",
+                     severity: "success",
+                  });
+               } catch {
+                  setSnackbar({
+                     open: true,
+                     message: "Failed to suspend the user.",
+                     severity: "error",
+                  });
+               }
                setSuspendedUser(null);
             }}
          />
