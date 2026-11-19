@@ -6,6 +6,7 @@ import DateRangePicker from "@src/components/DateRange";
 import { useEffect, useState, useCallback } from "react";
 import { useSettings } from "@src/lib/settingsContext";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { fetchAllReportRows, reportParams } from "../reportExport";
 // Phase 1: ExpenseChart is intentionally not rendered — it is built
 // entirely on hard-coded example data (invented daily expenses for
 // Dec 2025), not on the reports API. The table below is real. The
@@ -99,6 +100,11 @@ const Expenses = () => {
                exportConfig={{
                   filename: `Expenses_Report_${new Date().toISOString().split("T")[0]}`,
                   title: "DevX POS - Expenses Report",
+                  fetchAllData: () =>
+                     fetchAllReportRows(
+                        reportParams("expenses", dateRange),
+                        (d) => d.rows || [],
+                     ),
                }}
                printConfig={{
                   title: "DevX POS - Expenses Report",

@@ -11,6 +11,7 @@ import { GridCellParams } from "@mui/x-data-grid";
 import { Stock } from "../../Product";
 import { useSettings } from "@src/lib/settingsContext";
 import { ProductDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { fetchAllReportRows, reportParams } from "../reportExport";
 
 const Products = () => {
    const { formatCurrency, settings } = useSettings();
@@ -151,6 +152,8 @@ const Products = () => {
                      exportConfig={{
                         filename: `Low_Stock_Alert_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Low Stock Alert Monitor",
+                        fetchAllData: () =>
+                           fetchAllReportRows(reportParams("products"), (d) => d.lowStockRows || []),
                      }}
                      printConfig={{
                         title: "DevX POS - Low Stock Alert Monitor",

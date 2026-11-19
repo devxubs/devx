@@ -10,6 +10,7 @@ import { GridCellParams } from "@mui/x-data-grid";
 import DateRangePickerCustom from "@src/components/DateRange";
 import { useSettings } from "@src/lib/settingsContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { fetchAllReportRows, reportParams } from "../reportExport";
 
 const statusColor: Record<
    string,
@@ -211,6 +212,14 @@ const Sales = () => {
                      exportConfig={{
                         filename: `Sales_Report_Orders_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Sales Orders Report",
+                        // Phase 2 (§2.8): export the complete
+                        // date-filtered dataset, not just the page
+                        // currently displayed.
+                        fetchAllData: () =>
+                           fetchAllReportRows(
+                              reportParams("sales", dateRange),
+                              (d) => d.orders || [],
+                           ),
                      }}
                      printConfig={{
                         title: "DevX POS - Sales Orders Report",

@@ -273,7 +273,10 @@ export async function GET(request: NextRequest) {
                id: p.customId || p.invoice || p.id,
                supplier: p.supplier?.name || "Direct Supplier",
                date: p.createdAt ? new Date(p.createdAt).toISOString().split("T")[0] : "-",
-               totalAmount: `৳ ${Number(p.total).toLocaleString()}`,
+               // Phase 2 (2.12): numeric amount — the client formats it
+               // with the settings-aware currency formatter. This used
+               // to be a preformatted "৳ …" string baked in server-side.
+               totalAmount: Number(p.total),
                status: Number(p.due) === 0 ? "Completed" : "Pending",
             })),
          });

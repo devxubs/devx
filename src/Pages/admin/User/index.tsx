@@ -168,6 +168,13 @@ const Users = () => {
    const [viewUserData, setViewUserData] = useState<any>(null);
    const [loadingDetail, setLoadingDetail] = useState(false);
 
+   // Phase 2 (2.3): global-search deep link — /admin/user?user=<id>
+   // opens that user's detail directly.
+   useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("user");
+      if (id) setDetailUser(id);
+   }, []);
+
    useEffect(() => {
       if (!detailUser) {
          setViewUserData(null);

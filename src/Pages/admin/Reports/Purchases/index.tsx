@@ -7,6 +7,7 @@ import CustomTable from "@src/components/Table";
 import DateRangePickerCustom from "@src/components/DateRange";
 import { useSettings } from "@src/lib/settingsContext";
 import { PurchaseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { fetchAllReportRows, reportParams } from "../reportExport";
 
 const Purchases = () => {
    const { formatCurrency } = useSettings();
@@ -55,7 +56,12 @@ const Purchases = () => {
       },
       { field: "supplier", headerName: "Supplier", width: 200 },
       { field: "date", headerName: "Date", width: 150 },
-      { field: "totalAmount", headerName: "Total Amount", width: 150 },
+      {
+         field: "totalAmount",
+         headerName: "Total Amount",
+         width: 150,
+         renderCell: (params: any) => formatCurrency(Number(params.row.totalAmount || 0)),
+      },
       { field: "status", headerName: "Status", width: 150 },
    ];
 
@@ -116,6 +122,11 @@ const Purchases = () => {
                      exportConfig={{
                         filename: `Purchases_Report_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Purchases Report",
+                        fetchAllData: () =>
+                           fetchAllReportRows(
+                              reportParams("purchases", dateRange),
+                              (d) => d.rows || [],
+                           ),
                      }}
                      printConfig={{
                         title: "DevX POS - Purchases Report",

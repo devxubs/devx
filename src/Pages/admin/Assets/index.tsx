@@ -45,6 +45,12 @@ const Asset = () => {
    const theme = useTheme();
    const [detailAssetId, setDetailAssetId] = useState<string | null>(null);
 
+   // Phase 2 (2.3): global-search deep link — /admin/assets?asset=<id>
+   useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("asset");
+      if (id) setDetailAssetId(id);
+   }, []);
+
    const columns: ColumnConfig[] = [
       {
          field: "customId",

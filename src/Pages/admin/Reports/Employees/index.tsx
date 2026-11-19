@@ -9,6 +9,7 @@ import { SellerProFile } from "../../Dashboard";
 import { GridCellParams } from "@mui/x-data-grid";
 import { useSettings } from "@src/lib/settingsContext";
 import { EmployeeDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { fetchAllReportRows, reportParams } from "../reportExport";
 
 const Employees = () => {
    const { formatCurrency } = useSettings();
@@ -155,6 +156,8 @@ const Employees = () => {
                      exportConfig={{
                         filename: `Employees_Ranking_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Employee Performance Ranking",
+                        fetchAllData: () =>
+                           fetchAllReportRows(reportParams("employees"), (d) => d.rows || []),
                      }}
                      printConfig={{
                         title: "DevX POS - Employee Performance Ranking",

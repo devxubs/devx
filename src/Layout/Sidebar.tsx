@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
    Box,
    Stack,
@@ -16,122 +16,280 @@ import LogoNameIcon from "@src/SvgIcon/logoName";
 import CustomBox from "@src/components/CustomBox";
 import ChatIcon from "@src/SvgIcon/ChatIcon";
 
-const items = [
+// Phase 2 (2.2): permission-filtered navigation. Each item names the
+// permission family that governs it, using ONLY keys that exist in the
+// permission model (the seeded module keys and the Roles-UI
+// "<category>_<permission>" keys — see src/lib/auth.ts). An item is
+// visible when the user's map grants the module key, the singular key,
+// or any granular key under the module prefix (e.g. `order_create`,
+// `products_read`). System Admin (`all: true`) sees everything.
+// Dashboard and Chat carry no permission keys in the model (the
+// dashboard is every role's landing page and chat is session-scoped),
+// so they are always visible. This is a UI filter only — the APIs
+// enforce the same permissions server-side (Phase 1).
+type NavItem = {
+   heading?: { title: string; id: string };
+   headingId?: string;
+   icon: any;
+   label: string;
+   url: string;
+   module?: { plural: string; singular: string };
+   always?: boolean;
+   adminKeys?: string[];
+   // An additional module whose grant also unlocks this item (Roles is
+   // readable by user-managers — GET /api/roles accepts user-view).
+   alsoModule?: { plural: string; singular: string };
+};
+
+const items: NavItem[] = [
    {
       heading: { title: "MANAGEMENT", id: "management" },
       icon: "solar:widget-5-bold-duotone",
       label: "Dashboard",
       url: "/admin/dashboard",
+      always: true,
    },
    {
       headingId: "management",
       icon: "solar:users-group-rounded-bold-duotone",
       label: "User",
       url: "/admin/user",
+      module: { plural: "users", singular: "user" },
    },
    {
       headingId: "management",
       icon: "solar:hanger-2-bold-duotone",
       label: "Product",
       url: "/admin/product",
+      module: { plural: "products", singular: "product" },
    },
    {
       headingId: "management",
       icon: "solar:clipboard-list-bold-duotone",
       label: "Categories",
       url: "/admin/categories",
+      module: { plural: "categories", singular: "category" },
    },
    {
       headingId: "management",
       icon: "solar:bill-list-bold-duotone",
       label: "Unit",
       url: "/admin/unit",
+      module: { plural: "units", singular: "unit" },
    },
    {
       headingId: "management",
       icon: "solar:cart-plus-bold-duotone",
       label: "Order",
       url: "/admin/order",
+      module: { plural: "orders", singular: "order" },
    },
    {
       headingId: "management",
       icon: "solar:users-group-rounded-bold-duotone",
       label: "Customers",
       url: "/admin/customers",
+      module: { plural: "customers", singular: "customer" },
    },
-   // {
-   //    headingId: "management",
-   //    icon: "solar:palette-bold-duotone",
-   //    label: "Quote",
-   //    url: "/admin/quote",
-   // },
    {
       headingId: "management",
       icon: "solar:users-group-two-rounded-bold-duotone",
       label: "Suppliers",
       url: "/admin/suppliers",
+      module: { plural: "suppliers", singular: "supplier" },
    },
    {
       headingId: "management",
       icon: "solar:cart-large-2-bold-duotone",
       label: "Purchase",
       url: "/admin/purchase",
+      module: { plural: "purchases", singular: "purchase" },
    },
    {
       headingId: "management",
       icon: "solar:explicit-bold-duotone",
       label: "Expenses",
       url: "/admin/expense",
+      module: { plural: "expenses", singular: "expense" },
    },
    {
       headingId: "management",
       icon: "solar:cassette-2-bold-duotone",
       label: "Assets",
       url: "/admin/assets",
+      module: { plural: "assets", singular: "asset" },
    },
    {
       headingId: "management",
       icon: <ChatIcon />,
       label: "Chat",
       url: "/admin/chat",
+      always: true,
    },
    {
       headingId: "management",
       icon: "solar:pie-chart-2-bold-duotone",
       label: "Reports",
       url: "/admin/reports",
+      module: { plural: "reports", singular: "report" },
    },
    {
       headingId: "management",
       icon: "solar:trash-bin-trash-bold-duotone",
       label: "Bin",
       url: "/admin/bin",
+      adminKeys: ["bin"],
    },
    {
       heading: { title: "ACCOUNT", id: "account" },
       icon: "solar:settings-bold-duotone",
       label: "Setting",
       url: "/admin/settings",
+      adminKeys: ["settings", "setting"],
    },
    {
       headingId: "account",
       icon: "solar:lock-keyhole-bold-duotone",
       label: "Roles",
       url: "/admin/roles",
+      adminKeys: ["roles", "role"],
+      alsoModule: { plural: "users", singular: "user" },
    },
    {
       headingId: "account",
       icon: "solar:wallet-money-bold-duotone",
       label: "Billing",
       url: "/admin/billing",
+      adminKeys: ["billing"],
    },
 ];
+
+// Client mirror of lib/auth.ts normalizePermissions (same key
+// normalisation: lower-case, spaces → underscores; both stored shapes).
+function normalizePermissions(raw: unknown): Record<string, boolean> {
+   const out: Record<string, boolean> = {};
+   if (!raw) return out;
+   if (Array.isArray(raw)) {
+      for (const entry of raw as any[]) {
+         if (entry && typeof entry === "object") {
+            const key = String(entry.key || entry.name || "")
+               .trim()
+               .toLowerCase()
+               .replace(/\s+/g, "_");
+            if (key) out[key] = entry.allow !== false && entry.value !== false;
+         } else if (typeof entry === "string") {
+            out[entry.trim().toLowerCase().replace(/\s+/g, "_")] = true;
+         }
+      }
+      return out;
+   }
+   if (typeof raw === "object") {
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+         out[k.trim().toLowerCase().replace(/\s+/g, "_")] =
+            v === true || v === "true";
+      }
+   }
+   return out;
+}
+
+function moduleGranted(
+   permissions: Record<string, boolean>,
+   plural: string,
+   singular: string,
+): boolean {
+   if (permissions[plural] === true || permissions[singular] === true) {
+      return true;
+   }
+   // Granular Roles-UI keys live under the module prefix
+   // (order_create, products_read, customer_view_customer, …).
+   return Object.entries(permissions).some(
+      ([key, granted]) =>
+         granted &&
+         (key.startsWith(`${singular}_`) || key.startsWith(`${plural}_`)),
+   );
+}
+
+function canSeeItem(
+   item: NavItem,
+   permissions: Record<string, boolean>,
+   isAdmin: boolean,
+): boolean {
+   if (isAdmin) return true;
+   if (item.always) return true;
+   if (
+      item.alsoModule &&
+      moduleGranted(permissions, item.alsoModule.plural, item.alsoModule.singular)
+   ) {
+      return true;
+   }
+   if (item.adminKeys) {
+      return item.adminKeys.some((k) => permissions[k] === true);
+   }
+   if (item.module) {
+      return moduleGranted(permissions, item.module.plural, item.module.singular);
+   }
+   return true;
+}
 
 const Sidebar = () => {
    const globalState = useGlobalState();
    const theme = useTheme();
    const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
    const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
+
+   // Phase 2 (2.2): load the signed-in user's permissions once and
+   // filter the navigation. Until the request resolves, the full menu
+   // renders (the layout only mounts for signed-in users); afterwards
+   // only accessible items remain.
+   const [permissions, setPermissions] = useState<Record<
+      string,
+      boolean
+   > | null>(null);
+   const [isAdmin, setIsAdmin] = useState(false);
+
+   useEffect(() => {
+      let cancelled = false;
+      fetch("/api/auth/me")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((data) => {
+            if (cancelled || !data?.user) return;
+            const perms = normalizePermissions(
+               data.user.roleDetails?.permissions,
+            );
+            setPermissions(perms);
+            setIsAdmin(
+               perms["all"] === true || data.user.role === "System Admin",
+            );
+         })
+         .catch(() => {});
+      return () => {
+         cancelled = true;
+      };
+   }, []);
+
+   const visibleItems = useMemo(() => {
+      const visible =
+         permissions === null
+            ? items
+            : items.filter((item) => canSeeItem(item, permissions, isAdmin));
+      // Re-attach each group's heading to its first visible item (the
+      // heading normally rides on the group's first entry, which may
+      // have been filtered out).
+      const headings: Record<string, { title: string; id: string }> = {
+         management: { title: "MANAGEMENT", id: "management" },
+         account: { title: "ACCOUNT", id: "account" },
+      };
+      const seenGroups = new Set<string>();
+      return visible.map((item) => {
+         const group = item.heading?.id || item.headingId || "";
+         const { heading: _heading, ...rest } = item;
+         if (group && headings[group] && !seenGroups.has(group)) {
+            seenGroups.add(group);
+            return { ...rest, heading: headings[group] };
+         }
+         return rest;
+      });
+   }, [permissions, isAdmin]);
 
    useEffect(() => {
       if (isMdDown) {
@@ -220,7 +378,7 @@ const Sidebar = () => {
             >
                <CustomList
                   fullMenu={layout}
-                  items={items.map((i) => ({
+                  items={visibleItems.map((i) => ({
                      ...i,
                      onItemClick: () => {
                         if (isSmDown) {

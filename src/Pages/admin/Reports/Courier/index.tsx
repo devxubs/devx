@@ -9,6 +9,7 @@ import AnalyticsCard from "@cmp/AnalyticsCard";
 import RadialBar from "@cmp/RadialBar";
 import { useSettings } from "@src/lib/settingsContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { fetchAllReportRows, reportParams } from "../reportExport";
 
 const Courier = () => {
    const theme = useTheme();
@@ -176,6 +177,11 @@ const Courier = () => {
                      exportConfig={{
                         filename: `Couriers_Report_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Couriers Performance Report",
+                        fetchAllData: () =>
+                           fetchAllReportRows(
+                              reportParams("courier", dateRange),
+                              (d) => d.rows || [],
+                           ),
                      }}
                      printConfig={{
                         title: "DevX POS - Couriers Performance Report",

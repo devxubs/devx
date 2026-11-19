@@ -6,6 +6,7 @@ import CustomTable from "@src/components/Table";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import { fetchAllReportRows, reportParams } from "../reportExport";
 
 export const customerOrderData: any[] = [];
 
@@ -155,6 +156,8 @@ const Customer = () => {
                      exportConfig={{
                         filename: `Customers_Report_${new Date().toISOString().split("T")[0]}`,
                         title: "DevX POS - Customers Analytics Report",
+                        fetchAllData: () =>
+                           fetchAllReportRows(reportParams("customers"), (d) => d.rows || []),
                      }}
                      printConfig={{
                         title: "DevX POS - Customers Analytics Report",

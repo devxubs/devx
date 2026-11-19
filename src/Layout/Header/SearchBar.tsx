@@ -15,6 +15,7 @@ import {
    Chip,
 } from "@mui/material";
 import CustomBox from "@src/components/CustomBox";
+import { useSettings } from "@src/lib/settingsContext";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
@@ -34,6 +35,9 @@ interface SearchResults {
 
 export default function FullWidthSuggestions() {
    const router = useRouter();
+   // Phase 2 (2.12): money in search results uses the shared
+   // settings-aware formatter instead of a hard-coded ৳ literal.
+   const { formatCurrency } = useSettings();
    const [query, setQuery] = useState("");
    const [open, setOpen] = useState(false);
    const [loading, setLoading] = useState(false);
@@ -108,7 +112,7 @@ export default function FullWidthSuggestions() {
       results.products.forEach((p) => {
          items.push({
             title: p.productName,
-            subtitle: `${p.customId || p.productCode || ""} • Qty: ${p.quantity ?? 0} • ৳${p.regularPrice}`,
+            subtitle: `${p.customId || p.productCode || ""} • Qty: ${p.quantity ?? 0} • ${formatCurrency(Number(p.regularPrice || 0))}`,
             tag: "Product",
             url: `/admin/product?id=${p.id}`,
          });
@@ -117,18 +121,21 @@ export default function FullWidthSuggestions() {
       results.orders.forEach((o) => {
          items.push({
             title: o.orderCode || o.orderId || o.customId,
-            subtitle: `${o.customer?.name || "Customer"} • ৳${o.total} • ${o.status}`,
+            subtitle: `${o.customer?.name || "Customer"} • ${formatCurrency(Number(o.total || 0))} • ${o.status}`,
             tag: "Order",
             url: `/admin/order/${o.orderCode || o.orderId || o.id}`,
          });
       });
 
+      // Phase 2 (2.3): deep links — every result opens its own record
+      // (the target list pages read these params and open the matching
+      // detail view) instead of landing on an unfiltered list.
       results.customers.forEach((c) => {
          items.push({
             title: c.name,
             subtitle: `${c.customId || ""} • ${c.phone || c.email || ""}`,
             tag: "Customer",
-            url: `/admin/customers`,
+            url: `/admin/customers?customer=${c.customId || c.id}`,
          });
       });
 
@@ -137,7 +144,7 @@ export default function FullWidthSuggestions() {
             title: e.name,
             subtitle: `${e.customId || ""} • ${e.role?.name || "Staff"} • ${e.email}`,
             tag: "Employee",
-            url: `/admin/user`,
+            url: `/admin/user?user=${e.customId || e.id}`,
          });
       });
 
@@ -164,34 +171,34 @@ export default function FullWidthSuggestions() {
             title: s.name,
             subtitle: `${s.customId || ""} • ${s.phone || ""}`,
             tag: "Supplier",
-            url: `/admin/suppliers`,
+            url: `/admin/suppliers?supplier=${s.customId || s.id}`,
          });
       });
 
       results.purchases.forEach((pu) => {
          items.push({
             title: pu.invoice || pu.customId,
-            subtitle: `${pu.supplier?.name || "Supplier"} • ৳${pu.total}`,
+            subtitle: `${pu.supplier?.name || "Supplier"} • ${formatCurrency(Number(pu.total || 0))}`,
             tag: "Purchase",
-            url: `/admin/purchase`,
+            url: `/admin/purchase?purchase=${pu.customId || pu.id}`,
          });
       });
 
       results.expenses.forEach((ex) => {
          items.push({
             title: ex.type,
-            subtitle: `${ex.customId || ""} • ৳${ex.amount} • ${ex.note || ""}`,
+            subtitle: `${ex.customId || ""} • ${formatCurrency(Number(ex.amount || 0))} • ${ex.note || ""}`,
             tag: "Expense",
-            url: `/admin/expense`,
+            url: `/admin/expense?expense=${ex.customId || ex.id}`,
          });
       });
 
       results.assets.forEach((ast) => {
          items.push({
             title: ast.name,
-            subtitle: `${ast.customId || ""} • ${ast.category || ""} • ৳${ast.value}`,
+            subtitle: `${ast.customId || ""} • ${ast.category || ""} • ${formatCurrency(Number(ast.value || 0))}`,
             tag: "Asset",
-            url: `/admin/assets`,
+            url: `/admin/assets?asset=${ast.customId || ast.id}`,
          });
       });
 
@@ -205,7 +212,7 @@ export default function FullWidthSuggestions() {
       });
 
       return items;
-   }, [results]);
+   }, [results, formatCurrency]);
 
    const handleSelect = (url: string) => {
       setOpen(false);
