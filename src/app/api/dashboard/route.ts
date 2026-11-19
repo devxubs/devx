@@ -8,10 +8,10 @@ import { calculateNetProfit } from "@src/lib/finance";
 // All period figures are bounded by the requested range
 // (`startDate`/`endDate`; a legacy `year` param still maps to that
 // calendar year; default = last 30 days) and come from Prisma
-// count/aggregate queries. The previous implementation aggregated a
-// full year of order/expense rows in memory no matter what the UI
-// asked for; the series is now bucketed from range-bounded rows only
-// (daily buckets up to 62 days, monthly beyond). Current-state
+// count/aggregate queries. The chart series is built from one
+// aggregate query per time bucket (daily buckets up to 62 days,
+// monthly beyond) — QA fix (B4): no code path loads the range's
+// order/expense rows into memory to build the series. Current-state
 // figures (low stock, pending orders, total customer due, recent
 // orders, category stock distribution) describe "now" and are
 // intentionally not range-bounded. The response shape is unchanged
@@ -66,6 +66,55 @@ export async function GET(request: NextRequest) {
    const todayStart = startOfDay(now);
    const todayEnd = endOfDay(now);
 
+   // Series bucket boundaries (QA fix B4). Labels match the previous
+   // in-memory bucketing exactly; the first/last buckets are clamped
+   // to the requested range so aggregates never count rows outside
+   // it (the old row pass was range-bounded the same way).
+   type SeriesBucket = {
+      label: string;
+      start: Date;
+      end: Date;
+      income: number;
+      expenses: number;
+   };
+   const bucketDefs: SeriesBucket[] = [];
+   if (bucketMode === "day") {
+      const cursor = startOfDay(rangeStart);
+      while (cursor <= rangeEnd) {
+         const start = new Date(cursor);
+         bucketDefs.push({
+            label: cursor.toLocaleDateString("en-US", {
+               month: "short",
+               day: "numeric",
+            }),
+            start: start < rangeStart ? new Date(rangeStart) : start,
+            end: endOfDay(cursor),
+            income: 0,
+            expenses: 0,
+         });
+         cursor.setDate(cursor.getDate() + 1);
+      }
+   } else {
+      const cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+      while (cursor <= rangeEnd) {
+         const monthStart = new Date(cursor);
+         const monthEnd = endOfDay(
+            new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0),
+         );
+         bucketDefs.push({
+            label: cursor.toLocaleDateString("en-US", {
+               month: "short",
+               year: "numeric",
+            }),
+            start: monthStart < rangeStart ? new Date(rangeStart) : monthStart,
+            end: monthEnd > rangeEnd ? new Date(rangeEnd) : monthEnd,
+            income: 0,
+            expenses: 0,
+         });
+         cursor.setMonth(cursor.getMonth() + 1);
+      }
+   }
+
    try {
       const [
          totalOrders,
@@ -80,8 +129,6 @@ export async function GET(request: NextRequest) {
          lowStockProducts,
          recentOrders,
          allEmployees,
-         ordersInRange,
-         expensesInRange,
          categoryDistribution,
          pendingOrders,
          todaysOrders,
@@ -150,15 +197,6 @@ export async function GET(request: NextRequest) {
                },
             },
          }),
-         // Series source rows — bounded by the range (PERF-02).
-         prisma.order.findMany({
-            where: { isDeleted: false, createdAt: rangeWhere },
-            select: { total: true, status: true, createdAt: true },
-         }),
-         prisma.expense.findMany({
-            where: { isDeleted: false, createdAt: rangeWhere },
-            select: { amount: true, createdAt: true },
-         }),
          prisma.category.findMany({
             select: {
                name: true,
@@ -202,57 +240,43 @@ export async function GET(request: NextRequest) {
       const netProfit = calculateNetProfit(totalRevenue, totalExpenses, totalPurchases);
       const currentBalance = Math.max(totalRevenue - totalExpenses - settledPayouts, 0);
 
-      // Range-bucketed income vs expenses series (replaces the fixed
-      // 12-month in-memory aggregation). Income counts COMPLETED /
-      // DELIVERED orders only, as before.
-      const buckets = new Map<string, { label: string; income: number; expenses: number }>();
-      const cursor = new Date(rangeStart);
-      if (bucketMode === "day") {
-         while (cursor <= rangeEnd) {
-            const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
-            buckets.set(key, {
-               label: cursor.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
+      // Range-bucketed income vs expenses series — one bounded
+      // aggregate query per bucket (QA fix B4; previously every
+      // order/expense row in the range was loaded and bucketed in
+      // memory). Income counts COMPLETED / DELIVERED orders only,
+      // exactly as the row pass did.
+      const [bucketIncomeAggs, bucketExpenseAggs] = await Promise.all([
+         Promise.all(
+            bucketDefs.map((b) =>
+               prisma.order.aggregate({
+                  where: {
+                     isDeleted: false,
+                     status: { in: ["COMPLETED", "DELIVERED"] },
+                     createdAt: { gte: b.start, lte: b.end },
+                  },
+                  _sum: { total: true },
                }),
-               income: 0,
-               expenses: 0,
-            });
-            cursor.setDate(cursor.getDate() + 1);
-         }
-      } else {
-         cursor.setDate(1);
-         while (cursor <= rangeEnd) {
-            const key = `${cursor.getFullYear()}-${cursor.getMonth()}`;
-            buckets.set(key, {
-               label: cursor.toLocaleDateString("en-US", {
-                  month: "short",
-                  year: "numeric",
+            ),
+         ),
+         Promise.all(
+            bucketDefs.map((b) =>
+               prisma.expense.aggregate({
+                  where: {
+                     isDeleted: false,
+                     createdAt: { gte: b.start, lte: b.end },
+                  },
+                  _sum: { amount: true },
                }),
-               income: 0,
-               expenses: 0,
-            });
-            cursor.setMonth(cursor.getMonth() + 1);
-         }
-      }
-      const keyOf = (d: Date) =>
-         bucketMode === "day"
-            ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-            : `${d.getFullYear()}-${d.getMonth()}`;
-      ordersInRange.forEach((ord) => {
-         if (ord.status === "COMPLETED" || ord.status === "DELIVERED") {
-            const b = buckets.get(keyOf(new Date(ord.createdAt)));
-            if (b) b.income += Number(ord.total);
-         }
+            ),
+         ),
+      ]);
+      bucketDefs.forEach((b, i) => {
+         b.income = Number(bucketIncomeAggs[i]._sum.total || 0);
+         b.expenses = Number(bucketExpenseAggs[i]._sum.amount || 0);
       });
-      expensesInRange.forEach((exp) => {
-         const b = buckets.get(keyOf(new Date(exp.createdAt)));
-         if (b) b.expenses += Number(exp.amount);
-      });
-      const seriesBuckets = [...buckets.values()];
-      const monthlyIncome = seriesBuckets.map((b) => b.income);
-      const monthlyExpenses = seriesBuckets.map((b) => b.expenses);
-      const seriesLabels = seriesBuckets.map((b) => b.label);
+      const monthlyIncome = bucketDefs.map((b) => b.income);
+      const monthlyExpenses = bucketDefs.map((b) => b.expenses);
+      const seriesLabels = bucketDefs.map((b) => b.label);
 
       // Employee Ranking Calculation with deterministic tie-breaking
       const calculatedRankings = allEmployees.map((emp) => {
