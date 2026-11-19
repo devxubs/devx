@@ -568,6 +568,7 @@ model SupplierPayment {
   paymentDate   DateTime  @default(now())
   note          String?
   isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
   createdById   String?
   createdBy     User?     @relation(fields: [createdById], references: [id])
 

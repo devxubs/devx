@@ -185,12 +185,42 @@ export async function POST(
       }
 
       const result = await prisma.$transaction(async (tx) => {
+         // QA fix (S2): re-read the purchase INSIDE the transaction
+         // and validate + compute from that fresh row. Previously the
+         // due was validated from a read taken before the transaction
+         // and `paid` was computed from the same stale object, so two
+         // simultaneous allocated payments could both validate
+         // against one due and desync paid/due from the payment
+         // records. The pre-transaction check above stays as the fast
+         // path; this in-transaction check is the authoritative one.
+         // Validation runs before any write, so a failure returns
+         // without persisting anything.
+         let freshPurchase: any = null;
+         if (purchase) {
+            freshPurchase = await tx.purchase.findFirst({
+               where: { id: purchase.id, supplierId: supplier.id, isDeleted: false },
+            });
+            if (!freshPurchase) {
+               return {
+                  ok: false as const,
+                  message: "The selected purchase does not belong to this supplier.",
+               };
+            }
+            const freshDueCents = Math.round(Number(freshPurchase.due || 0) * 100);
+            if (amountCents > freshDueCents) {
+               return {
+                  ok: false as const,
+                  message: `Payment exceeds the outstanding due on this purchase (${Number(freshPurchase.due).toFixed(2)}). Record the remainder as an unallocated payment if it is an advance.`,
+               };
+            }
+         }
+
          const { customId } = await generateNextEntityId("SUPPLIER_PAYMENT", tx);
          const payment = await tx.supplierPayment.create({
             data: {
                customId,
                supplierId: supplier.id,
-               purchaseId: purchase ? purchase.id : null,
+               purchaseId: freshPurchase ? freshPurchase.id : null,
                amount: amountCents / 100,
                paymentMethod: body.paymentMethod
                   ? String(body.paymentMethod).trim()
@@ -204,18 +234,25 @@ export async function POST(
             },
          });
 
-         if (purchase) {
-            const newPaid = Number(purchase.paid || 0) + amountCents / 100;
-            const newDue = Math.max(0, Number(purchase.total || 0) - newPaid);
+         if (freshPurchase) {
+            const newPaid = Number(freshPurchase.paid || 0) + amountCents / 100;
+            const newDue = Math.max(0, Number(freshPurchase.total || 0) - newPaid);
             await tx.purchase.update({
-               where: { id: purchase.id },
+               where: { id: freshPurchase.id },
                data: { paid: newPaid, due: newDue },
             });
          }
 
          const summary = await payableSummary(tx, supplier.id);
-         return { payment, summary };
+         return { ok: true as const, payment, summary };
       });
+
+      if (!result.ok) {
+         return NextResponse.json(
+            { error: "Validation error", message: result.message },
+            { status: 400 },
+         );
+      }
 
       return NextResponse.json(
          {

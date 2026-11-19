@@ -43,7 +43,9 @@ export async function DELETE(
 
          await tx.supplierPayment.update({
             where: { id: payment.id },
-            data: { isDeleted: true },
+            // QA fix (B2): stamp deletedAt alongside isDeleted, the
+            // BIN-03 standard every other soft-delete model follows.
+            data: { isDeleted: true, deletedAt: new Date() },
          });
 
          if (payment.purchaseId) {
