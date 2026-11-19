@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { adjustWarehouseStock } from "@src/lib/stock";
+import {
+   normalizeBarcode,
+   findBarcodeConflict,
+   findPayloadDuplicateBarcode,
+   barcodeConflictMessage,
+   assertBarcodeAvailable,
+   BarcodeConflictError,
+} from "@src/lib/barcodeUniqueness";
 
 export async function GET(
    request: NextRequest,
@@ -86,12 +94,37 @@ export async function PUT(
          }
       }
 
-      if (body.barcode && body.barcode !== existing.barcode) {
-         const collision = await prisma.product.findFirst({
-            where: { barcode: body.barcode, id: { not: id }, isDeleted: false },
+      // Phase 4 (D6): same unified-namespace rule as product create
+      // (lib/barcodeUniqueness) — the new code must not collide with
+      // any other product's barcode or any variant's barcode. Only
+      // checked when the value actually changes, so a pre-existing
+      // legacy duplicate elsewhere never blocks an unrelated edit.
+      // Two variants in the same save may not share a barcode
+      // either (payload-internal, no DB state involved).
+      if (Array.isArray(body.variants)) {
+         const payloadDuplicate = findPayloadDuplicateBarcode(
+            body.variants.map((v: any) => normalizeBarcode(v?.barcode)),
+         );
+         if (payloadDuplicate) {
+            return NextResponse.json(
+               {
+                  error: `Barcode "${payloadDuplicate}" is used more than once in this product`,
+               },
+               { status: 409 },
+            );
+         }
+      }
+
+      const nextBarcode = normalizeBarcode(body.barcode);
+      if (nextBarcode && nextBarcode !== normalizeBarcode(existing.barcode)) {
+         const conflict = await findBarcodeConflict(prisma, nextBarcode, {
+            excludeProductId: id,
          });
-         if (collision) {
-            return NextResponse.json({ error: `Barcode "${body.barcode}" is already taken` }, { status: 409 });
+         if (conflict) {
+            return NextResponse.json(
+               { error: barcodeConflictMessage(conflict) },
+               { status: 409 },
+            );
          }
       }
 
@@ -215,6 +248,25 @@ export async function PUT(
                data: { isDeleted: true, deletedAt: new Date() },
             });
 
+            // Phase 4 (D6): variant barcodes join the same unified
+            // namespace check as product barcodes. Runs inside the
+            // transaction AFTER the soft-delete above, so a code
+            // freed by a removed variant can be reused in the same
+            // save, and a conflict rolls the whole edit back. Each
+            // incoming variant is excluded from its own check by id;
+            // the parent product's own barcode (already updated
+            // above) counts as a conflict like any other record.
+            const incomingBarcodes = body.variants.map((v: any) =>
+               normalizeBarcode(v?.barcode),
+            );
+            for (let i = 0; i < body.variants.length; i++) {
+               const code = incomingBarcodes[i];
+               if (!code) continue;
+               await assertBarcodeAvailable(tx, code, {
+                  excludeVariantId: body.variants[i]?.id || undefined,
+               });
+            }
+
             // Upsert incoming variants
             for (let i = 0; i < body.variants.length; i++) {
                const v = body.variants[i];
@@ -274,6 +326,12 @@ export async function PUT(
 
       return NextResponse.json(product);
    } catch (error: any) {
+      if (error instanceof BarcodeConflictError) {
+         return NextResponse.json(
+            { error: error.message },
+            { status: 409 },
+         );
+      }
       if (error?.code === "P2002") {
          return NextResponse.json(
             { error: "Product SKU or barcode collision occurred" },

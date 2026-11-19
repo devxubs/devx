@@ -3,6 +3,12 @@ import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { parsePagination } from "@src/lib/pagination";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   normalizeBarcode,
+   findBarcodeConflict,
+   findPayloadDuplicateBarcode,
+   barcodeConflictMessage,
+} from "@src/lib/barcodeUniqueness";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -205,13 +211,43 @@ export async function POST(request: NextRequest) {
          );
       }
 
+      // Phase 4 (D6): barcode uniqueness is enforced against the
+      // unified scan namespace — every non-deleted product barcode
+      // AND every non-deleted variant barcode — because the scan
+      // lookup resolves both together and a shared code is
+      // ambiguous at scan time. The product's own code, each
+      // variant code, and duplicates inside this payload are all
+      // checked before anything is written (lib/barcodeUniqueness).
+      const variantBarcodes = (Array.isArray(variants) ? variants : []).map(
+         (v: any) => normalizeBarcode(v?.barcode),
+      );
       if (finalBarcode) {
-         const existingBarcode = await prisma.product.findFirst({
-            where: { barcode: finalBarcode, isDeleted: false },
-         });
-         if (existingBarcode) {
+         const conflict = await findBarcodeConflict(prisma, finalBarcode);
+         if (conflict) {
             return NextResponse.json(
-               { error: `Barcode "${finalBarcode}" is already in use by another product` },
+               { error: barcodeConflictMessage(conflict) },
+               { status: 409 },
+            );
+         }
+      }
+      const payloadDuplicate = findPayloadDuplicateBarcode([
+         finalBarcode,
+         ...variantBarcodes,
+      ]);
+      if (payloadDuplicate) {
+         return NextResponse.json(
+            {
+               error: `Barcode "${payloadDuplicate}" is used more than once in this product`,
+            },
+            { status: 409 },
+         );
+      }
+      for (const code of variantBarcodes) {
+         if (!code) continue;
+         const conflict = await findBarcodeConflict(prisma, code);
+         if (conflict) {
+            return NextResponse.json(
+               { error: barcodeConflictMessage(conflict) },
                { status: 409 },
             );
          }
