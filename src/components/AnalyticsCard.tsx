@@ -14,8 +14,11 @@ interface AnalyticsCardProps {
    title: string;
    value: number | string;
    percentage?: string;
-   isPositive: boolean;
-   data: number[]; // Should have 7 values (Mon → Sun)
+   isPositive?: boolean;
+   // Optional real trend series (7 values, Mon → Sun). Phase 1: when no
+   // real series exists, omit this prop — the card renders without a
+   // sparkline instead of drawing invented trend data.
+   data?: number[];
    currency?: string;
 }
 
@@ -23,7 +26,7 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    title,
    value,
    percentage = 0,
-   isPositive,
+   isPositive = true,
    data,
    currency,
 }) => {
@@ -135,13 +138,15 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                </Stack>
             </Stack>
 
-            <Box sx={{ height: 66, width: 80 }}>
-               <ReactApexChart
-                  type="line"
-                  series={[{ name: "Value", data: Array.isArray(data) && data.length > 0 ? data.map((v) => Number(v) || 0) : [0, 0, 0, 0, 0, 0, 0] }]}
-                  options={chartOptions}
-               />
-            </Box>
+            {Array.isArray(data) && data.length > 0 && (
+               <Box sx={{ height: 66, width: 80 }}>
+                  <ReactApexChart
+                     type="line"
+                     series={[{ name: "Value", data: data.map((v) => Number(v) || 0) }]}
+                     options={chartOptions}
+                  />
+               </Box>
+            )}
          </Stack>
       </Stack>
    );

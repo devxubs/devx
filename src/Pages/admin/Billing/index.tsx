@@ -279,7 +279,6 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Total Settled Payouts"}
                      value={`${settings.currencySymbol || "৳"} ${formatCompactNumber(metrics.totalSettled)}`}
                      isPositive={true}
-                     data={[10, 15, 8, 12, 20, 18, 25]}
                   />
                </Grid>
                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -287,7 +286,6 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Available Net Balance"}
                      value={`${settings.currencySymbol || "৳"} ${formatCompactNumber(availableBalance)}`}
                      isPositive={true}
-                     data={[10, 15, 8, 12, 20, 18, 25]}
                   />
                </Grid>
                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -295,36 +293,34 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Pending Settlements"}
                      value={`${settings.currencySymbol || "৳"} ${formatCompactNumber(metrics.totalPending)}`}
                      isPositive={false}
-                     data={[5, 8, 6, 10, 15, 12, 18]}
                   />
                </Grid>
 
-               <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+               <Grid size={{ xs: 12, sm: 4, md: 4 }}>
                   <InfoCard
                      title={"Total Transactions"}
                      value={billingData.length}
                      icon={"solar:cart-large-bold-duotone"}
                   />
                </Grid>
-               <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+               <Grid size={{ xs: 12, sm: 4, md: 4 }}>
+                  {/* Phase 1 (NEW-06): 1.5% is the configured rate the
+                      billing API actually applies to every payout
+                      (serviceCharge = amount x 0.015) — labelled as a
+                      rate, not presented as measured data. The former
+                      "Settlement Status: Operational" card is removed:
+                      no settlement provider exists to report a status. */}
                   <InfoCard
-                     title={"Settlement Fee"}
+                     title={"Settlement Fee Rate (per payout)"}
                      value={"1.5%"}
                      icon={"solar:hand-money-bold-duotone"}
                   />
                </Grid>
-               <Grid size={{ xs: 12, sm: 4, md: 3 }}>
+               <Grid size={{ xs: 12, sm: 4, md: 4 }}>
                   <InfoCard
                      title={"Total Service Charges"}
                      value={`${settings.currencySymbol || "৳"} ${Number(metrics.totalCharges).toFixed(2)}`}
                      icon={"solar:wallet-money-bold-duotone"}
-                  />
-               </Grid>
-               <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-                  <InfoCard
-                     title={"Settlement Status"}
-                     value={"Operational"}
-                     icon={"solar:check-circle-bold-duotone"}
                   />
                </Grid>
 
@@ -444,7 +440,7 @@ Thank you for using DevX POS Settlement Gateway!
                         </Typography>
                      </Stack>
                      <Stack direction="row" justifyContent="space-between">
-                        <Typography variant="body2" color="text.secondary">Fee (1.5%):</Typography>
+                        <Typography variant="body2" color="text.secondary">Service Charge:</Typography>
                         <Typography variant="body2" color="error.main">
                            -{formatCurrency(printReceipt.serviceCharge || 0)}
                         </Typography>

@@ -53,12 +53,30 @@ const statusColor: Record<
    Failed: "error",
 } as const;
 
+// Phase 1 (NEW-02): tab counts were fabricated in code
+// (`value: (i + 10) * i`). They now come from the orders API's real
+// per-status groupBy (`ordersByStatus` in GET /api/orders). Until the
+// first response arrives, tabs render without a count chip rather
+// than with an invented number.
 const orderStatus: StatusProps[] = [
    {
       label: "All",
    },
-   ...orderStatuses.map((os, i) => ({ label: os, value: (i + 10) * i })),
+   ...orderStatuses.map((os) => ({ label: os })),
 ];
+
+const statusLabelToApi: Record<string, string> = {
+   Pending: "PENDING",
+   Confirmed: "CONFIRMED",
+   Cancelled: "CANCELLED",
+   Hold: "HOLD",
+   Completed: "COMPLETED",
+   Delivered: "DELIVERED",
+   Processing: "PROCESSING",
+   Shipped: "SHIPPED",
+   "Out for Delivery": "OUT_FOR_DELIVERY",
+   Failed: "FAILED",
+};
 
 const OrderTable = () => {
    const router = useRouter();
@@ -74,6 +92,7 @@ const OrderTable = () => {
       },
    );
    const [orderRows, setOrderRows] = useState<OrderType[]>([]);
+   const [statusCounts, setStatusCounts] = useState<Record<string, number> | null>(null);
    const [loading, setLoading] = useState(false);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
    const [detailCustomerId, setDetailCustomerId] = useState<string | null>(
@@ -228,6 +247,9 @@ const OrderTable = () => {
          const res = await fetch(`/api/orders?${params.toString()}`);
          if (res.ok) {
             const data = await res.json();
+            if (data.ordersByStatus) {
+               setStatusCounts(data.ordersByStatus);
+            }
             const mapped: OrderType[] = (data.orders || []).map((o: any) => ({
                id: o.id,
                orderCode: o.orderCode || o.customId || o.orderId,
@@ -457,6 +479,21 @@ const OrderTable = () => {
       { field: "@actions", headerName: "", flex: 0.1 },
    ];
 
+   // Real per-status counts from the API (see NEW-02 note above). A
+   // status with no API count yet gets no chip, never a fake number.
+   const orderStatusWithCounts: StatusProps[] = orderStatus.map((s) => {
+      if (!statusCounts) return s;
+      if (s.label === "All") {
+         const total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+         return { ...s, value: total };
+      }
+      const apiStatus = statusLabelToApi[s.label];
+      return {
+         ...s,
+         value: apiStatus ? (statusCounts[apiStatus] ?? 0) : undefined,
+      };
+   });
+
    return (
       <Stack
          bgcolor={"background.paper"}
@@ -468,7 +505,7 @@ const OrderTable = () => {
          {/* Order tab */}
          <Stack>
             <OrderTab
-               status={orderStatus}
+               status={orderStatusWithCounts}
                value={orderTab}
                onChange={(s) => {
                   setFilterQueryData({

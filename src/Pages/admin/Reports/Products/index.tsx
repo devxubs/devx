@@ -81,43 +81,35 @@ const Products = () => {
                <AnalyticsCard
                   title={"Total Items in Stock"}
                   isPositive={true}
-                  data={[10, 30, 40, 50, 60, 70, 80]}
                   value={totalInStock}
-                  percentage={"+12%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
                   title={"Low Stock Alerts"}
                   isPositive={false}
-                  data={[10, 8, 6, 5, 4, 3, 2]}
                   value={lowStockCount}
-                  percentage={"-15%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
                   title={"Out of Stock"}
                   isPositive={false}
-                  data={[5, 4, 3, 2, 2, 1, 0]}
                   value={outOfStockCount}
-                  percentage={"-25%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                <AnalyticsCard
                   title={"Top Product Sales"}
                   isPositive={true}
-                  data={[10, 25, 45, 60, 75, 90, 110]}
                   value={topProducts[0]?.sold || 0}
-                  percentage={"+30%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>
                <RadialBar
                   title={"Inventory Distribution"}
                   data={[
-                     { label: "In Stock", value: Math.max(totalInStock - outOfStockCount - lowStockCount, 1) },
+                     { label: "In Stock", value: Math.max(totalInStock - outOfStockCount - lowStockCount, 0) },
                      { label: "Low Stock", value: lowStockCount },
                      { label: "Out of Stock", value: outOfStockCount },
                   ]}

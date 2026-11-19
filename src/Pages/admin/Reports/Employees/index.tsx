@@ -4,7 +4,6 @@ import { Stack, Grid, Typography, Chip } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
-import RadialBar from "@cmp/RadialBar";
 import CustomTable from "@src/components/Table";
 import { SellerProFile } from "../../Dashboard";
 import { GridCellParams } from "@mui/x-data-grid";
@@ -47,7 +46,10 @@ const Employees = () => {
             </Stack>
          ),
       },
-      { field: "calls", headerName: "Interactions", width: 140 },
+      // Phase 1: the "Interactions" (calls) column is removed — the API
+      // deliberately returns calls: null because the old value was a
+      // fabricated formula and no call/interaction data exists in the
+      // system. An always-empty column only invites misreading.
       { field: "conforms", headerName: "Completed Sales", width: 150 },
       { field: "cancels", headerName: "Cancelled", width: 130 },
       {
@@ -95,27 +97,21 @@ const Employees = () => {
                <AnalyticsCard
                   title={"Total Employees"}
                   isPositive={true}
-                  data={[1, 2, 3, 4, 5, 6, 8]}
                   value={totalEmployees}
-                  percentage={"+5%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Completed Sales"}
                   isPositive={true}
-                  data={[5, 10, 15, 20, 25, 30, 35]}
                   value={totalCompletedSales}
-                  percentage={"+15%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Revenue Generated"}
                   isPositive={true}
-                  data={[5000, 10000, 15000, 20000, 25000, 30000]}
                   value={formatCurrency(totalGeneratedRevenue)}
-                  percentage={"+12%"}
                />
             </Grid>
 
@@ -130,17 +126,6 @@ const Employees = () => {
                   }))}
                />
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-               <RadialBar
-                  title="Team Performance"
-                  data={[
-                     { label: "High Achievers", value: 75 },
-                     { label: "On Track", value: 20 },
-                     { label: "Need Attention", value: 5 },
-                  ]}
-               />
-            </Grid>
-
             <Grid size={{ xs: 12 }}>
                <Stack
                   spacing={2}

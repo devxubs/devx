@@ -5,7 +5,6 @@ import CustomerInfo from "@src/Pages/admin/Customers/CustomerInfo";
 import CustomTable from "@src/components/Table";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
-import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 
 export const customerOrderData: any[] = [];
@@ -110,40 +109,21 @@ const Customer = () => {
                <AnalyticsCard
                   title={"Total Customers"}
                   isPositive={true}
-                  data={[10, 20, 25, 30, 35, 40, 50]}
                   value={totalCustomers}
-                  percentage={"+12%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Active Customers"}
                   isPositive={true}
-                  data={[5, 10, 15, 20, 25, 30, 35]}
                   value={activeCustomers}
-                  percentage={"+18%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Repeat Customers"}
                   isPositive={true}
-                  data={[1, 3, 5, 8, 12, 16, 20]}
                   value={repeatCustomers}
-                  percentage={"+25%"}
-               />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-               <AnalyticsGraph
-                  title={"Customer Growth"}
-                  isPositive={true}
-                  type="day"
-                  data={[
-                     { x: "Week 1", y: 15 },
-                     { x: "Week 2", y: 28 },
-                     { x: "Week 3", y: 42 },
-                     { x: "Week 4", y: 60 },
-                  ]}
                />
             </Grid>
             <Grid size={{ xs: 12 }}>

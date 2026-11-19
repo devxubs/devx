@@ -6,7 +6,6 @@ import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import { useTheme } from "@mui/material/styles";
 import AnalyticsCard from "@cmp/AnalyticsCard";
-import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import RadialBar from "@cmp/RadialBar";
 import { useSettings } from "@src/lib/settingsContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
@@ -99,34 +98,25 @@ const Courier = () => {
    const totalPaidToYou = rows.reduce((s: number, r: any) => s + Number(r.courier_pay_to_you || 0), 0);
    const totalCharges = rows.reduce((s: number, r: any) => s + Number(r.courier_charge || 0), 0);
 
+   // Phase 1: card values are computed from the fetched report rows.
+   // The invented percentage changes, sparkline arrays, and the
+   // hard-coded "Courier Success Rate" (96%/100% — no delivery-outcome
+   // data backs it) have been removed.
    const courierData = [
       {
          title: "Total In Courier",
          value: totalSubmitted,
-         percentage: "+5%",
          isPositive: true,
-         data: [10, 20, 30, 25, 35, 45, 50],
       },
       {
          title: "Courier Net Payout",
          value: formatCurrency(totalPaidToYou),
-         percentage: "+8%",
          isPositive: true,
-         data: [500, 1000, 1500, 2000, 2500, 3000, 3500],
       },
       {
          title: "Total Courier Fees",
          value: formatCurrency(totalCharges),
-         percentage: "-2%",
          isPositive: false,
-         data: [80, 160, 240, 320, 400, 480, 560],
-      },
-      {
-         title: "Courier Success Rate",
-         value: totalSubmitted > 0 ? "96%" : "100%",
-         percentage: "+1.2%",
-         isPositive: true,
-         data: [90, 92, 94, 95, 96, 96, 96],
       },
    ];
 
@@ -146,25 +136,10 @@ const Courier = () => {
                   <AnalyticsCard
                      title={item.title}
                      value={item.value}
-                     percentage={item.percentage}
                      isPositive={item.isPositive}
-                     data={item.data}
                   />
                </Grid>
             ))}
-
-            <Grid size={{ xs: 12, md: 8 }}>
-               <AnalyticsGraph
-                  title={"Courier Payout Trends"}
-                  isPositive={true}
-                  data={[
-                     { x: "Week 1", y: 1200 },
-                     { x: "Week 2", y: 1800 },
-                     { x: "Week 3", y: 1600 },
-                     { x: "Week 4", y: 2400 },
-                  ]}
-               />
-            </Grid>
 
             <Grid size={{ xs: 12, md: 4 }}>
                <RadialBar

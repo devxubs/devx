@@ -20,9 +20,15 @@ interface GenderSalesChartProps {
 const GenderSalesChart = ({ distribution }: GenderSalesChartProps) => {
    const theme = useTheme();
 
-   const labels = distribution?.labels?.length ? distribution.labels : ["Beverages", "Snacks", "Electronics"];
-   const rawSeries = distribution?.series?.length ? distribution.series : [45, 35, 20];
+   // Phase 1 (NEW-04): real API data only. The previous hard-coded
+   // fallback (Beverages/Snacks/Electronics at 45/35/20) presented
+   // invented inventory as fact; with no data the card now shows an
+   // explicit empty state instead. (Despite the legacy file name, this
+   // chart is inventory distribution by category.)
+   const labels = distribution?.labels ?? [];
+   const rawSeries = distribution?.series ?? [];
    const totalSum = rawSeries.reduce((a, b) => a + b, 0);
+   const hasData = labels.length > 0 && totalSum > 0;
 
    // Normalize to percentages for radialBar
    const series = rawSeries.map((val) =>
@@ -79,6 +85,25 @@ const GenderSalesChart = ({ distribution }: GenderSalesChartProps) => {
          lineCap: "round",
       },
    };
+
+   if (!hasData) {
+      return (
+         <CustomCard title="Category inventory distribution" subtitle="Product stock breakdown">
+            <Box
+               height={260}
+               display="flex"
+               alignItems="center"
+               justifyContent="center"
+               px={3}
+            >
+               <Typography variant="body2" color="text.secondary" textAlign="center">
+                  No inventory data yet. Add products with stock to see the
+                  category breakdown.
+               </Typography>
+            </Box>
+         </CustomCard>
+      );
+   }
 
    return (
       <CustomCard title="Category inventory distribution" subtitle="Product stock breakdown">

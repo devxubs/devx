@@ -116,8 +116,13 @@ const OrderTab = ({ value, onChange, status }: OrderTabProps) => {
                      disableFocusRipple
                      label={s.label}
                      icon={
+                        // Phase 1 (NEW-02): render the count chip only
+                        // for a real count. The previous expression
+                        // `(s.value || 99)` displayed "99+" for missing
+                        // counts AND for a genuine count of 0.
+                        typeof s.value === "number" ? (
                         <Chip
-                           label={(s.value || 99) >= 99 ? "99+" : s.value}
+                           label={s.value > 99 ? "99+" : s.value}
                            size="small"
                            sx={{
                               borderRadius: "6px!important",
@@ -127,6 +132,7 @@ const OrderTab = ({ value, onChange, status }: OrderTabProps) => {
                               color: textColor,
                            }}
                         />
+                        ) : undefined
                      }
                      iconPosition="end"
                      sx={{

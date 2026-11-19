@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
          purchaseSum,
          refundSum,
          payoutSum,
-         lowStockCount,
+         lowStockProducts,
          recentOrders,
          allEmployees,
          ordersForYear,
@@ -53,8 +53,12 @@ export async function GET(request: NextRequest) {
             where: { status: "COMPLETED" },
             _sum: { amount: true },
          }),
-         prisma.product.count({
-            where: { isDeleted: false, quantity: { lte: 10 } },
+         // Phase 1: low stock is defined per product by its own
+         // lowStockAlert threshold — the previous query hard-coded
+         // quantity <= 10 for every product regardless of its setting.
+         prisma.product.findMany({
+            where: { isDeleted: false },
+            select: { quantity: true, lowStockAlert: true },
          }),
          prisma.order.findMany({
             where: { isDeleted: false },
@@ -108,6 +112,9 @@ export async function GET(request: NextRequest) {
          }),
       ]);
 
+      const lowStockCount = lowStockProducts.filter(
+         (p) => p.quantity <= p.lowStockAlert,
+      ).length;
       const totalRevenue = Number(revenueSum._sum.total || 0);
       const totalExpenses = Number(expenseSum._sum.amount || 0);
       const totalPurchases = Number(purchaseSum._sum.total || 0);
@@ -222,16 +229,16 @@ export async function GET(request: NextRequest) {
       // Distribution data for RadialBar / Category distribution
       const distributionLabels: string[] = [];
       const distributionSeries: number[] = [];
+      // Phase 1 (NEW-04): real quantities only — zero-stock categories
+      // report 0, and when there are no categories the distribution is
+      // empty so the UI shows an empty state. The previous code inflated
+      // zero quantities to 1 and invented "Beverages/Snacks/Electronics"
+      // 50/30/20 data when the database had none.
       categoryDistribution.forEach((cat) => {
          const totalQty = cat.products.reduce((acc, p) => acc + p.quantity, 0);
          distributionLabels.push(cat.name);
-         distributionSeries.push(totalQty > 0 ? totalQty : 1);
+         distributionSeries.push(totalQty);
       });
-
-      if (distributionLabels.length === 0) {
-         distributionLabels.push("Beverages", "Snacks", "Electronics");
-         distributionSeries.push(50, 30, 20);
-      }
 
       return NextResponse.json({
          totalOrders,

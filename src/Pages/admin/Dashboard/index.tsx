@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Stack, Typography, Avatar, Box, Chip } from "@mui/material";
+import { Grid, Stack, Typography, Avatar, Box, Chip, Alert, Button } from "@mui/material";
 import AnalyticsCard from "@src/components/AnalyticsCard";
+import { DashboardSkeleton } from "@src/components/SkeletonLoader";
 import SalesByGender from "./SalesByGender";
 import YearlySalesChart from "./YearlySalesChart";
 import Scrollbar from "react-browser-scrollbar";
@@ -22,6 +23,7 @@ const Dashboard = () => {
    const { formatCurrency } = useSettings();
    const [metrics, setMetrics] = useState<any>(null);
    const [loading, setLoading] = useState(true);
+   const [loadError, setLoadError] = useState(false);
 
    const loadDashboard = useCallback(async (year?: string) => {
       try {
@@ -30,9 +32,15 @@ const Dashboard = () => {
          if (res.ok) {
             const data = await res.json();
             setMetrics(data);
+            setLoadError(false);
+         } else {
+            // Phase 1: a failed load must look like a failure — the
+            // previous silent catch rendered an all-zero dashboard that
+            // was indistinguishable from a zero-sales day.
+            setLoadError(true);
          }
       } catch {
-         // silent
+         setLoadError(true);
       } finally {
          setLoading(false);
       }
@@ -57,9 +65,11 @@ const Dashboard = () => {
             );
          },
       },
-      { field: "call", headerName: "Call" },
-      { field: "conform", headerName: "Conform" },
-      { field: "cancel", headerName: "Cancel" },
+      // The API's "call" is the count of orders the employee handled —
+      // labelled honestly instead of implying phone calls.
+      { field: "call", headerName: "Orders Handled" },
+      { field: "conform", headerName: "Confirmed" },
+      { field: "cancel", headerName: "Cancelled" },
       {
          field: "rank",
          headerName: "Rank",
@@ -95,27 +105,30 @@ const Dashboard = () => {
       },
    ];
 
+   // Phase 1 (NEW-04): values only — the hard-coded percentage labels
+   // ("+100%", "-5%") and invented sparkline arrays have been removed.
+   // The API does not provide a per-card trend series, so the cards
+   // render without sparklines rather than with fabricated ones.
    const dynamicAnalytics = [
       {
          title: "Completed Orders",
          value: metrics?.completedOrders ?? 0,
-         percentage: "+100%",
          isPositive: true,
-         data: [1, 2, 3, 4, 5, 6, metrics?.completedOrders || 0],
       },
       {
          title: "Pending / Processing",
          value: (metrics?.totalOrders || 0) - (metrics?.completedOrders || 0) - (metrics?.cancelledOrders || 0),
-         percentage: "Active",
          isPositive: true,
-         data: [1, 2, 2, 3, 2, 1, 2],
       },
       {
          title: "Cancelled Orders",
          value: metrics?.cancelledOrders ?? 0,
-         percentage: metrics?.cancelledOrders ? "-5%" : "0%",
          isPositive: false,
-         data: [0, 0, 0, 1, 0, 0, metrics?.cancelledOrders || 0],
+      },
+      {
+         title: "Low Stock Alerts",
+         value: metrics?.lowStockCount ?? 0,
+         isPositive: false,
       },
    ];
 
@@ -134,13 +147,35 @@ const Dashboard = () => {
       color: emp.color,
    }));
 
+   if (loading && !metrics) {
+      return <DashboardSkeleton />;
+   }
+
+   if (loadError && !metrics) {
+      return (
+         <Stack spacing={3} py={1}>
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={() => loadDashboard()}>
+                     Retry
+                  </Button>
+               }
+            >
+               Couldn&apos;t load dashboard data. No figures are shown rather than
+               incorrect ones — check the connection and try again.
+            </Alert>
+         </Stack>
+      );
+   }
+
    return (
       <Stack spacing={3} py={1}>
          <Scrollbar autoHide thumbSize={6} darkMode>
             <Grid container spacing={3}>
-               {/* 3 Metric Summary Cards */}
+               {/* 4 Metric Summary Cards */}
                {dynamicAnalytics.map((item, idx) => (
-                  <Grid size={{ xs: 12, md: 4 }} key={idx}>
+                  <Grid size={{ xs: 12, sm: 6, md: 3 }} key={idx}>
                      <AnalyticsCard {...item} />
                   </Grid>
                ))}

@@ -2,7 +2,6 @@
 
 import { Stack, Grid, Typography } from "@mui/material";
 import React, { useState, useEffect, useCallback } from "react";
-import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import CustomTable from "@src/components/Table";
 import DateRangePickerCustom from "@src/components/DateRange";
@@ -71,40 +70,21 @@ const Purchases = () => {
                <AnalyticsCard
                   title={"Total Purchases"}
                   isPositive={true}
-                  data={[10, 20, 25, 30, 35, 40, 50]}
                   value={totalCount}
-                  percentage={"+10%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Total Spending"}
                   isPositive={true}
-                  data={[1000, 3000, 5000, 7000, 9000, 12000, 15000]}
                   value={formatCurrency(totalAmount)}
-                  percentage={"+15%"}
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard
                   title={"Suppliers Active"}
                   isPositive={true}
-                  data={[2, 4, 6, 8, 10, 12, 14]}
-                  value={new Set(rows.map((r: any) => r.supplier)).size || 1}
-                  percentage={"+5%"}
-               />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-               <AnalyticsGraph
-                  title={"Monthly Purchase Trend"}
-                  isPositive={true}
-                  type="day"
-                  data={[
-                     { x: "Week 1", y: 15000 },
-                     { x: "Week 2", y: 25000 },
-                     { x: "Week 3", y: 35000 },
-                     { x: "Week 4", y: 45000 },
-                  ]}
+                  value={new Set(rows.map((r: any) => r.supplier)).size}
                />
             </Grid>
             <Grid size={{ xs: 12 }}>

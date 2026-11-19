@@ -28,13 +28,19 @@ const YearlySalesChart = ({
    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
    const [year, setYear] = useState(currentYear);
 
+   // Phase 1 (NEW-04): the hard-coded fallback series (invented
+   // monthly income/expenses) have been removed. Missing data renders
+   // as an empty state below, never as fabricated figures.
    const defaultIncome = incomeData && incomeData.length === 12
       ? incomeData
-      : [400, 350, 300, 250, 800, 900, 750, 1600, 1200, 1000, 800, 700];
+      : new Array(12).fill(0);
 
    const defaultExpenses = expenseData && expenseData.length === 12
       ? expenseData
-      : [250, 200, 100, 150, 400, 500, 350, 400, 300, 250, 200, 180];
+      : new Array(12).fill(0);
+
+   const hasData =
+      defaultIncome.some((v) => v > 0) || defaultExpenses.some((v) => v > 0);
 
    const series = [
       {
@@ -196,14 +202,27 @@ const YearlySalesChart = ({
             <Stat label="Total expenses" value={formatCurrency(totalExpenseSum)} color="#FFC300" />
          </Stack>
 
-         <Box height={260}>
-            <ReactApexChart
-               options={options}
-               series={series}
-               type="area"
+         {hasData ? (
+            <Box height={260}>
+               <ReactApexChart
+                  options={options}
+                  series={series}
+                  type="area"
+                  height={260}
+               />
+            </Box>
+         ) : (
+            <Box
                height={260}
-            />
-         </Box>
+               display="flex"
+               alignItems="center"
+               justifyContent="center"
+            >
+               <Typography variant="body2" color="text.secondary">
+                  No income or expense data recorded for {year}.
+               </Typography>
+            </Box>
+         )}
       </CustomCard>
    );
 };

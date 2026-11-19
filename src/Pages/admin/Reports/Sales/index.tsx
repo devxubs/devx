@@ -113,38 +113,35 @@ const Sales = () => {
       },
    ];
 
+   // Phase 1: the API's trendData is a real 7-day revenue trend, so the
+   // revenue card and the graph may use it — but the invented fallback
+   // arrays and percentage labels are removed, and the revenue trend is
+   // no longer presented as the "Total orders" trend.
    const analyticsCards = [
       {
          title: "Total orders",
          value: report?.totalOrders ?? 0,
          isPositive: true,
-         percentage: "100%",
-         data: report?.trendData || [10, 20, 30, 40, 50, 60, 70],
       },
       {
          title: "Total revenue",
          value: formatCurrency(report?.totalRevenue ?? 0),
          isPositive: true,
-         percentage: "+15%",
-         data: report?.trendData || [50, 60, 70, 80, 90, 100, 110],
+         data: report?.trendData,
       },
       {
          title: "Completed orders",
          value: report?.completedCount ?? 0,
          isPositive: true,
-         percentage: "+12%",
-         data: [1, 2, 4, 6, 8, 10, 12],
       },
       {
          title: "Returned / Failed",
          value: report?.returnedCount ?? 0,
          isPositive: false,
-         percentage: "-2%",
-         data: [2, 1, 3, 2, 1, 2, 1],
       },
    ];
 
-   const graphData = (report?.trendData || [100, 200, 300, 400, 500, 600, 700]).map((y: number, idx: number) => ({
+   const graphData = (report?.trendData || []).map((y: number, idx: number) => ({
       x: `Day ${idx + 1}`,
       y,
    }));

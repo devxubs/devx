@@ -3,8 +3,6 @@ import { Stack, Button, useTheme, Tab, Tabs } from "@mui/material";
 import Icon from "@src/components/Icon";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect } from "react";
-import PrintButton from "@src/components/PrintButton";
-import ExportButton from "@src/components/ExportButton";
 import Sales from "./Sales";
 import Courier from "./Courier";
 import Customer from "./Customer";
@@ -19,7 +17,10 @@ const tabs = [
    "Sales",
    "Courier",
    "Customers",
-   // "Expenses",
+   // Phase 1 (1.4): Expenses re-enabled — its table is fully wired to
+   // GET /api/reports?tab=expenses. (The Suppliers tab stays disabled:
+   // no such report module exists.)
+   "Expenses",
    "Purchases",
    // "Suppliers",
    "Employees",
@@ -115,31 +116,11 @@ const Report = () => {
                   />
                ))}
             </Tabs>
-            <Stack direction="row" spacing={1} alignItems="center">
-               <PrintButton
-                  label="Print Report"
-                  variant="contained"
-                  color="primary"
-                  sx={{ whiteSpace: "nowrap", height: 50, px: 2.5 }}
-               />
-               <ExportButton
-                  label="Export Report"
-                  variant="outlined"
-                  filename={`${tabs[val] || "Summary"}_Report_${new Date().toISOString().split("T")[0]}`}
-                  title={`DevX POS - ${tabs[val] || "Summary"} Analytics Report`}
-                  columns={[
-                     { field: "metric", headerName: "Metric / Dimension", width: 30 },
-                     { field: "value", headerName: "Value / Count", width: 25 },
-                     { field: "status", headerName: "Performance Status", width: 25 },
-                     { field: "timestamp", headerName: "Calculated At", width: 20 },
-                  ]}
-                  currentPageData={[
-                     { metric: "Active Report Module", value: tabs[val] || "Summary", status: "VERIFIED", timestamp: new Date().toLocaleDateString() },
-                     { metric: "Database Status", value: "CONNECTED", status: "HEALTHY", timestamp: new Date().toLocaleDateString() },
-                  ]}
-                  sx={{ whiteSpace: "nowrap", height: 50, px: 2.5 }}
-               />
-            </Stack>
+            {/* Phase 1 (NEW-03): the header Print/Export pair is removed.
+                The Export button downloaded hard-coded placeholder rows
+                ("Active Report Module = VERIFIED", "Database Status =
+                CONNECTED / HEALTHY") instead of report data. Each tab's
+                own table keeps its real print/export actions. */}
          </Stack>
 
          <Stack spacing={2}>

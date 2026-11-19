@@ -6,7 +6,11 @@ import DateRangePicker from "@src/components/DateRange";
 import { useEffect, useState, useCallback } from "react";
 import { useSettings } from "@src/lib/settingsContext";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
-import ExpenseChart from "./ExpenseChart";
+// Phase 1: ExpenseChart is intentionally not rendered — it is built
+// entirely on hard-coded example data (invented daily expenses for
+// Dec 2025), not on the reports API. The table below is real. The
+// chart component file is left on disk for a future data-backed
+// rewrite using the API's byType totals.
 
 const Expenses = () => {
    const { formatCurrency } = useSettings();
@@ -68,7 +72,6 @@ const Expenses = () => {
 
    return (
       <Stack spacing={3}>
-         <ExpenseChart />
          <Stack
             spacing={2}
             bgcolor={"background.paper"}
