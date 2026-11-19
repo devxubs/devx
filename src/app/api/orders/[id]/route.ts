@@ -421,6 +421,27 @@ export async function PUT(
       const statusChanged =
          body.status !== undefined && body.status !== existingOrder.status;
       const writeOrderAudit = async (tx: any, updatedOrder: any) => {
+         // Follow-up round: the diff also covers paymentMethod,
+         // courier, deliveryCharge and discount (previously a PUT
+         // changing only one of those wrote an audit row whose diff
+         // was empty), and a genuinely no-op PUT — empty diff —
+         // writes no UPDATE audit row at all.
+         const changes = buildChanges(existingOrder, updatedOrder, [
+            "status",
+            "paymentStatus",
+            "paymentTxId",
+            "paymentMethod",
+            "courier",
+            "deliveryCharge",
+            "discount",
+            "total",
+            "dueAmount",
+            "advancePayment",
+            "courierConsignmentId",
+            "courierTrackingCode",
+            "courierProviderStatus",
+         ]);
+         if (!changes) return;
          await logAudit(tx, {
             actor: { id: auditActor.id, label: auditActor.name },
             action: statusChanged ? "STATUS_CHANGE" : "UPDATE",
@@ -431,17 +452,7 @@ export async function PUT(
             summary: statusChanged
                ? `Order ${existingOrder.orderId || existingOrder.customId} status changed from ${existingOrder.status} to ${body.status}`
                : `Order ${existingOrder.orderId || existingOrder.customId} updated`,
-            changes: buildChanges(existingOrder, updatedOrder, [
-               "status",
-               "paymentStatus",
-               "paymentTxId",
-               "total",
-               "dueAmount",
-               "advancePayment",
-               "courierConsignmentId",
-               "courierTrackingCode",
-               "courierProviderStatus",
-            ]),
+            changes,
             ...requestAuditContext(request),
          });
       };
@@ -1315,7 +1326,12 @@ export async function DELETE(
          }
 
          if (!existing.isDeleted) {
-            if (orderHoldsStock(existing)) {
+            // Follow-up round: the audit summary must reflect
+            // whether stock was actually restored — a CANCELLED
+            // order holds no stock (released at cancel time), so
+            // claiming "stock restored" for it was wrong.
+            const stockRestored = orderHoldsStock(existing);
+            if (stockRestored) {
                await restoreStockForItems(
                   tx,
                   existing.items
@@ -1344,7 +1360,9 @@ export async function DELETE(
                entityType: "ORDER",
                entityId: existing.id,
                entityCustomId: existing.orderId || existing.customId,
-               summary: `Order ${existing.orderId || existing.customId} moved to bin — stock restored`,
+               summary: stockRestored
+                  ? `Order ${existing.orderId || existing.customId} moved to bin — stock restored`
+                  : `Order ${existing.orderId || existing.customId} moved to bin — no stock restored (order was cancelled)`,
                ...requestAuditContext(request),
             });
 

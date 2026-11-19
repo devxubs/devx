@@ -52,8 +52,13 @@ export async function POST(request: NextRequest) {
    try {
       const body = await request.json();
       const action = body.action;
+      // Follow-up round: duplicate IDs are dropped up front — the
+      // same order listed twice would otherwise be processed twice
+      // and write duplicate audit rows (and a duplicate result).
       const orderIds: string[] = Array.isArray(body.orderIds)
-         ? body.orderIds.map((v: any) => String(v)).filter(Boolean)
+         ? Array.from(
+              new Set(body.orderIds.map((v: any) => String(v)).filter(Boolean)),
+           )
          : [];
 
       if (action !== "status" && action !== "courier") {
@@ -267,6 +272,30 @@ export async function POST(request: NextRequest) {
                });
 
                // Phase 4 (D1): audit in the same transaction.
+               // Follow-up round: the diff records only the courier
+               // fields this flow actually changed — previously it
+               // always claimed `courier` changed (a phantom entry
+               // when the same courier was re-assigned) and never
+               // recorded courierStatus.
+               const courierChanges: Record<
+                  string,
+                  { from: string | null; to: string | null }
+               > = {};
+               if ((order.courier || null) !== courierName) {
+                  courierChanges.courier = {
+                     from: order.courier || null,
+                     to: courierName,
+                  };
+               }
+               if (
+                  courierStatus !== undefined &&
+                  (order.courierStatus || null) !== courierStatus
+               ) {
+                  courierChanges.courierStatus = {
+                     from: order.courierStatus || null,
+                     to: courierStatus,
+                  };
+               }
                await logAudit(tx, {
                   actor: auditActorRef,
                   action: "UPDATE",
@@ -274,9 +303,10 @@ export async function POST(request: NextRequest) {
                   entityId: order.id,
                   entityCustomId: displayId,
                   summary: `Order ${displayId} courier set to ${courierName} (bulk)`,
-                  changes: {
-                     courier: { from: order.courier || null, to: courierName },
-                  },
+                  changes:
+                     Object.keys(courierChanges).length > 0
+                        ? courierChanges
+                        : null,
                   ...auditCtx,
                });
                return { ok: true, displayId };

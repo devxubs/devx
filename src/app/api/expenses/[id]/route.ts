@@ -57,17 +57,22 @@ export async function PUT(
          });
 
          // Phase 4 (D1): audit in the same transaction.
+         // Follow-up round: a no-op PUT (empty computed diff)
+         // writes no UPDATE audit row.
          if (before) {
-            await logAudit(tx, {
-               actor: auditActorFromContext(gate),
-               action: "UPDATE",
-               entityType: "EXPENSE",
-               entityId: updated.id,
-               entityCustomId: updated.customId,
-               summary: `Expense ${updated.customId || updated.id} updated`,
-               changes: buildChanges(before, updated, ["type", "amount", "note"]),
-               ...auditCtx,
-            });
+            const changes = buildChanges(before, updated, ["type", "amount", "note"]);
+            if (changes) {
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "UPDATE",
+                  entityType: "EXPENSE",
+                  entityId: updated.id,
+                  entityCustomId: updated.customId,
+                  summary: `Expense ${updated.customId || updated.id} updated`,
+                  changes,
+                  ...auditCtx,
+               });
+            }
          }
 
          return updated;

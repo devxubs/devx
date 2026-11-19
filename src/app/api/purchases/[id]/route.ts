@@ -350,23 +350,28 @@ export async function PUT(
          });
 
          // Phase 4 (D1): audit in the same transaction.
-         await logAudit(tx, {
-            actor: auditActorFromContext(gate),
-            action: "UPDATE",
-            entityType: "PURCHASE",
-            entityId: fresh.id,
-            entityCustomId: fresh.customId,
-            summary: `Purchase ${fresh.customId || fresh.id} updated — total ৳${total.toFixed(2)}, due ৳${due.toFixed(2)}`,
-            changes: buildChanges(fresh, result, [
-               "total",
-               "due",
-               "paid",
-               "productAmount",
-               "othersCost",
-               "discount",
-            ]),
-            ...auditCtx,
-         });
+         // Follow-up round: a no-op PUT (empty computed diff)
+         // writes no UPDATE audit row.
+         const purchaseChanges = buildChanges(fresh, result, [
+            "total",
+            "due",
+            "paid",
+            "productAmount",
+            "othersCost",
+            "discount",
+         ]);
+         if (purchaseChanges) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "UPDATE",
+               entityType: "PURCHASE",
+               entityId: fresh.id,
+               entityCustomId: fresh.customId,
+               summary: `Purchase ${fresh.customId || fresh.id} updated — total ৳${total.toFixed(2)}, due ৳${due.toFixed(2)}`,
+               changes: purchaseChanges,
+               ...auditCtx,
+            });
+         }
 
          return result;
       });

@@ -465,13 +465,48 @@ export async function POST(request: NextRequest) {
       // 6. EXPENSE HANDLING
       if (type === "expense") {
          if (action === "restore") {
-            await prisma.expense.update({
-               where: { id },
-               data: { isDeleted: false, deletedAt: null },
+            // Follow-up round: audited in the same transaction,
+            // mirroring the product/order/purchase bin pattern
+            // (expense bin ops were the remaining unaudited pair).
+            await prisma.$transaction(async (tx) => {
+               const expense = await tx.expense.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, type: true },
+               });
+               if (!expense) throw new Error("Expense not found");
+               await tx.expense.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "EXPENSE",
+                  entityId: expense.id,
+                  entityCustomId: expense.customId,
+                  summary: `Expense ${expense.customId || expense.type} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Expense restored successfully" });
          } else if (action === "delete") {
-            await prisma.expense.delete({ where: { id } });
+            await prisma.$transaction(async (tx) => {
+               const expense = await tx.expense.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, type: true },
+               });
+               if (!expense) throw new Error("Expense not found");
+               await tx.expense.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "EXPENSE",
+                  entityId: expense.id,
+                  entityCustomId: expense.customId,
+                  summary: `Expense ${expense.customId || expense.type} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Expense permanently deleted" });
          }
       }
