@@ -30,6 +30,11 @@ const Products = () => {
    } | null>(null);
    const [detailProductId, setDetailProductId] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+   // The API paginates lowStockRows (follow-up round); the monitor
+   // below renders the complete low-stock set, so it is assembled
+   // through the shared chunked loader (bounded pages) and falls
+   // back to the main response's first page until it arrives.
+   const [allLowStockRows, setAllLowStockRows] = useState<any[] | null>(null);
 
    useEffect(() => {
       setLoading(true);
@@ -69,6 +74,20 @@ const Products = () => {
          .catch(() => {});
    }, [dateRange]);
 
+   useEffect(() => {
+      let cancelled = false;
+      fetchAllReportRows(reportParams("products", dateRange), (d) => d.lowStockRows || [])
+         .then((all) => {
+            if (!cancelled) setAllLowStockRows(all);
+         })
+         .catch(() => {
+            if (!cancelled) setAllLowStockRows(null);
+         });
+      return () => {
+         cancelled = true;
+      };
+   }, [dateRange]);
+
    const hasRange = Boolean(dateRange[0] || dateRange[1]);
 
    const lowStockColumns = [
@@ -106,7 +125,7 @@ const Products = () => {
       },
    ];
 
-   const lowStockRows = report?.lowStockRows || [];
+   const lowStockRows = allLowStockRows ?? report?.lowStockRows ?? [];
    const totalInStock = report?.totalInStock || 0;
    const outOfStockCount = report?.outOfStockCount || 0;
    const lowStockCount = report?.lowStockCount || lowStockRows.length;

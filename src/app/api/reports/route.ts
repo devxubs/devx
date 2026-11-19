@@ -65,7 +65,44 @@ export async function GET(request: NextRequest) {
             lte: trendEnd,
          };
 
-         const [orders, totalOrders, totalRevenueAgg, completedCount, returnedCount, trendOrders] = await Promise.all([
+         // The labelled days are the same window the trend queries
+         // below use: the 7 days ending at trendEnd.
+         const trendDays = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(trendEnd);
+            d.setDate(d.getDate() - (6 - i));
+            return d.toISOString().split("T")[0];
+         });
+
+         // Follow-up round: the trend is computed with one DB
+         // aggregate per day bucket instead of loading every order
+         // in the window and bucketing in JS (the pattern the
+         // Dashboard fix already uses). Bucket boundaries are UTC
+         // days, matching the previous `toISOString().startsWith(day)`
+         // bucketing exactly, and each bucket is intersected with
+         // the trend window so a selected past range still clips
+         // the first/last day the same way.
+         const trendPromise = Promise.all(
+            trendDays.map(async (day) => {
+               const dayStart = new Date(`${day}T00:00:00.000Z`);
+               const dayEnd = new Date(`${day}T23:59:59.999Z`);
+               const gte =
+                  trendWhere.createdAt.gte > dayStart
+                     ? trendWhere.createdAt.gte
+                     : dayStart;
+               const lte =
+                  trendWhere.createdAt.lte < dayEnd
+                     ? trendWhere.createdAt.lte
+                     : dayEnd;
+               if (gte > lte) return 0;
+               const agg = await prisma.order.aggregate({
+                  where: { ...trendWhere, createdAt: { gte, lte } },
+                  _sum: { total: true },
+               });
+               return Number(agg._sum.total || 0);
+            }),
+         );
+
+         const [orders, totalOrders, totalRevenueAgg, completedCount, returnedCount, trendData] = await Promise.all([
             prisma.order.findMany({
                where: whereOrder,
                include: { customer: true, items: true },
@@ -84,27 +121,10 @@ export async function GET(request: NextRequest) {
             prisma.order.count({
                where: { ...whereOrder, status: { in: ["CANCELLED", "FAILED"] } },
             }),
-            prisma.order.findMany({
-               where: trendWhere,
-               select: { total: true, createdAt: true },
-            }),
+            trendPromise,
          ]);
 
          const totalRevenue = Number(totalRevenueAgg._sum.total || 0);
-
-         // Generate 7-day revenue trend from the full trend population.
-         // The labelled days are the same window the query above used:
-         // the 7 days ending at trendEnd.
-         const trendDays = Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(trendEnd);
-            d.setDate(d.getDate() - (6 - i));
-            return d.toISOString().split("T")[0];
-         });
-         const trendData = trendDays.map((day) => {
-            const dayOrders = trendOrders.filter((o) => o.createdAt.toISOString().startsWith(day));
-            const sum = dayOrders.reduce((acc, o) => acc + Number(o.total || 0), 0);
-            return sum;
-         });
 
          return NextResponse.json({
             totalOrders,
@@ -134,7 +154,27 @@ export async function GET(request: NextRequest) {
          const whereOrder: any = { isDeleted: false };
          if (hasDate) whereOrder.createdAt = dateFilter;
 
-         const [orders, sourceDistribution, statsOrders] = await Promise.all([
+         const DISPATCHED_STATUSES = ["SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"];
+
+         // Phase 3B (3.4) definitions, unchanged — but computed with
+         // database groupBy aggregates over the COMPLETE filtered
+         // dataset (follow-up round; previously every matching order
+         // row was loaded and bucketed in JS):
+         //  - dispatched: handed to the courier — courierSubmittedAt
+         //    is set, or the order has reached a post-dispatch
+         //    status (SHIPPED / OUT_FOR_DELIVERY / DELIVERED /
+         //    COMPLETED);
+         //  - delivered: status DELIVERED or COMPLETED;
+         //  - returned: courierStatus "Returned", or a CANCELLED
+         //    order that had already been dispatched (for a CANCELLED
+         //    order "dispatched" reduces to courierSubmittedAt set,
+         //    and the two returned branches are made disjoint so no
+         //    order is counted twice);
+         //  - COD collected: order totals of delivered orders (the
+         //    amount the courier collects on delivery);
+         //  - COD pending: outstanding dueAmount of orders still
+         //    in flight (not delivered/cancelled/failed).
+         const [orders, sourceDistribution, totalsG, dispatchedG, deliveredG, returnedAG, returnedBG, codPendingG] = await Promise.all([
             prisma.order.findMany({
                where: whereOrder,
                select: {
@@ -159,38 +199,57 @@ export async function GET(request: NextRequest) {
                where: whereOrder,
                _count: { id: true },
             }),
-            // Phase 3B (3.4): per-courier performance aggregates over
-            // the COMPLETE filtered dataset (light select, same
-            // pattern as the sales trend query). Definitions:
-            //  - dispatched: handed to the courier — courierSubmittedAt
-            //    is set, or the order has reached a post-dispatch
-            //    status (SHIPPED / OUT_FOR_DELIVERY / DELIVERED /
-            //    COMPLETED);
-            //  - delivered: status DELIVERED or COMPLETED;
-            //  - returned: courierStatus "Returned", or a CANCELLED
-            //    order that had already been dispatched;
-            //  - COD collected: order totals of delivered orders (the
-            //    amount the courier collects on delivery);
-            //  - COD pending: outstanding dueAmount of orders still
-            //    in flight (not delivered/cancelled/failed).
-            prisma.order.findMany({
+            prisma.order.groupBy({
+               by: ["courier"],
                where: whereOrder,
-               select: {
-                  courier: true,
-                  courierStatus: true,
-                  status: true,
-                  courierSubmittedAt: true,
-                  total: true,
-                  dueAmount: true,
-                  courierCharge: true,
+               _count: { id: true },
+               _sum: { courierCharge: true },
+            }),
+            prisma.order.groupBy({
+               by: ["courier"],
+               where: {
+                  ...whereOrder,
+                  OR: [
+                     { courierSubmittedAt: { not: null } },
+                     { status: { in: DISPATCHED_STATUSES } },
+                  ],
                },
+               _count: { id: true },
+            }),
+            prisma.order.groupBy({
+               by: ["courier"],
+               where: { ...whereOrder, status: { in: ["DELIVERED", "COMPLETED"] } },
+               _count: { id: true },
+               _sum: { total: true },
+            }),
+            prisma.order.groupBy({
+               by: ["courier"],
+               where: { ...whereOrder, courierStatus: "Returned" },
+               _count: { id: true },
+            }),
+            prisma.order.groupBy({
+               by: ["courier"],
+               where: {
+                  ...whereOrder,
+                  status: "CANCELLED",
+                  courierSubmittedAt: { not: null },
+                  OR: [{ courierStatus: null }, { courierStatus: { not: "Returned" } }],
+               },
+               _count: { id: true },
+            }),
+            prisma.order.groupBy({
+               by: ["courier"],
+               where: {
+                  ...whereOrder,
+                  status: { notIn: ["DELIVERED", "COMPLETED", "CANCELLED", "FAILED"] },
+               },
+               _sum: { dueAmount: true },
             }),
          ]);
 
-         const DISPATCHED_STATUSES = ["SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"];
          const statsMap = new Map<string, any>();
-         for (const o of statsOrders) {
-            const key = o.courier || "Unassigned";
+         const statsFor = (courierRaw: string | null) => {
+            const key = courierRaw || "Unassigned";
             if (!statsMap.has(key)) {
                statsMap.set(key, {
                   courier: key,
@@ -203,30 +262,29 @@ export async function GET(request: NextRequest) {
                   courierCharges: 0,
                });
             }
-            const s = statsMap.get(key);
-            const dispatched =
-               Boolean(o.courierSubmittedAt) || DISPATCHED_STATUSES.includes(o.status);
-            const delivered = o.status === "DELIVERED" || o.status === "COMPLETED";
-            s.orders += 1;
-            if (dispatched) s.dispatched += 1;
-            if (delivered) {
-               s.delivered += 1;
-               s.codCollected += Number(o.total || 0);
-            }
-            if (
-               o.courierStatus === "Returned" ||
-               (o.status === "CANCELLED" && dispatched)
-            ) {
-               s.returned += 1;
-            }
-            if (
-               !delivered &&
-               o.status !== "CANCELLED" &&
-               o.status !== "FAILED"
-            ) {
-               s.codPending += Number(o.dueAmount || 0);
-            }
-            s.courierCharges += Number(o.courierCharge || 0);
+            return statsMap.get(key);
+         };
+         for (const g of totalsG as any[]) {
+            const s = statsFor(g.courier);
+            s.orders += Number(g._count?.id || 0);
+            s.courierCharges += Number(g._sum?.courierCharge || 0);
+         }
+         for (const g of dispatchedG as any[]) {
+            statsFor(g.courier).dispatched += Number(g._count?.id || 0);
+         }
+         for (const g of deliveredG as any[]) {
+            const s = statsFor(g.courier);
+            s.delivered += Number(g._count?.id || 0);
+            s.codCollected += Number(g._sum?.total || 0);
+         }
+         for (const g of returnedAG as any[]) {
+            statsFor(g.courier).returned += Number(g._count?.id || 0);
+         }
+         for (const g of returnedBG as any[]) {
+            statsFor(g.courier).returned += Number(g._count?.id || 0);
+         }
+         for (const g of codPendingG as any[]) {
+            statsFor(g.courier).codPending += Number(g._sum?.dueAmount || 0);
          }
          const courierStats = Array.from(statsMap.values())
             .map((s) => ({
@@ -539,14 +597,25 @@ export async function GET(request: NextRequest) {
             rank: `Top ${i + 1}`,
          }));
 
+         // Follow-up round: the ranked list is paginated like every
+         // other tab's rows (ranking is computed over the complete
+         // set BEFORE slicing, so rank labels stay global). The
+         // previous response embedded the full employee set in every
+         // paged response, which made the chunked export loader
+         // re-download and re-append the whole set per page. The
+         // Employees page assembles the full set for display through
+         // that same loader.
          return NextResponse.json({
-            rows: rankedRows,
+            rows: rankedRows.slice(skip, skip + limit),
+            page,
+            limit,
+            total: rankedRows.length,
          });
       }
 
       // 6. PRODUCTS REPORT
       if (tab === "products") {
-         const [allProducts, allStockLevels, topSold, stockAgg, outOfStockAll] = await Promise.all([
+         const [allProducts, lowStockPageRows, lowStockTotalRows, topSold, stockAgg, outOfStockAll] = await Promise.all([
             prisma.product.findMany({
                where: { isDeleted: false },
                select: { id: true, customId: true, productName: true, quantity: true, regularPrice: true, lowStockAlert: true },
@@ -557,19 +626,30 @@ export async function GET(request: NextRequest) {
             // THE low-stock definition — the same rule the Dashboard,
             // the Stock workspace and the Product list use:
             // quantity <= the product's OWN lowStockAlert threshold
-            // (schema default 10). Prisma cannot compare two columns
-            // in a where clause, so the light stock-level list is
-            // filtered in JS (the Dashboard route uses the same
-            // pattern). The previous implementation hard-coded
-            // quantity <= 10 — which disagreed with every other screen
-            // for any product whose threshold was not 10 — and capped
-            // the row list at take: 50; the list and the count below
-            // now come from this one filtered set, with no row cap.
-            prisma.product.findMany({
-               where: { isDeleted: false },
-               select: { id: true, customId: true, productName: true, quantity: true, lowStockAlert: true },
-               orderBy: { quantity: "asc" },
-            }),
+            // (schema default 10), with a stored 0 treated as the
+            // default exactly like the JS `lowStockAlert || 10`
+            // fallback used elsewhere. Follow-up round: the filter
+            // now runs in the DATABASE and the list is paginated —
+            // Prisma cannot compare two columns in a where clause,
+            // so the comparison is expressed as raw SQL (the count
+            // uses the identical predicate). Previously the whole
+            // catalogue's stock levels were loaded and filtered in
+            // JS, and the full low-stock set was embedded in every
+            // paged response.
+            prisma.$queryRaw<any[]>`
+               SELECT id, customId, productName, quantity, lowStockAlert
+               FROM Product
+               WHERE isDeleted = 0
+                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), 10)
+               ORDER BY quantity ASC
+               LIMIT ${limit} OFFSET ${skip}
+            `,
+            prisma.$queryRaw<any[]>`
+               SELECT COUNT(*) AS total
+               FROM Product
+               WHERE isDeleted = 0
+                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), 10)
+            `,
             prisma.orderItem.groupBy({
                by: ["name"],
                // Top sellers are order-derived, so they honour the
@@ -596,18 +676,19 @@ export async function GET(request: NextRequest) {
             }),
          ]);
 
-         const lowStockList = allStockLevels.filter(
-            (p) => p.quantity <= (p.lowStockAlert || 10),
-         );
+         const lowStockList = lowStockPageRows || [];
+         // MySQL COUNT(*) comes back as BigInt via the raw query.
+         const lowStockCount = Number(lowStockTotalRows?.[0]?.total ?? 0);
 
          const totalInStock = Number(stockAgg._sum.quantity || 0);
          const outOfStockCount = outOfStockAll;
-         const lowStockCount = lowStockList.length;
 
          return NextResponse.json({
             totalInStock,
             outOfStockCount,
             lowStockCount,
+            page,
+            limit,
             lowStockRows: lowStockList.map((p) => ({
                id: p.customId || p.id,
                name: p.productName,
@@ -835,7 +916,7 @@ export async function GET(request: NextRequest) {
             expenseAgg,
             expensesByType,
             purchaseAgg,
-            soldItems,
+            soldItemGroups,
             receivableGroups,
             paymentMethodGroups,
          ] = await Promise.all([
@@ -858,18 +939,20 @@ export async function GET(request: NextRequest) {
                _sum: { total: true },
             }),
             // Estimated COGS inputs: items on revenue orders in the
-            // period, with their product's current cost price.
-            prisma.orderItem.findMany({
+            // period, aggregated per product in the database
+            // (follow-up round — previously every sold item row was
+            // loaded). The cost price is looked up once per distinct
+            // product below; the per-row math is unchanged.
+            prisma.orderItem.groupBy({
+               by: ["productId"],
                where: {
                   order: {
                      ...whereOrderPeriod,
                      status: { in: ["COMPLETED", "DELIVERED"] },
                   },
                },
-               select: {
-                  quantity: true,
-                  product: { select: { costPrice: true } },
-               },
+               _sum: { quantity: true },
+               _count: { id: true },
             }),
             // Receivables are a CURRENT-state figure (all outstanding
             // dues, not just this period's), grouped per customer.
@@ -899,15 +982,32 @@ export async function GET(request: NextRequest) {
 
          // Estimated COGS at CURRENT cost prices. Items whose product
          // is gone or has no cost price recorded cannot be costed —
-         // they are excluded and counted so the UI can say so.
+         // they are excluded and counted so the UI can say so. The
+         // groupBy above preserves the exact figures: quantity sums
+         // per product × that product's cost, and the excluded count
+         // is the number of item ROWS in the uncostable groups.
+         const soldProductIds = soldItemGroups
+            .map((g) => g.productId)
+            .filter((id): id is string => Boolean(id));
+         const soldProducts = soldProductIds.length
+            ? await prisma.product.findMany({
+                 where: { id: { in: soldProductIds } },
+                 select: { id: true, costPrice: true },
+              })
+            : [];
+         const costByProductId = new Map(
+            soldProducts.map((p) => [p.id, p.costPrice]),
+         );
          let estimatedCogs = 0;
          let cogsExcludedItems = 0;
-         for (const item of soldItems) {
-            const cost = item.product?.costPrice;
+         for (const group of soldItemGroups as any[]) {
+            const cost = group.productId
+               ? costByProductId.get(group.productId)
+               : undefined;
             if (cost === null || cost === undefined) {
-               cogsExcludedItems += 1;
+               cogsExcludedItems += Number(group._count?.id || 0);
             } else {
-               estimatedCogs += item.quantity * Number(cost);
+               estimatedCogs += Number(group._sum?.quantity || 0) * Number(cost);
             }
          }
 
@@ -915,30 +1015,34 @@ export async function GET(request: NextRequest) {
          const receivableCustomerIds = receivableGroups
             .map((g) => g.customerId)
             .filter((id): id is string => Boolean(id));
-         const [receivableCustomers, oldestDueOrders] = await Promise.all([
+         const [receivableCustomers, oldestDueGroups] = await Promise.all([
             receivableCustomerIds.length
                ? prisma.customer.findMany({
                     where: { id: { in: receivableCustomerIds } },
                     select: { id: true, customId: true, name: true, phone: true },
                  })
                : Promise.resolve([]),
+            // Oldest open order per customer via a database _min
+            // aggregate (follow-up round — previously every open
+            // order for these customers was loaded just to find the
+            // earliest date per customer).
             receivableCustomerIds.length
-               ? prisma.order.findMany({
+               ? prisma.order.groupBy({
+                    by: ["customerId"],
                     where: {
                        isDeleted: false,
                        dueAmount: { gt: 0 },
                        customerId: { in: receivableCustomerIds },
                     },
-                    select: { customerId: true, createdAt: true },
-                    orderBy: { createdAt: "asc" },
+                    _min: { createdAt: true },
                  })
                : Promise.resolve([]),
          ]);
          const customerById = new Map(receivableCustomers.map((c) => [c.id, c]));
          const oldestByCustomer = new Map<string, Date>();
-         for (const o of oldestDueOrders) {
-            if (o.customerId && !oldestByCustomer.has(o.customerId)) {
-               oldestByCustomer.set(o.customerId, o.createdAt);
+         for (const g of oldestDueGroups as any[]) {
+            if (g.customerId && g._min?.createdAt) {
+               oldestByCustomer.set(g.customerId, new Date(g._min.createdAt));
             }
          }
          const receivables = receivableGroups.map((g) => {
@@ -1004,30 +1108,35 @@ export async function GET(request: NextRequest) {
                ...returnGroups.map((g) => g.supplierId).filter(Boolean),
             ]),
          ) as string[];
-         const [payableSuppliers, oldestDuePurchases] = await Promise.all([
+         const [payableSuppliers, oldestDuePurchaseGroups] = await Promise.all([
             payableSupplierIds.length
                ? prisma.supplier.findMany({
                     where: { id: { in: payableSupplierIds } },
                     select: { id: true, customId: true, name: true, phone: true },
                  })
                : Promise.resolve([]),
+            // Oldest open purchase per supplier via a database _min
+            // aggregate (same follow-up conversion as receivables).
             payableSupplierIds.length
-               ? prisma.purchase.findMany({
+               ? prisma.purchase.groupBy({
+                    by: ["supplierId"],
                     where: {
                        isDeleted: false,
                        due: { gt: 0 },
                        supplierId: { in: payableSupplierIds },
                     },
-                    select: { supplierId: true, createdAt: true },
-                    orderBy: { createdAt: "asc" },
+                    _min: { createdAt: true },
                  })
                : Promise.resolve([]),
          ]);
          const supplierById = new Map(payableSuppliers.map((s) => [s.id, s]));
          const oldestPurchaseBySupplier = new Map<string, Date>();
-         for (const p of oldestDuePurchases) {
-            if (p.supplierId && !oldestPurchaseBySupplier.has(p.supplierId)) {
-               oldestPurchaseBySupplier.set(p.supplierId, p.createdAt);
+         for (const g of oldestDuePurchaseGroups as any[]) {
+            if (g.supplierId && g._min?.createdAt) {
+               oldestPurchaseBySupplier.set(
+                  g.supplierId,
+                  new Date(g._min.createdAt),
+               );
             }
          }
          const dueBySupplier = new Map(

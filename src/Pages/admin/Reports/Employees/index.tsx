@@ -22,19 +22,28 @@ const Employees = () => {
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
    useEffect(() => {
+      let cancelled = false;
       setLoading(true);
-      fetch(`/api/reports?${reportParams("employees", dateRange).toString()}`)
-         .then((r) => {
-            if (!r.ok) throw new Error("Failed to load employees report");
-            return r.json();
+      // The API now paginates the ranked rows (follow-up round), so
+      // the full set this page renders — and totals from it — is
+      // assembled through the shared chunked loader, the same one
+      // the export below uses. A failed page throws and lands in
+      // the error Alert instead of silently truncating the list.
+      fetchAllReportRows(reportParams("employees", dateRange), (d) => d.rows || [])
+         .then((rows) => {
+            if (!cancelled) setReport({ rows });
          })
-         .then((d) => {
-            if (d) setReport(d);
+         .catch(() => {
+            if (!cancelled) {
+               setError("Failed to load the employees report. The figures below may be out of date.");
+            }
          })
-         .catch(() =>
-            setError("Failed to load the employees report. The figures below may be out of date."),
-         )
-         .finally(() => setLoading(false));
+         .finally(() => {
+            if (!cancelled) setLoading(false);
+         });
+      return () => {
+         cancelled = true;
+      };
    }, [dateRange]);
 
    const hasRange = Boolean(dateRange[0] || dateRange[1]);
