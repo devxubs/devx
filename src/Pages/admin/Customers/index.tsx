@@ -20,7 +20,9 @@ import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { useSettings } from "@src/lib/settingsContext";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import AlertDialog from "@src/components/AlertDialog";
+import Icon from "@src/components/Icon";
 import CustomerTable from "./components/CustomerTable";
+import CustomerFormModal from "./components/CustomerFormModal";
 import CustomerFilterModal from "./components/CustomerFilterModal";
 import {
    buildCustomerFilterChips,
@@ -55,6 +57,19 @@ const Customers = () => {
       useState<CustomerRow | null>(null);
    const [snack, setSnack] = useState<SnackState>(null);
    const [exporting, setExporting] = useState(false);
+   // Phase 2 (§2.2): Add / Edit customer — the page previously offered
+   // only view + delete. `formCustomer` undefined = closed, null = add
+   // mode, a row = edit mode.
+   const [formCustomer, setFormCustomer] = useState<
+      CustomerRow | null | undefined
+   >(undefined);
+
+   // Phase 2 (2.3): global-search deep link — /admin/customers?customer=<id>
+   // opens that customer's detail directly.
+   useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("customer");
+      if (id) setSelectedCustomerId(id);
+   }, []);
 
    const [filterModalOpen, setFilterModalOpen] = useState(false);
    const [showFilterErrors, setShowFilterErrors] = useState(false);
@@ -290,6 +305,19 @@ const Customers = () => {
          spacing={2}
          sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
       >
+         {/* Header — Add Customer (Phase 2, §2.2) */}
+         <Stack direction="row" justifyContent="flex-end">
+            <Button
+               variant="contained"
+               color="primary"
+               startIcon={<Icon icon="mingcute:add-line" />}
+               onClick={() => setFormCustomer(null)}
+               sx={{ textTransform: "none", fontWeight: 600 }}
+            >
+               Add Customer
+            </Button>
+         </Stack>
+
          {/* Empty-result guidance */}
          {loadedOnce && !loading && rows.length === 0 && (
             <Stack
@@ -334,6 +362,7 @@ const Customers = () => {
             formatCurrency={formatCurrency}
             onOpenFilter={handleOpenFilter}
             onOpenDetails={openDetails}
+            onEditCustomer={(row) => setFormCustomer(row)}
             // Phase 1 (1.5): Delete asks for confirmation first (the
             // standard AlertDialog, Categories pattern) instead of
             // deleting immediately — see the dialog below.
@@ -360,6 +389,18 @@ const Customers = () => {
             open={Boolean(selectedCustomerId)}
             onClose={() => setSelectedCustomerId(null)}
             customerId={selectedCustomerId}
+         />
+
+         {/* Add / Edit Customer (Phase 2, §2.2) — after a save the list
+             reloads from the API so the analytics columns stay exact. */}
+         <CustomerFormModal
+            open={formCustomer !== undefined}
+            customer={formCustomer ?? null}
+            onClose={() => setFormCustomer(undefined)}
+            onSaved={(message) => {
+               setSnack({ severity: "success", message });
+               loadCustomers();
+            }}
          />
 
          {/* Delete confirmation (Phase 1, 1.5) */}

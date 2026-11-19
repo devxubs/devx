@@ -765,9 +765,123 @@ export const SupplierDetailModal = ({
                      </Grid>
                   </Grid>
                   <Divider />
-                  <Typography variant="subtitle2" fontWeight={600}>
-                     Associated Purchases ({supplier.purchases?.length || 0})
-                  </Typography>
+                  {/* Phase 2 (§2.5): accurate payable summary computed
+                      from the supplier's actual purchases, plus the
+                      purchase history itself. A standalone payment
+                      ledger does not exist yet (Phase 3, schema-gated)
+                      — payments are tracked per purchase, and this
+                      section says so instead of inventing a history. */}
+                  {(() => {
+                     const purchases = supplier.purchases || [];
+                     const totalPurchased = purchases.reduce(
+                        (sum: number, p: any) => sum + Number(p.total || 0),
+                        0,
+                     );
+                     const totalPaid = purchases.reduce(
+                        (sum: number, p: any) => sum + Number(p.paid || 0),
+                        0,
+                     );
+                     const totalDue = purchases.reduce(
+                        (sum: number, p: any) => sum + Number(p.due || 0),
+                        0,
+                     );
+                     return (
+                        <>
+                           <Grid container spacing={2}>
+                              <Grid size={{ xs: 4 }}>
+                                 <Typography variant="caption" color="text.secondary">
+                                    Total Purchased
+                                 </Typography>
+                                 <Typography variant="body2" fontWeight={700}>
+                                    {formatCurrency(totalPurchased)}
+                                 </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 4 }}>
+                                 <Typography variant="caption" color="text.secondary">
+                                    Total Paid
+                                 </Typography>
+                                 <Typography variant="body2" fontWeight={700}>
+                                    {formatCurrency(totalPaid)}
+                                 </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 4 }}>
+                                 <Typography variant="caption" color="text.secondary">
+                                    Outstanding Payable
+                                 </Typography>
+                                 <Typography
+                                    variant="body2"
+                                    fontWeight={700}
+                                    color={totalDue > 0 ? "error.main" : "text.primary"}
+                                 >
+                                    {formatCurrency(totalDue)}
+                                 </Typography>
+                              </Grid>
+                           </Grid>
+                           <Typography variant="subtitle2" fontWeight={600}>
+                              Purchase History ({purchases.length})
+                           </Typography>
+                           {purchases.length === 0 ? (
+                              <Typography variant="body2" color="text.secondary">
+                                 No purchases recorded for this supplier yet.
+                              </Typography>
+                           ) : (
+                              <Stack spacing={1}>
+                                 {purchases.slice(0, 10).map((p: any) => (
+                                    <Stack
+                                       key={p.id}
+                                       direction="row"
+                                       justifyContent="space-between"
+                                       alignItems="center"
+                                       sx={{
+                                          border: 1,
+                                          borderColor: "divider",
+                                          borderRadius: 1,
+                                          px: 1.5,
+                                          py: 1,
+                                       }}
+                                    >
+                                       <Box>
+                                          <Typography variant="body2" fontWeight={600}>
+                                             {p.customId || p.id}
+                                             {p.invoice ? ` · Inv: ${p.invoice}` : ""}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                             {p.createdAt
+                                                ? new Date(p.createdAt).toLocaleDateString()
+                                                : ""}
+                                          </Typography>
+                                       </Box>
+                                       <Box sx={{ textAlign: "right" }}>
+                                          <Typography variant="body2" fontWeight={600}>
+                                             {formatCurrency(Number(p.total || 0))}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                             Paid {formatCurrency(Number(p.paid || 0))} · Due{" "}
+                                             {formatCurrency(Number(p.due || 0))}
+                                          </Typography>
+                                       </Box>
+                                    </Stack>
+                                 ))}
+                                 {purchases.length > 10 && (
+                                    <Typography variant="caption" color="text.secondary">
+                                       Showing the 10 most recent purchases.
+                                    </Typography>
+                                 )}
+                              </Stack>
+                           )}
+                           <Divider />
+                           <Typography variant="subtitle2" fontWeight={600}>
+                              Payment Ledger
+                           </Typography>
+                           <Typography variant="body2" color="text.secondary">
+                              Standalone supplier payments are not recorded
+                              yet — payments are tracked per purchase (Paid /
+                              Due above). A dedicated payment ledger is
+                              planned for a later phase.
+                           </Typography>
+                        </>
+                     );
+                  })()}
                </Stack>
             ) : (
                <Typography variant="body2" color="text.secondary">

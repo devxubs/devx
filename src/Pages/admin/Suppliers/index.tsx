@@ -2,18 +2,21 @@
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
+   Alert,
    Button,
    Stack,
    useTheme,
    Grid,
    TextField,
    Typography,
+   Snackbar,
 } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
+import { useSettings } from "@src/lib/settingsContext";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -25,12 +28,14 @@ type SuppliersTypes = {
    email: string;
    number: string; // 11 digit BD phone number
    address: string;
+   // Phase 2 (§2.5): real aggregates from GET /api/suppliers `totals`
+   // (summed over the supplier's non-deleted purchases). The previous
+   // advance / pay_return / due_return fields had no data source
+   // anywhere in the system and were displayed as constant zeros.
+   purchases?: number;
    total?: number;
    pay?: number;
    due?: number;
-   advance?: number;
-   pay_return?: number;
-   due_return?: number;
 };
 export const suppliersData: SuppliersTypes[] = [];
 
@@ -81,7 +86,16 @@ export const SuppliersProfile = ({ name, number }: SuppliersProfileProps) => {
 
 const Suppliers = () => {
    const theme = useTheme();
+   const { formatCurrency } = useSettings();
    const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
+   const [loadError, setLoadError] = useState(false);
+   const [snack, setSnack] = useState<string | null>(null);
+
+   // Phase 2 (2.3): global-search deep link — /admin/suppliers?supplier=<id>
+   React.useEffect(() => {
+      const id = new URLSearchParams(window.location.search).get("supplier");
+      if (id) setDetailSupplierId(id);
+   }, []);
 
    const columns: ColumnConfig[] = [
       {
@@ -122,28 +136,31 @@ const Suppliers = () => {
          flex: 1,
       },
       {
+         field: "purchases",
+         headerName: "Purchases",
+         width: 110,
+      },
+      {
          field: "total",
-         headerName: "Total",
+         headerName: "Total Purchased",
+         renderCell: (params) => formatCurrency(Number(params.row.total || 0)),
       },
       {
          field: "pay",
-         headerName: "Pay",
+         headerName: "Paid",
+         renderCell: (params) => formatCurrency(Number(params.row.pay || 0)),
       },
       {
          field: "due",
-         headerName: "Due",
-      },
-      {
-         field: "advance",
-         headerName: "Advance",
-      },
-      {
-         field: "pay_return",
-         headerName: "Pay Return",
-      },
-      {
-         field: "due_return",
-         headerName: "Due Return",
+         headerName: "Payable (Due)",
+         renderCell: (params) =>
+            Number(params.row.due || 0) > 0 ? (
+               <Typography variant="body2" fontWeight={700} color="error.main">
+                  {formatCurrency(Number(params.row.due))}
+               </Typography>
+            ) : (
+               formatCurrency(0)
+            ),
       },
       {
          field: "@actions",
@@ -167,17 +184,18 @@ const Suppliers = () => {
                email: s.email || "-",
                number: s.phone || "-",
                address: s.address || "-",
-               total: 0,
-               pay: 0,
-               due: 0,
-               advance: 0,
-               pay_return: 0,
-               due_return: 0,
+               purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
+               total: Number(s.totals?.total || 0),
+               pay: Number(s.totals?.paid || 0),
+               due: Number(s.totals?.due || 0),
             }));
             setSuppliers(mapped);
+            setLoadError(false);
+         } else {
+            setLoadError(true);
          }
       } catch {
-         // fallback
+         setLoadError(true);
       } finally {
          setLoading(false);
       }
@@ -213,9 +231,10 @@ const Suppliers = () => {
 
    const onSubmit: SubmitHandler<SupplierFormValues> = async (formData) => {
       try {
-         if (!edit) {
-            await fetch("/api/suppliers", {
-               method: "POST",
+         const res = await fetch(
+            edit ? `/api/suppliers/${edit.id}` : "/api/suppliers",
+            {
+               method: edit ? "PUT" : "POST",
                headers: { "Content-Type": "application/json" },
                body: JSON.stringify({
                   name: formData.name,
@@ -223,24 +242,16 @@ const Suppliers = () => {
                   phone: formData.number,
                   address: formData.address,
                }),
-            });
-         } else {
-            await fetch(`/api/suppliers/${edit.id}`, {
-               method: "PUT",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({
-                  name: formData.name,
-                  email: formData.email,
-                  phone: formData.number,
-                  address: formData.address,
-               }),
-            });
-            setEdit(null);
-         }
+            },
+         );
+         if (!res.ok) throw new Error("save failed");
+         setSnack(edit ? "Supplier updated." : "Supplier added.");
+         setEdit(null);
          loadSuppliers();
-      } catch {}
-
-      setModalOpen(false);
+         setModalOpen(false);
+      } catch {
+         setSnack("Failed to save the supplier. Please try again.");
+      }
    };
 
    return (
@@ -272,7 +283,19 @@ const Suppliers = () => {
                Add Supplier
             </Button>
          </Stack>
-         {loading ? (
+         {loadError && !loading && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={loadSuppliers}>
+                     Retry
+                  </Button>
+               }
+            >
+               Failed to load suppliers. Please try again.
+            </Alert>
+         )}
+         {loading && suppliers.length === 0 ? (
             <TableSkeleton rows={5} cols={6} />
          ) : (
             <CustomTable
@@ -298,10 +321,10 @@ const Suppliers = () => {
                            name: s.name,
                            number: s.phone || "-",
                            address: s.address || "-",
-                           total: s._count?.purchases || 0,
-                           pay: "-",
-                           due: "-",
-                           advance: "-",
+                           purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
+                           total: Number(s.totals?.total || 0),
+                           pay: Number(s.totals?.paid || 0),
+                           due: Number(s.totals?.due || 0),
                         }));
                      } catch {
                         return [];
@@ -514,9 +537,13 @@ const Suppliers = () => {
             onConfirm={async () => {
                if (deleteOpen) {
                   try {
-                     await fetch(`/api/suppliers/${deleteOpen.id}`, { method: "DELETE" });
-                  } catch {}
-                  setSuppliers(suppliers.filter((s) => s.id !== deleteOpen.id));
+                     const res = await fetch(`/api/suppliers/${deleteOpen.id}`, { method: "DELETE" });
+                     if (!res.ok) throw new Error("delete failed");
+                     setSuppliers(suppliers.filter((s) => s.id !== deleteOpen.id));
+                     setSnack("Supplier deleted.");
+                  } catch {
+                     setSnack("Failed to delete the supplier.");
+                  }
                   setDeleteOpen(null);
                }
             }}
@@ -524,6 +551,22 @@ const Suppliers = () => {
                setDeleteOpen(null);
             }}
          />
+         <Snackbar
+            open={Boolean(snack)}
+            autoHideDuration={4000}
+            onClose={() => setSnack(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+         >
+            {snack ? (
+               <Alert
+                  severity={snack.startsWith("Failed") ? "error" : "success"}
+                  onClose={() => setSnack(null)}
+                  sx={{ width: "100%" }}
+               >
+                  {snack}
+               </Alert>
+            ) : undefined}
+         </Snackbar>
       </Stack>
    );
 };

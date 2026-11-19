@@ -27,6 +27,7 @@ interface CustomerTableProps {
    formatCurrency: (amount: number) => string;
    onOpenFilter: () => void;
    onOpenDetails: (row: CustomerRow) => void;
+   onEditCustomer: (row: CustomerRow) => void;
    onDeleteCustomer: (row: CustomerRow) => void;
    onExport: (format: "csv" | "excel", selected: CustomerRow[]) => void;
 }
@@ -40,6 +41,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
    formatCurrency,
    onOpenFilter,
    onOpenDetails,
+   onEditCustomer,
    onDeleteCustomer,
    onExport,
 }) => {
@@ -280,6 +282,10 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
                {
                   label: "View Details & Print",
                   onClick: (p) => onOpenDetails(p.row as CustomerRow),
+               },
+               {
+                  label: "Edit",
+                  onClick: (p) => onEditCustomer(p.row as CustomerRow),
                },
                {
                   label: "Delete",
