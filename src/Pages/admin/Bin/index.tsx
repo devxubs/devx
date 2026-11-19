@@ -35,7 +35,10 @@ const tabs = [
    "Suppliers",
    "Expenses",
    "Assets",
-   "Users",
+   // Phase 1 (1.8): the "Users" tab is removed. The Bin API (BIN-01
+   // fix) deliberately excludes users — accounts have no soft-delete,
+   // and INACTIVE/SUSPENDED status is managed in User Management — so
+   // the tab was permanently empty and taught a wrong mental model.
 ];
 
 const Bin = () => {
@@ -79,7 +82,6 @@ const Bin = () => {
 
    // Map active tab to item type safely
    const tabToTypeMap: Record<string, string> = {
-      users: "user",
       products: "product",
       categories: "category",
       units: "unit",
@@ -126,10 +128,15 @@ const Bin = () => {
       },
       {
          field: "deleteDate",
-         headerName: "Deleted At",
+         // Phase 1 (1.8): the API projects this value from the record's
+         // updatedAt — there is no real deletedAt column yet (BIN-03,
+         // approval-gated). Label it honestly as "Last Modified", and
+         // show a dash instead of inventing today's date when absent.
+         headerName: "Last Modified",
          flex: 0.8,
          renderCell: (params) => {
-            const d = params.row.deletedAt ? new Date(params.row.deletedAt) : new Date();
+            if (!params.row.deletedAt) return "—";
+            const d = new Date(params.row.deletedAt);
             return d.toLocaleDateString("en-US", {
                year: "numeric",
                month: "short",

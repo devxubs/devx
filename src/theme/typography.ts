@@ -93,7 +93,9 @@ const typography: any = {
    },
    overline: {
       fontWeight: 700,
-      fontSize: "0.",
+      // Phase 1 (1.6): was the invalid truncated value "0." — restored
+      // to 0.75rem, consistent with caption and the MUI default.
+      fontSize: "0.75rem",
       lineHeight: 1.5,
    },
    button: {

@@ -23,6 +23,7 @@ import {
    Typography,
 } from "@mui/material";
 import CustomModal from "@src/components/Modal";
+import AlertDialog from "@src/components/AlertDialog";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -73,6 +74,7 @@ const Customers = () => {
    const [loading, setLoading] = useState(true);
    const [loadedOnce, setLoadedOnce] = useState(false);
    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+   const [customerToDelete, setCustomerToDelete] = useState<CustomerRow | null>(null);
    const [snack, setSnack] = useState<SnackState>(null);
    const [exporting, setExporting] = useState(false);
 
@@ -555,24 +557,12 @@ const Customers = () => {
                   {
                      label: "Delete",
                      color: "error",
-                     onClick: async (p) => {
-                        try {
-                           const res = await fetch(
-                              `/api/customers/${p.row.id}`,
-                              { method: "DELETE" },
-                           );
-                           if (!res.ok) throw new Error("Delete failed");
-                           setSnack({
-                              severity: "success",
-                              message: "Customer deleted.",
-                           });
-                           loadCustomers();
-                        } catch {
-                           setSnack({
-                              severity: "error",
-                              message: "Failed to delete the customer.",
-                           });
-                        }
+                     // Phase 1 (1.5): this was the only destructive
+                     // action in the app with no confirmation — it fired
+                     // the DELETE immediately. It now opens the standard
+                     // AlertDialog (Categories pattern) first.
+                     onClick: (p) => {
+                        setCustomerToDelete(p.row as CustomerRow);
                      },
                   },
                ]}
@@ -649,6 +639,35 @@ const Customers = () => {
             open={Boolean(selectedCustomerId)}
             onClose={() => setSelectedCustomerId(null)}
             customerId={selectedCustomerId}
+         />
+
+         <AlertDialog
+            type="delete"
+            open={Boolean(customerToDelete)}
+            onClose={() => setCustomerToDelete(null)}
+            title={`Are you sure want to delete "${customerToDelete?.name || "this customer"}"?`}
+            onConfirm={async () => {
+               if (!customerToDelete) return;
+               try {
+                  const res = await fetch(
+                     `/api/customers/${customerToDelete.id}`,
+                     { method: "DELETE" },
+                  );
+                  if (!res.ok) throw new Error("Delete failed");
+                  setSnack({
+                     severity: "success",
+                     message: "Customer deleted.",
+                  });
+                  loadCustomers();
+               } catch {
+                  setSnack({
+                     severity: "error",
+                     message: "Failed to delete the customer.",
+                  });
+               } finally {
+                  setCustomerToDelete(null);
+               }
+            }}
          />
 
          <Snackbar

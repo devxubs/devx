@@ -51,7 +51,10 @@ const palette = {
     0: "#FFFFFF",
     50: "#F9FAFB",
     100: "#F4F6F8",
-    200: "#F4F6F8",
+    // Phase 1 (1.6): 200 duplicated 100 exactly, collapsing the scale.
+    // Set to the midpoint between 100 and 300 so the steps are distinct
+    // and monotonic again.
+    200: "#E9ECF0",
     300: "#DFE3E8",
     400: "#C4CDD5",
     500: "#919EAB",

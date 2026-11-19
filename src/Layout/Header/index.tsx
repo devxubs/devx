@@ -38,7 +38,7 @@ const Header = () => {
    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
    const [openSearch, setOpenSearch] = useState(false);
 
-   React.useEffect(() => {
+   const refreshUnreadCount = React.useCallback(() => {
       fetch("/api/notifications")
          .then((r) => (r.ok ? r.json() : null))
          .then((data) => {
@@ -46,6 +46,25 @@ const Header = () => {
          })
          .catch(() => {});
    }, []);
+
+   // Phase 1 (1.12): the badge previously fetched once on mount and
+   // stayed stale for the whole session (new low-stock/chat alerts
+   // never appeared). Refetch on route change, on window focus, and
+   // on a modest 60-second poll; the drawer still reports its own
+   // changes immediately via onUnreadChange.
+   React.useEffect(() => {
+      refreshUnreadCount();
+   }, [refreshUnreadCount, pathname]);
+
+   React.useEffect(() => {
+      const onFocus = () => refreshUnreadCount();
+      window.addEventListener("focus", onFocus);
+      const interval = setInterval(refreshUnreadCount, 60000);
+      return () => {
+         window.removeEventListener("focus", onFocus);
+         clearInterval(interval);
+      };
+   }, [refreshUnreadCount]);
 
    const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
       setAnchorEl(event.currentTarget);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Stack, Typography, useTheme } from "@mui/material";
+import { Button, Chip, Stack, Typography, useTheme } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomTable, { MenuItem } from "@src/components/Table";
@@ -8,28 +8,43 @@ import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
 
-const roles = [
-   {
-      id: 1,
-      name: "Customer Support Officer",
-   },
-   {
-      id: 2,
-      name: "Warehouse Supervisor",
-   },
-   {
-      id: 3,
-      name: "Team Lead",
-   },
-   {
-      id: 4,
-      name: "Delivery Staff",
-   },
-   {
-      id: 5,
-      name: "System Admin",
-   },
-];
+// Phase 1 (1.7): read-only permission summary for the roles list, so an
+// admin can see what a role grants without opening the editor. Handles
+// all three stored permission shapes (seed map, Roles-UI map, array).
+// (The unused hard-coded `roles` mock array that used to sit here was
+// removed — the table has always rendered API data.)
+const summarizePermissions = (raw: any) => {
+   const granted = new Set<string>();
+   if (Array.isArray(raw)) {
+      raw.forEach((entry: any) => {
+         const key =
+            entry && typeof entry === "object"
+               ? String(entry.key || entry.name || "")
+               : String(entry || "");
+         const allow =
+            entry && typeof entry === "object"
+               ? entry.allow !== false && entry.value !== false
+               : true;
+         if (key && allow) granted.add(key.trim().toLowerCase());
+      });
+   } else if (raw && typeof raw === "object") {
+      Object.entries(raw).forEach(([k, v]) => {
+         if (v === true || v === "true") granted.add(k.trim().toLowerCase());
+      });
+   }
+   if (granted.has("all")) {
+      return { fullAccess: true, modules: [] as string[], count: granted.size };
+   }
+   const modules = Array.from(
+      new Set(
+         Array.from(granted).map((k) => {
+            const head = k.split("_")[0];
+            return head.charAt(0).toUpperCase() + head.slice(1);
+         }),
+      ),
+   ).sort();
+   return { fullAccess: false, modules, count: granted.size };
+};
 
 const columns = [
    {
@@ -45,7 +60,52 @@ const columns = [
    {
       field: "name",
       headerName: "Name",
-      flex: 1,
+      flex: 0.6,
+   },
+   {
+      field: "permissions",
+      headerName: "Permissions",
+      flex: 1.4,
+      sortable: false,
+      renderCell: (params: any) => {
+         const summary = summarizePermissions(params.row.permissions);
+         const userCount = params.row._count?.users;
+         if (summary.fullAccess) {
+            return (
+               <Stack direction="row" spacing={1} alignItems="center" height="100%">
+                  <Chip label="Full access" size="small" color="primary" />
+                  {typeof userCount === "number" && (
+                     <Typography variant="caption" color="text.secondary">
+                        {userCount} user{userCount === 1 ? "" : "s"}
+                     </Typography>
+                  )}
+               </Stack>
+            );
+         }
+         if (summary.count === 0) {
+            return (
+               <Typography variant="body2" color="text.secondary">
+                  No permissions granted
+               </Typography>
+            );
+         }
+         const shown = summary.modules.slice(0, 4);
+         const extra = summary.modules.length - shown.length;
+         return (
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" height="100%">
+               {shown.map((m) => (
+                  <Chip key={m} label={m} size="small" variant="outlined" />
+               ))}
+               {extra > 0 && (
+                  <Chip label={`+${extra} more`} size="small" variant="outlined" />
+               )}
+               <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                  {summary.count} permission{summary.count === 1 ? "" : "s"}
+                  {typeof userCount === "number" ? ` · ${userCount} user${userCount === 1 ? "" : "s"}` : ""}
+               </Typography>
+            </Stack>
+         );
+      },
    },
    {
       field: "@actions",

@@ -54,6 +54,11 @@ const Chat = () => {
    const [loadingMessages, setLoadingMessages] = useState(false);
    const [currentUser, setCurrentUser] = useState<any | null>(null);
 
+   const currentUserRef = useRef<any | null>(null);
+   useEffect(() => {
+      currentUserRef.current = currentUser;
+   }, [currentUser]);
+
    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
    const messagesEndRef = useRef<HTMLDivElement | null>(null);
    const initialLoadRef = useRef(true);
@@ -131,6 +136,28 @@ const Chat = () => {
          if (res.ok) {
             const data = await res.json();
             setMessages(data);
+            // Phase 1 (CHAT-02): the messages API provides an explicit
+            // mark_read action, but the UI never called it, so read
+            // receipts stalled at "unread" forever. Now, whenever the
+            // open conversation contains unread messages from other
+            // members, mark them read (fire-and-forget; the next poll
+            // reflects the new state).
+            const myId = currentUserRef.current?.id;
+            const hasUnreadFromOthers =
+               Array.isArray(data) &&
+               data.some(
+                  (m: any) => !m.isRead && m.senderId && (!myId || m.senderId !== myId),
+               );
+            if (hasUnreadFromOthers) {
+               fetch("/api/chat/messages", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                     conversationId: convId,
+                     action: "mark_read",
+                  }),
+               }).catch(() => {});
+            }
          }
       } catch {
          // silent

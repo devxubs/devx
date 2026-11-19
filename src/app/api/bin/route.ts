@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
             customId: u.customId,
             type: "unit",
             name: `Unit: ${u.name}`,
-            deletedAt: u.updatedAt || new Date(),
+            deletedAt: u.updatedAt,
          })),
          // BIN-01 fix: INACTIVE/SUSPENDED users are NOT deleted
          // records and no longer appear in the Recycle Bin. The User
