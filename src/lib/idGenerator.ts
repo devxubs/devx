@@ -14,6 +14,10 @@ export const DEFAULT_PREFIXES: Record<string, string> = {
    ROLE: "ROLE_",
    BILLING: "BILL_",
    WAREHOUSE: "WH_",
+   // Phase 3B (3.7): supplier payment ledger IDs (SPAY_1, SPAY_2, …).
+   // No StoreSetting prefix column exists for this entity — the
+   // schema plan deliberately keeps it on the default prefix.
+   SUPPLIER_PAYMENT: "SPAY_",
 };
 
 export type EntityType =
@@ -29,7 +33,8 @@ export type EntityType =
    | "ASSET"
    | "ROLE"
    | "BILLING"
-   | "WAREHOUSE";
+   | "WAREHOUSE"
+   | "SUPPLIER_PAYMENT";
 
 /**
  * Retrieve the configured prefix for an entity type from StoreSetting
@@ -54,6 +59,7 @@ export async function getEntityPrefix(entityType: EntityType, client?: any): Pro
          ROLE: setting.prefixRole || DEFAULT_PREFIXES.ROLE,
          BILLING: setting.prefixBilling || DEFAULT_PREFIXES.BILLING,
          WAREHOUSE: setting.prefixWarehouse || DEFAULT_PREFIXES.WAREHOUSE,
+         SUPPLIER_PAYMENT: DEFAULT_PREFIXES.SUPPLIER_PAYMENT,
       };
 
       return map[entityType] || DEFAULT_PREFIXES[entityType] || `${entityType}_`;
@@ -91,6 +97,7 @@ export async function generateNextEntityId(
       // the collision check for billing IDs.
       BILLING: db.billingTransaction,
       WAREHOUSE: db.warehouse,
+      SUPPLIER_PAYMENT: db.supplierPayment,
    };
 
    const sequence = await db.entitySequence.upsert({

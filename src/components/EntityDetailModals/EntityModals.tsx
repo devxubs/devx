@@ -30,6 +30,7 @@ import HtmlRenderer from "@src/components/HtmlRenderer";
 import { isDescriptionEmpty } from "@src/lib/sanitizeHtml";
 import { exportToExcel, exportToWord } from "@src/lib/exportEngine";
 import { useSettings } from "@src/lib/settingsContext";
+import SupplierPaymentLedger from "./SupplierPaymentLedger";
 
 // ==========================================
 // 1. EMPLOYEE DETAIL MODAL
@@ -652,10 +653,23 @@ export const SupplierDetailModal = ({
    const { formatCurrency } = useSettings();
    const [supplier, setSupplier] = useState<any>(null);
    const [loading, setLoading] = useState(false);
+   // Phase 3B (3.7): payable summary from the payments API — the
+   // Outstanding Payable figure below is Σ purchase due − unallocated
+   // credit once the ledger has reported it.
+   const [payableSummary, setPayableSummary] = useState<any>(null);
+
+   const loadSupplier = React.useCallback(() => {
+      if (!supplierId) return;
+      fetch(`/api/suppliers/${supplierId}`)
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => setSupplier(d))
+         .catch(() => {});
+   }, [supplierId]);
 
    useEffect(() => {
       if (!open || !supplierId) return;
       setLoading(true);
+      setPayableSummary(null);
       fetch(`/api/suppliers/${supplierId}`)
          .then((r) => (r.ok ? r.json() : null))
          .then((d) => setSupplier(d))
@@ -683,6 +697,24 @@ export const SupplierDetailModal = ({
                field: "Total Purchases",
                value: String(supplier.purchases?.length || 0),
             },
+            // Phase 3B (3.7): ledger-aware payable figures — net of
+            // unallocated supplier credit when the payments API has
+            // reported its summary.
+            {
+               field: "Outstanding Payable (net)",
+               value: payableSummary
+                  ? String(payableSummary.netPayable)
+                  : String(
+                       (supplier.purchases || []).reduce(
+                          (sum: number, p: any) => sum + Number(p.due || 0),
+                          0,
+                       ),
+                    ),
+            },
+            {
+               field: "Supplier Credit (unallocated payments)",
+               value: String(payableSummary?.credit ?? 0),
+            },
          ],
       });
    };
@@ -707,12 +739,30 @@ export const SupplierDetailModal = ({
                field: "Total Purchases",
                value: String(supplier.purchases?.length || 0),
             },
+            // Phase 3B (3.7): ledger-aware payable figures — net of
+            // unallocated supplier credit when the payments API has
+            // reported its summary.
+            {
+               field: "Outstanding Payable (net)",
+               value: payableSummary
+                  ? String(payableSummary.netPayable)
+                  : String(
+                       (supplier.purchases || []).reduce(
+                          (sum: number, p: any) => sum + Number(p.due || 0),
+                          0,
+                       ),
+                    ),
+            },
+            {
+               field: "Supplier Credit (unallocated payments)",
+               value: String(payableSummary?.credit ?? 0),
+            },
          ],
       });
    };
 
    return (
-      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
          <DialogTitle
             sx={{
                display: "flex",
@@ -767,10 +817,10 @@ export const SupplierDetailModal = ({
                   <Divider />
                   {/* Phase 2 (§2.5): accurate payable summary computed
                       from the supplier's actual purchases, plus the
-                      purchase history itself. A standalone payment
-                      ledger does not exist yet (Phase 3, schema-gated)
-                      — payments are tracked per purchase, and this
-                      section says so instead of inventing a history. */}
+                      purchase history itself. Phase 3B (3.7): the
+                      payment ledger below is real, and the Outstanding
+                      Payable figure nets off unallocated supplier
+                      credit reported by the payments API. */}
                   {(() => {
                      const purchases = supplier.purchases || [];
                      const totalPurchased = purchases.reduce(
@@ -811,10 +861,22 @@ export const SupplierDetailModal = ({
                                  <Typography
                                     variant="body2"
                                     fontWeight={700}
-                                    color={totalDue > 0 ? "error.main" : "text.primary"}
+                                    color={
+                                       (payableSummary ? payableSummary.netPayable : totalDue) > 0
+                                          ? "error.main"
+                                          : "text.primary"
+                                    }
                                  >
-                                    {formatCurrency(totalDue)}
+                                    {formatCurrency(
+                                       payableSummary ? payableSummary.netPayable : totalDue,
+                                    )}
                                  </Typography>
+                                 {payableSummary && payableSummary.credit > 0 && (
+                                    <Typography variant="caption" color="text.secondary">
+                                       Due {formatCurrency(totalDue)} − credit{" "}
+                                       {formatCurrency(payableSummary.credit)}
+                                    </Typography>
+                                 )}
                               </Grid>
                            </Grid>
                            <Typography variant="subtitle2" fontWeight={600}>
@@ -870,15 +932,16 @@ export const SupplierDetailModal = ({
                               </Stack>
                            )}
                            <Divider />
-                           <Typography variant="subtitle2" fontWeight={600}>
-                              Payment Ledger
-                           </Typography>
-                           <Typography variant="body2" color="text.secondary">
-                              Standalone supplier payments are not recorded
-                              yet — payments are tracked per purchase (Paid /
-                              Due above). A dedicated payment ledger is
-                              planned for a later phase.
-                           </Typography>
+                           {/* Phase 3B (3.7): the payment ledger is now
+                               real — history, record-payment form and
+                               voiding live in SupplierPaymentLedger,
+                               backed by /api/suppliers/[id]/payments. */}
+                           <SupplierPaymentLedger
+                              supplierId={supplier.id}
+                              purchases={purchases}
+                              onDataChanged={loadSupplier}
+                              onSummaryChange={setPayableSummary}
+                           />
                         </>
                      );
                   })()}

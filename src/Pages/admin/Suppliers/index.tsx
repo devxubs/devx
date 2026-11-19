@@ -35,7 +35,10 @@ type SuppliersTypes = {
    purchases?: number;
    total?: number;
    pay?: number;
+   /** Outstanding payable = Σ purchase due − unallocated credit
+    * (Phase 3B 3.7 definition, same as supplier detail / Finance). */
    due?: number;
+   credit?: number;
 };
 export const suppliersData: SuppliersTypes[] = [];
 
@@ -152,7 +155,7 @@ const Suppliers = () => {
       },
       {
          field: "due",
-         headerName: "Payable (Due)",
+         headerName: "Outstanding Payable",
          renderCell: (params) =>
             Number(params.row.due || 0) > 0 ? (
                <Typography variant="body2" fontWeight={700} color="error.main">
@@ -187,7 +190,8 @@ const Suppliers = () => {
                purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
                total: Number(s.totals?.total || 0),
                pay: Number(s.totals?.paid || 0),
-               due: Number(s.totals?.due || 0),
+               due: Number(s.totals?.netPayable ?? s.totals?.due ?? 0),
+               credit: Number(s.totals?.credit || 0),
             }));
             setSuppliers(mapped);
             setLoadError(false);
@@ -324,7 +328,7 @@ const Suppliers = () => {
                            purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
                            total: Number(s.totals?.total || 0),
                            pay: Number(s.totals?.paid || 0),
-                           due: Number(s.totals?.due || 0),
+                           due: Number(s.totals?.netPayable ?? s.totals?.due ?? 0),
                         }));
                      } catch {
                         return [];
