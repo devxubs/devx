@@ -17,6 +17,7 @@ import {
 import Icon from "@src/components/Icon";
 import CustomSwitch from "@src/components/CustomSwitch";
 import AlertDialog from "@src/components/AlertDialog";
+import CourierProvidersCard from "./CourierProvidersCard";
 
 interface SystemTabProps {
    values: any;
@@ -231,6 +232,9 @@ export default function SystemTab({
                </Button>
             </Stack>
          </Card>
+
+         {/* Courier Providers (Phase 4, D4) — env-credential status */}
+         <CourierProvidersCard />
 
          {/* Factory Reset */}
          <Box sx={{ pt: 1 }}>
