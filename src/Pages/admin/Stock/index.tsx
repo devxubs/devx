@@ -231,7 +231,9 @@ const Stock = () => {
                   />
                )}
                {tab === 2 && <WarehousesTab refreshKey={refreshKey} />}
-               {tab === 3 && <LowStockTab products={products} />}
+               {tab === 3 && (
+                  <LowStockTab products={products} loading={loadingProducts} />
+               )}
             </Box>
          </Paper>
       </Stack>

@@ -5,6 +5,7 @@ import { Button, Stack, Typography } from "@mui/material";
 import { useRouter } from "next/navigation";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import Icon from "@src/components/Icon";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 import type { StockProduct } from "./index";
 
 // Phase 3A (3.3): low-stock restocking. A product is low when
@@ -14,26 +15,44 @@ import type { StockProduct } from "./index";
 // the alert level. "Start draft purchase" opens the existing Purchase
 // create form PREFILLED (supplier + this line) for manual review —
 // nothing is created or submitted automatically.
-const LowStockTab = ({ products }: { products: StockProduct[] }) => {
+const LowStockTab = ({
+   products,
+   loading = false,
+}: {
+   products: StockProduct[];
+   loading?: boolean;
+}) => {
    const router = useRouter();
+   // The shared CustomTable toolbar renders a search box on every
+   // table (wired to the page-level filter query, like Products and
+   // the Movements tab). Consume it here too — the rows are derived
+   // client-side from the catalogue, so the search filters them
+   // client-side; no API call or calculation changes.
+   const { filterQueryData } = useFilterQuery();
+   const search = (filterQueryData.searchText || "").trim().toLowerCase();
 
-   const rows = useMemo(
-      () =>
-         products
-            .filter((p) => p.quantity <= p.lowStockAlert)
-            .map((p) => ({
-               id: p.id,
-               productName: p.productName,
-               productSku: p.productSku,
-               quantity: p.quantity,
-               threshold: p.lowStockAlert,
-               suggestedQty: Math.max(p.lowStockAlert - p.quantity + 1, 1),
-               supplierName: p.primarySupplier?.name || null,
-               isVariable: p.productType === "variable",
-               product: p,
-            })),
-      [products],
-   );
+   const rows = useMemo(() => {
+      const all = products
+         .filter((p) => p.quantity <= p.lowStockAlert)
+         .map((p) => ({
+            id: p.id,
+            productName: p.productName,
+            productSku: p.productSku,
+            quantity: p.quantity,
+            threshold: p.lowStockAlert,
+            suggestedQty: Math.max(p.lowStockAlert - p.quantity + 1, 1),
+            supplierName: p.primarySupplier?.name || null,
+            isVariable: p.productType === "variable",
+            product: p,
+         }));
+      if (!search) return all;
+      return all.filter(
+         (r) =>
+            r.productName.toLowerCase().includes(search) ||
+            (r.productSku || "").toLowerCase().includes(search) ||
+            (r.supplierName || "").toLowerCase().includes(search),
+      );
+   }, [products, search]);
 
    const startDraftPurchase = (row: any) => {
       const p: StockProduct = row.product;
@@ -125,6 +144,7 @@ const LowStockTab = ({ products }: { products: StockProduct[] }) => {
          <CustomTable
             rows={rows}
             columns={columns}
+            loading={loading}
             canPrint={false}
             canExport={false}
             hideSelectionToolbar

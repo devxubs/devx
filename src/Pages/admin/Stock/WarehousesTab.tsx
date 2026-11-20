@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
    Alert,
    Button,
@@ -14,6 +14,7 @@ import {
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import CustomModal from "@src/components/Modal";
 import Icon from "@src/components/Icon";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 
 // Phase 3A (3.2): warehouses from the existing warehouses API.
 // The API supports GET (list, now including per-warehouse stock rows)
@@ -112,6 +113,26 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
       }
    };
 
+   // The shared CustomTable toolbar renders a search box on every
+   // table (wired to the page-level filter query, like Products and
+   // the Movements tab). Consume it here too — the warehouse list is
+   // loaded in full client-side (GET /api/warehouses takes no search
+   // param), so the search filters the loaded rows client-side; the
+   // API call itself is unchanged.
+   const { filterQueryData } = useFilterQuery();
+   const search = (filterQueryData.searchText || "").trim().toLowerCase();
+   const visibleRows = useMemo(() => {
+      if (!search) return rows;
+      return rows.filter(
+         (r) =>
+            r.name.toLowerCase().includes(search) ||
+            (r.code || "").toLowerCase().includes(search) ||
+            (r.customId || "").toLowerCase().includes(search) ||
+            (r.address || "").toLowerCase().includes(search) ||
+            (r.phone || "").toLowerCase().includes(search),
+      );
+   }, [rows, search]);
+
    const columns: ColumnConfig[] = [
       { field: "customId", headerName: "ID", width: 110 },
       {
@@ -169,7 +190,7 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
          </Stack>
 
          <CustomTable
-            rows={rows}
+            rows={visibleRows}
             columns={columns}
             loading={loading}
             canPrint={false}
