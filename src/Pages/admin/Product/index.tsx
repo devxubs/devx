@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import CustomModal from "@src/components/Modal";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import ExportProductModal from "./ExportProductModal";
 import BarcodeLabelsModal from "./BarcodeLabelsModal";
@@ -147,14 +148,34 @@ export const ProductsView = ({
          onClick={onClick}
          sx={{ cursor: onClick ? "pointer" : "default" }}
       >
-         <Avatar
-            variant="rounded"
-            src={url}
-            sx={{
-               width: 50,
-               height: 50,
-            }}
-         />
+         {url ? (
+            <Avatar
+               variant="rounded"
+               src={url}
+               sx={{
+                  width: 50,
+                  height: 50,
+               }}
+            />
+         ) : (
+            // P3-8: local no-image state — a themed placeholder block
+            // (no external URL) for products without an image.
+            <Box
+               sx={{
+                  width: 50,
+                  height: 50,
+                  flexShrink: 0,
+                  borderRadius: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  bgcolor: "action.hover",
+                  color: "text.secondary",
+               }}
+            >
+               <Icon icon="solar:gallery-bold-duotone" />
+            </Box>
+         )}
          <Stack>
             <Typography
                variant="body1"
@@ -180,6 +201,7 @@ const Product = () => {
    const theme = useTheme();
    const router = useRouter();
    const { formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const { filterQueryData } = useFilterQuery();
 
    const [products, setProducts] = useState<ProductType[]>([]);
@@ -369,12 +391,11 @@ const Product = () => {
                   productName: p.productName,
                   subDescription: p.subDescription || "",
                   content: p.content || "",
-                  images:
-                     imgs.length > 0
-                        ? imgs
-                        : [
-                             "https://api-prod-minimal-v700.pages.dev/assets/images/m-product/product-1.webp",
-                          ],
+                  // P3-8: image-less products carry NO image — the
+                  // list used to substitute an external template
+                  // placeholder URL. ProductsView renders a local
+                  // themed no-image block for an empty url instead.
+                  images: imgs,
                   productCode: p.productCode,
                   productSku: p.productSku,
                   // Carried for the barcode label dialog (Phase 4,
@@ -431,10 +452,13 @@ const Product = () => {
    const handleDeleteConfirm = async () => {
       if (!deleteDialog) return;
       try {
-         await fetch(`/api/products/${deleteDialog.id}`, { method: "DELETE" });
+         const res = await fetch(`/api/products/${deleteDialog.id}`, { method: "DELETE" });
+         if (!res.ok) throw new Error("request failed");
          setProducts((prev) => prev.filter((p) => p.id !== deleteDialog.id));
+         // P3-2: deletes previously confirmed silently.
+         showSnackbar("Product deleted successfully.", "success");
       } catch {
-         // silent
+         showSnackbar("Failed to delete the product.", "error");
       }
       setDeleteDialog(null);
    };

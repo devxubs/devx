@@ -4,6 +4,7 @@ import {
    Box,
    Stack,
    IconButton,
+   Tooltip,
    useTheme,
    useMediaQuery,
    Drawer,
@@ -333,8 +334,13 @@ const Sidebar = () => {
       >
          {/* Toggle button */}
          {!isSmDown ? (
+            <Tooltip
+               title={layout ? "Collapse sidebar" : "Expand sidebar"}
+               disableInteractive
+            >
             <IconButton
                size="small"
+               aria-label={layout ? "Collapse sidebar" : "Expand sidebar"}
                sx={{
                   bgcolor: (t) => `${t.palette.background.default}!important`,
                   border: 1,
@@ -363,8 +369,10 @@ const Sidebar = () => {
                   style={{ width: 18, height: 18 }}
                />
             </IconButton>
+            </Tooltip>
          ) : (
             <IconButton
+               aria-label="Close sidebar"
                onClick={() => globalState.set("layoutFull", false)}
                sx={{
                   position: "absolute",

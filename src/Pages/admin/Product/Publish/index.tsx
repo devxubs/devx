@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import {
    productSchema,
    ProductSchemaType,
@@ -121,6 +122,7 @@ const DEFAULT_FORM_VALUES: ProductSchemaType = {
 
 export const Publish: React.FC = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const router = useRouter();
    const params = useSearchParams();
    const id = params?.get("id");
@@ -418,6 +420,14 @@ export const Publish: React.FC = () => {
          }
 
          clearDraftOnSubmit();
+         // P3-2: a successful save previously gave no confirmation
+         // (failures already surface via the serverError banner).
+         // The snackbar provider lives in the admin Layout, so the
+         // message survives the navigation back to the list.
+         showSnackbar(
+            id ? "Product updated successfully." : "Product added successfully.",
+            "success",
+         );
          return true;
       } catch (err: any) {
          setServerError(

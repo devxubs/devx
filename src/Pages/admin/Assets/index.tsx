@@ -4,7 +4,6 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import {
    Alert,
    Button,
-   Snackbar,
    Stack,
    useTheme,
    Grid,
@@ -18,6 +17,7 @@ import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { AssetDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import React, { useEffect, useState } from "react";
@@ -64,6 +64,7 @@ const AssetsSchema = yup.object({
 const Asset = () => {
    const theme = useTheme();
    const { formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    // Phase B4b (P1-5): consume the shared toolbar search — the
    // assets API already accepts `search` (name / category / customId),
    // so the term is passed server-side exactly like Expenses does.
@@ -118,11 +119,7 @@ const Asset = () => {
    const [loading, setLoading] = useState(false);
    // Phase 2 (2.6): standard list feedback states.
    const [loadError, setLoadError] = useState<string | null>(null);
-   const [snackbar, setSnackbar] = useState<{
-      open: boolean;
-      message: string;
-      severity: "success" | "error";
-   }>({ open: false, message: "", severity: "success" });
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
 
    const loadAssets = React.useCallback(async () => {
       setLoading(true);
@@ -223,20 +220,12 @@ const Asset = () => {
                  body: JSON.stringify(payload),
               });
          if (!res.ok) throw new Error("request failed");
-         setSnackbar({
-            open: true,
-            message: editItem
+         showSnackbar(editItem
                ? "Asset updated successfully."
-               : "Asset added successfully.",
-            severity: "success",
-         });
+               : "Asset added successfully.", "success");
          loadAssets();
       } catch {
-         setSnackbar({
-            open: true,
-            message: "Failed to save the asset.",
-            severity: "error",
-         });
+         showSnackbar("Failed to save the asset.", "error");
          return;
       }
 
@@ -258,21 +247,6 @@ const Asset = () => {
                {loadError}
             </Alert>
          )}
-
-         <Snackbar
-            open={snackbar.open}
-            autoHideDuration={3000}
-            onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-         >
-            <Alert
-               severity={snackbar.severity}
-               onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-               sx={{ width: "100%" }}
-            >
-               {snackbar.message}
-            </Alert>
-         </Snackbar>
 
          {/* Header */}
          <Stack direction="row" justifyContent="flex-end" spacing={2}>
@@ -553,17 +527,9 @@ const Asset = () => {
                      setAssets((prev) =>
                         prev.filter((item) => item.id !== deleteItem.id),
                      );
-                     setSnackbar({
-                        open: true,
-                        message: "Asset deleted successfully.",
-                        severity: "success",
-                     });
+                     showSnackbar("Asset deleted successfully.", "success");
                   } catch {
-                     setSnackbar({
-                        open: true,
-                        message: "Failed to delete the asset.",
-                        severity: "error",
-                     });
+                     showSnackbar("Failed to delete the asset.", "error");
                   }
                   setDeleteItem(null);
                }

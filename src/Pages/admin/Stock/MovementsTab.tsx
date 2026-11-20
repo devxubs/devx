@@ -2,7 +2,10 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
+   Alert,
    Badge,
+   Button,
+   Chip,
    FormControl,
    IconButton,
    InputLabel,
@@ -73,6 +76,12 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
    const [rows, setRows] = useState<any[]>([]);
    const [total, setTotal] = useState(0);
    const [loading, setLoading] = useState(false);
+   // P3-5: a failed load used to be silent (table left as-is with no
+   // signal). It now surfaces the Product/Purchase banner + Retry
+   // pattern; rows are deliberately NOT cleared on error, and the
+   // banner stays visible above them so stale data is never
+   // mistaken for a fresh load.
+   const [loadError, setLoadError] = useState<string | null>(null);
    const [paginationModel, setPaginationModel] = useState({
       page: 0,
       pageSize: 25,
@@ -95,7 +104,12 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
          if (filters.range[1])
             params.set("endDate", filters.range[1].toISOString());
          const res = await fetch(`/api/stock-movements?${params.toString()}`);
+         if (!res.ok) {
+            setLoadError("Failed to load stock movements.");
+            return;
+         }
          if (res.ok) {
+            setLoadError(null);
             const data = await res.json();
             setRows(
                (data.movements || []).map((m: any) => ({
@@ -116,7 +130,9 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
             setTotal(Number(data.total ?? 0));
          }
       } catch {
-         // Leave the table empty; the user can retry via filters.
+         // Rows stay as they are (possibly stale) — the banner above
+         // the table says the load failed and offers Retry.
+         setLoadError("Failed to load stock movements.");
       } finally {
          setLoading(false);
       }
@@ -189,8 +205,73 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
       { field: "note", headerName: "Reason / Note", flex: 1 },
    ];
 
+   // P3-6: applied-filter chips. The tab's filters live in local
+   // state (not the shared FilterData buckets — those are shared by
+   // every Stock tab, so writing movement filters into them would
+   // leak chips onto sibling tabs), and FilterModalShell provides
+   // no chips rendering, so the applied state is rendered here with
+   // the same Chip affordance other pages use: visible once the
+   // modal closes, each chip deletable on its own.
+   const appliedProductName = filters.productId
+      ? products.find((p) => p.id === filters.productId)?.productName ||
+        filters.productId
+      : "";
+   const appliedRangeLabel = (() => {
+      const [s, e] = filters.range;
+      const fmt = (d: Date) => d.toLocaleDateString("en-US");
+      if (s && e) return `${fmt(s)} → ${fmt(e)}`;
+      if (s) return `From ${fmt(s)}`;
+      if (e) return `Until ${fmt(e)}`;
+      return "";
+   })();
+
    return (
       <Stack spacing={2}>
+         {loadError && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={() => load()}>
+                     Retry
+                  </Button>
+               }
+            >
+               {loadError}
+            </Alert>
+         )}
+
+         {countActive(filters) > 0 && (
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+               {filters.type !== "All" && (
+                  <Chip
+                     size="small"
+                     label={`Type: ${filters.type}`}
+                     onDelete={() =>
+                        setFilters({ ...filters, type: "All" })
+                     }
+                  />
+               )}
+               {filters.productId && (
+                  <Chip
+                     size="small"
+                     label={`Product: ${appliedProductName}`}
+                     onDelete={() =>
+                        setFilters({ ...filters, productId: "" })
+                     }
+                  />
+               )}
+               {appliedRangeLabel && (
+                  <Chip
+                     size="small"
+                     label={`Date: ${appliedRangeLabel}`}
+                     onDelete={() =>
+                        setFilters({ ...filters, range: [null, null] })
+                     }
+                  />
+               )}
+            </Stack>
+         )}
+
          <CustomTable
             rows={rows}
             columns={columns}

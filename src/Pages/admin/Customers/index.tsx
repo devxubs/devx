@@ -3,9 +3,7 @@
 // Customer Page — clean, modular architecture.
 // Page-level composition, state coordination, and data fetching.
 import {
-   Alert,
    Button,
-   Snackbar,
    Stack,
    Typography,
 } from "@mui/material";
@@ -19,6 +17,7 @@ import React, {
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
@@ -39,10 +38,10 @@ import {
    exportCustomersToCsv,
    exportCustomersToExcel,
 } from "./components/customerExport";
-import { SnackState } from "./types";
 
 const Customers = () => {
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const currencySymbol = settings.currencySymbol || "৳";
    const { filterQueryData, setFilterQueryData } = useFilterQuery();
    const searchText = filterQueryData.searchText || "";
@@ -56,7 +55,7 @@ const Customers = () => {
    );
    const [customerToDelete, setCustomerToDelete] =
       useState<CustomerRow | null>(null);
-   const [snack, setSnack] = useState<SnackState>(null);
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
    const [exporting, setExporting] = useState(false);
    // Phase 2 (§2.2): Add / Edit customer — the page previously offered
    // only view + delete. `formCustomer` undefined = closed, null = add
@@ -151,17 +150,14 @@ const Customers = () => {
          lastLoadOkRef.current = false;
          setRows([]);
          setTotal(0);
-         setSnack({
-            severity: "error",
-            message: "Failed to load customers. Please try again.",
-         });
+         showSnackbar("Failed to load customers. Please try again.", "error");
       } finally {
          if (req === requestRef.current) {
             setLoading(false);
             setLoadedOnce(true);
          }
       }
-   }, [appliedFilters, debouncedSearch, sortBy, sortDir]);
+   }, [appliedFilters, debouncedSearch, sortBy, sortDir, showSnackbar]);
 
    useEffect(() => {
       loadCustomers();
@@ -272,16 +268,12 @@ const Customers = () => {
       try {
          if (format === "csv") exportCustomersToCsv(selected);
          else await exportCustomersToExcel(selected);
-         setSnack({
-            severity: "success",
-            message: `${selected.length} customer(s) exported to ${format === "csv" ? "CSV" : "Excel"}.`,
-         });
+         showSnackbar(`${selected.length} customer(s) exported to ${format === "csv" ? "CSV" : "Excel"}.`, "success");
       } catch {
-         setSnack({
-            severity: "error",
-            message:
-               "Export failed. Your selection is unchanged — please try again.",
-         });
+         showSnackbar(
+            "Export failed. Your selection is unchanged — please try again.",
+            "error",
+         );
       } finally {
          setExporting(false);
       }
@@ -293,16 +285,10 @@ const Customers = () => {
             method: "DELETE",
          });
          if (!res.ok) throw new Error("Delete failed");
-         setSnack({
-            severity: "success",
-            message: "Customer deleted.",
-         });
+         showSnackbar("Customer deleted.", "success");
          loadCustomers();
       } catch {
-         setSnack({
-            severity: "error",
-            message: "Failed to delete the customer.",
-         });
+         showSnackbar("Failed to delete the customer.", "error");
       }
    };
 
@@ -413,7 +399,7 @@ const Customers = () => {
             customer={formCustomer ?? null}
             onClose={() => setFormCustomer(undefined)}
             onSaved={(message) => {
-               setSnack({ severity: "success", message });
+               showSnackbar(message, "success");
                loadCustomers();
             }}
          />
@@ -430,24 +416,6 @@ const Customers = () => {
                setCustomerToDelete(null);
             }}
          />
-
-         {/* Feedback Snackbar */}
-         <Snackbar
-            open={Boolean(snack)}
-            autoHideDuration={4000}
-            onClose={() => setSnack(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-         >
-            {snack ? (
-               <Alert
-                  severity={snack.severity}
-                  onClose={() => setSnack(null)}
-                  sx={{ width: "100%" }}
-               >
-                  {snack.message}
-               </Alert>
-            ) : undefined}
-         </Snackbar>
       </Stack>
    );
 };

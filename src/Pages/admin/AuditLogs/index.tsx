@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
    Alert,
    Box,
+   Button,
    Chip,
    Divider,
    IconButton,
@@ -74,6 +75,12 @@ const AuditLogs = () => {
    const [total, setTotal] = useState(0);
    const [loading, setLoading] = useState(false);
    const [forbidden, setForbidden] = useState(false);
+   // P3-5: non-403 load failures used to leave the table silently
+   // as-is. They now surface the Product/Purchase banner + Retry
+   // pattern; rows are NOT cleared, and the banner stays visible
+   // above them so stale rows are never mistaken for fresh data.
+   // The explicit 403 state below is unchanged and takes precedence.
+   const [loadError, setLoadError] = useState<string | null>(null);
    const [paginationModel, setPaginationModel] = useState({
       page: 0,
       pageSize: 25,
@@ -101,12 +108,18 @@ const AuditLogs = () => {
          const res = await fetch(`/api/audit-logs?${params.toString()}`);
          if (res.status === 403) {
             setForbidden(true);
+            setLoadError(null);
             setRows([]);
             setTotal(0);
             return;
          }
+         if (!res.ok) {
+            setLoadError("Failed to load audit logs.");
+            return;
+         }
          if (res.ok) {
             const data = await res.json();
+            setLoadError(null);
             setForbidden(false);
             setRows(
                (data.logs || []).map((log: any) => ({
@@ -122,7 +135,9 @@ const AuditLogs = () => {
             setTotal(Number(data.total ?? 0));
          }
       } catch {
-         // Leave the table as-is; the user can retry via filters.
+         // Rows stay as they are (possibly stale) — the banner above
+         // the table says the load failed and offers Retry.
+         setLoadError("Failed to load audit logs.");
       } finally {
          setLoading(false);
       }
@@ -259,6 +274,19 @@ const AuditLogs = () => {
                Read-only: audit records cannot be edited or deleted.
             </Typography>
          </Stack>
+
+         {loadError && !forbidden && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={() => load()}>
+                     Retry
+                  </Button>
+               }
+            >
+               {loadError}
+            </Alert>
+         )}
 
          {forbidden ? (
             <Alert severity="error">

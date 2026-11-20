@@ -14,7 +14,6 @@ import {
    Chip,
    CircularProgress,
    Alert,
-   Snackbar,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
@@ -25,6 +24,7 @@ import Modal from "./Modal";
 import AlertDialog from "@src/components/AlertDialog";
 import CustomAutocomplete, { OptionType } from "@src/components/Autocomplete";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 export interface UserProps {
    id: string;
@@ -161,6 +161,7 @@ export const UserRows: UserProps[] = [
 
 const Users = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const [users, setUsers] = useState<UserProps[]>([]);
    const [rolesList, setRolesList] = useState<string[]>(roles);
    const [loading, setLoading] = useState(false);
@@ -291,11 +292,7 @@ const Users = () => {
    // Phase 2 (2.6): standard list feedback states — load errors are
    // visible with a retry; saves/deletes confirm via Snackbar.
    const [loadError, setLoadError] = useState<string | null>(null);
-   const [snackbar, setSnackbar] = useState<{
-      open: boolean;
-      message: string;
-      severity: "success" | "error";
-   }>({ open: false, message: "", severity: "success" });
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
 
    const loadUsers = React.useCallback(async () => {
       setLoading(true);
@@ -392,21 +389,6 @@ const Users = () => {
                   {loadError}
                </Alert>
             )}
-
-            <Snackbar
-               open={snackbar.open}
-               autoHideDuration={3000}
-               onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-               anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-            >
-               <Alert
-                  severity={snackbar.severity}
-                  onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-                  sx={{ width: "100%" }}
-               >
-                  {snackbar.message}
-               </Alert>
-            </Snackbar>
 
             {/* Header */}
             <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
@@ -520,18 +502,10 @@ const Users = () => {
                         }),
                      });
                      if (!res.ok) throw new Error("request failed");
-                     setSnackbar({
-                        open: true,
-                        message: "User added successfully.",
-                        severity: "success",
-                     });
+                     showSnackbar("User added successfully.", "success");
                      loadUsers();
                   } catch {
-                     setSnackbar({
-                        open: true,
-                        message: "Failed to add the user.",
-                        severity: "error",
-                     });
+                     showSnackbar("Failed to add the user.", "error");
                   }
                }}
                onEditUser={async (newData) => {
@@ -542,18 +516,10 @@ const Users = () => {
                         body: JSON.stringify(newData),
                      });
                      if (!res.ok) throw new Error("request failed");
-                     setSnackbar({
-                        open: true,
-                        message: "User updated successfully.",
-                        severity: "success",
-                     });
+                     showSnackbar("User updated successfully.", "success");
                      loadUsers();
                   } catch {
-                     setSnackbar({
-                        open: true,
-                        message: "Failed to update the user.",
-                        severity: "error",
-                     });
+                     showSnackbar("Failed to update the user.", "error");
                   }
                }}
             />
@@ -577,17 +543,9 @@ const Users = () => {
                   setUsers((prev) =>
                      prev.filter((user) => user.id !== deleteUser.id),
                   );
-                  setSnackbar({
-                     open: true,
-                     message: "User deleted successfully.",
-                     severity: "success",
-                  });
+                  showSnackbar("User deleted successfully.", "success");
                } catch {
-                  setSnackbar({
-                     open: true,
-                     message: "Failed to delete the user.",
-                     severity: "error",
-                  });
+                  showSnackbar("Failed to delete the user.", "error");
                }
                setDeleteUser(null);
             }}
@@ -617,17 +575,9 @@ const Users = () => {
                            : user,
                      ),
                   );
-                  setSnackbar({
-                     open: true,
-                     message: "User suspended.",
-                     severity: "success",
-                  });
+                  showSnackbar("User suspended.", "success");
                } catch {
-                  setSnackbar({
-                     open: true,
-                     message: "Failed to suspend the user.",
-                     severity: "error",
-                  });
+                  showSnackbar("Failed to suspend the user.", "error");
                }
                setSuspendedUser(null);
             }}

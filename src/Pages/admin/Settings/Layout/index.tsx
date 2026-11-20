@@ -8,8 +8,6 @@ import {
    useMediaQuery,
    Drawer,
    CircularProgress,
-   Snackbar,
-   Alert,
    Button,
    Paper,
 } from "@mui/material";
@@ -20,6 +18,7 @@ import useQueryParams from "@src/handler/useQueryParams";
 import Header from "./Header";
 import CustomBox from "@src/components/CustomBox";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 import GeneralTab from "../Tabs/GeneralTab";
 import PosTab from "../Tabs/PosTab";
@@ -92,14 +91,11 @@ const Layout = () => {
    const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
 
    const { settings, loading, updateSettings, resetSettings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [formValues, setFormValues] = useState<any>({});
    const [isSaving, setIsSaving] = useState(false);
    const [searchQuery, setSearchQuery] = useState("");
-   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
-      open: false,
-      message: "",
-      severity: "success",
-   });
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
 
    const [showSidebar, setShowSidebar] = useState(false);
 
@@ -131,24 +127,12 @@ const Layout = () => {
       try {
          const success = await updateSettings(formValues);
          if (success) {
-            setSnackbar({
-               open: true,
-               message: "Store settings saved and updated successfully!",
-               severity: "success",
-            });
+            showSnackbar("Store settings saved and updated successfully!", "success");
          } else {
-            setSnackbar({
-               open: true,
-               message: "Failed to save settings. Please try again.",
-               severity: "error",
-            });
+            showSnackbar("Failed to save settings. Please try again.", "error");
          }
       } catch {
-         setSnackbar({
-            open: true,
-            message: "An unexpected error occurred while saving.",
-            severity: "error",
-         });
+         showSnackbar("An unexpected error occurred while saving.", "error");
       } finally {
          setIsSaving(false);
       }
@@ -157,11 +141,7 @@ const Layout = () => {
    const handleResetDefaults = async (): Promise<boolean> => {
       const ok = await resetSettings();
       if (ok) {
-         setSnackbar({
-            open: true,
-            message: "Settings reset to factory defaults.",
-            severity: "success",
-         });
+         showSnackbar("Settings reset to factory defaults.", "success");
       }
       return ok;
    };
@@ -368,22 +348,6 @@ const Layout = () => {
                </Stack>
             </Paper>
          </Stack>
-
-         {/* Feedback Snackbar */}
-         <Snackbar
-            open={snackbar.open}
-            autoHideDuration={4000}
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-         >
-            <Alert
-               onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-               severity={snackbar.severity}
-               sx={{ width: "100%", borderRadius: 1.5 }}
-            >
-               {snackbar.message}
-            </Alert>
-         </Snackbar>
       </Stack>
    );
 };

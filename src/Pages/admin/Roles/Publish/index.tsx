@@ -17,6 +17,7 @@ import Item from "./Item";
 import Scrollbar from "react-browser-scrollbar";
 import { orderStatuses } from "../../Order/data";
 import { storedToEditorState, editorStateToStored } from "./permissions";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 export interface Permission {
    id: number;
@@ -434,6 +435,7 @@ const data: DataItem[] = [
 
 const Publish = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
    const router = useRouter();
    const params = useSearchParams();
@@ -487,7 +489,8 @@ const Publish = () => {
 
    const handleSaveRole = async () => {
       if (!roleName.trim()) {
-         alert("Please enter a role name");
+         // P3-2: native alert() replaced by the central snackbar.
+         showSnackbar("Please enter a role name", "error");
          return;
       }
       setSubmitting(true);
@@ -517,9 +520,15 @@ const Publish = () => {
             throw new Error(err.error || "Failed to save role");
          }
 
+         // P3-2: success confirmation via the central snackbar
+         // (survives the navigation back to the list).
+         showSnackbar(
+            id ? "Role updated successfully." : "Role created successfully.",
+            "success",
+         );
          router.push("/admin/roles");
       } catch (err: any) {
-         alert(err.message || "Failed to save role");
+         showSnackbar(err.message || "Failed to save role", "error");
       } finally {
          setSubmitting(false);
       }

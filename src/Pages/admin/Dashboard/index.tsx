@@ -183,7 +183,12 @@ const Dashboard = () => {
          isPositive: true,
       },
       {
-         title: "Pending / Processing",
+         // P3-7: this remainder is total − completed − cancelled,
+         // which is NOT just pending/processing orders — it also
+         // counts DELIVERED, HOLD, FAILED and every other status.
+         // The old "Pending / Processing" label described arithmetic
+         // the value does not perform; the value itself is unchanged.
+         title: "Other Orders",
          value: (metrics?.totalOrders || 0) - (metrics?.completedOrders || 0) - (metrics?.cancelledOrders || 0),
          isPositive: true,
       },
@@ -291,6 +296,23 @@ const Dashboard = () => {
                </Typography>
             )}
          </Stack>
+         {/* P3-5: when a reload fails but earlier data is on screen,
+             keep the figures AND show the failure with a Retry —
+             previously the error only rendered when there was no
+             data at all, so stale figures looked fresh. */}
+         {loadError && metrics && (
+            <Alert
+               severity="error"
+               action={
+                  <Button color="inherit" size="small" onClick={() => loadDashboard()}>
+                     Retry
+                  </Button>
+               }
+            >
+               Couldn&apos;t refresh dashboard data — the figures below may be
+               out of date.
+            </Alert>
+         )}
          {metrics && metrics.totalOrders === 0 && (
             <Alert severity="info">
                No orders were recorded in the selected range — the period

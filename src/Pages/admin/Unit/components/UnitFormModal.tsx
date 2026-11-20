@@ -14,6 +14,7 @@ import {
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import CustomModal from "@src/components/Modal";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { UnitFormValues, UnitType, unitSchema } from "../types";
 
 interface UnitFormModalProps {
@@ -29,6 +30,7 @@ export const UnitFormModal: React.FC<UnitFormModalProps> = ({
    selectedUnit,
    onSuccess,
 }) => {
+   const { showSnackbar } = useSnackbar();
    const [apiError, setApiError] = useState<string | null>(null);
    const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -115,7 +117,12 @@ export const UnitFormModal: React.FC<UnitFormModalProps> = ({
             return;
          }
 
-         // Successful creation or update
+         // Successful creation or update — P3-2: confirm through the
+         // central snackbar (failures already surface via apiError).
+         showSnackbar(
+            selectedUnit ? "Unit updated successfully." : "Unit created successfully.",
+            "success",
+         );
          onSuccess();
          handleClose();
       } catch (err: any) {

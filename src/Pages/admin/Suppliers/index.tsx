@@ -9,7 +9,6 @@ import {
    Grid,
    TextField,
    Typography,
-   Snackbar,
 } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
@@ -17,6 +16,7 @@ import CustomModal from "@src/components/Modal";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
@@ -93,9 +93,10 @@ export const SuppliersProfile = ({ name, number }: SuppliersProfileProps) => {
 const Suppliers = () => {
    const theme = useTheme();
    const { formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
    const [loadError, setLoadError] = useState(false);
-   const [snack, setSnack] = useState<string | null>(null);
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
 
    // Phase 2 (2.3): global-search deep link — /admin/suppliers?supplier=<id>
    React.useEffect(() => {
@@ -271,12 +272,12 @@ const Suppliers = () => {
             },
          );
          if (!res.ok) throw new Error("save failed");
-         setSnack(edit ? "Supplier updated." : "Supplier added.");
+         showSnackbar(edit ? "Supplier updated." : "Supplier added.", "success");
          setEdit(null);
          loadSuppliers();
          setModalOpen(false);
       } catch {
-         setSnack("Failed to save the supplier. Please try again.");
+         showSnackbar("Failed to save the supplier. Please try again.", "error");
       }
    };
 
@@ -569,9 +570,9 @@ const Suppliers = () => {
                      const res = await fetch(`/api/suppliers/${deleteOpen.id}`, { method: "DELETE" });
                      if (!res.ok) throw new Error("delete failed");
                      setSuppliers(suppliers.filter((s) => s.id !== deleteOpen.id));
-                     setSnack("Supplier deleted.");
+                     showSnackbar("Supplier deleted.", "success");
                   } catch {
-                     setSnack("Failed to delete the supplier.");
+                     showSnackbar("Failed to delete the supplier.", "error");
                   }
                   setDeleteOpen(null);
                }
@@ -580,22 +581,6 @@ const Suppliers = () => {
                setDeleteOpen(null);
             }}
          />
-         <Snackbar
-            open={Boolean(snack)}
-            autoHideDuration={4000}
-            onClose={() => setSnack(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-         >
-            {snack ? (
-               <Alert
-                  severity={snack.startsWith("Failed") ? "error" : "success"}
-                  onClose={() => setSnack(null)}
-                  sx={{ width: "100%" }}
-               >
-                  {snack}
-               </Alert>
-            ) : undefined}
-         </Snackbar>
       </Stack>
    );
 };

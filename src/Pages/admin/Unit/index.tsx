@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Stack, Button, Typography, useTheme } from "@mui/material";
+import { Alert, Stack, Button, Typography, useTheme } from "@mui/material";
 import Scrollbar from "react-browser-scrollbar";
 import Icon from "@src/components/Icon";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
@@ -36,9 +37,13 @@ export const productUnits = [
 
 const Unit = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const { filterQueryData } = useFilterQuery();
    const [units, setUnits] = useState<UnitType[]>([]);
    const [loading, setLoading] = useState(false);
+   // P3-2/P3-5: load failures were console.error-only — invisible
+   // to the user. They now render the established banner + Retry.
+   const [loadError, setLoadError] = useState<string | null>(null);
 
    // Modal & Dialog state
    const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,8 +53,13 @@ const Unit = () => {
 
    const loadUnits = useCallback(async () => {
       setLoading(true);
+      setLoadError(null);
       try {
          const res = await fetch("/api/units");
+         if (!res.ok) {
+            setLoadError("Failed to load units.");
+            return;
+         }
          if (res.ok) {
             const data = await res.json();
             const mapped: UnitType[] = data.map((u: any) => ({
@@ -63,8 +73,8 @@ const Unit = () => {
             }));
             setUnits(mapped);
          }
-      } catch (err) {
-         console.error("Failed to load units:", err);
+      } catch {
+         setLoadError("Failed to load units.");
       } finally {
          setLoading(false);
       }
@@ -102,7 +112,8 @@ const Unit = () => {
       setSelectedUnit(null);
    };
 
-   // Delete handler
+   // Delete handler — P3-2: outcomes confirm through the central
+   // snackbar instead of console-only / silent handling.
    const handleDelete = async () => {
       if (!selectedUnit) return;
       setIsDeleting(true);
@@ -110,11 +121,11 @@ const Unit = () => {
          const res = await fetch(`/api/units/${selectedUnit.id}`, {
             method: "DELETE",
          });
-         if (res.ok) {
-            await loadUnits();
-         }
-      } catch (err) {
-         console.error("Failed to delete unit:", err);
+         if (!res.ok) throw new Error("request failed");
+         showSnackbar("Unit deleted successfully.", "success");
+         await loadUnits();
+      } catch {
+         showSnackbar("Failed to delete the unit.", "error");
       } finally {
          setIsDeleting(false);
          setIsDeleteDialogOpen(false);
@@ -173,6 +184,19 @@ const Unit = () => {
                   Add Unit
                </Button>
             </Stack>
+
+            {loadError && (
+               <Alert
+                  severity="error"
+                  action={
+                     <Button color="inherit" size="small" onClick={loadUnits}>
+                        Retry
+                     </Button>
+                  }
+               >
+                  {loadError}
+               </Alert>
+            )}
 
             {/* Units Data Table */}
             {loading ? (

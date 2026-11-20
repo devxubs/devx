@@ -13,6 +13,7 @@ import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { GridRenderCellParams } from "@mui/x-data-grid";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 const productSchema = z.object({
    name: z.string().min(1, "Name is required!"),
@@ -38,6 +39,7 @@ export const categoriesData: CategoryType[] = [
 
 const Categories = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const { filterQueryData } = useFilterQuery();
    const [categories, setCategories] = useState<CategoryType[]>([]);
    const [loading, setLoading] = useState(false);
@@ -105,24 +107,34 @@ const Categories = () => {
       reset({ name: "" });
    };
 
-   // Add / Edit submit handler
+   // Add / Edit submit handler — P3-2: mutations previously gave no
+   // feedback at all; they now confirm through the central snackbar
+   // (a failed save keeps the modal open, mirroring Assets).
    const onSubmit: SubmitHandler<FormValues> = async (data) => {
       try {
-         if (selectedCategory) {
-            await fetch(`/api/categories/${selectedCategory.id}`, {
-               method: "PUT",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({ name: data.name }),
-            });
-         } else {
-            await fetch("/api/categories", {
-               method: "POST",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify({ name: data.name }),
-            });
-         }
+         const res = selectedCategory
+            ? await fetch(`/api/categories/${selectedCategory.id}`, {
+                 method: "PUT",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ name: data.name }),
+              })
+            : await fetch("/api/categories", {
+                 method: "POST",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ name: data.name }),
+              });
+         if (!res.ok) throw new Error("request failed");
+         showSnackbar(
+            selectedCategory
+               ? "Category updated successfully."
+               : "Category added successfully.",
+            "success",
+         );
          loadCategories();
-      } catch {}
+      } catch {
+         showSnackbar("Failed to save the category.", "error");
+         return;
+      }
       closeModal();
    };
 
@@ -130,11 +142,15 @@ const Categories = () => {
    const handleDelete = async () => {
       if (selectedCategory) {
          try {
-            await fetch(`/api/categories/${selectedCategory.id}`, {
+            const res = await fetch(`/api/categories/${selectedCategory.id}`, {
                method: "DELETE",
             });
+            if (!res.ok) throw new Error("request failed");
+            showSnackbar("Category deleted successfully.", "success");
             loadCategories();
-         } catch {}
+         } catch {
+            showSnackbar("Failed to delete the category.", "error");
+         }
          setSelectedCategory(null);
          setIsDeleteDialogOpen(false);
       }

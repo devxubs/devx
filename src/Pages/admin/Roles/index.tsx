@@ -1,7 +1,9 @@
 "use client";
 
-import { Button, Chip, Stack, Typography, useTheme } from "@mui/material";
+import { Alert, Button, Chip, Stack, Typography, useTheme } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
+import { TableSkeleton } from "@src/components/SkeletonLoader";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import Icon from "@src/components/Icon";
 import CustomTable, { MenuItem } from "@src/components/Table";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
@@ -118,21 +120,28 @@ const columns = [
 
 const Roles = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const router = useRouter();
 
    const [rolesData, setRolesData] = useState<any[]>([]);
    const [loading, setLoading] = useState(false);
+   // P3-5: a failed load used to be silent (empty table, no signal).
+   // It now surfaces the Product/Purchase banner + Retry pattern.
+   const [loadError, setLoadError] = useState<string | null>(null);
 
    const loadRoles = React.useCallback(async () => {
       setLoading(true);
+      setLoadError(null);
       try {
          const res = await fetch("/api/roles");
          if (res.ok) {
             const data = await res.json();
             setRolesData(data);
+         } else {
+            setLoadError("Failed to load roles.");
          }
       } catch {
-         // fallback
+         setLoadError("Failed to load roles.");
       } finally {
          setLoading(false);
       }
@@ -215,12 +224,30 @@ const Roles = () => {
                   Add Roles
                </Button>
             </Stack>
+            {loadError && (
+               <Alert
+                  severity="error"
+                  action={
+                     <Button color="inherit" size="small" onClick={loadRoles}>
+                        Retry
+                     </Button>
+                  }
+               >
+                  {loadError}
+               </Alert>
+            )}
             <Stack>
-               <CustomTable
-                  rows={filteredRoles}
-                  columns={columns}
-                  menuItems={actionMenu}
-               />
+               {/* P3-4: sibling list pages show a TableSkeleton while
+                   loading; Roles passed no loading visual at all. */}
+               {loading ? (
+                  <TableSkeleton rows={5} cols={4} />
+               ) : (
+                  <CustomTable
+                     rows={filteredRoles}
+                     columns={columns}
+                     menuItems={actionMenu}
+                  />
+               )}
                <AlertDialog
                   open={!!roleToDelete}
                   onClose={() => {
@@ -228,9 +255,14 @@ const Roles = () => {
                   }}
                   onConfirm={async () => {
                      if (roleToDelete) {
+                        // P3-2: deletes previously gave no feedback.
                         try {
-                           await fetch(`/api/roles/${roleToDelete.id}`, { method: "DELETE" });
-                        } catch {}
+                           const res = await fetch(`/api/roles/${roleToDelete.id}`, { method: "DELETE" });
+                           if (!res.ok) throw new Error("request failed");
+                           showSnackbar("Role deleted successfully.", "success");
+                        } catch {
+                           showSnackbar("Failed to delete the role.", "error");
+                        }
                         setRolesData((prev) =>
                            prev.filter((role) => role.id !== roleToDelete.id),
                         );

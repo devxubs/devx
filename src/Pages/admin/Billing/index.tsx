@@ -7,8 +7,6 @@ import {
    Grid,
    Typography,
    CircularProgress,
-   Alert,
-   Snackbar,
    Dialog,
    DialogTitle,
    DialogContent,
@@ -26,6 +24,7 @@ import CustomModal from "@src/components/Modal";
 import Modal from "./Modal";
 import PrintButton from "@src/components/PrintButton";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
 
@@ -63,6 +62,7 @@ const InfoCard = ({ title, value, icon }: InfoCardProps) => {
 
 const Billing = () => {
    const { settings, formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    // Phase B4b (P1-5): consume the shared toolbar search. The billing
    // API accepts no search parameter and returns the complete
    // transaction set, so the term filters the loaded rows client-side
@@ -78,11 +78,7 @@ const Billing = () => {
       totalPending: 0,
       totalCharges: 0,
    });
-   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
-      open: false,
-      message: "",
-      severity: "success",
-   });
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
    const [printReceipt, setPrintReceipt] = useState<any | null>(null);
 
    const loadBilling = useCallback(async () => {
@@ -109,15 +105,11 @@ const Billing = () => {
             });
          }
       } catch {
-         setSnackbar({
-            open: true,
-            message: "Failed to load settlement transactions.",
-            severity: "error",
-         });
+         showSnackbar("Failed to load settlement transactions.", "error");
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [showSnackbar]);
 
    useEffect(() => {
       loadBilling();
@@ -136,27 +128,15 @@ const Billing = () => {
          });
 
          if (res.ok) {
-            setSnackbar({
-               open: true,
-               message: "Payout settlement recorded successfully!",
-               severity: "success",
-            });
+            showSnackbar("Payout settlement recorded successfully!", "success");
             setOpenModal(false);
             loadBilling();
          } else {
             const err = await res.json();
-            setSnackbar({
-               open: true,
-               message: err.error || "Failed to submit payment transaction.",
-               severity: "error",
-            });
+            showSnackbar(err.error || "Failed to submit payment transaction.", "error");
          }
       } catch {
-         setSnackbar({
-            open: true,
-            message: "An error occurred while creating transaction.",
-            severity: "error",
-         });
+         showSnackbar("An error occurred while creating transaction.", "error");
       }
    };
 
@@ -487,22 +467,6 @@ Thank you for using DevX POS Settlement Gateway!
                <PrintButton label="Print Voucher" variant="contained" color="primary" />
             </DialogActions>
          </Dialog>
-
-         {/* Feedback Snackbar */}
-         <Snackbar
-            open={snackbar.open}
-            autoHideDuration={4000}
-            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-         >
-            <Alert
-               onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-               severity={snackbar.severity}
-               sx={{ width: "100%", borderRadius: 1.5 }}
-            >
-               {snackbar.message}
-            </Alert>
-         </Snackbar>
       </Stack>
    );
 };
