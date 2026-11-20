@@ -633,6 +633,35 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
    return steps;
 }
 
+// The four order-note types, by the titles the API writes into note
+// audit-history events (badgeLabel / diff.field / "<Title> Created|
+// Updated|Added" actions).
+const NOTE_AUDIT_TITLES = [
+   "Courier Note",
+   "Customer Note",
+   "Packing Note",
+   "Employee Note",
+] as const;
+
+/**
+ * Which of the four note types a persistent audit-history event
+ * belongs to, or null when the event is not a typed note event
+ * (e.g. a generic "Order Note" entry from the notes array).
+ */
+function noteTitleOfAuditEvent(item: any): string | null {
+   if (!item || item.category !== "note") return null;
+   for (const title of NOTE_AUDIT_TITLES) {
+      if (item.badgeLabel === title || item.diff?.field === title)
+         return title;
+   }
+   if (typeof item.action === "string") {
+      for (const title of NOTE_AUDIT_TITLES) {
+         if (item.action.includes(title)) return title;
+      }
+   }
+   return null;
+}
+
 export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
    if (!order) return [];
 
@@ -668,14 +697,15 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
              })()
            : {};
 
-   let hasPersistentNoteAudit = false;
+   const coveredNoteTitles = new Set<string>();
    let hasPersistentStatusAudit = false;
    let hasPersistentPaymentAudit = false;
    let hasPersistentCourierAudit = false;
 
    if (Array.isArray(tagsObj.auditHistory)) {
       for (const item of tagsObj.auditHistory) {
-         if (item.category === "note") hasPersistentNoteAudit = true;
+         const noteTitle = noteTitleOfAuditEvent(item);
+         if (noteTitle) coveredNoteTitles.add(noteTitle);
          if (item.category === "workflow" || item.action?.includes("Status")) hasPersistentStatusAudit = true;
          if (item.category === "payment") hasPersistentPaymentAudit = true;
          if (item.category === "courier") hasPersistentCourierAudit = true;
@@ -770,25 +800,57 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
       });
    }
 
-   // 4. Initial customer note fallback if no persistent audit history exists yet
-   if (!hasPersistentNoteAudit && order.orderNote) {
+   // 4. Initial note fallbacks, per note type (display-only). Orders
+   // created before create-time note events existed — or whose notes
+   // were otherwise saved without audit history — have note values in
+   // orderTags but no persistent events for them. For each of the four
+   // types WITHOUT persistent coverage, synthesize the same "… Note
+   // Added" entry the old customer-only fallback produced, from the
+   // note's current value. Types with real events are never
+   // duplicated; the Customer Note keeps its legacy source
+   // (orderTags.customerNote, falling back to the orderNote column).
+   const noteFallbackValues: { title: string; id: string; value: any }[] = [
+      {
+         title: "Courier Note",
+         id: "act-note-courier",
+         value: tagsObj.courierNote,
+      },
+      {
+         title: "Customer Note",
+         id: "act-note",
+         value: tagsObj.customerNote ? tagsObj.customerNote : order.orderNote,
+      },
+      {
+         title: "Packing Note",
+         id: "act-note-packing",
+         value: tagsObj.packingNote,
+      },
+      {
+         title: "Employee Note",
+         id: "act-note-employee",
+         value: tagsObj.employeeNote,
+      },
+   ];
+   for (const fb of noteFallbackValues) {
+      if (coveredNoteTitles.has(fb.title)) continue;
+      if (!String(fb.value || "").trim()) continue;
       const noteTimes = formatDateTimeParts(order.updatedAt || order.createdAt);
       activities.push({
-         id: "act-note",
-         action: "Customer Note Added",
+         id: fb.id,
+         action: `${fb.title} Added`,
          category: "note",
          actor: {
             ...defaultActor,
             role: "Customer Support",
          },
-         details: `"${order.orderNote}"`,
-         diff: { field: "Customer Note", previous: null, new: order.orderNote },
+         details: `"${fb.value}"`,
+         diff: { field: fb.title, previous: null, new: fb.value },
          date: noteTimes.date,
          time: noteTimes.time,
          timestamp: noteTimes.full,
          rawDate: noteTimes.rawDate,
          icon: "solar:notes-bold",
-         badgeLabel: "Customer Note",
+         badgeLabel: fb.title,
       });
    }
 
