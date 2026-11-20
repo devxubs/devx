@@ -25,6 +25,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@src/components/Icon";
 import { useSettings } from "@src/lib/settingsContext";
 
+import { mergeLineVariants } from "@src/lib/orderLineVariants";
 import { useOrderCreate } from "../create/useOrderCreate";
 import SectionCard from "../create/SectionCard";
 import CustomerSection from "../create/CustomerSection";
@@ -83,6 +84,38 @@ const Publish = () => {
             const o = await res.json();
             if (cancelled) return;
             const tags = (o.orderTags || {}) as any;
+            // P2-2: load each line product's LIVE variants so the
+            // variant selector renders on edit and the variant can be
+            // changed (the PUT already nets stock per product+variant).
+            // Source/shape match the create flow: the product payload's
+            // live, non-deleted variants (via GET /api/products/[id]).
+            // A failed fetch leaves that line with an empty picker
+            // list — its stored variantId still rides along below.
+            const orderItems: any[] = o.items || [];
+            const lineProductIds = Array.from(
+               new Set(
+                  orderItems
+                     .map((it: any) => it.productId || it.product?.id)
+                     .filter(Boolean),
+               ),
+            ) as string[];
+            const variantsByProductId: Record<string, any[]> = {};
+            await Promise.all(
+               lineProductIds.map(async (pid) => {
+                  try {
+                     const pr = await fetch(`/api/products/${pid}`);
+                     if (pr.ok) {
+                        const p = await pr.json();
+                        variantsByProductId[pid] = Array.isArray(p.variants)
+                           ? p.variants
+                           : [];
+                     }
+                  } catch {
+                     /* keep an empty picker list for this product */
+                  }
+               }),
+            );
+            if (cancelled) return;
             oc.hydrate({
                customer: {
                   id: o.customerId || o.customer?.id || null,
@@ -91,15 +124,15 @@ const Publish = () => {
                   phone: o.customer?.phone || "",
                   address: o.customer?.address || "",
                },
-               lines: (o.items || []).map((it: any) => ({
+               lines: mergeLineVariants(
+                  orderItems.map((it: any) => ({
                   productId: it.productId || it.id,
                   // INV-02: keep the line's variant linkage through an
-                  // edit — the picker list itself is not loaded here,
-                  // but variantId/variantName ride along so the PUT
-                  // preserves variant stock semantics.
+                  // edit — variantId/variantName ride along so the PUT
+                  // preserves variant stock semantics, and (P2-2) the
+                  // live picker list is merged in by mergeLineVariants.
                   variantId: it.variantId || null,
                   variantName: it.variant?.variantName || null,
-                  variants: [],
                   name: it.name,
                   code: it.code || it.variant?.sku || "",
                   productBarcode: it.product?.barcode || null,
@@ -117,7 +150,9 @@ const Publish = () => {
                   quantity: Number(it.quantity) || 1,
                   discountType: "amount",
                   discountValue: 0,
-               })),
+                  })),
+                  variantsByProductId,
+               ),
                orderSource: o.orderSource || "Website",
                status: toTitleStatus(o.status),
                courier: o.courier || "",
