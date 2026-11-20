@@ -170,10 +170,11 @@ const Stock = () => {
             {stats.map((s) => (
                <Grid key={s.label} size={{ xs: 12, sm: 6, lg: 3 }}>
                   <Paper
+                     elevation={0}
                      sx={{
                         p: 2,
                         borderRadius: 1.5,
-                        boxShadow: 15,
+                        border: `1px solid ${theme.palette.divider}`,
                         height: "100%",
                      }}
                   >
@@ -197,7 +198,13 @@ const Stock = () => {
             ))}
          </Grid>
 
-         <Paper sx={{ borderRadius: 1.5, boxShadow: 15 }}>
+         <Paper
+            elevation={0}
+            sx={{
+               borderRadius: 1.5,
+               border: `1px solid ${theme.palette.divider}`,
+            }}
+         >
             <Tabs
                value={tab}
                onChange={(_, v) => setTab(v)}

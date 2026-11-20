@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Button, Chip, Stack, Typography } from "@mui/material";
+import { Button, Stack, Typography } from "@mui/material";
 import { useRouter } from "next/navigation";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import Icon from "@src/components/Icon";
@@ -76,13 +76,11 @@ const LowStockTab = ({ products }: { products: StockProduct[] }) => {
          field: "quantity",
          headerName: "Current Qty",
          width: 120,
-         renderCell: (params: any) => (
-            <Chip
-               size="small"
-               label={params.row.quantity}
-               color={params.row.quantity <= 0 ? "error" : "warning"}
-            />
-         ),
+         // Shared CustomTable chip column (soft tinted chip, like
+         // every other admin table) instead of a solid MUI Chip.
+         chip: true,
+         color: (params: any) =>
+            params.row.quantity <= 0 ? "error" : "warning",
       },
       { field: "threshold", headerName: "Alert Threshold", width: 140 },
       { field: "suggestedQty", headerName: "Suggested Order Qty", width: 160 },

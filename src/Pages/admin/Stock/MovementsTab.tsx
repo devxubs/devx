@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
    Badge,
-   Chip,
    FormControl,
    IconButton,
    InputLabel,
@@ -164,14 +163,11 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
          field: "type",
          headerName: "Type",
          width: 130,
-         renderCell: (params: any) => (
-            <Chip
-               size="small"
-               label={params.row.type}
-               color={typeColor(params.row.type) as any}
-               variant="outlined"
-            />
-         ),
+         // Shared CustomTable chip column — the soft tinted chip
+         // every other admin table renders — instead of a one-off
+         // outlined MUI Chip.
+         chip: true,
+         color: (params: any) => typeColor(params.row.type),
       },
       {
          field: "quantity",

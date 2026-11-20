@@ -8,6 +8,8 @@ import {
    Stack,
    TextField,
    Typography,
+   alpha,
+   useTheme,
 } from "@mui/material";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import CustomModal from "@src/components/Modal";
@@ -30,6 +32,7 @@ interface WarehouseRow {
 }
 
 const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
+   const theme = useTheme();
    const [rows, setRows] = useState<WarehouseRow[]>([]);
    const [loading, setLoading] = useState(false);
    const [modalOpen, setModalOpen] = useState(false);
@@ -119,7 +122,19 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
             <Stack direction="row" spacing={1} alignItems="center">
                <Typography variant="body2">{params.row.name}</Typography>
                {params.row.isDefault && (
-                  <Chip size="small" label="Default" color="primary" />
+                  <Chip
+                     size="small"
+                     label="Default"
+                     sx={{
+                        // Same soft tinted chip the shared CustomTable
+                        // chip columns render (no solid fills).
+                        borderRadius: 0.5,
+                        fontWeight: 700,
+                        fontSize: "0.75rem",
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        color: theme.palette.primary.main,
+                     }}
+                  />
                )}
             </Stack>
          ),
