@@ -5,6 +5,9 @@ import {
    computeReturnableQuantity,
    soldOrConsumedQuantity,
    standingCreditOf,
+   computePurchaseTotals,
+   resolveRecordedDueAbsorbed,
+   sumRecordedDueAbsorbed,
 } from "@src/lib/purchaseReturns";
 import {
    deductStockForPurchaseReturn,
@@ -302,5 +305,167 @@ describe("restoreStockForPurchaseReturn", () => {
          quantity: 4,
          purchaseId: "pur1",
       });
+   });
+});
+
+// P0-1 (audit C-1): the purchase PUT totals recompute must be
+// return-aware. Returns record their dueAbsorbed in the CREATE
+// audit row (the value return deletion restores from); the PUT
+// subtracts Σ recorded dueAbsorbed from the gross recompute so an
+// edit can never resurrect settled due.
+describe("resolveRecordedDueAbsorbed / sumRecordedDueAbsorbed", () => {
+   it("prefers the CREATE audit row's recorded dueAbsorbed for every settlement", () => {
+      expect(
+         resolveRecordedDueAbsorbed({
+            settlement: "SUPPLIER_CREDIT",
+            totalAmount: 50,
+            creditConsumed: 20,
+            auditDueAbsorbed: 20,
+            auditCreditConsumed: 20,
+         }),
+      ).toBe(20);
+      expect(
+         resolveRecordedDueAbsorbed({
+            settlement: "CASH_REFUND",
+            totalAmount: 50,
+            creditConsumed: 50,
+            auditDueAbsorbed: 20,
+            cashRefundRemainder: 30,
+         }),
+      ).toBe(20);
+      expect(
+         resolveRecordedDueAbsorbed({
+            settlement: "DUE_REDUCTION",
+            totalAmount: 25,
+            creditConsumed: 25,
+            auditDueAbsorbed: 25,
+         }),
+      ).toBe(25);
+   });
+
+   it("falls back like return deletion when the audit row is missing", () => {
+      // SUPPLIER_CREDIT: creation initialised creditConsumed to
+      // dueAbsorbed, so the stored column is the fallback.
+      expect(
+         resolveRecordedDueAbsorbed({
+            settlement: "SUPPLIER_CREDIT",
+            totalAmount: 50,
+            creditConsumed: 20,
+         }),
+      ).toBe(20);
+      // CASH_REFUND: total − remainder (remainder from the refund
+      // Expense row, as deletion derives it).
+      expect(
+         resolveRecordedDueAbsorbed({
+            settlement: "CASH_REFUND",
+            totalAmount: 50,
+            creditConsumed: 50,
+            cashRefundRemainder: 30,
+         }),
+      ).toBe(20);
+      // DUE_REDUCTION: the whole amount was absorbed.
+      expect(
+         resolveRecordedDueAbsorbed({
+            settlement: "DUE_REDUCTION",
+            totalAmount: 25,
+            creditConsumed: 25,
+         }),
+      ).toBe(25);
+   });
+
+   it("sums the recorded absorption over live returns only (caller filters deleted)", () => {
+      expect(
+         sumRecordedDueAbsorbed([
+            {
+               settlement: "SUPPLIER_CREDIT",
+               totalAmount: 50,
+               creditConsumed: 20,
+               auditDueAbsorbed: 20,
+            },
+            {
+               settlement: "DUE_REDUCTION",
+               totalAmount: 10,
+               creditConsumed: 10,
+               auditDueAbsorbed: 10,
+            },
+         ]),
+      ).toBe(30);
+      expect(sumRecordedDueAbsorbed([])).toBe(0);
+   });
+});
+
+describe("computePurchaseTotals (return-aware PUT recompute)", () => {
+   it("(a) owner's scenario: note-only PUT after a return keeps total 80 / due 0", () => {
+      // Purchase: productAmount ৳100, others 0, discount 0, paid
+      // ৳80. One live return of ৳50 settled as SUPPLIER_CREDIT:
+      // dueAbsorbed 20, remainder ৳30 standing credit. The return
+      // already moved the stored totals to total 80 / due 0 — a
+      // note-only PUT recompute must reproduce exactly that.
+      const totals = computePurchaseTotals({
+         productAmount: 100,
+         othersCost: 0,
+         discount: 0,
+         paid: 80,
+         totalDueAbsorbed: 20,
+      });
+      expect(totals).toEqual({ total: 80, due: 0 });
+   });
+
+   it("(b) no returns: gross recompute is unchanged (total 100, due 20)", () => {
+      const totals = computePurchaseTotals({
+         productAmount: 100,
+         othersCost: 0,
+         discount: 0,
+         paid: 80,
+         totalDueAbsorbed: 0,
+      });
+      expect(totals).toEqual({ total: 100, due: 20 });
+   });
+
+   it("(c) items edit raising productAmount to 150 with the same live return", () => {
+      const totals = computePurchaseTotals({
+         productAmount: 150,
+         othersCost: 0,
+         discount: 0,
+         paid: 80,
+         totalDueAbsorbed: 20,
+      });
+      expect(totals).toEqual({ total: 130, due: 50 });
+   });
+
+   it("(d) return deleted (Σ = 0) after settlement: gross totals come back exactly once", () => {
+      // Return deletion itself restores total 80 → 100 / due 0 → 20
+      // from the recorded dueAbsorbed; a PUT after that must agree
+      // with the restored figures, not add the absorption again.
+      const totals = computePurchaseTotals({
+         productAmount: 100,
+         othersCost: 0,
+         discount: 0,
+         paid: 80,
+         totalDueAbsorbed: sumRecordedDueAbsorbed([]),
+      });
+      expect(totals).toEqual({ total: 100, due: 20 });
+   });
+
+   it("honours othersCost / discount / paid edits alongside the absorption", () => {
+      const totals = computePurchaseTotals({
+         productAmount: 100,
+         othersCost: 10,
+         discount: 5,
+         paid: 90,
+         totalDueAbsorbed: 20,
+      });
+      expect(totals).toEqual({ total: 85, due: 0 });
+   });
+
+   it("clamps at zero when the absorption exceeds the edited gross total", () => {
+      const totals = computePurchaseTotals({
+         productAmount: 10,
+         othersCost: 0,
+         discount: 0,
+         paid: 0,
+         totalDueAbsorbed: 20,
+      });
+      expect(totals).toEqual({ total: 0, due: 0 });
    });
 });

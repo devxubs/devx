@@ -6,7 +6,12 @@ import {
    findVariantlessVariableLine,
    StockReversalUnsafeError,
 } from "@src/lib/stock";
-import { lockPurchaseRow } from "@src/lib/purchaseReturns";
+import {
+   lockPurchaseRow,
+   computePurchaseTotals,
+   sumRecordedDueAbsorbed,
+   CASH_REFUND_EXPENSE_TYPE,
+} from "@src/lib/purchaseReturns";
 import {
    logAudit,
    auditActorFromContext,
@@ -315,10 +320,94 @@ export async function PUT(
             );
          }
 
+         // P0-1 (audit C-1): the totals recompute must be
+         // return-aware. Purchase returns reduce `total`/`due` by
+         // their recorded `dueAbsorbed` but never touch
+         // `productAmount`, so recomputing from the gross fields
+         // alone resurrects due the shop already settled — and a
+         // later return-deletion would then add it back a second
+         // time. Σ recorded dueAbsorbed over the purchase's live
+         // (non-deleted) returns is read here, under the same
+         // Purchase-row lock, from the SAME source of truth return
+         // deletion restores from: each return's CREATE audit row,
+         // with the deletion route's settlement fallbacks.
+         const liveReturns = await tx.purchaseReturn.findMany({
+            where: { purchaseId: id, isDeleted: false },
+            select: {
+               id: true,
+               customId: true,
+               settlement: true,
+               totalAmount: true,
+               creditConsumed: true,
+            },
+         });
+         let totalDueAbsorbed = 0;
+         if (liveReturns.length > 0) {
+            const createAudits = await tx.auditLog.findMany({
+               where: {
+                  entityType: "PURCHASE_RETURN",
+                  action: "CREATE",
+                  entityId: { in: liveReturns.map((r) => r.id) },
+               },
+               orderBy: { createdAt: "asc" },
+               select: { entityId: true, changes: true },
+            });
+            const auditByReturnId = new Map<string, any>();
+            for (const row of createAudits) {
+               if (!auditByReturnId.has(row.entityId)) {
+                  auditByReturnId.set(row.entityId, row.changes);
+               }
+            }
+            const absorbedEntries = [];
+            for (const r of liveReturns) {
+               const changes: any = auditByReturnId.get(r.id) || null;
+               const auditDueAbsorbed =
+                  changes && typeof changes.dueAbsorbed?.to === "number"
+                     ? changes.dueAbsorbed.to
+                     : null;
+               const auditCreditConsumed =
+                  changes && typeof changes.creditConsumed?.to === "number"
+                     ? changes.creditConsumed.to
+                     : null;
+               let cashRefundRemainder: number | null = null;
+               if (r.settlement === "CASH_REFUND" && auditDueAbsorbed == null) {
+                  // Same fallback source as return deletion: the
+                  // refund Expense row carries the remainder.
+                  const refundExpense = await tx.expense.findFirst({
+                     where: {
+                        type: CASH_REFUND_EXPENSE_TYPE,
+                        isDeleted: false,
+                        note: { contains: r.customId || r.id },
+                     },
+                     orderBy: { createdAt: "asc" },
+                  });
+                  if (refundExpense) {
+                     cashRefundRemainder = Math.abs(
+                        Number(refundExpense.amount),
+                     );
+                  }
+               }
+               absorbedEntries.push({
+                  settlement: r.settlement,
+                  totalAmount: Number(r.totalAmount),
+                  creditConsumed: Number(r.creditConsumed),
+                  auditDueAbsorbed,
+                  auditCreditConsumed,
+                  cashRefundRemainder,
+               });
+            }
+            totalDueAbsorbed = sumRecordedDueAbsorbed(absorbedEntries);
+         }
+
          // Financial integrity: total and due are always recomputed
          // server-side; a client-sent `due` is never stored verbatim.
-         const total = Math.max(0, productAmount + othersCost - discount);
-         const due = Math.max(0, total - paid);
+         const { total, due } = computePurchaseTotals({
+            productAmount,
+            othersCost,
+            discount,
+            paid,
+            totalDueAbsorbed,
+         });
 
          const result = await tx.purchase.update({
             where: { id },

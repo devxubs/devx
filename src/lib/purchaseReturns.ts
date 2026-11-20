@@ -240,6 +240,113 @@ export async function lockPurchaseRow(
 }
 
 /**
+ * The `dueAbsorbed` a return recorded at creation time.
+ *
+ * `dueAbsorbed` is NOT a column on PurchaseReturn — creation
+ * records it in the return's CREATE audit row
+ * (`changes.dueAbsorbed.to`), and return deletion restores the
+ * purchase totals from exactly that recorded value (see
+ * `src/app/api/purchase-returns/[id]/route.ts`). This resolver
+ * mirrors the deletion route's source of truth and its
+ * settlement-derived fallbacks, so any other consumer (the
+ * purchase PUT totals recompute) agrees with deletion about what
+ * a return absorbed:
+ *
+ *   1. the CREATE audit row's recorded `dueAbsorbed`, when present;
+ *   2. SUPPLIER_CREDIT → the audit row's recorded initial
+ *      `creditConsumed`, else the row's stored `creditConsumed`
+ *      (creation initialised it to `dueAbsorbed`);
+ *   3. CASH_REFUND → `totalAmount − remainder`, the remainder read
+ *      from the refund Expense row by the caller (the same source
+ *      deletion uses); when the caller cannot supply it, the whole
+ *      amount is treated as absorbed — reachable only when the
+ *      audit row is also missing, which creation's same-transaction
+ *      audit write makes impossible in practice;
+ *   4. DUE_REDUCTION → `totalAmount` (fully absorbed by design).
+ */
+export function resolveRecordedDueAbsorbed(input: {
+   settlement: string;
+   totalAmount: number;
+   creditConsumed: number;
+   auditDueAbsorbed?: number | null;
+   auditCreditConsumed?: number | null;
+   cashRefundRemainder?: number | null;
+}): number {
+   if (
+      input.auditDueAbsorbed != null &&
+      Number.isFinite(Number(input.auditDueAbsorbed))
+   ) {
+      return round2(input.auditDueAbsorbed);
+   }
+   const totalAmount = round2(input.totalAmount);
+   if (input.settlement === "SUPPLIER_CREDIT") {
+      return round2(input.auditCreditConsumed ?? input.creditConsumed);
+   }
+   if (input.settlement === "CASH_REFUND") {
+      const remainder =
+         input.cashRefundRemainder != null
+            ? round2(input.cashRefundRemainder)
+            : 0;
+      return round2(totalAmount - remainder);
+   }
+   // DUE_REDUCTION (and any legacy settlement): fully absorbed.
+   return totalAmount;
+}
+
+/** Σ recorded `dueAbsorbed` over a purchase's live returns. */
+export function sumRecordedDueAbsorbed(
+   entries: Array<Parameters<typeof resolveRecordedDueAbsorbed>[0]>,
+): number {
+   return round2(
+      entries.reduce((sum, entry) => sum + resolveRecordedDueAbsorbed(entry), 0),
+   );
+}
+
+export interface PurchaseTotalsInput {
+   productAmount: number;
+   othersCost: number;
+   discount: number;
+   paid: number;
+   /**
+    * Σ recorded `dueAbsorbed` over the purchase's non-deleted
+    * returns (see `resolveRecordedDueAbsorbed`). Returns reduce
+    * `total`/`due` by this amount but never touch `productAmount`,
+    * so a totals recompute that omits it resurrects due the shop
+    * already settled (audit C-1 / P0-1).
+    */
+   totalDueAbsorbed: number;
+}
+
+export interface PurchaseTotals {
+   total: number;
+   due: number;
+}
+
+/**
+ * The purchase totals recompute used by the purchase PUT route:
+ * gross totals from the (possibly edited) money fields, minus the
+ * due already absorbed by live purchase returns, with the same
+ * clamping the handler has always applied (`total` never negative,
+ * `due = max(0, total − paid)`). Pure — the route feeds it values
+ * read under the Purchase-row lock.
+ */
+export function computePurchaseTotals(
+   input: PurchaseTotalsInput,
+): PurchaseTotals {
+   const total = round2(
+      Math.max(
+         0,
+         round2(input.productAmount) +
+            round2(input.othersCost) -
+            round2(input.discount) -
+            round2(input.totalDueAbsorbed),
+      ),
+   );
+   const due = round2(Math.max(0, total - round2(input.paid)));
+   return { total, due };
+}
+
+/**
  * Σ standing return credit for one supplier over non-deleted
  * returns, computed from stored columns alone (one aggregate, no
  * settlement-type branch — see the header for why that holds).
