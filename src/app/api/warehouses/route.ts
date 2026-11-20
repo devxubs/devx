@@ -8,7 +8,13 @@ export async function GET(request: NextRequest) {
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
-      let warehouses: any[] = await prisma.warehouse.findMany({
+      // P2-1: GET is read-only — it previously auto-created a
+      // "Main Warehouse" row when the list was empty (a write on
+      // read). Default-warehouse provisioning now lives in the POST
+      // create path below, which guarantees a default exists once
+      // any warehouse has been created; the stock engine's mirror
+      // tolerates the no-warehouse state until then.
+      const warehouses: any[] = await prisma.warehouse.findMany({
          where: { isDeleted: false },
          orderBy: { createdAt: "asc" },
          // Phase 3A (3.2): the Stock workspace lists per-warehouse stock
@@ -17,21 +23,6 @@ export async function GET(request: NextRequest) {
             stocks: { select: { productId: true, quantity: true } },
          },
       });
-
-      // Auto-provision default warehouse if none exist
-      if (warehouses.length === 0) {
-         const { customId } = await generateNextEntityId("WAREHOUSE");
-         const defaultWh = await prisma.warehouse.create({
-            data: {
-               customId,
-               name: "Main Warehouse",
-               code: "WH-MAIN",
-               address: "Central Distribution Center, Dhaka",
-               isDefault: true,
-            },
-         });
-         warehouses = [defaultWh];
-      }
 
       return NextResponse.json(warehouses);
    } catch {
@@ -59,6 +50,17 @@ export async function POST(request: NextRequest) {
 
       const { customId } = await generateNextEntityId("WAREHOUSE");
 
+      // P2-1: the create path guarantees a default warehouse exists
+      // (this provisioning used to hide inside GET). An explicit
+      // isDefault resets the others as before; when NO live default
+      // exists at all, the new warehouse becomes the default so the
+      // stock mirror always has a target once warehouses are in use.
+      const existingDefault = await prisma.warehouse.findFirst({
+         where: { isDeleted: false, isDefault: true },
+         select: { id: true },
+      });
+      const makeDefault = Boolean(isDefault) || !existingDefault;
+
       if (isDefault) {
          // Reset other defaults
          await prisma.warehouse.updateMany({
@@ -74,7 +76,7 @@ export async function POST(request: NextRequest) {
             code: code?.trim() || customId,
             address: address?.trim() || null,
             phone: phone?.trim() || null,
-            isDefault: Boolean(isDefault),
+            isDefault: makeDefault,
          },
       });
 
