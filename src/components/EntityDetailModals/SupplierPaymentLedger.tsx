@@ -72,6 +72,9 @@ const SupplierPaymentLedger = ({
    const [txId, setTxId] = useState("");
    const [note, setNote] = useState("");
    const [allocation, setAllocation] = useState<any>(null);
+   // B2-3 (audit C-9 / P1-7): standing return credit the operator
+   // chooses to apply to the allocated purchase's due.
+   const [applyCredit, setApplyCredit] = useState("");
    const [formError, setFormError] = useState<string | null>(null);
    const [saving, setSaving] = useState(false);
    const [notice, setNotice] = useState<string | null>(null);
@@ -115,13 +118,31 @@ const SupplierPaymentLedger = ({
       })),
    ];
 
+   const standingReturnCredit = Number(summary?.returnCredit || 0);
+   const creditValue = Number(applyCredit || 0);
+
    const handleRecord = async () => {
-      const value = Number(amount);
-      if (!Number.isFinite(value) || value <= 0) {
+      const value = amount.trim() === "" ? 0 : Number(amount);
+      const credit = Number.isFinite(creditValue) ? creditValue : NaN;
+      if (!Number.isFinite(credit) || credit < 0) {
+         setFormError("Return credit to apply cannot be negative.");
+         return;
+      }
+      if (credit > 0 && !allocation?.id) {
+         setFormError("Return credit can only be applied when a purchase is allocated.");
+         return;
+      }
+      if (credit > standingReturnCredit) {
+         setFormError(
+            `Return credit exceeds this supplier's standing credit (${formatCurrency(standingReturnCredit)}).`,
+         );
+         return;
+      }
+      if (!Number.isFinite(value) || value < 0 || value + credit <= 0) {
          setFormError("Enter a payment amount greater than zero.");
          return;
       }
-      if (allocation?.id && value > Number(allocation.due || 0)) {
+      if (allocation?.id && value + credit > Number(allocation.due || 0)) {
          setFormError(
             `Amount exceeds the due on the selected purchase (${formatCurrency(Number(allocation.due || 0))}). Record the rest as a separate unallocated payment.`,
          );
@@ -135,6 +156,7 @@ const SupplierPaymentLedger = ({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                amount: value,
+               applyReturnCredit: credit > 0 ? credit : undefined,
                paymentMethod: method || null,
                paymentTxId: txId.trim() || null,
                paymentDate: payDate || undefined,
@@ -144,8 +166,13 @@ const SupplierPaymentLedger = ({
          });
          const data = await res.json().catch(() => ({}));
          if (!res.ok) throw new Error(data.message || data.error || "Failed to record payment");
-         setNotice(`Payment ${data.payment?.customId || ""} recorded.`);
+         setNotice(
+            credit > 0
+               ? `Payment recorded — ${formatCurrency(credit)} of return credit applied.`
+               : `Payment ${data.payment?.customId || ""} recorded.`,
+         );
          setAmount("");
+         setApplyCredit("");
          setTxId("");
          setNote("");
          setAllocation(null);
@@ -271,6 +298,20 @@ const SupplierPaymentLedger = ({
                         )}
                      />
                   </Grid>
+                  {allocation?.id && standingReturnCredit > 0 && (
+                     <Grid size={{ xs: 12 }}>
+                        <TextField
+                           label="Apply return credit (optional)"
+                           type="number"
+                           size="small"
+                           fullWidth
+                           value={applyCredit}
+                           onChange={(e) => setApplyCredit(e.target.value)}
+                           inputProps={{ min: 0, step: "0.01" }}
+                           helperText={`Standing return credit: ${formatCurrency(standingReturnCredit)} — at most ${formatCurrency(Math.min(standingReturnCredit, Number(allocation.due || 0)))} can settle this purchase. Credit is not cash: it is recorded as a separate “Return Credit” ledger entry.`}
+                        />
+                     </Grid>
+                  )}
                   <Grid size={{ xs: 12 }}>
                      <TextField
                         label="Note (optional)"

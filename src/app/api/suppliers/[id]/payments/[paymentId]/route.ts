@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
-import { lockPurchaseRow } from "@src/lib/purchaseReturns";
+import {
+   lockPurchaseRow,
+   lockSupplierRow,
+   RETURN_CREDIT_PAYMENT_METHOD,
+} from "@src/lib/purchaseReturns";
 import {
    logAudit,
    auditActorFromContext,
@@ -57,6 +61,54 @@ export async function DELETE(
             await lockPurchaseRow(tx, payment.purchaseId);
          }
 
+         // B2-3: voiding a "Return Credit" payment must also give
+         // the consumed standing credit BACK (decrement each
+         // return's creditConsumed by the amount the payment's
+         // audit row recorded), or the credit would vanish. The
+         // supplier lock matches the create path's lock order
+         // (purchase → supplier). If the distribution record is
+         // missing the void is refused rather than desyncing the
+         // credit balances.
+         const isCreditPayment =
+            payment.paymentMethod === RETURN_CREDIT_PAYMENT_METHOD;
+         if (isCreditPayment) {
+            await lockSupplierRow(tx, supplier.id);
+            const createAudit = await tx.auditLog.findFirst({
+               where: {
+                  entityType: "SUPPLIER_PAYMENT",
+                  entityId: payment.id,
+                  action: "PAYMENT",
+               },
+               orderBy: { createdAt: "asc" },
+               select: { changes: true },
+            });
+            let allocations: Array<{ returnId: string; amount: number }> = [];
+            try {
+               const raw = (createAudit?.changes as any)?.creditApplications?.to;
+               if (typeof raw === "string") allocations = JSON.parse(raw);
+            } catch {
+               allocations = [];
+            }
+            if (!Array.isArray(allocations) || allocations.length === 0) {
+               return { status: 409 as const };
+            }
+            for (const alloc of allocations) {
+               const ret = await tx.purchaseReturn.findUnique({
+                  where: { id: alloc.returnId },
+                  select: { creditConsumed: true },
+               });
+               if (!ret) continue;
+               const restored = Math.max(
+                  0,
+                  Math.round((Number(ret.creditConsumed) - Number(alloc.amount || 0)) * 100) / 100,
+               );
+               await tx.purchaseReturn.update({
+                  where: { id: alloc.returnId },
+                  data: { creditConsumed: restored },
+               });
+            }
+         }
+
          await tx.supplierPayment.update({
             where: { id: payment.id },
             // QA fix (B2): stamp deletedAt alongside isDeleted, the
@@ -88,7 +140,7 @@ export async function DELETE(
             entityType: "SUPPLIER_PAYMENT",
             entityId: payment.id,
             entityCustomId: payment.customId,
-            summary: `Supplier payment ${payment.customId || payment.id} of ৳${Number(payment.amount || 0).toFixed(2)} voided${payment.purchaseId ? " — allocation reversed" : ""}`,
+            summary: `Supplier payment ${payment.customId || payment.id} of ৳${Number(payment.amount || 0).toFixed(2)} voided${payment.purchaseId ? " — allocation reversed" : ""}${isCreditPayment ? " — return credit restored" : ""}`,
             ...auditCtx,
          });
 
@@ -97,6 +149,16 @@ export async function DELETE(
 
       if (result.status === 404) {
          return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+      }
+      if (result.status === 409) {
+         return NextResponse.json(
+            {
+               error: "Cannot void payment",
+               message:
+                  "This return-credit payment's consumption record was not found, so voiding it would desync the supplier's standing credit. It has not been voided.",
+            },
+            { status: 409 },
+         );
       }
 
       return NextResponse.json({

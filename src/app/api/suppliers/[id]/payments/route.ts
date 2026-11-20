@@ -4,8 +4,18 @@ import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import {
    lockPurchaseRow,
+   lockSupplierRow,
    standingCreditOf,
+   getStandingReturnCredit,
+   planReturnCreditApplication,
+   RETURN_CREDIT_PAYMENT_METHOD,
 } from "@src/lib/purchaseReturns";
+import {
+   isMobilePaymentMethod,
+   findSupplierPaymentWithTxId,
+   supplierTxIdClashMessage,
+   DuplicateSupplierTxIdError,
+} from "@src/lib/payments";
 import {
    logAudit,
    auditActorFromContext,
@@ -167,14 +177,51 @@ export async function POST(
       }
 
       const body = await request.json();
-      const amount = Number(body.amount);
-      if (!Number.isFinite(amount) || amount <= 0) {
+
+      // B2-3 (audit C-9 / P1-7): a payment settles a purchase due
+      // with cash (`amount`, as always) and/or standing purchase-
+      // return credit (`applyReturnCredit`, allocated payments
+      // only). Credit is not cash: it is recorded as its own ledger
+      // row (method "Return Credit", no TxID) and consumes the
+      // supplier's SUPPLIER_CREDIT returns oldest-first, so Σdue
+      // and Σstanding credit fall by the same amount and netPayable
+      // moves only by the cash part — every approved payable
+      // formula stays true.
+      const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
+      const creditAmount = round2(Number(body.applyReturnCredit ?? 0));
+      if (!Number.isFinite(creditAmount) || creditAmount < 0) {
+         return NextResponse.json(
+            { error: "Validation error", message: "Return credit amount cannot be negative." },
+            { status: 400 },
+         );
+      }
+      const cashAmount =
+         body.amount === undefined && creditAmount > 0 ? 0 : Number(body.amount);
+      if (creditAmount > 0) {
+         if (!Number.isFinite(cashAmount) || cashAmount < 0) {
+            return NextResponse.json(
+               { error: "Validation error", message: "Payment amount cannot be negative." },
+               { status: 400 },
+            );
+         }
+         if (!body.purchaseId) {
+            return NextResponse.json(
+               {
+                  error: "Validation error",
+                  message: "Return credit can only be applied to a payment allocated to a purchase.",
+               },
+               { status: 400 },
+            );
+         }
+      } else if (!Number.isFinite(cashAmount) || cashAmount <= 0) {
          return NextResponse.json(
             { error: "Validation error", message: "Payment amount must be greater than zero." },
             { status: 400 },
          );
       }
-      const amountCents = Math.round(amount * 100);
+      const amountCents = Math.round(cashAmount * 100);
+      const creditCents = Math.round(creditAmount * 100);
+      const totalCents = amountCents + creditCents;
 
       const purchaseId = body.purchaseId ? String(body.purchaseId) : null;
       let purchase: any = null;
@@ -192,13 +239,53 @@ export async function POST(
             );
          }
          const dueCents = Math.round(Number(purchase.due || 0) * 100);
-         if (amountCents > dueCents) {
+         if (totalCents > dueCents) {
             return NextResponse.json(
                {
                   error: "Validation error",
                   message: `Payment exceeds the outstanding due on this purchase (${Number(purchase.due).toFixed(2)}). Record the remainder as an unallocated payment if it is an advance.`,
                },
                { status: 400 },
+            );
+         }
+      }
+
+      // Fast path for credit: the authoritative check re-runs
+      // inside the transaction from locked, freshly-read rows.
+      if (creditAmount > 0) {
+         const standing = await getStandingReturnCredit(prisma, supplier.id);
+         if (creditCents > Math.round(standing * 100)) {
+            return NextResponse.json(
+               {
+                  error: "Validation error",
+                  message: `Return credit of ৳${creditAmount.toFixed(2)} exceeds this supplier's standing return credit (৳${standing.toFixed(2)}).`,
+               },
+               { status: 400 },
+            );
+         }
+      }
+
+      // B2-4 (audit R-2 / P1-8): duplicate-TxID check, mirroring
+      // the order side — pre-transaction here, re-checked inside
+      // the transaction below. Mobile-money methods only; cash and
+      // empty TxIDs are never rejected.
+      const paymentMethod = body.paymentMethod
+         ? String(body.paymentMethod).trim()
+         : null;
+      const paymentTxId = body.paymentTxId
+         ? String(body.paymentTxId).trim()
+         : null;
+      if (paymentTxId && isMobilePaymentMethod(paymentMethod)) {
+         const clash = await findSupplierPaymentWithTxId(paymentTxId);
+         const clashMessage = supplierTxIdClashMessage(
+            paymentMethod,
+            paymentTxId,
+            clash,
+         );
+         if (clashMessage) {
+            return NextResponse.json(
+               { error: "Duplicate transaction ID", message: clashMessage },
+               { status: 409 },
             );
          }
       }
@@ -249,7 +336,7 @@ export async function POST(
                };
             }
             const freshDueCents = Math.round(Number(freshPurchase.due || 0) * 100);
-            if (amountCents > freshDueCents) {
+            if (totalCents > freshDueCents) {
                return {
                   ok: false as const,
                   message: `Payment exceeds the outstanding due on this purchase (${Number(freshPurchase.due).toFixed(2)}). Record the remainder as an unallocated payment if it is an advance.`,
@@ -257,27 +344,122 @@ export async function POST(
             }
          }
 
-         const { customId } = await generateNextEntityId("SUPPLIER_PAYMENT", tx);
-         const payment = await tx.supplierPayment.create({
-            data: {
-               customId,
-               supplierId: supplier.id,
-               purchaseId: freshPurchase ? freshPurchase.id : null,
-               amount: amountCents / 100,
-               paymentMethod: body.paymentMethod
-                  ? String(body.paymentMethod).trim()
-                  : null,
-               paymentTxId: body.paymentTxId
-                  ? String(body.paymentTxId).trim()
-                  : null,
-               paymentDate,
-               note: body.note ? String(body.note).trim() : null,
-               createdById: gate.userId,
-            },
-         });
+         // B2-3: credit consumption is serialized per supplier —
+         // the consumed return rows may belong to other purchases
+         // of this supplier, which the purchase lock alone does
+         // not cover. Lock order is always purchase → supplier.
+         if (creditAmount > 0) {
+            await lockSupplierRow(tx, supplier.id);
+         }
+
+         // B2-4: in-transaction duplicate-TxID re-check (narrows
+         // the race exactly like the order side's S1 fix).
+         if (paymentTxId && isMobilePaymentMethod(paymentMethod)) {
+            const clash = await findSupplierPaymentWithTxId(
+               paymentTxId,
+               undefined,
+               tx,
+            );
+            if (clash) throw new DuplicateSupplierTxIdError(paymentTxId, clash);
+         }
+
+         // B2-3: plan the credit consumption from freshly-read
+         // live returns (oldest first) and apply the increments.
+         // Validation happens before any write below, so a refusal
+         // persists nothing.
+         let creditAllocations: ReturnType<typeof planReturnCreditApplication> = [];
+         if (creditAmount > 0 && freshPurchase) {
+            const liveCreditReturns = await tx.purchaseReturn.findMany({
+               where: {
+                  supplierId: supplier.id,
+                  isDeleted: false,
+                  settlement: "SUPPLIER_CREDIT",
+               },
+               orderBy: { createdAt: "asc" },
+               select: {
+                  id: true,
+                  customId: true,
+                  totalAmount: true,
+                  creditConsumed: true,
+               },
+            });
+            try {
+               creditAllocations = planReturnCreditApplication(
+                  liveCreditReturns.map((r: any) => ({
+                     id: r.id,
+                     customId: r.customId,
+                     totalAmount: Number(r.totalAmount),
+                     creditConsumed: Number(r.creditConsumed),
+                  })),
+                  creditAmount,
+                  Math.max(
+                     0,
+                     round2(Number(freshPurchase.due || 0) - amountCents / 100),
+                  ),
+               );
+            } catch (err: any) {
+               return { ok: false as const, message: err.message };
+            }
+            for (const alloc of creditAllocations) {
+               await tx.purchaseReturn.update({
+                  where: { id: alloc.returnId },
+                  data: { creditConsumed: alloc.newCreditConsumed },
+               });
+            }
+         }
+
+         let payment: any = null;
+         if (amountCents > 0 || creditAmount <= 0) {
+            const { customId } = await generateNextEntityId("SUPPLIER_PAYMENT", tx);
+            payment = await tx.supplierPayment.create({
+               data: {
+                  customId,
+                  supplierId: supplier.id,
+                  purchaseId: freshPurchase ? freshPurchase.id : null,
+                  amount: amountCents / 100,
+                  paymentMethod,
+                  paymentTxId,
+                  paymentDate,
+                  note: body.note ? String(body.note).trim() : null,
+                  createdById: gate.userId,
+               },
+            });
+         }
+
+         // The credit leg is its own ledger row: no cash moved, so
+         // it carries the dedicated method and no TxID, with the
+         // consumed returns named in its note.
+         let creditPayment: any = null;
+         if (creditAmount > 0) {
+            const { customId: creditCustomId } =
+               await generateNextEntityId("SUPPLIER_PAYMENT", tx);
+            const creditNote =
+               `Return credit applied: ` +
+               creditAllocations
+                  .map(
+                     (a) =>
+                        `${a.returnCustomId || a.returnId} ৳${a.amount.toFixed(2)}`,
+                  )
+                  .join(", ");
+            creditPayment = await tx.supplierPayment.create({
+               data: {
+                  customId: creditCustomId,
+                  supplierId: supplier.id,
+                  purchaseId: freshPurchase ? freshPurchase.id : null,
+                  amount: creditCents / 100,
+                  paymentMethod: RETURN_CREDIT_PAYMENT_METHOD,
+                  paymentTxId: null,
+                  paymentDate,
+                  note: body.note
+                     ? `${creditNote} — ${String(body.note).trim()}`
+                     : creditNote,
+                  createdById: gate.userId,
+               },
+            });
+         }
 
          if (freshPurchase) {
-            const newPaid = Number(freshPurchase.paid || 0) + amountCents / 100;
+            const newPaid = Number(freshPurchase.paid || 0) + totalCents / 100;
             const newDue = Math.max(0, Number(freshPurchase.total || 0) - newPaid);
             await tx.purchase.update({
                where: { id: freshPurchase.id },
@@ -286,20 +468,55 @@ export async function POST(
          }
 
          // Phase 4 (D1): audit in the same transaction.
-         await logAudit(tx, {
-            actor: auditActorFromContext(gate),
-            action: "PAYMENT",
-            entityType: "SUPPLIER_PAYMENT",
-            entityId: payment.id,
-            entityCustomId: payment.customId,
-            summary: freshPurchase
-               ? `Supplier payment ${payment.customId} of ৳${(amountCents / 100).toFixed(2)} allocated to purchase ${freshPurchase.customId || freshPurchase.id}`
-               : `Supplier payment ${payment.customId} of ৳${(amountCents / 100).toFixed(2)} recorded as unallocated credit`,
-            ...auditCtx,
-         });
+         if (payment) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "PAYMENT",
+               entityType: "SUPPLIER_PAYMENT",
+               entityId: payment.id,
+               entityCustomId: payment.customId,
+               summary: freshPurchase
+                  ? `Supplier payment ${payment.customId} of ৳${(amountCents / 100).toFixed(2)} allocated to purchase ${freshPurchase.customId || freshPurchase.id}`
+                  : `Supplier payment ${payment.customId} of ৳${(amountCents / 100).toFixed(2)} recorded as unallocated credit`,
+               ...auditCtx,
+            });
+         }
+         if (creditPayment) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "PAYMENT",
+               entityType: "SUPPLIER_PAYMENT",
+               entityId: creditPayment.id,
+               entityCustomId: creditPayment.customId,
+               summary: `Supplier payment ${creditPayment.customId} applied ৳${creditAmount.toFixed(2)} of standing return credit to purchase ${freshPurchase?.customId || freshPurchase?.id} (${creditAllocations.map((a) => `${a.returnCustomId || a.returnId} ৳${a.amount.toFixed(2)}`).join(", ")})`,
+               // The per-return distribution is the machine-readable
+               // record the void route reverses from (buildChanges
+               // stores scalars only, so it rides as a JSON string).
+               changes: {
+                  returnCreditApplied: { from: null, to: creditAmount },
+                  creditApplications: {
+                     from: null,
+                     to: JSON.stringify(
+                        creditAllocations.map((a) => ({
+                           returnId: a.returnId,
+                           amount: a.amount,
+                        })),
+                     ),
+                  },
+               },
+               ...auditCtx,
+            });
+         }
 
          const summary = await payableSummary(tx, supplier.id);
-         return { ok: true as const, payment, summary };
+         return {
+            ok: true as const,
+            payment: payment || creditPayment,
+            creditPayment,
+            appliedReturnCredit: creditAmount,
+            creditAllocations,
+            summary,
+         };
       });
 
       if (!result.ok) {
@@ -321,11 +538,34 @@ export async function POST(
                note: result.payment.note || "",
                purchaseId: result.payment.purchaseId,
             },
+            creditPayment: result.creditPayment
+               ? {
+                    id: result.creditPayment.id,
+                    customId: result.creditPayment.customId,
+                    amount: Number(result.creditPayment.amount),
+                    paymentMethod: result.creditPayment.paymentMethod || "",
+                    paymentDate: result.creditPayment.paymentDate,
+                    note: result.creditPayment.note || "",
+                    purchaseId: result.creditPayment.purchaseId,
+                 }
+               : null,
+            appliedReturnCredit: result.appliedReturnCredit,
+            creditAllocations: result.creditAllocations.map((a) => ({
+               returnId: a.returnId,
+               returnCustomId: a.returnCustomId,
+               amount: a.amount,
+            })),
             summary: result.summary,
          },
          { status: 201 },
       );
-   } catch {
+   } catch (err) {
+      if (err instanceof DuplicateSupplierTxIdError) {
+         return NextResponse.json(
+            { error: "Duplicate transaction ID", message: err.message },
+            { status: 409 },
+         );
+      }
       return NextResponse.json(
          { error: "Failed to record supplier payment" },
          { status: 500 },

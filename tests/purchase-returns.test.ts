@@ -8,6 +8,9 @@ import {
    computePurchaseTotals,
    resolveRecordedDueAbsorbed,
    sumRecordedDueAbsorbed,
+   computeNetPurchaseQuantities,
+   planReturnCreditApplication,
+   returnCreditWasConsumed,
 } from "@src/lib/purchaseReturns";
 import {
    deductStockForPurchaseReturn,
@@ -467,5 +470,187 @@ describe("computePurchaseTotals (return-aware PUT recompute)", () => {
          totalDueAbsorbed: 20,
       });
       expect(totals).toEqual({ total: 0, due: 0 });
+   });
+});
+
+// B2-1 (audit C-11 / P1-3): purchase delete/restore must move the
+// NET quantities — purchased minus live returns — per
+// product+variant.
+describe("computeNetPurchaseQuantities", () => {
+   it("no returns → gross quantities", () => {
+      expect(
+         computeNetPurchaseQuantities(
+            [
+               { productId: "p1", variantId: null, quantity: 10 },
+               { productId: "p2", variantId: null, quantity: 4 },
+            ],
+            [],
+         ),
+      ).toEqual([
+         { productId: "p1", variantId: null, quantity: 10 },
+         { productId: "p2", variantId: null, quantity: 4 },
+      ]);
+   });
+
+   it("partial return → net (buy 10, return 3 → 7)", () => {
+      expect(
+         computeNetPurchaseQuantities(
+            [{ productId: "p1", variantId: null, quantity: 10 }],
+            [{ productId: "p1", variantId: null, quantity: 3 }],
+         ),
+      ).toEqual([{ productId: "p1", variantId: null, quantity: 7 }]);
+   });
+
+   it("full return → zero: the line moves nothing and is dropped", () => {
+      expect(
+         computeNetPurchaseQuantities(
+            [{ productId: "p1", variantId: null, quantity: 5 }],
+            [{ productId: "p1", variantId: null, quantity: 5 }],
+         ),
+      ).toEqual([]);
+   });
+
+   it("variant lines are keyed separately from each other and the product pool", () => {
+      expect(
+         computeNetPurchaseQuantities(
+            [
+               { productId: "p1", variantId: "v-red", quantity: 6 },
+               { productId: "p1", variantId: "v-blue", quantity: 4 },
+               { productId: "p1", variantId: null, quantity: 2 },
+            ],
+            [
+               { productId: "p1", variantId: "v-red", quantity: 2 },
+               { productId: "p1", variantId: null, quantity: 2 },
+            ],
+         ),
+      ).toEqual([
+         { productId: "p1", variantId: "v-red", quantity: 4 },
+         { productId: "p1", variantId: "v-blue", quantity: 4 },
+      ]);
+   });
+
+   it("aggregates duplicate lines and sums returns across multiple return records", () => {
+      expect(
+         computeNetPurchaseQuantities(
+            [
+               { productId: "p1", variantId: null, quantity: 6 },
+               { productId: "p1", variantId: null, quantity: 4 },
+            ],
+            [
+               { productId: "p1", variantId: null, quantity: 1 },
+               { productId: "p1", variantId: null, quantity: 2 },
+            ],
+         ),
+      ).toEqual([{ productId: "p1", variantId: null, quantity: 7 }]);
+   });
+
+   it("drops snapshot lines without a product and never goes negative", () => {
+      expect(
+         computeNetPurchaseQuantities(
+            [
+               { productId: null, variantId: null, quantity: 3 },
+               { productId: "p1", variantId: null, quantity: 2 },
+            ],
+            [{ productId: "p1", variantId: null, quantity: 5 }],
+         ),
+      ).toEqual([]);
+   });
+});
+
+// B2-3 (audit C-9 / P1-7): standing return-credit consumption —
+// oldest first, capped at standing credit and at the purchase due.
+describe("planReturnCreditApplication", () => {
+   const ret = (id: string, totalAmount: number, creditConsumed: number) => ({
+      id,
+      customId: `PRET_${id}`,
+      totalAmount,
+      creditConsumed,
+   });
+
+   it("single return, partial consume", () => {
+      // Return of ৳50 with dueAbsorbed 20 at creation → standing 30.
+      const plan = planReturnCreditApplication([ret("1", 50, 20)], 12, 100);
+      expect(plan).toEqual([
+         { returnId: "1", returnCustomId: "PRET_1", amount: 12, newCreditConsumed: 32 },
+      ]);
+   });
+
+   it("multiple returns are consumed oldest first", () => {
+      const plan = planReturnCreditApplication(
+         [ret("1", 50, 20), ret("2", 40, 10)], // standing 30 + 30
+         45,
+         100,
+      );
+      expect(plan).toEqual([
+         { returnId: "1", returnCustomId: "PRET_1", amount: 30, newCreditConsumed: 50 },
+         { returnId: "2", returnCustomId: "PRET_2", amount: 15, newCreditConsumed: 25 },
+      ]);
+   });
+
+   it("skips returns with no standing credit (fully consumed / non-credit settlements)", () => {
+      const plan = planReturnCreditApplication(
+         [ret("1", 50, 50), ret("2", 40, 10)],
+         10,
+         100,
+      );
+      expect(plan).toEqual([
+         { returnId: "2", returnCustomId: "PRET_2", amount: 10, newCreditConsumed: 20 },
+      ]);
+   });
+
+   it("caps at total standing credit — requesting more is rejected, never partially applied", () => {
+      expect(() =>
+         planReturnCreditApplication([ret("1", 50, 20)], 31, 100),
+      ).toThrow(/standing return credit/);
+   });
+
+   it("caps at the purchase due — requesting more than the due is rejected", () => {
+      expect(() =>
+         planReturnCreditApplication([ret("1", 50, 20)], 25, 20),
+      ).toThrow(/outstanding due/);
+   });
+
+   it("zero standing credit → any application is rejected", () => {
+      expect(() =>
+         planReturnCreditApplication([ret("1", 50, 50)], 1, 100),
+      ).toThrow(/standing return credit/);
+      expect(() => planReturnCreditApplication([], 1, 100)).toThrow(
+         /standing return credit/,
+      );
+   });
+
+   it("rejects a zero or negative amount", () => {
+      expect(() =>
+         planReturnCreditApplication([ret("1", 50, 20)], 0, 100),
+      ).toThrow(/greater than zero/);
+      expect(() =>
+         planReturnCreditApplication([ret("1", 50, 20)], -5, 100),
+      ).toThrow(/greater than zero/);
+   });
+
+   it("consuming exactly the full standing credit drains every return in order", () => {
+      const plan = planReturnCreditApplication(
+         [ret("1", 50, 20), ret("2", 40, 10)],
+         60,
+         60,
+      );
+      expect(plan.map((a) => a.newCreditConsumed)).toEqual([50, 40]);
+   });
+});
+
+describe("returnCreditWasConsumed (the now-live deletion guard predicate)", () => {
+   it("untouched return: current == creation baseline → deletion allowed", () => {
+      // SUPPLIER_CREDIT creation baseline = dueAbsorbed (20 of 50).
+      expect(returnCreditWasConsumed(20, 20)).toBe(false);
+   });
+
+   it("consumed beyond the baseline → deletion refused", () => {
+      expect(returnCreditWasConsumed(20, 32)).toBe(true);
+      expect(returnCreditWasConsumed(20, 50)).toBe(true);
+   });
+
+   it("a fully-paid purchase's return starts at baseline 0 — any consumption trips the guard", () => {
+      expect(returnCreditWasConsumed(0, 0)).toBe(false);
+      expect(returnCreditWasConsumed(0, 0.01)).toBe(true);
    });
 });

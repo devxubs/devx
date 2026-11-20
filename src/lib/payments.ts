@@ -73,3 +73,78 @@ export function duplicateTxIdMessage(
    const label = clash.orderId || clash.orderCode || clash.customId || clash.id;
    return `Transaction ID "${txId}" is already recorded on order ${label}. Check for a duplicate entry before saving.`;
 }
+
+// ─────────────────────────────────────────────
+// Supplier payments (B2-4, audit R-2 / P1-8): the same app-level
+// duplicate-TxID discipline the order side has always had, applied
+// to SupplierPayment rows. Deliberately NOT a database unique
+// constraint either — the 409 names the clashing payment.
+// ─────────────────────────────────────────────
+
+/**
+ * Find a non-deleted supplier payment (other than
+ * `excludePaymentId`) that already carries the given non-empty
+ * transaction ID. Returns null when the TxID is empty or unused.
+ * Accepts any Prisma-like client so write paths can re-run the
+ * check inside their transaction, mirroring findOrderWithTxId.
+ */
+export async function findSupplierPaymentWithTxId(
+   txId: string,
+   excludePaymentId?: string,
+   db: any = prisma,
+) {
+   const clean = String(txId || "").trim();
+   if (!clean) return null;
+   return db.supplierPayment.findFirst({
+      where: {
+         paymentTxId: clean,
+         isDeleted: false,
+         ...(excludePaymentId ? { id: { not: excludePaymentId } } : {}),
+      },
+      select: { id: true, customId: true },
+   });
+}
+
+export function duplicateSupplierTxIdMessage(
+   txId: string,
+   clash: { id?: string; customId?: string | null },
+): string {
+   const label = clash.customId || clash.id;
+   return `Transaction ID "${txId}" is already recorded on supplier payment ${label}. Check for a duplicate entry before saving.`;
+}
+
+/**
+ * Thrown by supplier-payment write paths when the in-transaction
+ * duplicate-TxID re-check finds a clash; handlers map it to the
+ * same 409 body the pre-transaction check returns.
+ */
+export class DuplicateSupplierTxIdError extends Error {
+   txId: string;
+   clash: { id?: string; customId?: string | null };
+   constructor(txId: string, clash: { id?: string; customId?: string | null }) {
+      super(duplicateSupplierTxIdMessage(txId, clash));
+      this.name = "DuplicateSupplierTxIdError";
+      this.txId = txId;
+      this.clash = clash;
+   }
+}
+
+/**
+ * Pure duplicate decision for supplier payments: a clash matters
+ * only for the mobile-money methods a TxID is meaningful for, and
+ * only when the TxID is non-empty and another live payment carries
+ * it. Cash payments and empty TxIDs are never rejected. Returns the
+ * 409 message, or null when the payment may proceed. The route
+ * feeds it the clash row from findSupplierPaymentWithTxId (queried
+ * both before and inside the transaction).
+ */
+export function supplierTxIdClashMessage(
+   method: string | null | undefined,
+   txId: string | null | undefined,
+   clash: { id?: string; customId?: string | null } | null | undefined,
+): string | null {
+   const clean = String(txId || "").trim();
+   if (!clean || !clash) return null;
+   if (!isMobilePaymentMethod(method)) return null;
+   return duplicateSupplierTxIdMessage(clean, clash);
+}

@@ -5,6 +5,10 @@ import {
    findOrderWithTxId,
    duplicateTxIdMessage,
    DuplicateTxIdError,
+   findSupplierPaymentWithTxId,
+   duplicateSupplierTxIdMessage,
+   DuplicateSupplierTxIdError,
+   supplierTxIdClashMessage,
 } from "@src/lib/payments";
 import { parsePagination } from "@src/lib/pagination";
 import { formatCompactNumber, calculateOrderTotals } from "@src/lib/utils";
@@ -48,6 +52,51 @@ describe("payment helpers", () => {
       expect(await findOrderWithTxId("", undefined, db)).toBeNull();
       expect(await findOrderWithTxId("   ", undefined, db)).toBeNull();
       expect(findFirst).not.toHaveBeenCalled();
+   });
+
+   // B2-4 (audit R-2 / P1-8): supplier payments get the same
+   // duplicate-TxID discipline as orders.
+   it("names the clashing supplier payment, preferring its customId", () => {
+      expect(
+         duplicateSupplierTxIdMessage("TX123", { customId: "SPAY_7", id: "cuid" }),
+      ).toContain("SPAY_7");
+      expect(duplicateSupplierTxIdMessage("TX123", { id: "cuid9" })).toContain("cuid9");
+      const err = new DuplicateSupplierTxIdError("TX123", { customId: "SPAY_7" });
+      expect(err.message).toContain("TX123");
+      expect(err.txId).toBe("TX123");
+   });
+
+   it("supplierTxIdClashMessage rejects only mobile methods with a live clash", () => {
+      const clash = { id: "sp2", customId: "SPAY_2" };
+      expect(supplierTxIdClashMessage("bKash", "TX9", clash)).toContain("SPAY_2");
+      expect(supplierTxIdClashMessage("Nagad", "TX9", clash)).toContain("TX9");
+      // Cash and other non-mobile methods are never rejected.
+      expect(supplierTxIdClashMessage("Cash", "TX9", clash)).toBeNull();
+      expect(supplierTxIdClashMessage("Bank Transfer", "TX9", clash)).toBeNull();
+      expect(supplierTxIdClashMessage(null, "TX9", clash)).toBeNull();
+      // Empty TxIDs and unused TxIDs pass.
+      expect(supplierTxIdClashMessage("bKash", "", clash)).toBeNull();
+      expect(supplierTxIdClashMessage("bKash", "   ", clash)).toBeNull();
+      expect(supplierTxIdClashMessage("bKash", "TX9", null)).toBeNull();
+   });
+
+   it("findSupplierPaymentWithTxId ignores empty TxIDs without querying", async () => {
+      const findFirst = vi.fn(async () => null);
+      const db = { supplierPayment: { findFirst } };
+      expect(await findSupplierPaymentWithTxId("", undefined, db)).toBeNull();
+      expect(await findSupplierPaymentWithTxId("   ", undefined, db)).toBeNull();
+      expect(findFirst).not.toHaveBeenCalled();
+   });
+
+   it("findSupplierPaymentWithTxId trims, excludes self and skips deleted rows", async () => {
+      const findFirst = vi.fn(async () => ({ id: "sp2", customId: "SPAY_2" }));
+      const db = { supplierPayment: { findFirst } };
+      const found = await findSupplierPaymentWithTxId("  TX9  ", "sp1", db);
+      expect(found).toEqual({ id: "sp2", customId: "SPAY_2" });
+      const where = (findFirst.mock.calls[0] as any[])[0].where;
+      expect(where.paymentTxId).toBe("TX9");
+      expect(where.isDeleted).toBe(false);
+      expect(where.id).toEqual({ not: "sp1" });
    });
 
    it("findOrderWithTxId trims the code and excludes the current order", async () => {

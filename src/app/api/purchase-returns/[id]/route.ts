@@ -4,6 +4,7 @@ import { prisma } from "@src/lib/prisma";
 import { restoreStockForPurchaseReturn } from "@src/lib/stock";
 import {
    lockPurchaseRow,
+   returnCreditWasConsumed,
    CASH_REFUND_EXPENSE_TYPE,
 } from "@src/lib/purchaseReturns";
 import {
@@ -128,7 +129,10 @@ export async function DELETE(
 
          if (purchaseReturn.settlement === "SUPPLIER_CREDIT") {
             const baseline = auditCreditConsumed ?? creditConsumed;
-            if (round2(creditConsumed) > round2(baseline)) {
+            // B2-3: this guard is now LIVE — allocated supplier
+            // payments consume standing credit by incrementing
+            // creditConsumed beyond this creation baseline.
+            if (returnCreditWasConsumed(baseline, creditConsumed)) {
                throw new ReturnReversalError(
                   `This return cannot be deleted: ৳${round2(creditConsumed - baseline).toFixed(2)} of its supplier credit has already been consumed by later transactions, which cannot be unwound here.`,
                );
