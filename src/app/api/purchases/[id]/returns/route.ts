@@ -166,12 +166,66 @@ export async function POST(
             );
          }
 
+         // Current on-hand stock per line (product pool, or the
+         // variant's own pool for variant lines), read under the
+         // same lock. A return can never deduct units that were
+         // already sold — the validator caps each line at the stock
+         // still on hand and rejects with a clear business error
+         // BEFORE anything is written, instead of surfacing the
+         // stock engine's never-negative guard as a raw failure.
+         // Lines whose product is missing or does not track
+         // inventory get onHand = null (stock does not limit them —
+         // the engine skips those lines too).
+         const stockProductIds = Array.from(
+            new Set(
+               lines
+                  .map(({ purchaseItem }) => purchaseItem.productId)
+                  .filter((v): v is string => Boolean(v)),
+            ),
+         );
+         const stockVariantIds = Array.from(
+            new Set(
+               lines
+                  .map(({ purchaseItem }) => purchaseItem.variantId)
+                  .filter((v): v is string => Boolean(v)),
+            ),
+         );
+         const stockProducts = stockProductIds.length
+            ? await tx.product.findMany({
+                 where: { id: { in: stockProductIds } },
+                 select: { id: true, quantity: true, trackInventory: true },
+              })
+            : [];
+         const stockVariants = stockVariantIds.length
+            ? await tx.productVariant.findMany({
+                 where: { id: { in: stockVariantIds } },
+                 select: { id: true, quantity: true },
+              })
+            : [];
+         const stockProductById = new Map(
+            stockProducts.map((p: any) => [p.id, p]),
+         );
+         const stockVariantById = new Map(
+            stockVariants.map((v: any) => [v.id, v]),
+         );
+         const onHandFor = (purchaseItem: any): number | null => {
+            if (!purchaseItem.productId) return null;
+            const product = stockProductById.get(purchaseItem.productId);
+            if (!product || product.trackInventory === false) return null;
+            if (purchaseItem.variantId) {
+               const variant = stockVariantById.get(purchaseItem.variantId);
+               return variant ? Number(variant.quantity) || 0 : null;
+            }
+            return Number(product.quantity) || 0;
+         };
+
          const quantityError = validateReturnQuantities(
             lines.map(({ purchaseItem, quantity }) => ({
                name: purchaseItem.name,
                purchased: purchaseItem.quantity,
                alreadyReturned: alreadyByItem.get(purchaseItem.id) || 0,
                requested: quantity,
+               onHand: onHandFor(purchaseItem),
             })),
          );
          if (quantityError) throw new ReturnValidationError(quantityError);

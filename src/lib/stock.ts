@@ -55,7 +55,7 @@ export class StockReversalUnsafeError extends Error {
    productName: string;
    constructor(productName: string, available: number, required: number) {
       super(
-         `Cannot reverse purchase stock for "${productName}": ${required} unit(s) were added by the purchase but only ${available} remain in stock (the rest were already sold). Adjust stock manually instead.`,
+         `Cannot reverse purchase stock for "${productName}": ${required} unit(s) were added by the purchase but only ${available} remain in stock — the rest were already sold, so this reversal cannot be completed without making stock negative.`,
       );
       this.name = "StockReversalUnsafeError";
       this.productName = productName;

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
    computeReturnSettlement,
    validateReturnQuantities,
+   computeReturnableQuantity,
+   soldOrConsumedQuantity,
    standingCreditOf,
 } from "@src/lib/purchaseReturns";
 import {
@@ -123,6 +125,85 @@ describe("validateReturnQuantities", () => {
          ]),
       ).toMatch(/at least 1/);
    });
+
+   // Stock-aware cap (owner's reported case): units that were
+   // already sold are NOT returnable, even when the
+   // purchased − returned arithmetic would still allow them.
+   it("refuses a return of a unit that was already sold (purchased 1, sold 1, on hand 0)", () => {
+      const err = validateReturnQuantities([
+         {
+            name: "Kids Denim Pant",
+            purchased: 1,
+            alreadyReturned: 0,
+            requested: 1,
+            onHand: 0,
+         },
+      ]);
+      expect(err).toMatch(/Kids Denim Pant/);
+      expect(err).toMatch(/Only 0 of the 1 requested/);
+      expect(err).toMatch(/1 unit\(s\) were already sold/);
+      expect(err).not.toMatch(/manually/i);
+   });
+
+   it("caps at the stock still on hand (purchased 5, sold 2, already returned 1 → returnable 2)", () => {
+      // On hand = 5 − 1 returned − 2 sold = 2.
+      expect(
+         validateReturnQuantities([
+            { name: "Shirt", purchased: 5, alreadyReturned: 1, requested: 2, onHand: 2 },
+         ]),
+      ).toBeNull();
+      const err = validateReturnQuantities([
+         { name: "Shirt", purchased: 5, alreadyReturned: 1, requested: 3, onHand: 2 },
+      ]);
+      expect(err).toMatch(/Only 2 of the 3 requested/);
+      expect(err).toMatch(/2 unit\(s\) were already sold/);
+   });
+
+   it("onHand above the purchased cap does not raise the limit", () => {
+      // Restocked by a later purchase: onHand 9, but only
+      // 5 − 1 = 4 of THIS purchase remain returnable.
+      expect(
+         validateReturnQuantities([
+            { name: "Shirt", purchased: 5, alreadyReturned: 1, requested: 4, onHand: 9 },
+         ]),
+      ).toBeNull();
+      expect(
+         validateReturnQuantities([
+            { name: "Shirt", purchased: 5, alreadyReturned: 1, requested: 5, onHand: 9 },
+         ]),
+      ).toMatch(/at most 4/);
+   });
+
+   it("onHand = null leaves the purchased-only rule in charge (untracked/snapshot lines)", () => {
+      expect(
+         validateReturnQuantities([
+            { name: "Service", purchased: 3, alreadyReturned: 1, requested: 2, onHand: null },
+         ]),
+      ).toBeNull();
+   });
+});
+
+describe("computeReturnableQuantity / soldOrConsumedQuantity", () => {
+   it("distinguishes purchased, returned, sold and on-hand", () => {
+      // Purchased 5, returned 1, sold 2, on hand 2.
+      expect(soldOrConsumedQuantity(5, 1, 2)).toBe(2);
+      expect(computeReturnableQuantity(5, 1, 2)).toBe(2);
+   });
+
+   it("everything sold → nothing returnable", () => {
+      expect(soldOrConsumedQuantity(1, 0, 0)).toBe(1);
+      expect(computeReturnableQuantity(1, 0, 0)).toBe(0);
+   });
+
+   it("restocks from other purchases never make sold negative or raise the cap", () => {
+      expect(soldOrConsumedQuantity(5, 1, 9)).toBe(0);
+      expect(computeReturnableQuantity(5, 1, 9)).toBe(4);
+   });
+
+   it("null onHand → only the purchased cap applies", () => {
+      expect(computeReturnableQuantity(5, 1, null)).toBe(4);
+      expect(computeReturnableQuantity(5, 5, null)).toBe(0);
+   });
 });
 
 describe("standingCreditOf", () => {
@@ -183,6 +264,24 @@ describe("deductStockForPurchaseReturn", () => {
          ),
       ).rejects.toBeInstanceOf(StockReversalUnsafeError);
       expect(f.productQty("p1")).toBe(2);
+      expect(f.movements).toHaveLength(0);
+   });
+
+   it("the unsafe-reversal error explains the sold units and never suggests manual adjustment", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Kids Denim Pant", quantity: 0 }],
+      });
+      const err = await deductStockForPurchaseReturn(
+         f.tx,
+         [{ productId: "p1", quantity: 1 }],
+         { purchaseId: "pur1", note: "Purchase return PRET_4" },
+      ).catch((e: any) => e);
+      expect(err).toBeInstanceOf(StockReversalUnsafeError);
+      expect(err.message).toMatch(/Kids Denim Pant/);
+      expect(err.message).toMatch(/already sold/);
+      expect(err.message).toMatch(/stock negative/);
+      expect(err.message).not.toMatch(/manually/i);
+      expect(f.productQty("p1")).toBe(0);
       expect(f.movements).toHaveLength(0);
    });
 });

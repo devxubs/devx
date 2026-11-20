@@ -124,14 +124,69 @@ export interface ReturnQuantityLine {
    purchased: number;
    alreadyReturned: number;
    requested: number;
+   /**
+    * Current on-hand stock for the line's product (or variant, for
+    * variant lines), read under the Purchase-row lock. `null` means
+    * stock does not limit this line — snapshot lines with no product,
+    * or products that do not track inventory (the stock engine skips
+    * those too). When a number is given, the request is ALSO capped
+    * at the stock still on hand: units that were already sold can
+    * never be returned, because deducting them would push stock
+    * below zero.
+    */
+   onHand?: number | null;
+}
+
+/**
+ * Units of a purchase line that are gone for good — sold (or
+ * otherwise consumed) after the purchase and never returned:
+ * purchased − already returned − still on hand, floored at 0 (other
+ * purchases may have restocked the product, which must not make
+ * this number negative). Only meaningful when `onHand` is known.
+ */
+export function soldOrConsumedQuantity(
+   purchased: number,
+   alreadyReturned: number,
+   onHand: number,
+): number {
+   return Math.max(
+      0,
+      Math.floor(purchased) -
+         Math.max(0, Math.floor(alreadyReturned)) -
+         Math.max(0, Math.floor(onHand)),
+   );
+}
+
+/**
+ * The maximum quantity of a purchase line that can actually be
+ * returned right now: what was purchased and not yet returned,
+ * further capped at the stock still on hand (sold units cannot be
+ * returned). With `onHand === null` stock does not limit the line
+ * and only the purchased cap applies. Pure — shared by the API
+ * validation and the return form's per-line caps so the two can
+ * never disagree about the limit.
+ */
+export function computeReturnableQuantity(
+   purchased: number,
+   alreadyReturned: number,
+   onHand: number | null,
+): number {
+   const purchasable = Math.max(
+      0,
+      Math.floor(purchased) - Math.max(0, Math.floor(alreadyReturned)),
+   );
+   if (onHand == null) return purchasable;
+   return Math.min(purchasable, Math.max(0, Math.floor(onHand)));
 }
 
 /**
  * Per-line quantity guard: a return line must request a whole
- * number ≥ 1 and may never push the cumulative returned quantity
- * past what was purchased. Returns an error message, or null when
- * every line is valid. Pure — the route feeds it quantities read
- * under the Purchase-row lock.
+ * number ≥ 1, may never push the cumulative returned quantity past
+ * what was purchased, and — when the line's on-hand stock is known —
+ * may never exceed the stock still on hand (already-sold units are
+ * not returnable). Returns an error message, or null when every
+ * line is valid. Pure — the route feeds it quantities read under
+ * the Purchase-row lock.
  */
 export function validateReturnQuantities(
    lines: ReturnQuantityLine[],
@@ -144,6 +199,21 @@ export function validateReturnQuantities(
       if (already + line.requested > line.purchased) {
          const available = Math.max(0, line.purchased - already);
          return `Cannot return ${line.requested} unit(s) of "${line.name}": ${line.purchased} purchased, ${already} already returned, so at most ${available} can be returned.`;
+      }
+      if (line.onHand != null) {
+         const returnable = computeReturnableQuantity(
+            line.purchased,
+            already,
+            line.onHand,
+         );
+         if (line.requested > returnable) {
+            const sold = soldOrConsumedQuantity(
+               line.purchased,
+               already,
+               line.onHand,
+            );
+            return `Only ${returnable} of the ${line.requested} requested unit(s) of "${line.name}" can be returned: ${sold} unit(s) were already sold (purchased ${line.purchased}, already returned ${already}, in stock ${Math.max(0, Math.floor(line.onHand))}).`;
+         }
       }
    }
    return null;

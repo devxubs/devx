@@ -23,11 +23,19 @@ import {
    Typography,
 } from "@mui/material";
 import { useSettings } from "@src/lib/settingsContext";
+import {
+   computeReturnableQuantity,
+   soldOrConsumedQuantity,
+} from "@src/lib/purchaseReturns";
 
 // Phase 4 (D2): create a purchase return from the purchase detail.
-// Quantities are capped client-side at purchased − already returned
-// (the API re-validates under the Purchase-row lock, so a stale cap
-// can never oversell a return). The settlement preview mirrors the
+// Quantities are capped client-side at the RETURNABLE quantity —
+// purchased − already returned, further capped at the stock still
+// on hand, because units that were already sold can never be
+// returned (the shared computeReturnableQuantity in
+// lib/purchaseReturns is the same function the API validates with
+// under the Purchase-row lock, so the form's cap and the server's
+// limit cannot drift apart). The settlement preview mirrors the
 // approved server math exactly: dueAbsorbed = min(R, purchase due);
 // any remainder becomes supplier credit (default) or a cash refund,
 // chosen by the user only when a remainder exists.
@@ -44,7 +52,12 @@ const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 interface ReturnLine {
    item: any;
    alreadyReturned: number;
-   available: number;
+   /** Current stock for the line's pool; null = stock not tracked. */
+   onHand: number | null;
+   /** Purchased units that were already sold/consumed. */
+   soldOrConsumed: number;
+   /** Max quantity that can actually be returned right now. */
+   returnable: number;
    qty: number;
    subtotal: number;
 }
@@ -101,24 +114,50 @@ const PurchaseReturnForm = ({
       () =>
          (purchase?.items || []).map((item: any): ReturnLine => {
             const alreadyReturned = returnedByItem[item.id] || 0;
-            const available = Math.max(
-               0,
-               Number(item.quantity || 0) - alreadyReturned,
+            const purchased = Number(item.quantity || 0);
+            // On-hand stock for this line's pool, from the purchase
+            // payload (items carry their product — and variant —
+            // records). Variant lines are capped by the VARIANT's
+            // stock, plain lines by the product's. Snapshot lines
+            // (no product) and untracked products are not limited
+            // by stock — the API applies the same rule.
+            let onHand: number | null = null;
+            if (item.productId && item.product && item.product.trackInventory !== false) {
+               if (item.variantId) {
+                  onHand = item.variant
+                     ? Number(item.variant.quantity) || 0
+                     : null;
+               } else {
+                  onHand = Number(item.product.quantity) || 0;
+               }
+            }
+            const returnable = computeReturnableQuantity(
+               purchased,
+               alreadyReturned,
+               onHand,
             );
+            const soldOrConsumed =
+               onHand != null
+                  ? soldOrConsumedQuantity(purchased, alreadyReturned, onHand)
+                  : 0;
             const qty = Math.min(
                Math.max(0, Math.floor(Number(quantities[item.id]) || 0)),
-               available,
+               returnable,
             );
             return {
                item,
                alreadyReturned,
-               available,
+               onHand,
+               soldOrConsumed,
+               returnable,
                qty,
                subtotal: round2(qty * Number(item.price || 0)),
             };
          }),
       [purchase, returnedByItem, quantities],
    );
+
+   const anySold = lines.some((l) => l.soldOrConsumed > 0);
 
    const totalAmount = round2(
       lines.reduce((s: number, l) => s + l.subtotal, 0),
@@ -189,7 +228,9 @@ const PurchaseReturnForm = ({
                               <TableCell>Item</TableCell>
                               <TableCell align="center">Purchased</TableCell>
                               <TableCell align="center">Returned</TableCell>
-                              <TableCell align="center">Available</TableCell>
+                              <TableCell align="center">Sold</TableCell>
+                              <TableCell align="center">In Stock</TableCell>
+                              <TableCell align="center">Returnable</TableCell>
                               <TableCell align="right">Unit Price</TableCell>
                               <TableCell align="center" sx={{ width: 110 }}>
                                  Return Qty
@@ -199,7 +240,7 @@ const PurchaseReturnForm = ({
                         </TableHead>
                         <TableBody>
                            {lines.map(
-                              ({ item, alreadyReturned, available, qty, subtotal }) => (
+                              ({ item, alreadyReturned, onHand, soldOrConsumed, returnable, qty, subtotal }) => (
                                  <TableRow key={item.id}>
                                     <TableCell>
                                        {item.name ||
@@ -213,7 +254,16 @@ const PurchaseReturnForm = ({
                                        {alreadyReturned}
                                     </TableCell>
                                     <TableCell align="center">
-                                       {available}
+                                       {onHand != null ? soldOrConsumed : "—"}
+                                    </TableCell>
+                                    <TableCell align="center">
+                                       {onHand != null ? onHand : "—"}
+                                    </TableCell>
+                                    <TableCell
+                                       align="center"
+                                       sx={{ fontWeight: 700 }}
+                                    >
+                                       {returnable}
                                     </TableCell>
                                     <TableCell align="right">
                                        {formatCurrency(Number(item.price || 0))}
@@ -224,10 +274,10 @@ const PurchaseReturnForm = ({
                                           size="small"
                                           value={qty || ""}
                                           placeholder="0"
-                                          disabled={available === 0}
+                                          disabled={returnable === 0}
                                           inputProps={{
                                              min: 0,
-                                             max: available,
+                                             max: returnable,
                                              step: 1,
                                           }}
                                           onChange={(e) =>
@@ -253,6 +303,14 @@ const PurchaseReturnForm = ({
                         </TableBody>
                      </Table>
                   </Paper>
+
+                  {anySold && (
+                     <Typography variant="caption" color="text.secondary">
+                        Some purchased units were already sold, so they
+                        can no longer be returned. “Returnable” is capped
+                        at the stock still on hand for each item.
+                     </Typography>
+                  )}
 
                   <TextField
                      label="Reason (optional)"
