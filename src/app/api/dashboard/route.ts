@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { calculateNetProfit } from "@src/lib/finance";
+import { lowStockSqlCondition } from "@src/lib/lowStock";
+import { bucketIndexSql, applyBucketTotals } from "@src/lib/dashboardSeries";
 
 // Dashboard API (Phase 3B, roadmap 3.9 / PERF-02).
 //
@@ -9,9 +12,10 @@ import { calculateNetProfit } from "@src/lib/finance";
 // (`startDate`/`endDate`; a legacy `year` param still maps to that
 // calendar year; default = last 30 days) and come from Prisma
 // count/aggregate queries. The chart series is built from one
-// aggregate query per time bucket (daily buckets up to 62 days,
-// monthly beyond) — QA fix (B4): no code path loads the range's
-// order/expense rows into memory to build the series. Current-state
+// grouped query per model over the time buckets (daily buckets up
+// to 62 days, monthly beyond) — QA fix (B4) + P2-6: no code path
+// loads the range's order/expense rows into memory to build the
+// series, and no per-bucket aggregate fan-out remains. Current-state
 // figures (low stock, pending orders, total customer due, recent
 // orders, category stock distribution) describe "now" and are
 // intentionally not range-bounded. The response shape is unchanged
@@ -126,7 +130,7 @@ export async function GET(request: NextRequest) {
          purchaseSum,
          refundSum,
          payoutSum,
-         lowStockProducts,
+         lowStockIdRows,
          recentOrders,
          allEmployees,
          categoryDistribution,
@@ -173,16 +177,25 @@ export async function GET(request: NextRequest) {
          // Phase 1: low stock is defined per product by its own
          // lowStockAlert threshold — the previous query hard-coded
          // quantity <= 10 for every product regardless of its setting.
-         prisma.product.findMany({
-            where: { isDeleted: false },
-            select: { quantity: true, lowStockAlert: true },
-         }),
+         // P2-6: the full catalogue is no longer loaded to count it —
+         // the matching ids are resolved with the canonical raw-SQL
+         // predicate from lib/lowStock (the id-resolution pattern
+         // the products list uses), then counted by Prisma below.
+         prisma.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM Product
+            WHERE isDeleted = 0
+              AND ${Prisma.raw(lowStockSqlCondition())}
+         `,
          prisma.order.findMany({
             where: { isDeleted: false },
             take: 5,
             orderBy: { createdAt: "desc" },
             include: { customer: true },
          }),
+         // P2-6: employee order figures come from the groupBy
+         // below — the nested ordersHandled load (every handled
+         // order row for every active employee) is gone. The user
+         // query itself keeps the same ACTIVE filter and fields.
          prisma.user.findMany({
             where: { status: "ACTIVE" },
             select: {
@@ -191,20 +204,13 @@ export async function GET(request: NextRequest) {
                name: true,
                image: true,
                role: { select: { name: true } },
-               ordersHandled: {
-                  where: { isDeleted: false, createdAt: rangeWhere },
-                  select: { status: true, total: true },
-               },
             },
          }),
+         // P2-6: category stock totals come from the product
+         // groupBy below instead of loading every product row of
+         // the first 4 categories. Same take: 4, same selection.
          prisma.category.findMany({
-            select: {
-               name: true,
-               products: {
-                  where: { isDeleted: false },
-                  select: { quantity: true },
-               },
-            },
+            select: { id: true, name: true },
             take: 4,
          }),
          // Phase 3B owner KPIs — current state, not range-bounded.
@@ -226,9 +232,71 @@ export async function GET(request: NextRequest) {
          }),
       ]);
 
-      const lowStockCount = lowStockProducts.filter(
-         (p) => p.quantity <= p.lowStockAlert,
-      ).length;
+      // P2-6: count the products the canonical predicate resolved
+      // above (quantity <= lowStockAlert || 10 — see lib/lowStock;
+      // for every product with a positive stored threshold this is
+      // exactly the previous in-JS `quantity <= lowStockAlert`).
+      const lowStockCount = await prisma.product.count({
+         where: {
+            isDeleted: false,
+            id: { in: lowStockIdRows.map((r) => r.id) },
+         },
+      });
+
+      // P2-6: per-employee handled-order figures via ONE groupBy
+      // (employee × status) over the same population the nested
+      // load used: non-deleted orders in the requested range,
+      // attributed via Order.employeeId (the ordersHandled
+      // relation). Groups for non-ACTIVE users are simply never
+      // read below, exactly as the nested load never returned them.
+      const employeeOrderStats = await prisma.order.groupBy({
+         by: ["employeeId", "status"],
+         where: {
+            isDeleted: false,
+            createdAt: rangeWhere,
+            employeeId: { not: null },
+         },
+         _count: { id: true },
+         _sum: { total: true },
+      });
+      const handledByEmployee = new Map<
+         string,
+         { handled: number; confirmed: number; cancelled: number; totalSales: number }
+      >();
+      for (const g of employeeOrderStats as any[]) {
+         if (!g.employeeId) continue;
+         const stats = handledByEmployee.get(g.employeeId) || {
+            handled: 0,
+            confirmed: 0,
+            cancelled: 0,
+            totalSales: 0,
+         };
+         const count = Number(g._count?.id || 0);
+         stats.handled += count;
+         if (g.status === "COMPLETED" || g.status === "DELIVERED") {
+            stats.confirmed += count;
+            stats.totalSales += Number(g._sum?.total || 0);
+         }
+         if (g.status === "CANCELLED") stats.cancelled += count;
+         handledByEmployee.set(g.employeeId, stats);
+      }
+
+      // P2-6: per-category stock totals via ONE product groupBy
+      // over the same population the nested load summed:
+      // non-deleted products of the (up to) 4 selected categories.
+      const categoryIds = categoryDistribution.map((c) => c.id);
+      const categoryStockStats = categoryIds.length
+         ? await prisma.product.groupBy({
+              by: ["categoryId"],
+              where: { isDeleted: false, categoryId: { in: categoryIds } },
+              _sum: { quantity: true },
+           })
+         : [];
+      const stockByCategory = new Map<string, number>(
+         (categoryStockStats as any[])
+            .filter((g) => g.categoryId)
+            .map((g) => [g.categoryId as string, Number(g._sum?.quantity || 0)]),
+      );
       const totalRevenue = Number(revenueSum._sum.total || 0);
       const totalExpenses = Number(expenseSum._sum.amount || 0);
       const totalPurchases = Number(purchaseSum._sum.total || 0);
@@ -240,56 +308,66 @@ export async function GET(request: NextRequest) {
       const netProfit = calculateNetProfit(totalRevenue, totalExpenses, totalPurchases);
       const currentBalance = Math.max(totalRevenue - totalExpenses - settledPayouts, 0);
 
-      // Range-bucketed income vs expenses series — one bounded
-      // aggregate query per bucket (QA fix B4; previously every
-      // order/expense row in the range was loaded and bucketed in
-      // memory). Income counts COMPLETED / DELIVERED orders only,
-      // exactly as the row pass did.
-      const [bucketIncomeAggs, bucketExpenseAggs] = await Promise.all([
-         Promise.all(
-            bucketDefs.map((b) =>
-               prisma.order.aggregate({
-                  where: {
-                     isDeleted: false,
-                     status: { in: ["COMPLETED", "DELIVERED"] },
-                     createdAt: { gte: b.start, lte: b.end },
-                  },
-                  _sum: { total: true },
-               }),
-            ),
-         ),
-         Promise.all(
-            bucketDefs.map((b) =>
-               prisma.expense.aggregate({
-                  where: {
-                     isDeleted: false,
-                     createdAt: { gte: b.start, lte: b.end },
-                  },
-                  _sum: { amount: true },
-               }),
-            ),
-         ),
+      // Range-bucketed income vs expenses series — P2-6: the
+      // per-bucket aggregate fan-out (one query per bucket per
+      // model, up to ~124 calls) is collapsed into ONE grouped
+      // query per model. A SQL CASE over the exact bucket
+      // boundaries computed above assigns each in-range row to its
+      // bucket index (lib/dashboardSeries), so the sums are the
+      // same sums the per-bucket aggregates produced — same
+      // filters (income = COMPLETED / DELIVERED orders only,
+      // non-deleted, range-bounded), same clamped first/last
+      // buckets, no timezone truncation.
+      const bucketSqlBounds = bucketDefs.map((b) => ({
+         start: b.start,
+         end: b.end,
+      }));
+      const [bucketIncomeRows, bucketExpenseRows] = await Promise.all([
+         prisma.$queryRaw<Array<{ bucket: number | bigint | null; total: unknown }>>`
+            SELECT ${bucketIndexSql(Prisma.sql`createdAt`, bucketSqlBounds)} AS bucket,
+                   SUM(total) AS total
+            FROM \`Order\`
+            WHERE isDeleted = 0
+              AND status IN ('COMPLETED', 'DELIVERED')
+              AND createdAt >= ${rangeStart} AND createdAt <= ${rangeEnd}
+            GROUP BY bucket
+         `,
+         prisma.$queryRaw<Array<{ bucket: number | bigint | null; total: unknown }>>`
+            SELECT ${bucketIndexSql(Prisma.sql`createdAt`, bucketSqlBounds)} AS bucket,
+                   SUM(amount) AS total
+            FROM Expense
+            WHERE isDeleted = 0
+              AND createdAt >= ${rangeStart} AND createdAt <= ${rangeEnd}
+            GROUP BY bucket
+         `,
       ]);
+      const bucketIncome = applyBucketTotals(bucketDefs.length, bucketIncomeRows);
+      const bucketExpenses = applyBucketTotals(bucketDefs.length, bucketExpenseRows);
       bucketDefs.forEach((b, i) => {
-         b.income = Number(bucketIncomeAggs[i]._sum.total || 0);
-         b.expenses = Number(bucketExpenseAggs[i]._sum.amount || 0);
+         b.income = bucketIncome[i];
+         b.expenses = bucketExpenses[i];
       });
       const monthlyIncome = bucketDefs.map((b) => b.income);
       const monthlyExpenses = bucketDefs.map((b) => b.expenses);
       const seriesLabels = bucketDefs.map((b) => b.label);
 
-      // Employee Ranking Calculation with deterministic tie-breaking
+      // Employee Ranking Calculation with deterministic tie-breaking.
+      // P2-6: the figures come from the employee × status groupBy
+      // above — handled = all groups, confirmed = COMPLETED +
+      // DELIVERED, cancelled = CANCELLED, totalSales = the summed
+      // totals of the confirmed groups. Identical definitions to
+      // the previous per-order JS pass over ordersHandled.
       const calculatedRankings = allEmployees.map((emp) => {
-         const handledCount = emp.ordersHandled.length;
-         const confirmedCount = emp.ordersHandled.filter(
-            (o) => o.status === "COMPLETED" || o.status === "DELIVERED",
-         ).length;
-         const cancelledCount = emp.ordersHandled.filter(
-            (o) => o.status === "CANCELLED",
-         ).length;
-         const totalSales = emp.ordersHandled
-            .filter((o) => o.status === "COMPLETED" || o.status === "DELIVERED")
-            .reduce((sum, o) => sum + Number(o.total), 0);
+         const handledStats = handledByEmployee.get(emp.id) || {
+            handled: 0,
+            confirmed: 0,
+            cancelled: 0,
+            totalSales: 0,
+         };
+         const handledCount = handledStats.handled;
+         const confirmedCount = handledStats.confirmed;
+         const cancelledCount = handledStats.cancelled;
+         const totalSales = handledStats.totalSales;
 
          return {
             id: emp.id,
@@ -371,7 +449,9 @@ export async function GET(request: NextRequest) {
       // zero quantities to 1 and invented "Beverages/Snacks/Electronics"
       // 50/30/20 data when the database had none.
       categoryDistribution.forEach((cat) => {
-         const totalQty = cat.products.reduce((acc, p) => acc + p.quantity, 0);
+         // P2-6: the groupBy sum over the category's non-deleted
+         // products — the same total the nested load reduced to.
+         const totalQty = stockByCategory.get(cat.id) || 0;
          distributionLabels.push(cat.name);
          distributionSeries.push(totalQty);
       });
