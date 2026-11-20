@@ -33,6 +33,7 @@ import {
    auditActorFromContext,
    requestAuditContext,
 } from "@src/lib/audit";
+import { buildNoteCreatedEvents } from "@src/lib/orderNoteEvents";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -612,6 +613,28 @@ export async function POST(request: NextRequest) {
          initialTags.packingNote = String(body.packingNote || "").trim();
       if (body.employeeNote !== undefined)
          initialTags.employeeNote = String(body.employeeNote || "").trim();
+
+      // QA fix (notes audit): seed the orderTags audit history with a
+      // "… Note Created" event for each non-empty note, in the same
+      // shape the PUT handler appends for note updates. Without this,
+      // an order created with notes had no auditHistory at all and the
+      // Order Details staff-activity timeline could only synthesize a
+      // customer-note fallback. The actor mirrors the PUT handler's
+      // shape, built from the session (POST does not fetch the user
+      // row; the helper applies the same fallbacks, EP_1 included).
+      // Any caller-supplied history is preserved after the new events.
+      const noteCreatedEvents = buildNoteCreatedEvents(initialTags, {
+         id: session.id,
+         name: session.name,
+         role: session.role,
+         email: session.email,
+      });
+      if (noteCreatedEvents.length > 0) {
+         const callerHistory = Array.isArray(initialTags.auditHistory)
+            ? initialTags.auditHistory
+            : [];
+         initialTags.auditHistory = [...noteCreatedEvents, ...callerHistory];
+      }
 
       // Phase 3B (3.6): payment reconciliation fields. The TxID and
       // sender number ride in the pricing payload (top-level fields
