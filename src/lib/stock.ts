@@ -243,6 +243,85 @@ function aggregateLines(lines: StockLine[]): Map<string, AggregatedLine> {
    return map;
 }
 
+/**
+ * Conditional product decrement (Phase C4, audit R-1 / P2-22).
+ *
+ * The availability pre-checks elsewhere in this engine read a
+ * snapshot; two concurrent sales of the last unit could both pass
+ * it and then both decrement unconditionally, driving stock
+ * negative. When `guarded` (stock validation on and the product
+ * does not allow negative stock), the decrement itself is the
+ * race guard: an atomic updateMany that only applies while
+ * quantity >= qty. count === 0 means a concurrent writer won the
+ * race — throw InsufficientStockError (with a freshly-read
+ * available figure) so the caller's transaction rolls back with
+ * no partial writes. When not guarded, negative stock is allowed
+ * by design and the decrement stays unconditional.
+ */
+async function decrementProductGuarded(
+   tx: any,
+   product: { id: string; productName: string },
+   qty: number,
+   guarded: boolean,
+): Promise<void> {
+   if (!guarded) {
+      await tx.product.update({
+         where: { id: product.id },
+         data: { quantity: { decrement: qty } },
+      });
+      return;
+   }
+   const result = await tx.product.updateMany({
+      where: { id: product.id, quantity: { gte: qty } },
+      data: { quantity: { decrement: qty } },
+   });
+   if (!result || result.count === 0) {
+      const fresh = await tx.product.findUnique({
+         where: { id: product.id },
+         select: { quantity: true },
+      });
+      throw new InsufficientStockError(
+         product.id,
+         product.productName,
+         fresh?.quantity ?? 0,
+         qty,
+      );
+   }
+}
+
+/** Variant-pool equivalent of decrementProductGuarded. */
+async function decrementVariantGuarded(
+   tx: any,
+   product: { id: string; productName: string },
+   variant: { id: string; variantName: string },
+   qty: number,
+   guarded: boolean,
+): Promise<void> {
+   if (!guarded) {
+      await tx.productVariant.update({
+         where: { id: variant.id },
+         data: { quantity: { decrement: qty } },
+      });
+      return;
+   }
+   const result = await tx.productVariant.updateMany({
+      where: { id: variant.id, quantity: { gte: qty } },
+      data: { quantity: { decrement: qty } },
+   });
+   if (!result || result.count === 0) {
+      const fresh = await tx.productVariant.findUnique({
+         where: { id: variant.id },
+         select: { quantity: true },
+      });
+      throw new InsufficientStockError(
+         product.id,
+         `${product.productName} (${variant.variantName})`,
+         fresh?.quantity ?? 0,
+         qty,
+      );
+   }
+}
+
 async function loadVariantMap(
    tx: any,
    entries: AggregatedLine[],
@@ -381,16 +460,19 @@ export async function deductStockForItems(
       }
 
       const beforeQty = runningQty.get(entry.productId) ?? product.quantity;
-      await tx.product.update({
-         where: { id: entry.productId },
-         data: { quantity: { decrement: qty } },
-      });
+      // C4-5 (audit R-1 / P2-22): the decrements are conditional
+      // (atomic quantity >= qty) whenever the pre-check above was
+      // enforced, so a concurrent sale of the last unit cannot
+      // slip past the snapshot check — the losing writer throws
+      // and its transaction rolls back. The variant pool is
+      // decremented first so a variant race leaves no partial
+      // product write behind.
+      const guarded =
+         opts.settings.enableStockValidation && !product.allowNegativeStock;
       if (variant) {
-         await tx.productVariant.update({
-            where: { id: variant.id },
-            data: { quantity: { decrement: qty } },
-         });
+         await decrementVariantGuarded(tx, product, variant, qty, guarded);
       }
+      await decrementProductGuarded(tx, product, qty, guarded);
       runningQty.set(entry.productId, beforeQty - qty);
       await adjustWarehouseStock(tx, entry.productId, -qty);
       await tx.stockMovement.create({
@@ -542,16 +624,14 @@ export async function applyStockDifference(
          }
       }
       const beforeQty = product.quantity;
-      await tx.product.update({
-         where: { id: productId },
-         data: { quantity: { decrement: diff } },
-      });
+      // C4-5 (audit R-1 / P2-22): conditional decrement, same race
+      // guard as deductStockForItems (variant pool first).
+      const guarded =
+         opts.settings.enableStockValidation && !product.allowNegativeStock;
       if (variant) {
-         await tx.productVariant.update({
-            where: { id: variant.id },
-            data: { quantity: { decrement: diff } },
-         });
+         await decrementVariantGuarded(tx, product, variant, diff, guarded);
       }
+      await decrementProductGuarded(tx, product, diff, guarded);
       await adjustWarehouseStock(tx, productId, -diff);
       await tx.stockMovement.create({
          data: {

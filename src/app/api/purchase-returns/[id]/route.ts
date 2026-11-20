@@ -5,7 +5,8 @@ import { restoreStockForPurchaseReturn } from "@src/lib/stock";
 import {
    lockPurchaseRow,
    returnCreditWasConsumed,
-   CASH_REFUND_EXPENSE_TYPE,
+   resolveRefundExpense,
+   refundExpenseMismatch,
 } from "@src/lib/purchaseReturns";
 import {
    logAudit,
@@ -32,7 +33,13 @@ import {
 //    that consumption cannot be unwound from here;
 //  - a CASH_REFUND return whose refund Expense row can no longer
 //    be found — the cash trail is broken and reversing the totals
-//    would desync the accounting.
+//    would desync the accounting;
+//  - a CASH_REFUND return whose refund Expense amount no longer
+//    equals the remainder recorded at creation (C4-4 / R-4) — the
+//    expense is resolved by the customId recorded in the CREATE
+//    audit row (legacy type + note match only for older returns)
+//    and a staff edit to its amount blocks the reversal instead of
+//    reversing the wrong amount.
 //
 // The creation baseline (dueAbsorbed / initial creditConsumed) is
 // read from the return's CREATE audit row, which creation wrote in
@@ -123,6 +130,19 @@ export async function DELETE(
             auditChanges && typeof auditChanges.creditConsumed?.to === "number"
                ? auditChanges.creditConsumed.to
                : null;
+         // C4-4 (audit R-4 / P2-23): the refund link + remainder
+         // recorded at creation (see resolveRefundExpense). Absent
+         // on returns created before the hardening — those fall
+         // back to the legacy note match with no amount check.
+         const auditRefundExpenseCustomId =
+            auditChanges &&
+            typeof auditChanges.refundExpenseCustomId?.to === "string"
+               ? auditChanges.refundExpenseCustomId.to
+               : null;
+         const auditRemainder =
+            auditChanges && typeof auditChanges.remainder?.to === "number"
+               ? auditChanges.remainder.to
+               : null;
 
          let dueAbsorbed: number;
          let refundExpense: any = null;
@@ -139,18 +159,33 @@ export async function DELETE(
             }
             dueAbsorbed = auditDueAbsorbed ?? baseline;
          } else if (purchaseReturn.settlement === "CASH_REFUND") {
-            refundExpense = await tx.expense.findFirst({
-               where: {
-                  type: CASH_REFUND_EXPENSE_TYPE,
-                  isDeleted: false,
-                  note: { contains: purchaseReturn.customId || purchaseReturn.id },
-               },
-               orderBy: { createdAt: "asc" },
+            // C4-4 (audit R-4 / P2-23): resolve by the customId
+            // recorded at creation first; the legacy type + note
+            // match runs only for pre-hardening returns. A recorded
+            // id that no longer resolves refuses here — falling
+            // back could reverse a different return's expense.
+            const resolution = await resolveRefundExpense(tx, {
+               recordedCustomId: auditRefundExpenseCustomId,
+               returnCustomId: purchaseReturn.customId,
+               returnId: purchaseReturn.id,
             });
-            if (!refundExpense) {
+            if (resolution.kind === "missing") {
                throw new ReturnReversalError(
-                  "This return cannot be deleted: its cash-refund accounting record was not found, so the refund cannot be reversed safely.",
+                  resolution.source === "recorded"
+                     ? `This return cannot be deleted: the cash-refund expense recorded at creation (${auditRefundExpenseCustomId}) was not found, so the refund cannot be reversed safely.`
+                     : "This return cannot be deleted: its cash-refund accounting record was not found, so the refund cannot be reversed safely.",
                );
+            }
+            refundExpense = resolution.expense;
+            // Verify the amount before reversing anything: a staff
+            // edit to the expense must block the reversal with a
+            // clear discrepancy message, never reverse wrong money.
+            const mismatch = refundExpenseMismatch(
+               refundExpense,
+               auditRemainder,
+            );
+            if (mismatch) {
+               throw new ReturnReversalError(mismatch);
             }
             const remainder = Math.abs(Number(refundExpense.amount));
             dueAbsorbed = auditDueAbsorbed ?? round2(totalAmount - remainder);

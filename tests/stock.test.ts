@@ -196,6 +196,88 @@ describe("deductStockForItems", () => {
    });
 });
 
+describe("conditional decrement race guard (C4-5 / R-1 / P2-22)", () => {
+   it("deductStockForItems: updateMany count 0 (concurrent sale won) → InsufficientStockError, no writes", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Rice", quantity: 5 }],
+         // The snapshot read sees 5 units, but the conditional
+         // write reports the stock already gone.
+         updateManyFailIds: ["p1"],
+      });
+      await expect(
+         deductStockForItems(
+            f.tx,
+            [{ productId: "p1", quantity: 3 }],
+            { settings: VALIDATED, note: "sale" },
+         ),
+      ).rejects.toBeInstanceOf(InsufficientStockError);
+      expect(f.productQty("p1")).toBe(5);
+      expect(f.movements).toHaveLength(0);
+   });
+
+   it("deductStockForItems: variant-pool race → error before any product write", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Shirt", quantity: 10 }],
+         variants: [{ id: "v1", productId: "p1", variantName: "M", quantity: 4 }],
+         updateManyFailIds: ["v1"],
+      });
+      await expect(
+         deductStockForItems(
+            f.tx,
+            [{ productId: "p1", quantity: 2, variantId: "v1" }],
+            { settings: VALIDATED, note: "sale" },
+         ),
+      ).rejects.toBeInstanceOf(InsufficientStockError);
+      expect(f.variantQty("v1")).toBe(4);
+      expect(f.productQty("p1")).toBe(10);
+      expect(f.movements).toHaveLength(0);
+   });
+
+   it("applyStockDifference: positive diff losing the race → error, no writes", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Rice", quantity: 10 }],
+         updateManyFailIds: ["p1"],
+      });
+      await expect(
+         applyStockDifference(f.tx, "p1", 4, {
+            settings: VALIDATED,
+            increaseNote: "more",
+            decreaseNote: "less",
+         }),
+      ).rejects.toBeInstanceOf(InsufficientStockError);
+      expect(f.productQty("p1")).toBe(10);
+      expect(f.movements).toHaveLength(0);
+   });
+
+   it("the guard is off when validation is off — negative stock stays allowed by design", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Rice", quantity: 2 }],
+         updateManyFailIds: ["p1"], // would fail IF the conditional path ran
+      });
+      await deductStockForItems(
+         f.tx,
+         [{ productId: "p1", quantity: 5 }],
+         { settings: UNVALIDATED, note: "sale" },
+      );
+      expect(f.productQty("p1")).toBe(-3);
+   });
+
+   it("the guard is off for allowNegativeStock products even with validation on", async () => {
+      const f = makeFakeTx({
+         products: [
+            { id: "p1", productName: "Rice", quantity: 1, allowNegativeStock: true },
+         ],
+         updateManyFailIds: ["p1"],
+      });
+      await deductStockForItems(
+         f.tx,
+         [{ productId: "p1", quantity: 4 }],
+         { settings: VALIDATED, note: "sale" },
+      );
+      expect(f.productQty("p1")).toBe(-3);
+   });
+});
+
 describe("restoreStockForItems", () => {
    it("restores product + variant quantities and writes a RETURN movement", async () => {
       const f = makeFakeTx({

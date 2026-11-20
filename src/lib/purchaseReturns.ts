@@ -40,7 +40,10 @@ export type ReturnSettlement = (typeof RETURN_SETTLEMENTS)[number];
  * Finance's expense total (and the one shared profit formula,
  * revenue − expenses − purchases) then reflects the inflow with no
  * parallel ledger and no formula change. The row's note carries
- * the PRET_ id, which is how the return-delete reversal finds it.
+ * the PRET_ id; since C4-4 the return-delete reversal primarily
+ * finds the row by the expense customId recorded in the return's
+ * CREATE audit row (see resolveRefundExpense below), with the
+ * note match kept as the legacy fallback.
  */
 export const CASH_REFUND_EXPENSE_TYPE = "Purchase Return Refund";
 
@@ -291,6 +294,91 @@ export function resolveRecordedDueAbsorbed(input: {
    }
    // DUE_REDUCTION (and any legacy settlement): fully absorbed.
    return totalAmount;
+}
+
+// ─────────────────────────────────────────────
+// C4-4 (audit R-4 / P2-23): CASH_REFUND expense link hardening
+// ─────────────────────────────────────────────
+
+/**
+ * Resolve the negative Expense row a CASH_REFUND return booked at
+ * creation, for the return-deletion reversal.
+ *
+ * PurchaseReturn has NO stored expense reference (no FK column —
+ * adding one needs a schema change), so creation records the
+ * refund expense's customId in the return's CREATE audit row
+ * (`changes.refundExpenseCustomId.to`) — the same audit row the
+ * settlement reversal already treats as its source of truth.
+ * Resolution prefers that recorded id: it is immune to the staff
+ * edits (amount / type / note) that break the legacy lookup. The
+ * legacy lookup (type + note contains the PRET id, oldest first)
+ * runs ONLY when no id was recorded (returns created before this
+ * hardening). A recorded id that no longer resolves to a live
+ * expense is "missing" — the reversal must refuse rather than
+ * fall back and possibly reverse a different return's expense.
+ */
+export type RefundExpenseResolution =
+   | {
+        kind: "found";
+        expense: { id: string; customId?: string | null; amount: unknown };
+        source: "recorded" | "legacy";
+     }
+   | { kind: "missing"; source: "recorded" | "legacy" };
+
+export async function resolveRefundExpense(
+   db: any,
+   args: {
+      recordedCustomId?: string | null;
+      returnCustomId?: string | null;
+      returnId: string;
+   },
+): Promise<RefundExpenseResolution> {
+   const recorded = args.recordedCustomId
+      ? String(args.recordedCustomId).trim()
+      : "";
+   if (recorded) {
+      const expense = await db.expense.findFirst({
+         where: { customId: recorded, isDeleted: false },
+      });
+      return expense
+         ? { kind: "found", expense, source: "recorded" }
+         : { kind: "missing", source: "recorded" };
+   }
+   const expense = await db.expense.findFirst({
+      where: {
+         type: CASH_REFUND_EXPENSE_TYPE,
+         isDeleted: false,
+         note: { contains: args.returnCustomId || args.returnId },
+      },
+      orderBy: { createdAt: "asc" },
+   });
+   return expense
+      ? { kind: "found", expense, source: "legacy" }
+      : { kind: "missing", source: "legacy" };
+}
+
+/**
+ * Verify a resolved refund expense still carries the refund
+ * remainder recorded at creation. Staff can edit the expense's
+ * amount through the normal expense UI; reversing a mismatched
+ * amount would desync the cash trail, so the deletion route
+ * refuses (409) on any discrepancy. Returns the refusal message,
+ * or null when the amount matches — or when no remainder was
+ * recorded (legacy rows: nothing trustworthy to check against;
+ * the amount found remains the remainder source, as before).
+ * Pure.
+ */
+export function refundExpenseMismatch(
+   expense: { amount: unknown },
+   expectedRemainder: number | null | undefined,
+): string | null {
+   if (expectedRemainder == null || !Number.isFinite(Number(expectedRemainder))) {
+      return null;
+   }
+   const expected = round2(expectedRemainder);
+   const actual = round2(Math.abs(Number(expense.amount)));
+   if (actual === expected) return null;
+   return `This return cannot be deleted: its cash-refund expense now shows ৳${actual.toFixed(2)}, but the refund recorded at creation was ৳${expected.toFixed(2)}. Correct the expense amount (or restore it) before deleting this return, so the reversal matches the original refund.`;
 }
 
 /** Σ recorded `dueAbsorbed` over a purchase's live returns. */

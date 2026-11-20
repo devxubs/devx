@@ -341,6 +341,12 @@ export async function POST(
                   dueAbsorbed: settlement.dueAbsorbed,
                   remainder: settlement.remainder,
                   creditConsumed: settlement.creditConsumed,
+                  // C4-4 (audit R-4 / P2-23): record WHICH expense
+                  // row booked the cash refund, so return deletion
+                  // resolves it by this id instead of relying on a
+                  // mutable note substring. Null for non-refund
+                  // settlements (buildChanges then omits the key).
+                  refundExpenseCustomId: refundExpenseId,
                },
                [
                   "totalAmount",
@@ -348,6 +354,7 @@ export async function POST(
                   "dueAbsorbed",
                   "remainder",
                   "creditConsumed",
+                  "refundExpenseCustomId",
                ],
             ),
             ...auditCtx,

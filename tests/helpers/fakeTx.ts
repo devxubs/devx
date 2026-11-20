@@ -29,7 +29,15 @@ export interface FakeVariant {
 export function makeFakeTx(init: {
    products?: FakeProduct[];
    variants?: FakeVariant[];
+   /**
+    * C4-5 race simulation: ids (product or variant) whose
+    * conditional updateMany must report count 0 without applying —
+    * as if a concurrent writer had already taken the stock between
+    * the engine's snapshot read and its conditional write.
+    */
+   updateManyFailIds?: string[];
 }) {
+   const updateManyFailIds = new Set(init.updateManyFailIds || []);
    const products = new Map<string, any>(
       (init.products || []).map((p) => [
          p.id,
@@ -76,6 +84,19 @@ export function makeFakeTx(init: {
             if (!record) throw new Error(`product ${where.id} not found`);
             return { ...applyDelta(record, data) };
          },
+         // C4-5: conditional decrement surface — applies only
+         // while the stored quantity satisfies the gte guard.
+         updateMany: async ({ where, data }: any) => {
+            const record = products.get(where.id);
+            if (!record) return { count: 0 };
+            if (updateManyFailIds.has(where.id)) return { count: 0 };
+            const gte = where?.quantity?.gte;
+            if (gte !== undefined && record.quantity < gte) {
+               return { count: 0 };
+            }
+            applyDelta(record, data);
+            return { count: 1 };
+         },
       },
       productVariant: {
          findMany: async ({ where }: any) => {
@@ -90,6 +111,17 @@ export function makeFakeTx(init: {
             const record = variants.get(where.id);
             if (!record) throw new Error(`variant ${where.id} not found`);
             return { ...applyDelta(record, data) };
+         },
+         updateMany: async ({ where, data }: any) => {
+            const record = variants.get(where.id);
+            if (!record) return { count: 0 };
+            if (updateManyFailIds.has(where.id)) return { count: 0 };
+            const gte = where?.quantity?.gte;
+            if (gte !== undefined && record.quantity < gte) {
+               return { count: 0 };
+            }
+            applyDelta(record, data);
+            return { count: 1 };
          },
       },
       stockMovement: {
