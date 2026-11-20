@@ -6,6 +6,7 @@ import { standingCreditOf } from "@src/lib/purchaseReturns";
 import {
    VALID_ORDER_WHERE,
    INVALID_ORDER_STATUSES,
+   DELIVERED_ORDER_STATUSES,
 } from "@src/lib/orderStatus";
 
 export async function GET(request: NextRequest) {
@@ -21,6 +22,16 @@ export async function GET(request: NextRequest) {
    // a silent hard cap. Defaults preserve the historical page size
    // (100 rows) so existing screens are unchanged; totals/counts in
    // every tab are computed from the COMPLETE filtered dataset.
+   //
+   // P4-7: DELIBERATE reports-only exception to the shared
+   // parsePagination helper (src/lib/pagination, max 100). The
+   // reports export loader (Pages/admin/Reports/reportExport.ts,
+   // fetchAllReportRows) pages through this route with
+   // limit=1000 explicitly — adopting the shared helper's 100 cap
+   // would make every report export ten times chattier for no
+   // correctness gain. The floor/default behaviour otherwise matches
+   // the shared helper: page never below 1, non-numeric page/limit
+   // fall back to 1/100, limit clamped to [1, 1000].
    const page = Math.max(parseInt(searchParams.get("page") || "1", 10) || 1, 1);
    const limit = Math.min(
       Math.max(parseInt(searchParams.get("limit") || "100", 10) || 100, 1),
@@ -61,6 +72,13 @@ export async function GET(request: NextRequest) {
          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
          sevenDaysAgo.setHours(0, 0, 0, 0);
          const trendWhere: any = { ...whereOrder };
+         // P4-15 (audit §E.2): the trend is a SALES chart, so it uses
+         // the same revenue definition as this tab's totalRevenue
+         // below — COMPLETED/DELIVERED orders only. Previously the
+         // trend aggregated orders with NO status filter, charting
+         // PENDING/CANCELLED/FAILED orders as sales while the
+         // headline revenue counted only completed/delivered ones.
+         trendWhere.status = { in: [...DELIVERED_ORDER_STATUSES] };
          trendWhere.createdAt = {
             gte:
                hasDate && dateFilter.gte && dateFilter.gte > sevenDaysAgo
@@ -109,7 +127,24 @@ export async function GET(request: NextRequest) {
          const [orders, totalOrders, totalRevenueAgg, completedCount, cancelledFailedCount, trendData] = await Promise.all([
             prisma.order.findMany({
                where: whereOrder,
-               include: { customer: true, items: true },
+               // P4-1: the response mapping below reads only id /
+               // orderId / customId / createdAt / total /
+               // paymentMethod / status + customer name/email/phone.
+               // The old include also loaded every order's `items`
+               // and the full customer row — the items were discarded
+               // unread on every Sales page and export request.
+               select: {
+                  id: true,
+                  orderId: true,
+                  customId: true,
+                  createdAt: true,
+                  total: true,
+                  paymentMethod: true,
+                  status: true,
+                  customer: {
+                     select: { name: true, email: true, phone: true },
+                  },
+               },
                orderBy: { createdAt: "desc" },
                skip,
                take: limit,
@@ -720,9 +755,14 @@ export async function GET(request: NextRequest) {
                // selected date range (on the parent order) and exclude
                // soft-deleted orders — previously this groupBy had no
                // filter at all and counted deleted orders' items.
+               // P4-15: items count as SOLD only on the same
+               // valid-sales set the revenue figures use
+               // (COMPLETED/DELIVERED) — cancelled/failed orders'
+               // items were previously counted as sold.
                where: {
                   order: {
                      isDeleted: false,
+                     status: { in: [...DELIVERED_ORDER_STATUSES] },
                      ...(hasDate ? { createdAt: dateFilter } : {}),
                   },
                },
@@ -1354,6 +1394,11 @@ export async function GET(request: NextRequest) {
             where: {
                order: {
                   isDeleted: false,
+                  // P4-15: top sellers count only items of orders in
+                  // the revenue set (COMPLETED/DELIVERED), matching
+                  // the Products tab — cancelled/failed orders' items
+                  // are not sales.
+                  status: { in: [...DELIVERED_ORDER_STATUSES] },
                   ...(hasDate ? { createdAt: dateFilter } : {}),
                },
             },

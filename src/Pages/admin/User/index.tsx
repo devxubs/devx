@@ -25,6 +25,7 @@ import AlertDialog from "@src/components/AlertDialog";
 import CustomAutocomplete, { OptionType } from "@src/components/Autocomplete";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { useSnackbar } from "@src/lib/snackbarContext";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 
 export interface UserProps {
    id: string;
@@ -298,28 +299,31 @@ const Users = () => {
       setLoading(true);
       setLoadError(null);
       try {
-         const res = await fetch("/api/users");
-         if (res.ok) {
-            const data = await res.json();
-            const mapped = (Array.isArray(data) ? data : []).map((u: any) => ({
-               id: u.id,
-               // ID-02: keep customId null when the record has none —
-               // substituting the raw database id here is what made
-               // un-numbered employees display a cuid as their ID.
-               customId: u.customId || "",
-               name: u.name || "User",
-               phoneNumber: u.phoneNumber || "-",
-               email: u.email,
-               address: u.address || "-",
-               role: u.role?.name || "Staff",
-               salary: u.salary || "0",
-               hireDate: u.hireDate ? new Date(u.hireDate) : new Date(),
-               status: (u.status ? u.status.toLowerCase() : "active") as any,
-            }));
-            setUsers(mapped);
-         } else {
-            setLoadError("Failed to load users.");
-         }
+         // P4-2: the users API is paginated by default now, so the
+         // page walks the bounded pages and renders the same
+         // complete staff set as the old single unbounded response.
+         // A failed page throws and lands in the load-error state.
+         const data = await fetchAllPages<any>(
+            (page, limit) => `/api/users?page=${page}&limit=${limit}`,
+            (d) => (Array.isArray(d) ? d : d.users || []),
+            (d) => d.total,
+         );
+         const mapped = data.map((u: any) => ({
+            id: u.id,
+            // ID-02: keep customId null when the record has none —
+            // substituting the raw database id here is what made
+            // un-numbered employees display a cuid as their ID.
+            customId: u.customId || "",
+            name: u.name || "User",
+            phoneNumber: u.phoneNumber || "-",
+            email: u.email,
+            address: u.address || "-",
+            role: u.role?.name || "Staff",
+            salary: u.salary || "0",
+            hireDate: u.hireDate ? new Date(u.hireDate) : new Date(),
+            status: (u.status ? u.status.toLowerCase() : "active") as any,
+         }));
+         setUsers(mapped);
       } catch {
          setLoadError("Failed to load users.");
       } finally {

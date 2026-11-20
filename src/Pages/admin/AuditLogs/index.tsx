@@ -27,6 +27,7 @@ import AuditFilter, {
    syncAuditFilters,
 } from "./AuditFilter";
 import { AuditFilters, EMPTY_AUDIT_FILTERS } from "./AuditFilterModel";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 
 // Phase 4 (D1): administrator-only, read-only audit trail viewer.
 // Data comes from GET /api/audit-logs (requireAdmin on the server);
@@ -151,17 +152,19 @@ const AuditLogs = () => {
    useEffect(() => {
       (async () => {
          try {
-            const res = await fetch("/api/users");
-            if (res.ok) {
-               const data = await res.json();
-               const list = Array.isArray(data) ? data : data.users || [];
-               setActors(
-                  list.map((u: any) => ({
-                     id: u.id,
-                     label: u.name || u.email || u.id,
-                  })),
-               );
-            }
+            // P4-2: the users API is paginated by default now — walk
+            // the bounded pages so the actor list stays complete.
+            const list = await fetchAllPages<any>(
+               (page, limit) => `/api/users?page=${page}&limit=${limit}`,
+               (d) => (Array.isArray(d) ? d : d.users || []),
+               (d) => d.total,
+            );
+            setActors(
+               list.map((u: any) => ({
+                  id: u.id,
+                  label: u.name || u.email || u.id,
+               })),
+            );
          } catch {
             // Actor filter simply stays unpopulated.
          }

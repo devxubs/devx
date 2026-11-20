@@ -355,12 +355,80 @@ export async function GET(request: NextRequest) {
             where,
             skip,
             take: limit,
-            include: {
-               customer: true,
+            // P4-1 (audit §F.7/O-01): select only the fields the list
+            // UI actually renders. Every Order scalar is kept (the
+            // table, Quick Edit, bulk modals and the print flow read
+            // assorted order fields), but the relations are narrowed:
+            // the old `customer: true` / `product: true` includes
+            // shipped the full customer row and the full product row
+            // (incl. the Text `content`, specifications and every
+            // price column) for every line of every order on the page.
+            // The consumers read exactly: customer id/name/email/
+            // phone/address; item id/productId/variantId/name/code/
+            // quantity/price/subtotal; product id/productCode/
+            // productName/images/isDeleted; the variant select below
+            // is unchanged from the previous include.
+            select: {
+               id: true,
+               customId: true,
+               orderCode: true,
+               orderId: true,
+               invoiceNo: true,
+               status: true,
+               orderNote: true,
+               orderSource: true,
+               paymentMethod: true,
+               subtotal: true,
+               deliveryCharge: true,
+               discount: true,
+               total: true,
+               advancePayment: true,
+               dueAmount: true,
+               paymentTxId: true,
+               paymentSenderNumber: true,
+               paymentStatus: true,
+               cancellationReason: true,
+               deliveredAt: true,
+               isDeleted: true,
+               deletedAt: true,
+               courier: true,
+               courierStatus: true,
+               courierCharge: true,
+               courierSubmittedAt: true,
+               printStatus: true,
+               printedAt: true,
+               orderType: true,
+               orderTags: true,
+               customerTags: true,
+               utmSource: true,
+               referenceId: true,
+               pathaoCity: true,
+               pathaoZone: true,
+               courierConsignmentId: true,
+               courierTrackingCode: true,
+               courierProviderStatus: true,
+               courierLastSyncAt: true,
+               customerId: true,
+               employeeId: true,
+               createdAt: true,
+               updatedAt: true,
+               customer: {
+                  select: { id: true, customId: true, name: true, email: true, phone: true, address: true },
+               },
                employee: { select: { id: true, name: true, email: true, phoneNumber: true, customId: true } },
                items: {
-                  include: {
-                     product: true,
+                  select: {
+                     id: true,
+                     productId: true,
+                     variantId: true,
+                     name: true,
+                     code: true,
+                     quantity: true,
+                     price: true,
+                     subtotal: true,
+                     product: {
+                        select: { id: true, productCode: true, productName: true, images: true, isDeleted: true },
+                     },
                      variant: {
                         select: { id: true, variantName: true, sku: true, barcode: true, attributes: true, quantity: true },
                      },

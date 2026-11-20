@@ -28,6 +28,19 @@ export async function GET(request: NextRequest) {
    const gate = await requireAdmin(request);
    if (gate instanceof NextResponse) return gate;
 
+   // P4-2 DOCUMENTED EXCEPTION — this GET stays unbounded by design:
+   // it merges TEN entity types into one list, and the Bin page
+   // renders that complete merged set in a single view with per-type
+   // tabs and counts derived from the full set. Server-paginating a
+   // merged cross-entity union cannot preserve those tabs/counts
+   // without an API redesign (per-type endpoints), and truncating
+   // would silently hide deleted records from an admin recovery
+   // screen — the worst failure mode for a recycle bin. The cost is
+   // bounded in practice: the route is admin-only, every scan below
+   // is select-narrowed to five display fields, and a single shop's
+   // bin holds deleted rows only. Revisit if a deployment's bin
+   // grows into the tens of thousands.
+
    try {
       const [
          products,

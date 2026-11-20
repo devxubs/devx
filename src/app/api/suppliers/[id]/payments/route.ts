@@ -21,6 +21,7 @@ import {
    auditActorFromContext,
    requestAuditContext,
 } from "@src/lib/audit";
+import { parsePagination } from "@src/lib/pagination";
 
 // Supplier payment ledger (Phase 3B, roadmap 3.7 / schema plan §3).
 //
@@ -124,23 +125,39 @@ export async function GET(
          dateFilter.lte = end;
       }
 
-      const payments = await prisma.supplierPayment.findMany({
-         where: {
-            supplierId: supplier.id,
-            isDeleted: false,
-            ...(startDate || endDate ? { paymentDate: dateFilter } : {}),
-         },
-         include: {
-            purchase: { select: { id: true, customId: true, invoice: true } },
-            createdBy: { select: { id: true, name: true, customId: true } },
-         },
-         orderBy: { paymentDate: "desc" },
-      });
+      // P4-2: the ledger rows are paginated with the shared
+      // parsePagination bounds (default 100, max 100); the response
+      // gains total/page/limit. The summary below stays a GLOBAL
+      // aggregate over the supplier's whole ledger (unchanged
+      // figures). The ledger UI walks the bounded pages and renders
+      // the same complete list as the old unbounded response.
+      const { page, limit, skip } = parsePagination(searchParams, 100);
+      const paymentsWhere: any = {
+         supplierId: supplier.id,
+         isDeleted: false,
+         ...(startDate || endDate ? { paymentDate: dateFilter } : {}),
+      };
+      const [payments, paymentsTotal] = await Promise.all([
+         prisma.supplierPayment.findMany({
+            where: paymentsWhere,
+            include: {
+               purchase: { select: { id: true, customId: true, invoice: true } },
+               createdBy: { select: { id: true, name: true, customId: true } },
+            },
+            orderBy: { paymentDate: "desc" },
+            skip,
+            take: limit,
+         }),
+         prisma.supplierPayment.count({ where: paymentsWhere }),
+      ]);
 
       const summary = await payableSummary(prisma, supplier.id);
 
       return NextResponse.json({
          supplierId: supplier.id,
+         total: paymentsTotal,
+         page,
+         limit,
          payments: payments.map((p) => ({
             id: p.id,
             customId: p.customId,

@@ -200,27 +200,31 @@ const Suppliers = () => {
    const loadSuppliers = React.useCallback(async () => {
       setLoading(true);
       try {
-         const res = await fetch("/api/suppliers");
-         if (res.ok) {
-            const data = await res.json();
-            const mapped = (Array.isArray(data) ? data : data.suppliers || []).map((s: any, idx: number) => ({
-               id: s.id,
-               customId: s.customId || `SUP_${idx + 1}`,
-               name: s.name,
-               email: s.email || "-",
-               number: s.phone || "-",
-               address: s.address || "-",
-               purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
-               total: Number(s.totals?.total || 0),
-               pay: Number(s.totals?.paid || 0),
-               due: Number(s.totals?.netPayable ?? s.totals?.due ?? 0),
-               credit: Number(s.totals?.credit || 0),
-            }));
-            setSuppliers(mapped);
-            setLoadError(false);
-         } else {
-            setLoadError(true);
-         }
+         // P4-2: the suppliers API is paginated by default now, so
+         // the page walks the bounded pages and renders the same
+         // complete set as the old single unbounded response. A
+         // failed page throws and lands in the load-error state
+         // below — never a silent partial list.
+         const data = await fetchAllPages<any>(
+            (page, limit) => `/api/suppliers?page=${page}&limit=${limit}`,
+            (d) => (Array.isArray(d) ? d : d.suppliers || []),
+            (d) => d.total,
+         );
+         const mapped = data.map((s: any, idx: number) => ({
+            id: s.id,
+            customId: s.customId || `SUP_${idx + 1}`,
+            name: s.name,
+            email: s.email || "-",
+            number: s.phone || "-",
+            address: s.address || "-",
+            purchases: s.totals?.purchases ?? s._count?.purchases ?? 0,
+            total: Number(s.totals?.total || 0),
+            pay: Number(s.totals?.paid || 0),
+            due: Number(s.totals?.netPayable ?? s.totals?.due ?? 0),
+            credit: Number(s.totals?.credit || 0),
+         }));
+         setSuppliers(mapped);
+         setLoadError(false);
       } catch {
          setLoadError(true);
       } finally {

@@ -125,29 +125,28 @@ const Asset = () => {
       setLoading(true);
       setLoadError(null);
       try {
-         // Only the `search` param is added — with no page/limit
-         // params the API keeps its bare-array response shape.
+         // P4-2: the assets API is paginated by default now, so the
+         // page walks the bounded pages (carrying the active search
+         // term) and renders the same complete set as the old single
+         // unbounded response. A failed page throws and lands in the
+         // load-error state below — never a silent partial list.
          const term = searchText.trim();
-         const res = await fetch(
-            term
-               ? `/api/assets?search=${encodeURIComponent(term)}`
-               : "/api/assets",
+         const data = await fetchAllPages<any>(
+            (page, limit) =>
+               `/api/assets?page=${page}&limit=${limit}${term ? `&search=${encodeURIComponent(term)}` : ""}`,
+            (d) => (Array.isArray(d) ? d : d.assets || []),
+            (d) => d.total,
          );
-         if (res.ok) {
-            const data = await res.json();
-            const mapped = (Array.isArray(data) ? data : []).map((a: any) => ({
-               id: a.id,
-               customId: a.customId,
-               name: a.name,
-               category: a.category || "",
-               value: Number(a.value || 0),
-               description: a.description || "",
-               date: a.createdAt ? new Date(a.createdAt).toISOString().split("T")[0] : "",
-            }));
-            setAssets(mapped);
-         } else {
-            setLoadError("Failed to load assets.");
-         }
+         const mapped = data.map((a: any) => ({
+            id: a.id,
+            customId: a.customId,
+            name: a.name,
+            category: a.category || "",
+            value: Number(a.value || 0),
+            description: a.description || "",
+            date: a.createdAt ? new Date(a.createdAt).toISOString().split("T")[0] : "",
+         }));
+         setAssets(mapped);
       } catch {
          setLoadError("Failed to load assets.");
       } finally {

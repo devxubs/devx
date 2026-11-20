@@ -27,6 +27,7 @@ import { useSettings } from "@src/lib/settingsContext";
 import { useSnackbar } from "@src/lib/snackbarContext";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 
 interface InfoCardProps {
    title: string;
@@ -84,26 +85,36 @@ const Billing = () => {
    const loadBilling = useCallback(async () => {
       setLoading(true);
       try {
-         const res = await fetch("/api/billing");
-         if (res.ok) {
-            const data = await res.json();
-            const formattedRows = (data.transactions || []).map((t: any) => ({
-               id: t.id,
-               customId: t.customId,
-               date: t.createdAt,
-               amount: t.amount,
-               serviceCharge: t.serviceCharge,
-               paymentMethod: t.paymentMethod,
-               status: t.status === "COMPLETED" ? "Paid" : t.status === "PENDING" ? "Pending" : t.status,
-               description: t.description,
-            }));
-            setBillingData(formattedRows);
-            setMetrics({
-               totalSettled: Number(data.totalSettled || 0),
-               totalPending: Number(data.totalPending || 0),
-               totalCharges: Number(data.totalCharges || 0),
-            });
-         }
+         // P4-2: the billing API paginates its transaction list by
+         // default now — walk the bounded pages and render the same
+         // complete set as the old single unbounded response. The
+         // metric totals are global aggregates, identical on every
+         // page; the pick closure captures them from each response.
+         let totals: any = null;
+         const transactions = await fetchAllPages<any>(
+            (page, limit) => `/api/billing?page=${page}&limit=${limit}`,
+            (d) => {
+               totals = d;
+               return d.transactions || [];
+            },
+            (d) => d.total,
+         );
+         const formattedRows = transactions.map((t: any) => ({
+            id: t.id,
+            customId: t.customId,
+            date: t.createdAt,
+            amount: t.amount,
+            serviceCharge: t.serviceCharge,
+            paymentMethod: t.paymentMethod,
+            status: t.status === "COMPLETED" ? "Paid" : t.status === "PENDING" ? "Pending" : t.status,
+            description: t.description,
+         }));
+         setBillingData(formattedRows);
+         setMetrics({
+            totalSettled: Number(totals?.totalSettled || 0),
+            totalPending: Number(totals?.totalPending || 0),
+            totalCharges: Number(totals?.totalCharges || 0),
+         });
       } catch {
          showSnackbar("Failed to load settlement transactions.", "error");
       } finally {

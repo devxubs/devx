@@ -17,25 +17,25 @@ export async function GET(request: NextRequest) {
    const { searchParams } = new URL(request.url);
 
    try {
-      // Optional server pagination for chunked export loaders
-      // (follow-up round, same pattern as /api/assets). The
-      // historical no-parameter response remains the bare enriched
-      // array, so the Suppliers page and other consumers are
-      // unchanged; with ?page=&limit= the aggregates below are
-      // computed for just the page's suppliers and the response is
-      // { suppliers, total, page, limit }.
-      const paginated = searchParams.has("page") || searchParams.has("limit");
+      // P4-2: pagination is now the DEFAULT (and only) shape — the
+      // shared parsePagination bounds (default 20, max 100) always
+      // apply and the response is always { suppliers, total, page,
+      // limit }, with the aggregates below computed for just the
+      // page's suppliers. The previous no-parameter bare enriched
+      // array was an unbounded full-table load. Consumers that
+      // render the full set (the Suppliers page, the export loader)
+      // walk the bounded pages via lib/fetchAllPages, so the rows
+      // and per-supplier totals they show are unchanged.
       const { page, limit, skip } = parsePagination(searchParams, 20);
-      const total = paginated
-         ? await prisma.supplier.count({ where: { isDeleted: false } })
-         : 0;
+      const total = await prisma.supplier.count({ where: { isDeleted: false } });
       const suppliers = await prisma.supplier.findMany({
          where: { isDeleted: false },
          include: { _count: { select: { purchases: true } } },
          orderBy: { name: "asc" },
-         ...(paginated ? { skip, take: limit } : {}),
+         skip,
+         take: limit,
       });
-      const pageSupplierIds = paginated ? suppliers.map((s) => s.id) : null;
+      const pageSupplierIds = suppliers.map((s) => s.id);
 
       // Phase 2 (§2.5): real per-supplier purchase totals. The list UI
       // previously displayed hard-coded zeros for Total / Pay / Due
@@ -129,10 +129,7 @@ export async function GET(request: NextRequest) {
          };
       });
 
-      if (paginated) {
-         return NextResponse.json({ suppliers: enriched, total, page, limit });
-      }
-      return NextResponse.json(enriched);
+      return NextResponse.json({ suppliers: enriched, total, page, limit });
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch suppliers" },

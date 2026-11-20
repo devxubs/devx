@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { parsePagination } from "@src/lib/pagination";
 import {
    logAudit,
    auditActorFromContext,
@@ -17,6 +18,22 @@ export async function GET(
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
+      // P4-2: the included purchases are paginated (previously the
+      // detail GET loaded a supplier's ENTIRE purchase history in
+      // one response). Bounds come from the shared parsePagination
+      // helper (default 100, max 100) via the purchasesPage /
+      // purchasesLimit params; the response gains `purchasesTotal`
+      // so consumers that render the full history (the supplier
+      // detail modal computes its totals from it) can walk the
+      // bounded pages and assemble the same complete set.
+      const { searchParams } = new URL(request.url);
+      const purchaseParams = new URLSearchParams();
+      const purchasesPageParam = searchParams.get("purchasesPage");
+      const purchasesLimitParam = searchParams.get("purchasesLimit");
+      if (purchasesPageParam) purchaseParams.set("page", purchasesPageParam);
+      if (purchasesLimitParam) purchaseParams.set("limit", purchasesLimitParam);
+      const { skip, limit: purchasesLimit } = parsePagination(purchaseParams, 100);
+
       const supplier = await prisma.supplier.findFirst({
          where: {
             OR: [{ id }, { customId: id }],
@@ -25,6 +42,8 @@ export async function GET(
             purchases: {
                where: { isDeleted: false },
                orderBy: { createdAt: "desc" },
+               skip,
+               take: purchasesLimit,
             },
          },
       });
@@ -33,7 +52,11 @@ export async function GET(
          return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
       }
 
-      return NextResponse.json(supplier);
+      const purchasesTotal = await prisma.purchase.count({
+         where: { supplierId: supplier.id, isDeleted: false },
+      });
+
+      return NextResponse.json({ ...supplier, purchasesTotal });
    } catch {
       return NextResponse.json({ error: "Failed to fetch supplier" }, { status: 500 });
    }

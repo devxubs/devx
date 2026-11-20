@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import React, { useEffect, useRef, useState } from "react";
 import CustomAutocomplete from "@src/components/Autocomplete";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 import DateRange from "@src/components/DateRange";
 import {
    CustomerFilterErrors,
@@ -489,19 +490,24 @@ const CustomerFilters = ({
             /* ignore */
          }
          try {
-            const res = await fetch("/api/users?limit=100");
-            if (res.ok) {
-               const data = await res.json();
-               const list = Array.isArray(data) ? data : data.users || [];
-               if (!cancelled) {
-                  setEmployeeOptions(
-                     list.map((u: any) => ({
-                        id: u.id,
-                        label: u.name || u.email || u.id,
-                     })),
-                  );
-                  setEmployeesLoaded(true);
-               }
+            // P4-2: the users API is paginated by default now — walk
+            // the bounded pages so the employee list stays complete
+            // (previously a single ?limit=100 request). A failed page
+            // throws into the catch below, exactly like a failed
+            // single request did.
+            const list = await fetchAllPages<any>(
+               (page, limit) => `/api/users?page=${page}&limit=${limit}`,
+               (d) => (Array.isArray(d) ? d : d.users || []),
+               (d) => d.total,
+            );
+            if (!cancelled) {
+               setEmployeeOptions(
+                  list.map((u: any) => ({
+                     id: u.id,
+                     label: u.name || u.email || u.id,
+                  })),
+               );
+               setEmployeesLoaded(true);
             }
          } catch {
             /* employee field stays hidden without user access */

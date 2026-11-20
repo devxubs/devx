@@ -2,16 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requireAdmin } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import { parsePagination } from "@src/lib/pagination";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
+   const { searchParams } = new URL(request.url);
+
    try {
-      const [transactions, totalSettledAgg, totalPendingAgg, totalChargesAgg] = await Promise.all([
+      // P4-2: the transaction list is paginated with the shared
+      // parsePagination bounds (default 20, max 100); the response
+      // gains total/page/limit. The three totals below stay GLOBAL
+      // aggregates over every transaction (unchanged figures) — the
+      // Billing page walks the bounded pages via fetchAllPages and
+      // renders the same complete set as the old unbounded load.
+      const { page, limit, skip } = parsePagination(searchParams, 20);
+      const [transactions, total, totalSettledAgg, totalPendingAgg, totalChargesAgg] = await Promise.all([
          prisma.billingTransaction.findMany({
             orderBy: { createdAt: "desc" },
+            skip,
+            take: limit,
          }),
+         prisma.billingTransaction.count(),
          prisma.billingTransaction.aggregate({
             where: { status: "COMPLETED" },
             _sum: { amount: true },
@@ -27,6 +40,9 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
          transactions,
+         total,
+         page,
+         limit,
          totalSettled: Number(totalSettledAgg._sum.amount || 0),
          totalPending: Number(totalPendingAgg._sum.amount || 0),
          totalCharges: Number(totalChargesAgg._sum.serviceCharge || 0),

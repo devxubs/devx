@@ -84,17 +84,35 @@ const SupplierPaymentLedger = ({
       if (!supplierId) return;
       setLoading(true);
       try {
-         const params = new URLSearchParams();
-         if (startDate) params.set("startDate", startDate);
-         if (endDate) params.set("endDate", endDate);
-         const res = await fetch(
-            `/api/suppliers/${supplierId}/payments?${params.toString()}`,
-         );
-         if (!res.ok) throw new Error("load failed");
-         const data = await res.json();
-         setPayments(data.payments || []);
-         setSummary(data.summary || null);
-         onSummaryChange?.(data.summary || null);
+         // P4-2: the ledger API paginates its rows by default now
+         // (100/page + total) — walk the bounded pages, carrying the
+         // active date range, and render the same complete list as
+         // the old single unbounded response. The summary is a
+         // global aggregate, identical on every page.
+         const allPayments: any[] = [];
+         let summaryData: any = null;
+         let page = 1;
+         for (;;) {
+            const params = new URLSearchParams();
+            if (startDate) params.set("startDate", startDate);
+            if (endDate) params.set("endDate", endDate);
+            params.set("page", String(page));
+            params.set("limit", "100");
+            const res = await fetch(
+               `/api/suppliers/${supplierId}/payments?${params.toString()}`,
+            );
+            if (!res.ok) throw new Error("load failed");
+            const data = await res.json();
+            const rows = data.payments || [];
+            allPayments.push(...rows);
+            summaryData = data.summary || null;
+            const total = Number(data.total ?? allPayments.length);
+            if (allPayments.length >= total || rows.length === 0) break;
+            page += 1;
+         }
+         setPayments(allPayments);
+         setSummary(summaryData);
+         onSummaryChange?.(summaryData);
          setLoadError(false);
       } catch {
          setLoadError(true);

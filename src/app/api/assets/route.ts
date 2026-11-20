@@ -26,29 +26,25 @@ export async function GET(request: NextRequest) {
    }
 
    try {
-      // Optional server pagination for chunked export loaders. The
-      // historical no-parameter response remains a bare array, so
-      // the Assets page and other existing consumers are unchanged.
-      if (searchParams.has("page") || searchParams.has("limit")) {
-         const { page, limit, skip } = parsePagination(searchParams, 20);
-         const [assets, total] = await Promise.all([
-            prisma.asset.findMany({
-               where,
-               skip,
-               take: limit,
-               orderBy: { createdAt: "desc" },
-            }),
-            prisma.asset.count({ where }),
-         ]);
-         return NextResponse.json({ assets, total, page, limit });
-      }
-
-      const assets = await prisma.asset.findMany({
-         where,
-         orderBy: { createdAt: "desc" },
-      });
-
-      return NextResponse.json(assets);
+      // P4-2: pagination is now the DEFAULT (and only) shape — the
+      // shared parsePagination bounds (default 20, max 100) always
+      // apply and the response is always { assets, total, page,
+      // limit }. The previous no-parameter bare-array response was
+      // an unbounded full-table load. Consumers that render the
+      // full set (the Assets page, the export loader) walk the
+      // bounded pages via lib/fetchAllPages, so the rows they show
+      // are unchanged — they just arrive in chunks.
+      const { page, limit, skip } = parsePagination(searchParams, 20);
+      const [assets, total] = await Promise.all([
+         prisma.asset.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: "desc" },
+         }),
+         prisma.asset.count({ where }),
+      ]);
+      return NextResponse.json({ assets, total, page, limit });
    } catch {
       return NextResponse.json({ error: "Failed to fetch assets" }, { status: 500 });
    }
