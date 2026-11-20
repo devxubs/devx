@@ -80,8 +80,10 @@ describe("parseCustomerListParams", () => {
       );
       expect(p.search).toBe("rahim");
       expect(p.phoneFilter).toBe("01712345678");
-      expect(p.regFrom?.toISOString()).toContain("2026-01-01T00:00:00");
-      expect(p.regTo?.toISOString()).toContain("2026-01-31T23:59:59");
+      // Local-midnight / local end-of-day semantics — assert on local
+      // date components so the test is timezone-independent.
+      expect([p.regFrom?.getFullYear(), p.regFrom?.getMonth(), p.regFrom?.getDate(), p.regFrom?.getHours(), p.regFrom?.getMinutes()]).toEqual([2026, 0, 1, 0, 0]);
+      expect([p.regTo?.getFullYear(), p.regTo?.getMonth(), p.regTo?.getDate(), p.regTo?.getHours(), p.regTo?.getMinutes(), p.regTo?.getSeconds()]).toEqual([2026, 0, 31, 23, 59, 59]);
    });
 
    it("parses the four stat range filters onto their fields", () => {
