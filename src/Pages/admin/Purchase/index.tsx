@@ -21,6 +21,47 @@ import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { PurchaseDetailModal, SupplierDetailModal } from "@src/components/EntityDetailModals/EntityModals";
+import PurchaseReturnForm from "@src/components/EntityDetailModals/PurchaseReturnForm";
+
+// Client mirror of lib/auth.ts normalizePermissions (same key
+// normalisation the Sidebar uses: lower-case, spaces → underscores;
+// both stored permission shapes).
+function normalizePermissions(raw: unknown): Record<string, boolean> {
+   const out: Record<string, boolean> = {};
+   if (!raw) return out;
+   if (Array.isArray(raw)) {
+      for (const entry of raw as any[]) {
+         if (entry && typeof entry === "object") {
+            const key = String(entry.key || entry.name || "")
+               .trim()
+               .toLowerCase()
+               .replace(/\s+/g, "_");
+            if (key) out[key] = entry.allow !== false && entry.value !== false;
+         } else if (typeof entry === "string") {
+            out[entry.trim().toLowerCase().replace(/\s+/g, "_")] = true;
+         }
+      }
+      return out;
+   }
+   if (typeof raw === "object") {
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+         out[k.trim().toLowerCase().replace(/\s+/g, "_")] =
+            v === true || v === "true";
+      }
+   }
+   return out;
+}
+
+// The same permission family the purchase-returns API enforces
+// server-side (POST /api/purchases/[id]/returns). The menu item is
+// only a shortcut — the API gate stays authoritative.
+const RETURN_GATE_KEYS = [
+   "suppliers",
+   "supplier",
+   "supplier_update",
+   "purchases",
+   "purchase_update",
+];
 
 export type PurchaseTypes = {
    id: number | string;
@@ -64,6 +105,56 @@ const Purchase = () => {
    const [loading, setLoading] = useState(false);
    const [detailPurchaseId, setDetailPurchaseId] = useState<string | null>(null);
    const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
+   // Purchase Return shortcut (row Action Menu): the full purchase
+   // (items + stock) is fetched on demand and handed to the SAME
+   // PurchaseReturnForm the purchase detail modal uses — no second
+   // return flow. Visibility follows the returns API permission
+   // family, loaded like the Sidebar loads it.
+   const [canReturn, setCanReturn] = useState(false);
+   const [returnPurchase, setReturnPurchase] = useState<any | null>(null);
+   const [returnError, setReturnError] = useState<string | null>(null);
+
+   React.useEffect(() => {
+      let cancelled = false;
+      fetch("/api/auth/me")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((data) => {
+            if (cancelled || !data?.user) return;
+            const perms = normalizePermissions(
+               data.user.roleDetails?.permissions,
+            );
+            setCanReturn(
+               perms["all"] === true ||
+                  RETURN_GATE_KEYS.some((k) => perms[k] === true) ||
+                  Object.entries(perms).some(
+                     ([key, granted]) =>
+                        granted &&
+                        (key.startsWith("purchases_") ||
+                           key.startsWith("purchase_") ||
+                           key.startsWith("suppliers_") ||
+                           key.startsWith("supplier_")),
+                  ),
+            );
+         })
+         .catch(() => {});
+      return () => {
+         cancelled = true;
+      };
+   }, []);
+
+   const openReturnFlow = React.useCallback(async (row: PurchaseTypes) => {
+      setReturnError(null);
+      try {
+         const res = await fetch(`/api/purchases/${row.id}`);
+         if (!res.ok) throw new Error("load failed");
+         const data = await res.json();
+         setReturnPurchase(data);
+      } catch {
+         setReturnError(
+            "Could not load that purchase for returning. Please try again.",
+         );
+      }
+   }, []);
    // Phase 2 (2.1): server-side pagination + toolbar search — the API
    // already accepts page/limit/search and returns the filtered total;
    // the list previously fetched a flat limit=100 with no search wiring.
@@ -286,6 +377,23 @@ const Purchase = () => {
             />
          ),
       },
+      // Purchase Return — same flow as the detail modal's
+      // "Return Items" (existing form, API and settlement rules).
+      // Shown only with the returns permission family; whether a
+      // specific purchase still has returnable units is answered by
+      // the form itself (per-line returnable caps) and re-validated
+      // by the API, so no parallel eligibility rules live here.
+      ...(canReturn
+         ? [
+              {
+                 label: "Purchase Return",
+                 icon: <Icon icon="solar:undo-left-bold" size="small" />,
+                 onClick: (params: GridRenderCellParams) => {
+                    openReturnFlow(params.row);
+                 },
+              },
+           ]
+         : []),
    ];
 
    return (
@@ -318,6 +426,11 @@ const Purchase = () => {
                }
             >
                Failed to load purchases. Please try again.
+            </Alert>
+         )}
+         {returnError && (
+            <Alert severity="error" onClose={() => setReturnError(null)}>
+               {returnError}
             </Alert>
          )}
          {loading && purchases.length === 0 ? (
@@ -489,6 +602,16 @@ const Purchase = () => {
             open={Boolean(detailSupplierId)}
             onClose={() => setDetailSupplierId(null)}
             supplierId={detailSupplierId}
+         />
+
+         <PurchaseReturnForm
+            purchase={returnPurchase}
+            open={Boolean(returnPurchase)}
+            onClose={() => setReturnPurchase(null)}
+            onSaved={() => {
+               setReturnPurchase(null);
+               loadPurchases();
+            }}
          />
       </Stack>
    );
