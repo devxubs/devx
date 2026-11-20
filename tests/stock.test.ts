@@ -394,4 +394,52 @@ describe("orderHoldsStock", () => {
       expect(orderHoldsStock({ status: "CANCELLED", isDeleted: false })).toBe(false);
       expect(orderHoldsStock({ status: "PENDING", isDeleted: true })).toBe(false);
    });
+
+   // Phase B1 (P1-1): FAILED is terminal — it mirrors CANCELLED in
+   // every exactly-once transition the callers derive from this
+   // predicate (was/will pairs).
+   it("treats FAILED exactly like CANCELLED (terminal)", () => {
+      expect(orderHoldsStock({ status: "FAILED", isDeleted: false })).toBe(false);
+      expect(orderHoldsStock({ status: "FAILED", isDeleted: true })).toBe(false);
+      expect(orderHoldsStock({ status: "CANCELLED", isDeleted: true })).toBe(false);
+   });
+
+   it("create-in-FAILED deducts nothing, like create-in-CANCELLED", () => {
+      // The create path deducts iff orderHoldsStock(new order).
+      for (const status of ["CANCELLED", "FAILED"]) {
+         expect(orderHoldsStock({ status, isDeleted: false })).toBe(false);
+      }
+      expect(orderHoldsStock({ status: "PENDING", isDeleted: false })).toBe(true);
+   });
+
+   it("→FAILED restores once and FAILED→other re-deducts, mirroring CANCELLED", () => {
+      for (const terminal of ["CANCELLED", "FAILED"]) {
+         // Into terminal: was holding, will not → restore exactly once.
+         expect(orderHoldsStock({ status: "PENDING", isDeleted: false })).toBe(true);
+         expect(orderHoldsStock({ status: terminal, isDeleted: false })).toBe(false);
+         // Out of terminal: was not holding, will → re-deduct (validated).
+         expect(orderHoldsStock({ status: "CONFIRMED", isDeleted: false })).toBe(true);
+         // Terminal → terminal: neither side holds → no movement.
+         expect(orderHoldsStock({ status: terminal, isDeleted: false })).toBe(false);
+      }
+      // FAILED → CANCELLED and CANCELLED → FAILED also move nothing.
+      expect(orderHoldsStock({ status: "FAILED", isDeleted: false })).toBe(false);
+      expect(orderHoldsStock({ status: "CANCELLED", isDeleted: false })).toBe(false);
+   });
+
+   it("delete of a FAILED order restores nothing, like a cancelled one", () => {
+      // The delete path restores iff orderHoldsStock(existing).
+      expect(orderHoldsStock({ status: "FAILED", isDeleted: false })).toBe(false);
+      expect(orderHoldsStock({ status: "CANCELLED", isDeleted: false })).toBe(false);
+      expect(orderHoldsStock({ status: "PENDING", isDeleted: false })).toBe(true);
+   });
+
+   it("Bin restore of a FAILED order deducts nothing, like a cancelled one", () => {
+      // The Bin restore path deducts iff the RESTORED order would
+      // hold stock: orderHoldsStock({ status, isDeleted: false }).
+      for (const status of ["CANCELLED", "FAILED"]) {
+         expect(orderHoldsStock({ status, isDeleted: false })).toBe(false);
+      }
+      expect(orderHoldsStock({ status: "DELIVERED", isDeleted: false })).toBe(true);
+   });
 });

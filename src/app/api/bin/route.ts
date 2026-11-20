@@ -5,6 +5,7 @@ import {
    loadStockSettings,
    deductStockForItems,
    addStockForPurchaseItems,
+   orderHoldsStock,
    InsufficientStockError,
 } from "@src/lib/stock";
 import {
@@ -220,15 +221,21 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             // BIN-02/ORD-02 fix: soft-deleting the order released its
             // stock, so restoring must deduct it again (validated,
-            // same transaction) — unless the order is CANCELLED, in
-            // which case it holds no stock either way.
+            // same transaction) — unless the order is in a terminal
+            // status (CANCELLED, or FAILED since Phase B1 P1-1), in
+            // which case it holds no stock either way. The decision
+            // is orderHoldsStock evaluated on the RESTORED state
+            // (isDeleted: false), the exact mirror of the delete.
             await prisma.$transaction(async (tx) => {
                const order = await tx.order.findUnique({
                   where: { id },
                   include: { items: true },
                });
                if (!order) throw new Error("Order not found");
-               if (order.isDeleted && order.status !== "CANCELLED") {
+               if (
+                  order.isDeleted &&
+                  orderHoldsStock({ status: order.status, isDeleted: false })
+               ) {
                   const stockSettings = await loadStockSettings(tx);
                   await deductStockForItems(
                      tx,

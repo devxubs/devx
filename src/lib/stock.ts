@@ -1001,13 +1001,24 @@ export async function adjustStock(
 }
 
 /**
- * An order "holds" stock while it is neither cancelled nor deleted.
- * Stock transitions must key off this predicate so each deduction is
- * reversed exactly once (ORD-02 duplicate-prevention).
+ * An order "holds" stock while it is neither cancelled, failed nor
+ * deleted. FAILED is TERMINAL (Phase B1, audit C-4 / P1-1 — the
+ * owner's decision): every statistic already treated it as terminal,
+ * so it is treated exactly like CANCELLED here and in every caller —
+ * creating an order directly in FAILED deducts nothing, moving into
+ * FAILED restores exactly once, moving out of FAILED re-deducts with
+ * validation, deleting a FAILED order restores nothing, and a Bin
+ * restore of a FAILED order deducts nothing. Stock transitions must
+ * key off this predicate so each deduction is reversed exactly once
+ * (ORD-02 duplicate-prevention).
  */
 export function orderHoldsStock(order: {
    status: string;
    isDeleted: boolean;
 }): boolean {
-   return !order.isDeleted && order.status !== "CANCELLED";
+   return (
+      !order.isDeleted &&
+      order.status !== "CANCELLED" &&
+      order.status !== "FAILED"
+   );
 }

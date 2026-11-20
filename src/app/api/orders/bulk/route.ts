@@ -10,29 +10,21 @@ import {
    InvalidVariantError,
 } from "@src/lib/stock";
 import { logAudit, requestAuditContext } from "@src/lib/audit";
+import {
+   normalizeOrderStatus,
+   ORDER_STATUSES,
+} from "@src/lib/orderStatus";
 
 // Bulk order actions (Phase 3B, roadmap 3.5).
 //
 // Each order is processed independently, in its own transaction,
 // through the SAME stock semantics as the single-order PUT
-// (src/app/api/orders/[id]): a transition into CANCELLED releases
-// the order's stock, a transition out of CANCELLED re-deducts it
-// (validated), totals are recomputed server-side, and an audit event
-// is appended to the order's history. A failure on one order is
-// reported in that order's result and never rolls back the others.
-
-const ORDER_STATUSES = [
-   "PENDING",
-   "CONFIRMED",
-   "PROCESSING",
-   "SHIPPED",
-   "OUT_FOR_DELIVERY",
-   "DELIVERED",
-   "COMPLETED",
-   "HOLD",
-   "CANCELLED",
-   "FAILED",
-];
+// (src/app/api/orders/[id]): a transition into CANCELLED (or FAILED
+// — terminal, Phase B1 P1-1) releases the order's stock, a
+// transition out of a terminal status re-deducts it (validated),
+// totals are recomputed server-side, and an audit event is appended
+// to the order's history. A failure on one order is reported in that
+// order's result and never rolls back the others.
 
 const MAX_BULK_ORDERS = 200;
 
@@ -85,8 +77,11 @@ export async function POST(request: NextRequest) {
 
       let nextStatus: string | undefined;
       if (action === "status") {
-         nextStatus = String(body.status || "").toUpperCase();
-         if (!ORDER_STATUSES.includes(nextStatus)) {
+         // Phase B1 (P1-4): the shared normaliser, so Title-Case /
+         // spaced forms ("Out for Delivery") are accepted exactly as
+         // in the single-order routes; unknown → 400, never 500.
+         const normalized = normalizeOrderStatus(body.status);
+         if (!normalized) {
             return NextResponse.json(
                {
                   error: "Validation error",
@@ -95,6 +90,7 @@ export async function POST(request: NextRequest) {
                { status: 400 },
             );
          }
+         nextStatus = normalized;
       }
       const courierName =
          action === "courier" ? String(body.courier || "").trim() : "";
@@ -161,7 +157,10 @@ export async function POST(request: NextRequest) {
                      return { ok: true, displayId, note: "Already in this status" };
                   }
                   const wasHoldingStock = orderHoldsStock(order);
-                  const willHoldStock = target !== "CANCELLED";
+                  const willHoldStock = orderHoldsStock({
+                     status: target,
+                     isDeleted: order.isDeleted,
+                  });
                   const itemLines = order.items
                      .filter((it) => it.productId)
                      .map((it) => ({
@@ -173,7 +172,7 @@ export async function POST(request: NextRequest) {
                   if (wasHoldingStock && !willHoldStock) {
                      await restoreStockForItems(tx, itemLines, {
                         orderId: order.id,
-                        note: `Order ${displayId} cancelled (bulk) — stock restored`,
+                        note: `Order ${displayId} ${target === "FAILED" ? "failed" : "cancelled"} (bulk) — stock restored`,
                      });
                   } else if (!wasHoldingStock && willHoldStock) {
                      const stockSettings = await loadStockSettings(tx);

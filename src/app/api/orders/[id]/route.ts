@@ -17,6 +17,10 @@ import {
    DuplicateTxIdError,
 } from "@src/lib/payments";
 import {
+   normalizeOrderStatus,
+   type OrderStatusValue,
+} from "@src/lib/orderStatus";
+import {
    logAudit,
    auditActorFromContext,
    requestAuditContext,
@@ -100,6 +104,28 @@ export async function PUT(
 
       if (!existingOrder) {
          return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      }
+
+      // Phase B1 (P1-4): normalise the status at the API boundary,
+      // BEFORE any comparison or write. The Publish flow sends Title
+      // Case ("Out for Delivery", "Cancelled"); the old handler wrote
+      // body.status raw, so those edits stored a non-enum string and
+      // the CANCELLED stock-release/audit comparisons below never
+      // matched. Every downstream use reads `normalizedStatus`, never
+      // body.status. Unknown statuses are a 400, never a 500.
+      let normalizedStatus: OrderStatusValue | undefined;
+      if (body.status !== undefined) {
+         const normalized = normalizeOrderStatus(body.status);
+         if (!normalized) {
+            return NextResponse.json(
+               {
+                  error: "Validation error",
+                  message: `status must be one of the known order statuses (e.g. PENDING, OUT_FOR_DELIVERY, DELIVERED).`,
+               },
+               { status: 400 },
+            );
+         }
+         normalizedStatus = normalized;
       }
 
       const existingTags =
@@ -200,9 +226,11 @@ export async function PUT(
          }
       }
 
-      // 2. Audit Status Changes
-      if (body.status !== undefined && body.status !== existingOrder.status) {
-         if (body.status === "CANCELLED") {
+      // 2. Audit Status Changes (compared on the NORMALISED status,
+      // so a Title-Case "Cancelled" from Publish takes the same
+      // cancellation branch as a canonical CANCELLED from QuickEdit).
+      if (normalizedStatus !== undefined && normalizedStatus !== existingOrder.status) {
+         if (normalizedStatus === "CANCELLED") {
             const reason = body.cancellationReason || "Cancelled by user or staff";
             newAuditEvents.push({
                id: `act-audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -223,19 +251,19 @@ export async function PUT(
          } else {
             newAuditEvents.push({
                id: `act-audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-               action: `Status Changed to ${body.status}`,
+               action: `Status Changed to ${normalizedStatus}`,
                category: "workflow",
                actor: auditActor,
-               details: `Status transitioned from ${existingOrder.status} to ${body.status}`,
+               details: `Status transitioned from ${existingOrder.status} to ${normalizedStatus}`,
                diff: {
                   field: "status",
                   previous: existingOrder.status,
-                  new: body.status,
+                  new: normalizedStatus,
                },
                timestamp: nowIso,
                icon: "solar:refresh-bold",
-               badgeLabel: body.status,
-               isImportant: body.status === "DELIVERED" || body.status === "COMPLETED",
+               badgeLabel: normalizedStatus,
+               isImportant: normalizedStatus === "DELIVERED" || normalizedStatus === "COMPLETED",
             });
          }
       }
@@ -419,7 +447,7 @@ export async function PUT(
       // inside whichever transaction path performs the update (the
       // legacy orderTags auditHistory above is unchanged).
       const statusChanged =
-         body.status !== undefined && body.status !== existingOrder.status;
+         normalizedStatus !== undefined && normalizedStatus !== existingOrder.status;
       const writeOrderAudit = async (tx: any, updatedOrder: any) => {
          // Follow-up round: the diff also covers paymentMethod,
          // courier, deliveryCharge and discount (previously a PUT
@@ -450,7 +478,7 @@ export async function PUT(
             entityCustomId:
                existingOrder.orderId || existingOrder.customId || existingOrder.id,
             summary: statusChanged
-               ? `Order ${existingOrder.orderId || existingOrder.customId} status changed from ${existingOrder.status} to ${body.status}`
+               ? `Order ${existingOrder.orderId || existingOrder.customId} status changed from ${existingOrder.status} to ${normalizedStatus}`
                : `Order ${existingOrder.orderId || existingOrder.customId} updated`,
             changes,
             ...requestAuditContext(request),
@@ -805,14 +833,22 @@ export async function PUT(
          // Step 4: Calculate net stock difference per product.
          // ORD-02 fix: the difference is computed between the stock
          // the order EFFECTIVELY held before and after this update.
-         // An order only holds stock while it is neither CANCELLED nor
-         // deleted — so transitioning into CANCELLED releases the full
-         // item quantities, and un-cancelling re-deducts them, instead
-         // of stock leaking on every status change.
+         // An order only holds stock while it is neither CANCELLED,
+         // FAILED (terminal, Phase B1 P1-1) nor deleted — so
+         // transitioning into CANCELLED/FAILED releases the full item
+         // quantities, and leaving a terminal status re-deducts them,
+         // instead of stock leaking on every status change. Both
+         // sides go through orderHoldsStock so the predicate can
+         // never drift between the before/after computations.
          const wasHoldingStock = orderHoldsStock(existingOrder);
          const nextStatus =
-            body.status !== undefined ? body.status : existingOrder.status;
-         const willHoldStock = nextStatus !== "CANCELLED";
+            normalizedStatus !== undefined
+               ? normalizedStatus
+               : existingOrder.status;
+         const willHoldStock = orderHoldsStock({
+            status: nextStatus,
+            isDeleted: existingOrder.isDeleted,
+         });
 
          // INV-02: differences are netted per product + variant —
          // moving a line from variant A to variant B of the same
@@ -1048,7 +1084,7 @@ export async function PUT(
                      body.discount !== undefined ? discount : undefined,
                   total: calculatedTotal,
                   dueAmount: calculatedDue,
-                  status: body.status !== undefined ? body.status : undefined,
+                  status: normalizedStatus,
                   orderNote: updatedOrderNote,
                   orderTags: updatedOrderTags,
                   orderSource:
@@ -1119,8 +1155,9 @@ export async function PUT(
       // discount / advance payment. A client-sent dueAmount (or total)
       // is never trusted — previously it was stored verbatim and could
       // desynchronise totals from dues.
-      // ORD-02 fix: a status transition into CANCELLED releases the
-      // order's stock; a transition out of CANCELLED re-deducts it
+      // ORD-02 fix: a status transition into CANCELLED (or FAILED —
+      // terminal, Phase B1 P1-1) releases the order's stock; a
+      // transition out of a terminal status re-deducts it
       // (validated). Both happen in the same transaction as the update.
       const effectiveDelivery =
          body.deliveryCharge !== undefined
@@ -1141,9 +1178,14 @@ export async function PUT(
       const recomputedDue = Math.max(0, recomputedTotal - effectiveAdvance);
 
       const nextStatus =
-         body.status !== undefined ? body.status : existingOrder.status;
+         normalizedStatus !== undefined
+            ? normalizedStatus
+            : existingOrder.status;
       const wasHoldingStock = orderHoldsStock(existingOrder);
-      const willHoldStock = nextStatus !== "CANCELLED";
+      const willHoldStock = orderHoldsStock({
+         status: nextStatus,
+         isDeleted: existingOrder.isDeleted,
+      });
 
       const updated = await prisma.$transaction(async (tx) => {
          // QA fix (S1, partial): in-transaction duplicate-TxID
@@ -1192,7 +1234,7 @@ export async function PUT(
          if (wasHoldingStock && !willHoldStock) {
             await restoreStockForItems(tx, itemLines, {
                orderId: existingOrder.id,
-               note: `Order ${existingOrder.orderId || existingOrder.orderCode} cancelled — stock restored`,
+               note: `Order ${existingOrder.orderId || existingOrder.orderCode} ${nextStatus === "FAILED" ? "failed" : "cancelled"} — stock restored`,
             });
          } else if (!wasHoldingStock && willHoldStock) {
             const stockSettings = await loadStockSettings(tx);
@@ -1206,7 +1248,7 @@ export async function PUT(
          const updatedOrder = await tx.order.update({
             where: { id: existingOrder.id },
             data: {
-               status: body.status !== undefined ? body.status : undefined,
+               status: normalizedStatus,
                orderNote: updatedOrderNote,
                orderTags: updatedOrderTags,
                orderSource:
@@ -1329,7 +1371,10 @@ export async function DELETE(
             // Follow-up round: the audit summary must reflect
             // whether stock was actually restored — a CANCELLED
             // order holds no stock (released at cancel time), so
-            // claiming "stock restored" for it was wrong.
+            // claiming "stock restored" for it was wrong. Phase B1
+            // (P1-1): FAILED is terminal exactly like CANCELLED, so
+            // the summary names the actual status instead of
+            // hard-coding "cancelled".
             const stockRestored = orderHoldsStock(existing);
             if (stockRestored) {
                await restoreStockForItems(
@@ -1362,7 +1407,7 @@ export async function DELETE(
                entityCustomId: existing.orderId || existing.customId,
                summary: stockRestored
                   ? `Order ${existing.orderId || existing.customId} moved to bin — stock restored`
-                  : `Order ${existing.orderId || existing.customId} moved to bin — no stock restored (order was cancelled)`,
+                  : `Order ${existing.orderId || existing.customId} moved to bin — no stock restored (order was ${existing.status})`,
                ...requestAuditContext(request),
             });
 

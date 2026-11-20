@@ -7,10 +7,16 @@ import { generateNextEntityId } from "@src/lib/idGenerator";
 import {
    loadStockSettings,
    deductStockForItems,
+   orderHoldsStock,
    findVariantlessVariableLine,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import {
+   normalizeOrderStatus,
+   VALID_ORDER_WHERE,
+   type OrderStatusValue,
+} from "@src/lib/orderStatus";
 import {
    findOrderWithTxId,
    duplicateTxIdMessage,
@@ -94,9 +100,18 @@ export async function GET(request: NextRequest) {
       ];
    }
 
-   // 1. Status with Exclude support
+   // 1. Status with Exclude support. Phase B1 (P1-4): each token is
+   // normalised through the shared normaliser, so the Title-Case
+   // values the order filters send ("Out for Delivery") match the
+   // stored enum (OUT_FOR_DELIVERY) instead of the invalid
+   // "OUT FOR DELIVERY" the old plain upper-casing produced. A token
+   // that does not normalise keeps its upper-cased form, preserving
+   // the previous behaviour for anything else.
    if (status && status !== "All") {
-      const statuses = status.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+      const statuses = status
+         .split(",")
+         .map((s) => normalizeOrderStatus(s) ?? s.trim().toUpperCase())
+         .filter(Boolean);
       if (excludeStatus) {
          where.status = { notIn: statuses };
       } else {
@@ -239,10 +254,15 @@ export async function GET(request: NextRequest) {
       }
    }
 
-   // 17. Customer Type
+   // 17. Customer Type. Phase B1 (P1-2): "many orders" uses the ONE
+   // canonical valid-order definition (lib/orderStatus) — the old
+   // groupBy counted ALL orders including soft-deleted, CANCELLED
+   // and FAILED ones, unlike the Customers page's New/Returning rule
+   // (New ≤1 / Returning >1 VALID orders).
    if (customerType && (customerType === "New" || customerType === "Regular")) {
       const customersWithManyOrders = await prisma.order.groupBy({
          by: ["customerId"],
+         where: { ...VALID_ORDER_WHERE },
          _count: { id: true },
          having: { id: { _count: { gt: 1 } } },
       });
@@ -409,6 +429,26 @@ export async function POST(request: NextRequest) {
    try {
       const body = await request.json();
       const { customer, products, pricing, orderNote, orderSource, status } = body;
+
+      // Phase B1 (P1-4): normalise the status at the API boundary.
+      // The Publish flow sends Title Case ("Out for Delivery"); the
+      // old code only upper-cased it, storing the invalid
+      // "OUT FOR DELIVERY" instead of the OUT_FOR_DELIVERY enum.
+      // Unknown statuses are a 400, never a 500.
+      let normalizedStatus: OrderStatusValue = "PENDING";
+      if (status !== undefined && status !== null && status !== "") {
+         const normalized = normalizeOrderStatus(status);
+         if (!normalized) {
+            return NextResponse.json(
+               {
+                  error: "Validation error",
+                  message: `status must be one of the known order statuses (e.g. PENDING, OUT_FOR_DELIVERY, DELIVERED).`,
+               },
+               { status: 400 },
+            );
+         }
+         normalizedStatus = normalized;
+      }
 
       if (!Array.isArray(products) || products.length === 0) {
          return NextResponse.json(
@@ -587,7 +627,7 @@ export async function POST(request: NextRequest) {
                orderCode: orderId,
                orderId,
                invoiceNo,
-               status: (status?.toUpperCase() || "PENDING") as any,
+               status: normalizedStatus as any,
                orderNote: orderNote || null,
                orderSource: orderSource || null,
                courier: body.courier ? String(body.courier) : null,
@@ -627,9 +667,10 @@ export async function POST(request: NextRequest) {
          // transaction via the shared stock engine, honouring
          // StoreSetting.enableStockValidation and per-product
          // allowNegativeStock; warehouse stock is mirrored (INV-01).
-         // An order created directly in CANCELLED status never holds
-         // stock, so no deduction happens for it.
-         if ((status?.toUpperCase() || "PENDING") !== "CANCELLED") {
+         // An order created directly in a terminal status (CANCELLED
+         // or FAILED — Phase B1, P1-1) never holds stock, so no
+         // deduction happens for it.
+         if (orderHoldsStock({ status: normalizedStatus, isDeleted: false })) {
             const stockSettings = await loadStockSettings(tx);
             await deductStockForItems(
                tx,
