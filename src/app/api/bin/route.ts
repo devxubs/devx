@@ -13,6 +13,7 @@ import {
    requestAuditContext,
 } from "@src/lib/audit";
 import { deleteUploadedFiles } from "@src/lib/uploadedFiles";
+import { selectCascadeDeletedVariantIds } from "@src/lib/binRestore";
 
 export async function GET(request: NextRequest) {
    // R-2 fix (Final Review): Recycle Bin contents are deleted business
@@ -378,9 +379,36 @@ export async function POST(request: NextRequest) {
             await prisma.$transaction(async (tx) => {
                const product = await tx.product.findUnique({
                   where: { id },
-                  select: { id: true, customId: true, productName: true },
+                  select: {
+                     id: true,
+                     customId: true,
+                     productName: true,
+                     deletedAt: true,
+                  },
                });
                if (!product) throw new Error("Product not found");
+               // P0-2 (audit C-2): product DELETE cascade-deleted
+               // the then-live variants under the product's own
+               // `deletedAt` stamp. Restore exactly those variants
+               // with the product — variants deleted individually
+               // at another time (different stamp) stay deleted.
+               // The product's quantity was never changed by the
+               // delete, so restoring the same variant set makes
+               // Σ live variant quantities equal it again.
+               const variants = await tx.productVariant.findMany({
+                  where: { productId: id },
+                  select: { id: true, isDeleted: true, deletedAt: true },
+               });
+               const cascadeVariantIds = selectCascadeDeletedVariantIds(
+                  product.deletedAt,
+                  variants,
+               );
+               if (cascadeVariantIds.length > 0) {
+                  await tx.productVariant.updateMany({
+                     where: { id: { in: cascadeVariantIds } },
+                     data: { isDeleted: false, deletedAt: null },
+                  });
+               }
                await tx.product.update({
                   where: { id },
                   data: { isDeleted: false, deletedAt: null },
@@ -391,7 +419,11 @@ export async function POST(request: NextRequest) {
                   entityType: "PRODUCT",
                   entityId: product.id,
                   entityCustomId: product.customId,
-                  summary: `Product ${product.customId || product.productName} restored from bin`,
+                  summary:
+                     `Product ${product.customId || product.productName} restored from bin` +
+                     (cascadeVariantIds.length > 0
+                        ? ` — ${cascadeVariantIds.length} variant(s) restored`
+                        : ""),
                   ...requestAuditContext(request),
                });
             });

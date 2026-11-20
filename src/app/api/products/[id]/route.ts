@@ -419,14 +419,23 @@ export async function DELETE(
 
    const { id } = await params;
    try {
+      // P0-2 (audit C-2): the product and the variants this delete
+      // cascades to share ONE `deletedAt` timestamp — that shared
+      // stamp is the delete-event linkage Bin restore matches on to
+      // bring back exactly the cascade-deleted variants. Only
+      // currently-live variants are stamped: a variant deleted
+      // individually earlier keeps its own `deletedAt`, so restore
+      // can tell the two apart (previously every variant's stamp
+      // was overwritten, and restore un-flagged none of them).
+      const deletedAt = new Date();
       await prisma.$transaction([
          prisma.product.update({
             where: { id },
-            data: { isDeleted: true, deletedAt: new Date() },
+            data: { isDeleted: true, deletedAt },
          }),
          prisma.productVariant.updateMany({
-            where: { productId: id },
-            data: { isDeleted: true, deletedAt: new Date() },
+            where: { productId: id, isDeleted: false },
+            data: { isDeleted: true, deletedAt },
          }),
       ]);
 
