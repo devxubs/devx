@@ -16,10 +16,11 @@
  * page-size options top out at 100 ([10, 25, 50, 100] in
  * src/components/Table), so no legitimate UI request is affected.
  * Exports page through the list endpoints with this helper via
- * fetchAllPages. One deliberate exception remains: the customers
- * list still honours `?all=true` because its page fetches every
- * matched customer (derived-stat filters must run before paging
- * to keep the total accurate) — see src/app/api/customers.
+ * fetchAllPages. The customers list was the last exception (it
+ * honoured `?all=true` because its derived-stat filters ran in
+ * memory before paging); Phase B4a (P1-13) moved those filters
+ * into SQL (lib/customerList), so it is paginated with this helper
+ * like every other list and `?all=true` is retired there too.
  */
 export function parsePagination(
    searchParams: URLSearchParams,

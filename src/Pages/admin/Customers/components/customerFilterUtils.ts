@@ -234,15 +234,24 @@ function addRangeParams(
    if (r.op === "between") q.set(`${prefix}Value2`, r.value2.trim());
 }
 
-/** Build the GET /api/customers query string for the applied filters. */
+/**
+ * Build the GET /api/customers query string for the applied filters.
+ * Phase B4a (P1-13): the list is server-paginated now — the old
+ * `all=true` full-population request is retired. Callers pass the
+ * page/limit they need; the page walks bounded pages via
+ * fetchAllPages to assemble the full matched set for the table.
+ */
 export function buildCustomerQuery(
    f: CustomerFilterState,
    search: string,
    sortBy: string,
    sortDir: string,
+   page?: number,
+   limit?: number,
 ): URLSearchParams {
    const q = new URLSearchParams();
-   q.set("all", "true");
+   if (page !== undefined) q.set("page", String(page));
+   if (limit !== undefined) q.set("limit", String(limit));
    const trimmed = search.trim();
    if (trimmed) q.set("search", trimmed);
    if (f.status === "new" || f.status === "returning") {

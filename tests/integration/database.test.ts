@@ -26,6 +26,10 @@ import {
    computeNetPurchaseQuantities,
 } from "@src/lib/purchaseReturns";
 import {
+   fetchCustomerListPage,
+   parseCustomerListParams,
+} from "@src/lib/customerList";
+import {
    addStockForPurchaseItems,
    reverseStockForPurchaseItems,
    deductStockForPurchaseReturn,
@@ -389,3 +393,144 @@ describe.skipIf(!enabled)("database integration (explicit test DB only)", () => 
       ).rejects.toThrow("intentional rollback");
    });
 });
+
+describe.skipIf(!enabled)(
+   "customers list server pagination (P1-13, explicit test DB only)",
+   () => {
+      // Seeds a small, uniquely-marked customer/order set and asserts
+      // the DB-level list (fetchCustomerListPage) returns exactly
+      // what the old in-memory computation produced for the same
+      // fixtures: A = 2 valid orders (100 + 50, one DELIVERED) plus
+      // one CANCELLED 999 that must not count; B = 1 valid order of
+      // 200 dated 100 days ago; C = no orders. All queries search
+      // for the unique marker, so the matched population is exactly
+      // these three customers regardless of other data in the DB.
+      const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const marker = `p113-${suffix}`;
+      let ids: string[] = [];
+
+      const list = (qs: string) =>
+         fetchCustomerListPage(
+            prisma as never,
+            parseCustomerListParams(new URLSearchParams(qs)),
+         );
+
+      beforeAll(async () => {
+         const mkCustomer = (name: string) =>
+            prisma!.customer.create({ data: { name: `${marker}-${name}` } });
+         const [a, b, c] = [await mkCustomer("A"), await mkCustomer("B"), await mkCustomer("C")];
+         ids = [a.id, b.id, c.id];
+         let seq = 0;
+         const mkOrder = (
+            customerId: string,
+            total: number,
+            advance: number,
+            status: "PENDING" | "DELIVERED" | "CANCELLED",
+            createdAt?: Date,
+         ) =>
+            prisma!.order.create({
+               data: {
+                  orderId: `${marker}-ORD-${++seq}`,
+                  invoiceNo: `${marker}-INV-${seq}`,
+                  status,
+                  subtotal: total,
+                  total,
+                  advancePayment: advance,
+                  dueAmount: total - advance,
+                  customerId,
+                  ...(createdAt ? { createdAt } : {}),
+               },
+            });
+         await mkOrder(a.id, 100, 100, "DELIVERED");
+         await mkOrder(a.id, 50, 20, "PENDING");
+         await mkOrder(a.id, 999, 999, "CANCELLED");
+         await mkOrder(
+            b.id,
+            200,
+            50,
+            "PENDING",
+            new Date(Date.now() - 100 * 24 * 60 * 60 * 1000),
+         );
+         void c;
+      });
+
+      afterAll(async () => {
+         await prisma!.order.deleteMany({
+            where: { customerId: { in: ids } },
+         });
+         await prisma!.customer.deleteMany({ where: { id: { in: ids } } });
+      });
+
+      it("computes the derived stats over valid orders only", async () => {
+         const res = await list(`search=${marker}&sortBy=totalPurchase&sortDir=desc`);
+         expect(res.total).toBe(3);
+         expect(res.customers.map((r) => r.name)).toEqual([
+            `${marker}-B`,
+            `${marker}-A`,
+            `${marker}-C`,
+         ]);
+         const bySuffix = (s: string) =>
+            res.customers.find((r) => r.name.endsWith(s))!;
+         // A: CANCELLED 999 excluded from every stat.
+         expect(bySuffix("-A").stats).toMatchObject({
+            totalOrders: 2,
+            totalPurchase: 150,
+            totalPaid: 120,
+            totalDue: 30,
+            status: "Returning",
+         });
+         expect(bySuffix("-B").stats).toMatchObject({
+            totalOrders: 1,
+            totalPurchase: 200,
+            status: "New",
+         });
+         expect(bySuffix("-C").stats).toMatchObject({
+            totalOrders: 0,
+            totalPurchase: 0,
+            lastOrderAt: null,
+            status: "New",
+         });
+      });
+
+      it("paginates in the database with an accurate total", async () => {
+         const page1 = await list(
+            `search=${marker}&sortBy=totalPurchase&sortDir=desc&limit=2&page=1`,
+         );
+         const page2 = await list(
+            `search=${marker}&sortBy=totalPurchase&sortDir=desc&limit=2&page=2`,
+         );
+         expect(page1.total).toBe(3);
+         expect(page1.customers.map((r) => r.name)).toEqual([
+            `${marker}-B`,
+            `${marker}-A`,
+         ]);
+         expect(page2.customers.map((r) => r.name)).toEqual([`${marker}-C`]);
+      });
+
+      it("highValue threshold is the 80th percentile of the matched spenders", async () => {
+         // Spenders in the matched population: A=150, B=200 → rank
+         // ceil(0.8×2)=2 → threshold 200 → only B qualifies.
+         const res = await list(`search=${marker}&segment=highValue`);
+         expect(res.segmentMeta.highValueThreshold).toBe(200);
+         expect(res.customers.map((r) => r.name)).toEqual([`${marker}-B`]);
+      });
+
+      it("inactive = has a valid order, none in the last 90 days", async () => {
+         const res = await list(`search=${marker}&segment=inactive`);
+         expect(res.customers.map((r) => r.name)).toEqual([`${marker}-B`]);
+      });
+
+      it("status and range filters match the in-memory semantics", async () => {
+         const returning = await list(`search=${marker}&status=returning`);
+         expect(returning.customers.map((r) => r.name)).toEqual([
+            `${marker}-A`,
+         ]);
+         const ranged = await list(
+            `search=${marker}&ordersOp=gte&ordersValue=1&sortBy=createdAt&sortDir=asc`,
+         );
+         expect(ranged.total).toBe(2);
+         const never = await list(`search=${marker}&neverOrdered=1`);
+         expect(never.customers.map((r) => r.name)).toEqual([`${marker}-C`]);
+      });
+   },
+);

@@ -17,6 +17,7 @@ import React, {
    useState,
 } from "react";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useSettings } from "@src/lib/settingsContext";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import AlertDialog from "@src/components/AlertDialog";
@@ -100,17 +101,31 @@ const Customers = () => {
       const req = ++requestRef.current;
       setLoading(true);
       try {
-         const q = buildCustomerQuery(
-            appliedFilters,
-            debouncedSearch,
-            sortBy,
-            sortDir,
+         // Phase B4a (P1-13): the API is server-paginated (bounded
+         // pages, max 100). The table still works on the full matched
+         // set, so walk the pages with the shared chunked loader —
+         // identical rows and order, and a failed page throws (no
+         // partial set is ever shown as complete).
+         let totalFromApi: number | null = null;
+         const allCustomers = await fetchAllPages<any>(
+            (page, limit) =>
+               `/api/customers?${buildCustomerQuery(
+                  appliedFilters,
+                  debouncedSearch,
+                  sortBy,
+                  sortDir,
+                  page,
+                  limit,
+               ).toString()}`,
+            (d) => (Array.isArray(d.customers) ? d.customers : []),
+            (d) => {
+               const t = Number(d.total);
+               if (!Number.isNaN(t)) totalFromApi = t;
+               return d.total;
+            },
          );
-         const res = await fetch(`/api/customers?${q.toString()}`);
-         if (!res.ok) throw new Error("Failed to load customers");
-         const data = await res.json();
          if (req !== requestRef.current) return;
-         const mapped: CustomerRow[] = (data.customers || []).map((c: any) => {
+         const mapped: CustomerRow[] = allCustomers.map((c: any) => {
             const s = c.stats || {};
             return {
                id: c.id,
@@ -129,7 +144,7 @@ const Customers = () => {
             };
          });
          setRows(mapped);
-         setTotal(Number(data.total ?? mapped.length));
+         setTotal(totalFromApi ?? mapped.length);
          lastLoadOkRef.current = true;
       } catch {
          if (req !== requestRef.current) return;
