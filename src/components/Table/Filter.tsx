@@ -22,7 +22,7 @@ import {
 import React, { useEffect, useMemo, useState } from "react";
 import Icon from "../Icon";
 import ExportButton from "../ExportButton";
-import { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
+import type { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
 import dayjs from "dayjs";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { usePrint } from "../TablePrintDocument/PrintPortal";

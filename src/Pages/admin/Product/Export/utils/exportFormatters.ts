@@ -1,4 +1,8 @@
-import { ExportColumn, formatExportCellValue, getColField, sanitizeCellValue } from "@src/lib/exportEngine";
+// P4-3: all of these live in the dependency-free lib/exportColumns
+// now — importing them from lib/exportEngine pulled ExcelJS + docx
+// into the Product page bundle.
+import type { ExportColumn } from "@src/lib/exportColumns";
+import { formatExportCellValue, getColField, sanitizeCellValue } from "@src/lib/exportColumns";
 import { ExportFormat } from "../types/export.types";
 
 /**

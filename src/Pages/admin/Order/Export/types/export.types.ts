@@ -1,4 +1,4 @@
-import { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
+import type { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
 
 export type ExportFormat = "excel" | "csv" | "word";
 export type DocumentPreviewTheme = "light" | "dark";

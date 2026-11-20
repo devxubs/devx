@@ -14,7 +14,7 @@ import {
    Grid,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
+import type { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
 import {
    DocumentPreviewTheme,
    NormalizedOrderRow,

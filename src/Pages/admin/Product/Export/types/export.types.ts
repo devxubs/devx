@@ -1,4 +1,4 @@
-import { ExportColumn, HeaderStyleOption, BorderStyleOption } from "@src/lib/exportEngine";
+import type { ExportColumn, HeaderStyleOption, BorderStyleOption } from "@src/lib/exportEngine";
 
 export type ExportFormat = "xlsx" | "docx" | "csv";
 export type DocumentTheme = "light" | "dark";

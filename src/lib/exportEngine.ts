@@ -14,91 +14,40 @@ import {
    ShadingType,
 } from "docx";
 
-export interface ExportColumn {
-   field?: string;
-   key?: string;
-   headerName?: string;
-   header?: string;
-   type?: "string" | "number" | "currency" | "date" | "boolean";
-   format?: (val: any, row?: any) => string;
-   width?: number;
-}
+// P4-3: ExportColumn / SummaryRowItem / getColField / getColHeader
+// moved to the dependency-free lib/exportColumns (see its header) —
+// they are re-exported here so every existing import from this
+// module keeps working, and used internally via the import below.
+export type { ExportColumn, SummaryRowItem } from "./exportColumns";
+export { getColField, getColHeader } from "./exportColumns";
+import type { ExportColumn, SummaryRowItem } from "./exportColumns";
+import { getColField, getColHeader } from "./exportColumns";
 
-export const getColField = (col: ExportColumn): string => col.field || col.key || "";
-export const getColHeader = (col: ExportColumn): string => col.headerName || col.header || getColField(col);
-
-export interface SummaryRowItem {
-   label: string;
-   value: string | number;
-   isTotal?: boolean;
-}
-
-export type DocumentThemeOption = "light" | "dark";
-
-export type HeaderStyleOption =
-   | "Default"
-   | "Modern"
-   | "Minimal"
-   | "Bold"
-   | "Professional"
-   | "Colored Header"
-   | "blue"
-   | "teal"
-   | "slate"
-   | "gray"
-   | "primary";
-
-export type BorderStyleOption =
-   | "No Borders"
-   | "Horizontal Lines"
-   | "All Borders"
-   | "Outer Border"
-   | "Minimal Borders"
-   | "thin"
-   | "medium"
-   | "none";
-
-export function resolveHeaderStyleColors(style?: string) {
-   switch (style) {
-      case "Modern":
-      case "teal":
-         return { bg: "#0F766E", text: "#FFFFFF", argb: "FF0F766E", wordFill: "0F766E", wordText: "FFFFFF" };
-      case "Minimal":
-         return { bg: "#F1F5F9", text: "#0F172A", argb: "FFF1F5F9", wordFill: "F1F5F9", wordText: "0F172A" };
-      case "Bold":
-         return { bg: "#0F172A", text: "#FFFFFF", argb: "FF0F172A", wordFill: "0F172A", wordText: "FFFFFF" };
-      case "Professional":
-      case "slate":
-         return { bg: "#1E293B", text: "#FFFFFF", argb: "FF1E293B", wordFill: "1E293B", wordText: "FFFFFF" };
-      case "Colored Header":
-         return { bg: "#4F46E5", text: "#FFFFFF", argb: "FF4F46E5", wordFill: "4F46E5", wordText: "FFFFFF" };
-      case "gray":
-         return { bg: "#475569", text: "#FFFFFF", argb: "FF475569", wordFill: "475569", wordText: "FFFFFF" };
-      case "Default":
-      case "blue":
-      case "primary":
-      default:
-         return { bg: "#0284C7", text: "#FFFFFF", argb: "FF0284C7", wordFill: "0284C7", wordText: "FFFFFF" };
-   }
-}
-
-export function formatExportCellValue(col: ExportColumn, rawVal: any, item?: any): string {
-   if (col.format) {
-      return col.format(rawVal, item);
-   }
-   if (col.type === "currency") {
-      const n = Number(rawVal);
-      return `৳ ${isNaN(n) ? "0.00" : n.toFixed(2)}`;
-   }
-   if (col.type === "number") {
-      const n = Number(rawVal);
-      return isNaN(n) ? "0" : n.toLocaleString();
-   }
-   if (col.type === "date" && rawVal) {
-      return new Date(rawVal).toLocaleDateString();
-   }
-   return rawVal == null || rawVal === "" ? "-" : String(rawVal);
-}
+// P4-3: the style types + the pure helpers resolveHeaderStyleColors /
+// formatExportCellValue / sanitizeCellValue also moved to the
+// dependency-free lib/exportColumns (see its header) — re-exported
+// here so existing imports keep working, and imported for internal
+// use below.
+export type {
+   DocumentThemeOption,
+   HeaderStyleOption,
+   BorderStyleOption,
+} from "./exportColumns";
+export {
+   resolveHeaderStyleColors,
+   formatExportCellValue,
+   sanitizeCellValue,
+} from "./exportColumns";
+import type {
+   DocumentThemeOption,
+   HeaderStyleOption,
+   BorderStyleOption,
+} from "./exportColumns";
+import {
+   resolveHeaderStyleColors,
+   formatExportCellValue,
+   sanitizeCellValue,
+} from "./exportColumns";
 
 export interface InvoiceExportData {
    invoiceNo: string;
@@ -132,24 +81,6 @@ export interface InvoiceExportData {
    due?: number;
    notes?: string;
    terms?: string;
-}
-
-/**
- * Neutralizes potential spreadsheet formula injection (=, +, -, @)
- */
-export function sanitizeCellValue(val: any): any {
-   if (typeof val === "string") {
-      const trimmed = val.trim();
-      if (
-         trimmed.startsWith("=") ||
-         trimmed.startsWith("+") ||
-         trimmed.startsWith("-") ||
-         trimmed.startsWith("@")
-      ) {
-         return "'" + val;
-      }
-   }
-   return val;
 }
 
 /**

@@ -1,8 +1,10 @@
-import {
+// P4-3: from the dependency-free lib/exportColumns (see
+// exportFormatters.ts note) — not lib/exportEngine.
+import type {
    HeaderStyleOption,
    BorderStyleOption,
-   resolveHeaderStyleColors,
-} from "@src/lib/exportEngine";
+} from "@src/lib/exportColumns";
+import { resolveHeaderStyleColors } from "@src/lib/exportColumns";
 import { DocumentTheme, NormalizedProduct } from "../types/export.types";
 
 /**

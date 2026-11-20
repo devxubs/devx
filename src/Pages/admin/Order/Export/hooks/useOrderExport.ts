@@ -15,11 +15,8 @@ import {
    normalizeOrderData,
 } from "../utils/exportHelpers";
 import { getValidatedFileName } from "../utils/exportFormatters";
-import {
-   exportToCsv,
-   exportToExcel,
-   exportToWord,
-} from "@src/lib/exportEngine";
+// P4-3: the runtime engine (ExcelJS + docx) is loaded lazily inside
+// executeExport via dynamic import(), not statically.
 import { useSettings } from "@src/lib/settingsContext";
 
 export function useOrderExport(selectedOrders: any[], onClose?: () => void) {
@@ -152,6 +149,11 @@ export function useOrderExport(selectedOrders: any[], onClose?: () => void) {
          });
 
          const companyInfo = storeInfo;
+
+         // P4-3: lazy-load the runtime engine only when an export
+         // actually runs.
+         const { exportToCsv, exportToExcel, exportToWord } =
+            await import("@src/lib/exportEngine");
 
          if (format === "excel") {
             await exportToExcel({

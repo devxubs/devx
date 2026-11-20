@@ -2,10 +2,9 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useSettings } from "@src/lib/settingsContext";
-import {
-   exportToExcel,
-   exportToWord,
-   exportToCsv,
+// P4-3: types are static (erased); the runtime engine is loaded
+// lazily inside the export handler via dynamic import().
+import type {
    HeaderStyleOption,
    BorderStyleOption,
 } from "@src/lib/exportEngine";
@@ -169,6 +168,11 @@ export function useProductExport({
             address: includeContact ? storeInfo.address : undefined,
             logoUrl: includeLogo ? storeInfo.logoUrl : undefined,
          };
+
+         // P4-3: lazy-load the runtime engine (ExcelJS + docx) only
+         // when an export actually runs.
+         const { exportToExcel, exportToWord, exportToCsv } =
+            await import("@src/lib/exportEngine");
 
          if (format === "xlsx") {
             await exportToExcel({

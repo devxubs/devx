@@ -16,7 +16,7 @@ import {
 import Icon from "@src/components/Icon";
 import { ProductExportConfig, NormalizedProduct } from "../types/export.types";
 import { formatCellValue, generateRawCsvString } from "../utils/exportFormatters";
-import { getColField } from "@src/lib/exportEngine";
+import { getColField } from "@src/lib/exportColumns";
 
 export interface CsvPreviewProps {
    config: ProductExportConfig;

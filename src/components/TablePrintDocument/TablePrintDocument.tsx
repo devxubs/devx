@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { ExportColumn, SummaryRowItem, getColField, getColHeader } from "@src/lib/exportEngine";
+// P4-3: column types + helpers come from the dependency-free
+// lib/exportColumns, NOT lib/exportEngine — this component is
+// mounted by the root print provider on every page, and importing
+// the engine here pulled ExcelJS + docx into every page's bundle.
+import type { ExportColumn, SummaryRowItem } from "@src/lib/exportColumns";
+import { getColField, getColHeader } from "@src/lib/exportColumns";
 import { StoreSettings } from "@src/lib/settingsContext";
 import InvoiceRenderer from "../InvoiceTemplates/InvoiceRenderer";
 import { InvoiceOrderData } from "../InvoiceTemplates/types";

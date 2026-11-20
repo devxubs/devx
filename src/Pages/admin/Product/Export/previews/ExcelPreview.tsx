@@ -21,7 +21,7 @@ import {
    resolveBorderStyles,
    getDocumentThemeStyles,
 } from "../utils/exportHelpers";
-import { getColField } from "@src/lib/exportEngine";
+import { getColField } from "@src/lib/exportColumns";
 
 export interface ExcelPreviewProps {
    config: ProductExportConfig;

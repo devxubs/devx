@@ -1,4 +1,4 @@
-import { ExportColumn, HeaderStyleOption, BorderStyleOption } from "@src/lib/exportEngine";
+import type { ExportColumn, HeaderStyleOption, BorderStyleOption } from "@src/lib/exportEngine";
 import { FormatOptionItem } from "../types/export.types";
 
 export const PRODUCT_EXPORT_COLUMNS: ExportColumn[] = [

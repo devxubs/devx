@@ -26,10 +26,12 @@ import {
 } from "@mui/material";
 import Icon from "./Icon";
 import CustomModal from "./Modal";
-import {
-   exportToExcel,
-   exportToWord,
-   exportToCsv,
+// P4-3: the export engine (ExcelJS + docx) is loaded lazily inside
+// handleExecuteExport via dynamic import() — this shared component
+// sits on nearly every list page, and the old static import pulled
+// the whole engine into every one of those pages' bundles. Only the
+// types are imported statically (erased at compile time).
+import type {
    ExportColumn,
    SummaryRowItem,
 } from "@src/lib/exportEngine";
@@ -177,6 +179,11 @@ export default function ExportButton({
             address: settings?.address,
             logoUrl: settings?.logoUrl,
          };
+
+         // P4-3: lazy-load the runtime engine only when an export
+         // actually runs (the customerExport pattern).
+         const { exportToExcel, exportToWord, exportToCsv } =
+            await import("@src/lib/exportEngine");
 
          if (format === "xlsx") {
             await exportToExcel({

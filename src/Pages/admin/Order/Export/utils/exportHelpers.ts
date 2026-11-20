@@ -1,4 +1,4 @@
-import { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
+import type { ExportColumn, SummaryRowItem } from "@src/lib/exportEngine";
 import { NormalizedOrderRow, OrderFieldKey } from "../types/export.types";
 import { ORDER_FIELD_GROUPS } from "./exportConstants";
 

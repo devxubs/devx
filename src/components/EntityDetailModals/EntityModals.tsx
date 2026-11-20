@@ -28,7 +28,10 @@ import PrintButton from "@src/components/PrintButton";
 import CustomModal from "@src/components/Modal";
 import HtmlRenderer from "@src/components/HtmlRenderer";
 import { isDescriptionEmpty } from "@src/lib/sanitizeHtml";
-import { exportToExcel, exportToWord } from "@src/lib/exportEngine";
+// P4-3: the export engine (ExcelJS + docx) is loaded lazily inside
+// the export handlers below via dynamic import() — this shared
+// modal library is imported by nearly every list page, and the old
+// static import pulled the whole engine into all of their bundles.
 import { useSettings } from "@src/lib/settingsContext";
 import SupplierPaymentLedger from "./SupplierPaymentLedger";
 import PurchaseReturnForm from "./PurchaseReturnForm";
@@ -397,8 +400,9 @@ export const PurchaseDetailModal = ({
       }
    };
 
-   const handleExportPurchaseDocx = () => {
+   const handleExportPurchaseDocx = async () => {
       if (!purchase) return;
+      const { exportToWord } = await import("@src/lib/exportEngine");
       exportToWord({
          filename: `PurchaseOrder_${purchase.purchaseNo || purchase.customId || "PO"}`,
          title: "Purchase Order",
@@ -433,8 +437,9 @@ export const PurchaseDetailModal = ({
       });
    };
 
-   const handleExportPurchaseXlsx = () => {
+   const handleExportPurchaseXlsx = async () => {
       if (!purchase) return;
+      const { exportToExcel } = await import("@src/lib/exportEngine");
       exportToExcel({
          filename: `PurchaseOrder_${purchase.purchaseNo || purchase.customId || "PO"}`,
          title: "Purchase Order",
@@ -827,6 +832,38 @@ export const PurchaseDetailModal = ({
 // ==========================================
 // 6. SUPPLIER DETAIL MODAL
 // ==========================================
+
+// P4-2: GET /api/suppliers/[id] paginates its purchases include
+// (purchasesPage/purchasesLimit, 100 per page + purchasesTotal).
+// This modal computes its totals from the supplier's COMPLETE
+// purchase history, so it walks the bounded pages and assembles
+// the same full set the old unbounded response returned. A failed
+// page rejects, and the callers keep their previous supplier state
+// (their .catch behaviour is unchanged).
+async function fetchSupplierWithAllPurchases(supplierId: string): Promise<any> {
+   const firstRes = await fetch(
+      `/api/suppliers/${supplierId}?purchasesPage=1&purchasesLimit=100`,
+   );
+   if (!firstRes.ok) return null;
+   const first = await firstRes.json();
+   if (!first) return null;
+   const purchases = [...(first.purchases || [])];
+   const total = Number(first.purchasesTotal ?? purchases.length);
+   let page = 2;
+   while (purchases.length < total) {
+      const res = await fetch(
+         `/api/suppliers/${supplierId}?purchasesPage=${page}&purchasesLimit=100`,
+      );
+      if (!res.ok) throw new Error("Failed to load supplier purchases");
+      const data = await res.json();
+      const rows = data?.purchases || [];
+      if (rows.length === 0) break;
+      purchases.push(...rows);
+      page += 1;
+   }
+   return { ...first, purchases };
+}
+
 export const SupplierDetailModal = ({
    open,
    onClose,
@@ -846,8 +883,7 @@ export const SupplierDetailModal = ({
 
    const loadSupplier = React.useCallback(() => {
       if (!supplierId) return;
-      fetch(`/api/suppliers/${supplierId}`)
-         .then((r) => (r.ok ? r.json() : null))
+      fetchSupplierWithAllPurchases(supplierId)
          .then((d) => setSupplier(d))
          .catch(() => {});
    }, [supplierId]);
@@ -856,15 +892,15 @@ export const SupplierDetailModal = ({
       if (!open || !supplierId) return;
       setLoading(true);
       setPayableSummary(null);
-      fetch(`/api/suppliers/${supplierId}`)
-         .then((r) => (r.ok ? r.json() : null))
+      fetchSupplierWithAllPurchases(supplierId)
          .then((d) => setSupplier(d))
          .catch(() => {})
          .finally(() => setLoading(false));
    }, [open, supplierId]);
 
-   const handleExportSupplierDocx = () => {
+   const handleExportSupplierDocx = async () => {
       if (!supplier) return;
+      const { exportToWord } = await import("@src/lib/exportEngine");
       exportToWord({
          filename: `Supplier_${supplier.name || "Statement"}`,
          title: `Supplier Statement - ${supplier.name || ""}`,
@@ -909,8 +945,9 @@ export const SupplierDetailModal = ({
       });
    };
 
-   const handleExportSupplierXlsx = () => {
+   const handleExportSupplierXlsx = async () => {
       if (!supplier) return;
+      const { exportToExcel } = await import("@src/lib/exportEngine");
       exportToExcel({
          filename: `Supplier_${supplier.name || "Statement"}`,
          title: `Supplier Statement - ${supplier.name || ""}`,

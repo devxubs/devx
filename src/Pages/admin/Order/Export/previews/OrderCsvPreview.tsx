@@ -14,7 +14,7 @@ import {
    Button,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import { ExportColumn } from "@src/lib/exportEngine";
+import type { ExportColumn } from "@src/lib/exportEngine";
 import {
    DocumentPreviewTheme,
    NormalizedOrderRow,

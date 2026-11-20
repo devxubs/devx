@@ -4,7 +4,7 @@ import React from "react";
 import { Grid, TextField, Box, Typography, Button } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import Icon from "@src/components/Icon";
-import { HeaderStyleOption, BorderStyleOption } from "@src/lib/exportEngine";
+import type { HeaderStyleOption, BorderStyleOption } from "@src/lib/exportEngine";
 import { DocumentTheme } from "../types/export.types";
 import {
    HEADER_STYLE_OPTIONS,

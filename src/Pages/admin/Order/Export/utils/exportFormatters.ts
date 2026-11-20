@@ -1,4 +1,4 @@
-import { ExportColumn } from "@src/lib/exportEngine";
+import type { ExportColumn } from "@src/lib/exportEngine";
 import { NormalizedOrderRow, OrderFieldKey } from "../types/export.types";
 
 export function sanitizeFileNameInput(rawName: string): string {

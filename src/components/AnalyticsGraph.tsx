@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import { Stack, Typography, Box, useTheme } from "@mui/material";
 import dynamic from "next/dynamic";
-import moment from "moment";
+import dayjs from "dayjs";
 import DateRangePickerCustom from "@src/components/DateRange";
 import CustomCard from "@src/components/CustomCard";
 
@@ -158,10 +158,13 @@ const AnalyticsGraph: React.FC<AnalyticsGraphProps> = ({
 
    /* -------- FORMATTERS -------- */
    const xLabelFormatter = (val: any) => {
+      // P4-3: dayjs (the app's primary date library) replaces
+      // moment, which was used in this one file only — the three
+      // format tokens below are identical in dayjs.
       if (type === "category") return val;
-      if (type === "week") return moment(val).format("ddd");
-      if (type === "month") return moment(val).format("MMM YYYY");
-      return moment(val).format("DD MMM");
+      if (type === "week") return dayjs(val).format("ddd");
+      if (type === "month") return dayjs(val).format("MMM YYYY");
+      return dayjs(val).format("DD MMM");
    };
 
    /* -------- CHART OPTIONS -------- */
