@@ -29,9 +29,14 @@ interface HeaderProps {
    mobileMode?: Boolean;
    onClose?: (open: boolean) => void;
    onConversationUpdated?: (updated: any) => void;
+   // P2-9: member management in the group modal needs the staff
+   // list, the current user, and a callback for membership changes.
+   users?: User[];
+   currentUserId?: string;
+   onMembersChanged?: (updated: any) => void;
 }
 
-const Header = ({ user, conversation, onClose, open, onConversationUpdated }: HeaderProps) => {
+const Header = ({ user, conversation, onClose, open, onConversationUpdated, users, currentUserId, onMembersChanged }: HeaderProps) => {
    const theme = useTheme();
    const [openModal, setOpenModal] = useState(false);
    const [openEditGroup, setOpenEditGroup] = useState(false);
@@ -175,9 +180,14 @@ const Header = ({ user, conversation, onClose, open, onConversationUpdated }: He
                      <EditGroupModal
                         open={openEditGroup}
                         conversation={conversation || user}
+                        users={users || []}
+                        currentUserId={currentUserId}
                         onClose={() => setOpenEditGroup(false)}
                         onUpdated={(updated) => {
                            onConversationUpdated?.(updated);
+                        }}
+                        onMembersChanged={(updated) => {
+                           onMembersChanged?.(updated);
                         }}
                      />
                   </>

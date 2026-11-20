@@ -42,6 +42,14 @@ interface ChatBoxProps {
       content: string;
    } | null;
    attachments?: Attachment;
+   // P2-9: persisted reactions — the full stored map
+   // ({ userId: unified }) and the current user's own reaction.
+   // When onReact is provided the reaction is controlled by the
+   // parent (which persists it through the messages API); without
+   // it the bubble falls back to the old local-only behaviour.
+   reactions?: Record<string, string> | null;
+   myReaction?: string;
+   onReact?: (unified: string) => void;
 }
 
 const ChatBox = ({
@@ -53,12 +61,27 @@ const ChatBox = ({
    onReply,
    replyTo,
    type,
+   reactions,
+   myReaction,
+   onReact,
 }: ChatBoxProps) => {
    const theme = useTheme();
    const [deleteChatOpen, setDeleteChatOpen] = useState(false);
    const [showImage, setShowImage] = useState(false);
    const [openReact, setOpenReact] = useState<null | HTMLElement>(null);
-   const [selectedReact, setSelectedReact] = useState("");
+   const [localReact, setLocalReact] = useState("");
+   const selectedReact = onReact ? myReaction || "" : localReact;
+   // Other members' reactions shown as a small cluster next to mine.
+   const otherReactions = reactions
+      ? Object.entries(reactions)
+           .filter(([, unified]) => unified && unified !== selectedReact)
+           .map(([, unified]) => unified)
+      : [];
+   const pickReaction = (unified: string) => {
+      setOpenReact(null);
+      if (onReact) onReact(unified);
+      else setLocalReact(unified === localReact ? "" : unified);
+   };
 
    const attachmentName =
       (attachments && (attachments.name || "").split(".")) || [];
@@ -191,6 +214,13 @@ const ChatBox = ({
                            attachmentName={attachmentName}
                         />
                      )}
+                     {/* P2-9: a message can carry text WITH its
+                         attachment — show the caption too. */}
+                     {massage && (
+                        <Typography variant="body2" color="textPrimary">
+                           {massage}
+                        </Typography>
+                     )}
                   </Stack>
                )}
 
@@ -201,26 +231,38 @@ const ChatBox = ({
                      name={attachments?.name || ""}
                   />
                )}
-               {/* Reaction */}
-               {selectedReact && (
+               {/* Reaction — P2-9: persisted reactions render from
+                   the stored map: the current user's reaction plus
+                   one badge per distinct reaction from others. */}
+               {(selectedReact || otherReactions.length > 0) && (
                   <Stack
-                     alignItems={"center"}
-                     justifyContent={"center"}
-                     sx={{
-                        position: "absolute",
-                        bottom: -10,
-                        right: 0,
-                        bgcolor: theme.palette.background.default,
-                        width: 20,
-                        height: 20,
-                        borderRadius: "50%",
-                     }}
+                     direction="row"
+                     spacing={0.3}
+                     sx={{ position: "absolute", bottom: -10, right: 0 }}
                   >
-                     <Emoji
-                        unified={selectedReact}
-                        emojiStyle={EmojiStyle.GOOGLE}
-                        size={15}
-                     />
+                     {Array.from(
+                        new Set(
+                           [selectedReact, ...otherReactions].filter(Boolean),
+                        ),
+                     ).map((unified) => (
+                        <Stack
+                           key={unified}
+                           alignItems={"center"}
+                           justifyContent={"center"}
+                           sx={{
+                              bgcolor: theme.palette.background.default,
+                              width: 20,
+                              height: 20,
+                              borderRadius: "50%",
+                           }}
+                        >
+                           <Emoji
+                              unified={unified}
+                              emojiStyle={EmojiStyle.GOOGLE}
+                              size={15}
+                           />
+                        </Stack>
+                     ))}
                   </Stack>
                )}
             </Stack>
@@ -259,10 +301,7 @@ const ChatBox = ({
                <Stack spacing={0.5} direction={"row"}>
                   <IconButton
                      size="small"
-                     onClick={() => {
-                        setOpenReact(null);
-                        setSelectedReact("2764-fe0f");
-                     }}
+                     onClick={() => pickReaction("2764-fe0f")}
                   >
                      <Emoji
                         unified={"2764-fe0f"}
@@ -272,10 +311,7 @@ const ChatBox = ({
                   </IconButton>
                   <IconButton
                      size="small"
-                     onClick={() => {
-                        setOpenReact(null);
-                        setSelectedReact("1f606");
-                     }}
+                     onClick={() => pickReaction("1f606")}
                   >
                      <Emoji
                         unified={"1f606"}
@@ -285,10 +321,7 @@ const ChatBox = ({
                   </IconButton>
                   <IconButton
                      size="small"
-                     onClick={() => {
-                        setOpenReact(null);
-                        setSelectedReact("1f62e");
-                     }}
+                     onClick={() => pickReaction("1f62e")}
                   >
                      <Emoji
                         unified={"1f62e"}
@@ -298,10 +331,7 @@ const ChatBox = ({
                   </IconButton>
                   <IconButton
                      size="small"
-                     onClick={() => {
-                        setOpenReact(null);
-                        setSelectedReact("1f622");
-                     }}
+                     onClick={() => pickReaction("1f622")}
                   >
                      <Emoji
                         unified={"1f622"}
@@ -311,10 +341,7 @@ const ChatBox = ({
                   </IconButton>
                   <IconButton
                      size="small"
-                     onClick={() => {
-                        setOpenReact(null);
-                        setSelectedReact("1f621");
-                     }}
+                     onClick={() => pickReaction("1f621")}
                   >
                      <Emoji
                         unified={"1f621"}
@@ -324,10 +351,7 @@ const ChatBox = ({
                   </IconButton>
                   <IconButton
                      size="small"
-                     onClick={() => {
-                        setOpenReact(null);
-                        setSelectedReact("1f44d");
-                     }}
+                     onClick={() => pickReaction("1f44d")}
                   >
                      <Emoji
                         unified={"1f44d"}

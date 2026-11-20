@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import {
+   parseChatLimit,
+   parseChatCursor,
+   parseChatSince,
+   olderThanCursorWhere,
+   newerThanSinceWhere,
+   chatPageMeta,
+   normalizeChatAttachment,
+   toggleReaction,
+} from "@src/lib/chatMessages";
 
 /**
  * CHAT-01 fix: every handler verifies the caller is a member of the
@@ -42,12 +52,65 @@ export async function GET(request: NextRequest) {
       // Fix instruction #18: GET is a pure read — it no longer marks
       // messages as read as a side effect. Read state changes go
       // through the explicit POST { action: "mark_read" } operation.
-      const messages = await prisma.chatMessage.findMany({
-         where: { conversationId },
-         orderBy: { createdAt: "asc" },
-      });
+      //
+      // P2-8: the history is no longer returned unbounded. Three
+      // modes, all returning the SAME envelope
+      // `{ messages, hasMore, nextBefore, nextBeforeId }` with
+      // messages in ascending createdAt order (the order the UI
+      // renders):
+      //  - default / cursor mode: the newest `limit` messages at or
+      //    before the `before`+`beforeId` cursor (or simply the
+      //    newest page when no cursor is given);
+      //  - `since` (+ optional `sinceId`) mode for polling: only
+      //    messages strictly after that point, ascending, capped at
+      //    the max page size — the client appends them and never
+      //    re-downloads history.
+      const limit = parseChatLimit(searchParams.get("limit"));
+      const since = parseChatSince(
+         searchParams.get("since"),
+         searchParams.get("sinceId"),
+      );
 
-      return NextResponse.json(messages);
+      if (since) {
+         const messages = await prisma.chatMessage.findMany({
+            where: {
+               conversationId,
+               ...newerThanSinceWhere(since),
+            },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            take: limit,
+         });
+         return NextResponse.json({
+            messages,
+            // A full page in since-mode means more may already be
+            // waiting; the client's next poll continues from the
+            // newest message it now holds.
+            hasMore: messages.length === limit,
+            nextBefore: null,
+            nextBeforeId: null,
+         });
+      }
+
+      const cursor = parseChatCursor(
+         searchParams.get("before"),
+         searchParams.get("beforeId"),
+         searchParams.get("cursor"),
+      );
+      // Probe one row past the page to know whether older history
+      // exists, fetching newest-first, then present ascending.
+      const probed = await prisma.chatMessage.findMany({
+         where: {
+            conversationId,
+            ...(cursor ? olderThanCursorWhere(cursor) : {}),
+         },
+         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+         take: limit + 1,
+      });
+      const messages = probed.slice(0, limit).reverse();
+      return NextResponse.json({
+         messages,
+         ...chatPageMeta(messages, probed.length, limit),
+      });
    } catch {
       return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
    }
@@ -61,7 +124,13 @@ export async function POST(request: NextRequest) {
    try {
       const body = await request.json();
       const message = body.message || body.content;
-      const { conversationId, attachments, action } = body;
+      const { conversationId, action } = body;
+      // P2-9: attachments are stored as the single attachment
+      // object the chat UI renders ({ type, url, name }) — the
+      // composer uploads the file through POST /api/uploads first
+      // and sends only the resulting URL. Normalising here keeps a
+      // malformed payload from persisting an unrenderable shape.
+      const attachments = normalizeChatAttachment(body.attachments);
 
       if (!conversationId) {
          return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
@@ -87,7 +156,35 @@ export async function POST(request: NextRequest) {
          return NextResponse.json({ message: "Messages marked as read" });
       }
 
-      if (!message && (!attachments || attachments.length === 0)) {
+      // P2-9: reactions are persisted on ChatMessage.reactions
+      // (JSON map userId → unified emoji code, the shape
+      // handler/chatData.ts already types). Toggling the same emoji
+      // removes it. Any member may react to any message in the
+      // conversation; membership was verified above.
+      if (action === "react") {
+         const { messageId, reaction } = body;
+         if (!messageId || typeof reaction !== "string" || !reaction) {
+            return NextResponse.json(
+               { error: "messageId and reaction are required" },
+               { status: 400 },
+            );
+         }
+         const target = await prisma.chatMessage.findFirst({
+            where: { id: messageId, conversationId },
+            select: { id: true, reactions: true },
+         });
+         if (!target) {
+            return NextResponse.json({ error: "Message not found" }, { status: 404 });
+         }
+         const reactions = toggleReaction(target.reactions, session.id, reaction);
+         const updated = await prisma.chatMessage.update({
+            where: { id: target.id },
+            data: { reactions },
+         });
+         return NextResponse.json(updated);
+      }
+
+      if (!message && !attachments) {
          return NextResponse.json({ error: "Message content or attachment is required" }, { status: 400 });
       }
 
@@ -105,7 +202,9 @@ export async function POST(request: NextRequest) {
                senderName: user?.name || session.name || "User",
                senderAvatar: user?.image || "/images/avatar-25.webp",
                message: message ? message.trim() : null,
-               attachments: attachments || null,
+               // The normalised object (or null when absent) — cast
+               // as the previous untyped body value was.
+               attachments: (attachments || null) as any,
                isRead: false,
             },
          }),

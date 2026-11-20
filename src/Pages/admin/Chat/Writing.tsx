@@ -21,9 +21,12 @@ interface WritingProps {
    imageUpload: any;
    attachmentUpload: any;
    onSendMessage?: (text: string) => void;
+   // P2-9: true while an uploaded attachment is pending — Send must
+   // work with an empty text body so the attachment can go alone.
+   canSendWithoutText?: boolean;
 }
 
-const Writing = ({ attachmentUpload, imageUpload, user, onSendMessage }: WritingProps) => {
+const Writing = ({ attachmentUpload, imageUpload, user, onSendMessage, canSendWithoutText }: WritingProps) => {
    const theme = useTheme();
    const state = useChatState();
    const [emojiAnchor, setEmojiAnchor] = useState<null | HTMLElement>(null);
@@ -70,10 +73,10 @@ const Writing = ({ attachmentUpload, imageUpload, user, onSendMessage }: Writing
 
    // ⏎ Handle Enter
    const submitMessage = () => {
-      const text = ref.current?.innerText.trim();
-      if (text) {
+      const text = ref.current?.innerText.trim() || "";
+      if (text || canSendWithoutText) {
          if (onSendMessage) onSendMessage(text);
-         ref.current!.innerHTML = "";
+         if (ref.current) ref.current.innerHTML = "";
          setMessageHTML("");
       }
    };

@@ -20,6 +20,7 @@ import Sidebar from "./Layout/Sidebar";
 import Icon from "@src/components/Icon";
 import ChatColorIcon from "@src/SvgIcon/ChatColorIcon";
 import CustomBox from "@src/components/CustomBox";
+import { uploadImageFile } from "@src/lib/uploadImage";
 import { User } from "./handler/chatData";
 import VoiceRecorder from "./VoiceRecorder";
 import useChatState from "./handler/chatState";
@@ -38,12 +39,31 @@ const Chat = () => {
    const [greeting, setGreeting] = useState("");
    const [profileOpen, setProfileOpen] = useState(false);
    const [smallSidebar, setSmallSidebar] = useState(false);
-   const [images, setImages] = useState<File | null>(null);
-   const [attachment, setAttachment] = useState<File | null>(null);
+   // P2-9: the pending attachment is the UPLOADED file's stored
+   // shape ({ type, url, name }) — the dropzones below upload
+   // through POST /api/uploads on drop, and the send handler
+   // includes this object in the message payload, which the API
+   // persists on ChatMessage.attachments and the list renders.
+   const [pendingAttachment, setPendingAttachment] = useState<{
+      type: string;
+      url: string;
+      name: string;
+   } | null>(null);
+   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+   const [attachmentError, setAttachmentError] = useState<string | null>(null);
    const [replyTo, setReplyTo] = useState<{
       name: string;
       content: string;
    } | null>(null);
+   // P2-8: paging state for the message history — whether older
+   // history exists, and the refs holding the oldest/newest known
+   // message cursors (kept in refs so the polling interval always
+   // sees the latest values without re-subscribing).
+   const [hasMoreOlder, setHasMoreOlder] = useState(false);
+   const [loadingOlder, setLoadingOlder] = useState(false);
+   const oldestCursorRef = useRef<{ before: string; beforeId: string } | null>(null);
+   const newestCursorRef = useRef<{ since: string; sinceId: string } | null>(null);
+   const prependRef = useRef(false);
 
    // Real backend data states
    const [conversations, setConversations] = useState<any[]>([]);
@@ -127,70 +147,177 @@ const Chat = () => {
       setActiveConversation(conversations[0]);
    }, [conversations, params]);
 
-   // 2. Fetch Messages for active conversation
-   const loadMessages = useCallback(async (convId: string, isSilent = false) => {
-      if (!convId) return;
-      if (!isSilent) setLoadingMessages(true);
-      try {
-         const res = await fetch(`/api/chat/messages?conversationId=${convId}`);
-         if (res.ok) {
-            const data = await res.json();
-            setMessages(data);
-            // Phase 1 (CHAT-02): the messages API provides an explicit
-            // mark_read action, but the UI never called it, so read
-            // receipts stalled at "unread" forever. Now, whenever the
-            // open conversation contains unread messages from other
-            // members, mark them read (fire-and-forget; the next poll
-            // reflects the new state).
-            const myId = currentUserRef.current?.id;
-            const hasUnreadFromOthers =
-               Array.isArray(data) &&
-               data.some(
-                  (m: any) => !m.isRead && m.senderId && (!myId || m.senderId !== myId),
-               );
-            if (hasUnreadFromOthers) {
-               fetch("/api/chat/messages", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                     conversationId: convId,
-                     action: "mark_read",
-                  }),
-               }).catch(() => {});
-            }
-         }
-      } catch {
-         // silent
-      } finally {
-         if (!isSilent) setLoadingMessages(false);
+   // Phase 1 (CHAT-02): whenever fetched messages contain unread
+   // messages from other members, mark them read via the API's
+   // explicit mark_read action (fire-and-forget).
+   const markReadIfNeeded = useCallback((convId: string, msgs: any[]) => {
+      const myId = currentUserRef.current?.id;
+      const hasUnreadFromOthers =
+         Array.isArray(msgs) &&
+         msgs.some(
+            (m: any) => !m.isRead && m.senderId && (!myId || m.senderId !== myId),
+         );
+      if (hasUnreadFromOthers) {
+         fetch("/api/chat/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+               conversationId: convId,
+               action: "mark_read",
+            }),
+         }).catch(() => {});
       }
    }, []);
 
+   const rememberCursors = useCallback((msgs: any[]) => {
+      if (msgs.length > 0) {
+         const newest = msgs[msgs.length - 1];
+         newestCursorRef.current = { since: newest.createdAt, sinceId: newest.id };
+      }
+   }, []);
+
+   // 2. Fetch Messages for active conversation — P2-8: the initial
+   // load fetches only the LATEST page (the API defaults to 50);
+   // older history is fetched on demand by loadOlderMessages.
+   const loadMessages = useCallback(
+      async (convId: string, isSilent = false) => {
+         if (!convId) return;
+         if (!isSilent) setLoadingMessages(true);
+         try {
+            const res = await fetch(
+               `/api/chat/messages?conversationId=${convId}&limit=50`,
+            );
+            if (res.ok) {
+               const data = await res.json();
+               const msgs = Array.isArray(data) ? data : data.messages || [];
+               setMessages(msgs);
+               setHasMoreOlder(Boolean(data?.hasMore));
+               oldestCursorRef.current =
+                  data?.nextBefore && data?.nextBeforeId
+                     ? { before: data.nextBefore, beforeId: data.nextBeforeId }
+                     : null;
+               rememberCursors(msgs);
+               markReadIfNeeded(convId, msgs);
+            }
+         } catch {
+            // silent
+         } finally {
+            if (!isSilent) setLoadingMessages(false);
+         }
+      },
+      [markReadIfNeeded, rememberCursors],
+   );
+
+   // P2-8: fetch the next older page and PREPEND it (deduplicated
+   // by id in case a poll raced the page fetch).
+   const loadOlderMessages = useCallback(async () => {
+      const convId = activeConversation?.id;
+      const cursor = oldestCursorRef.current;
+      if (!convId || !cursor || loadingOlder) return;
+      setLoadingOlder(true);
+      try {
+         const params = new URLSearchParams({
+            conversationId: convId,
+            limit: "50",
+            before: cursor.before,
+            beforeId: cursor.beforeId,
+         });
+         const res = await fetch(`/api/chat/messages?${params.toString()}`);
+         if (res.ok) {
+            const data = await res.json();
+            const older = Array.isArray(data) ? data : data.messages || [];
+            if (older.length > 0) {
+               prependRef.current = true;
+               setMessages((prev) => {
+                  const seen = new Set(prev.map((m: any) => m.id));
+                  return [...older.filter((m: any) => !seen.has(m.id)), ...prev];
+               });
+            }
+            setHasMoreOlder(Boolean(data?.hasMore));
+            oldestCursorRef.current =
+               data?.nextBefore && data?.nextBeforeId
+                  ? { before: data.nextBefore, beforeId: data.nextBeforeId }
+                  : null;
+         }
+      } catch {
+         // silent — the button stays available for a retry
+      } finally {
+         setLoadingOlder(false);
+      }
+   }, [activeConversation?.id, loadingOlder]);
+
+   // P2-8: incremental polling — ask only for messages after the
+   // newest known one and APPEND them; the full history is never
+   // re-downloaded. Falls back to a page load while the
+   // conversation is still empty (no cursor yet).
+   const pollMessages = useCallback(
+      async (convId: string) => {
+         const cursor = newestCursorRef.current;
+         if (!cursor) {
+            loadMessages(convId, true);
+            return;
+         }
+         try {
+            const params = new URLSearchParams({
+               conversationId: convId,
+               since: cursor.since,
+               sinceId: cursor.sinceId,
+            });
+            const res = await fetch(`/api/chat/messages?${params.toString()}`);
+            if (res.ok) {
+               const data = await res.json();
+               const fresh = Array.isArray(data) ? data : data.messages || [];
+               if (fresh.length > 0) {
+                  setMessages((prev) => {
+                     const seen = new Set(prev.map((m: any) => m.id));
+                     return [...prev, ...fresh.filter((m: any) => !seen.has(m.id))];
+                  });
+                  rememberCursors(fresh);
+                  markReadIfNeeded(convId, fresh);
+               }
+            }
+         } catch {
+            // silent
+         }
+      },
+      [loadMessages, markReadIfNeeded, rememberCursors],
+   );
+
    useEffect(() => {
       if (activeConversation?.id) {
+         // Switching conversations resets the paging cursors.
+         oldestCursorRef.current = null;
+         newestCursorRef.current = null;
+         setHasMoreOlder(false);
          loadMessages(activeConversation.id);
       }
    }, [activeConversation?.id, loadMessages]);
 
-   // 3. Real-time Message Polling (every 3.5 seconds)
+   // 3. Real-time Message Polling (every 3.5 seconds, incremental)
    useEffect(() => {
       if (!activeConversation?.id) return;
       const interval = setInterval(() => {
-         loadMessages(activeConversation.id, true);
+         pollMessages(activeConversation.id);
       }, 3500);
       return () => clearInterval(interval);
-   }, [activeConversation?.id, loadMessages]);
+   }, [activeConversation?.id, pollMessages]);
 
-   // 4. Send Message Handler
+   // 4. Send Message Handler — P2-9: a pending uploaded attachment
+   // is sent with the message (and a message may consist of the
+   // attachment alone, which the API accepts).
    const handleSendMessage = async (text: string) => {
-      if (!activeConversation?.id || !text.trim()) return;
+      if (!activeConversation?.id) return;
+      const trimmed = text.trim();
+      const att = pendingAttachment;
+      if (!trimmed && !att) return;
 
       const optimisticMsg = {
          id: `temp-${Date.now()}`,
          conversationId: activeConversation.id,
          senderId: currentUser?.id || "me",
          senderName: currentUser?.name || "Me",
-         message: text.trim(),
+         message: trimmed || null,
+         attachments: att,
          createdAt: new Date().toISOString(),
          isRead: false,
       };
@@ -203,7 +330,8 @@ const Chat = () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                conversationId: activeConversation.id,
-               message: text.trim(),
+               message: trimmed || undefined,
+               attachments: att || undefined,
             }),
          });
 
@@ -212,6 +340,13 @@ const Chat = () => {
             setMessages((prev) =>
                prev.map((m) => (m.id === optimisticMsg.id ? savedMsg : m))
             );
+            rememberCursors([savedMsg]);
+            setPendingAttachment(null);
+            setAttachmentError(null);
+            // NOTE (P2-9): the reply banner clears locally, but the
+            // quote is NOT persisted — ChatMessage has no reply-to
+            // field (schema change needed; see the phase report).
+            setReplyTo(null);
             loadConversations(); // refresh snippet & timestamps in sidebar
          }
       } catch {
@@ -219,8 +354,50 @@ const Chat = () => {
       }
    };
 
-   // Scroll to bottom on new messages
+   // P2-9: persist a reaction through the messages API (reactions
+   // live on ChatMessage.reactions, keyed by user). Optimistic
+   // local update; the API response is authoritative on success.
+   const handleReact = async (messageId: string, unified: string) => {
+      if (!activeConversation?.id || !currentUser?.id) return;
+      setMessages((prev) =>
+         prev.map((m: any) => {
+            if (m.id !== messageId) return m;
+            const reactions = { ...(m.reactions || {}) };
+            if (reactions[currentUser.id] === unified) delete reactions[currentUser.id];
+            else reactions[currentUser.id] = unified;
+            return { ...m, reactions };
+         }),
+      );
+      try {
+         const res = await fetch("/api/chat/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+               conversationId: activeConversation.id,
+               action: "react",
+               messageId,
+               reaction: unified,
+            }),
+         });
+         if (res.ok) {
+            const updated = await res.json();
+            setMessages((prev) =>
+               prev.map((m: any) => (m.id === messageId ? updated : m)),
+            );
+         }
+      } catch {
+         // optimistic state stands; next poll reconciles read state only
+      }
+   };
+
+   // Scroll to bottom on new messages — except when older history
+   // was just prepended (P2-8), where jumping to the bottom would
+   // lose the reader's place.
    useLayoutEffect(() => {
+      if (prependRef.current) {
+         prependRef.current = false;
+         return;
+      }
       const container = scrollContainerRef.current;
       if (!container) return;
 
@@ -240,11 +417,31 @@ const Chat = () => {
       return () => clearTimeout(timeout);
    }, [messages.length, activeConversation?.id]);
 
+   // P2-9: dropped files are uploaded immediately through the
+   // existing uploads flow (POST /api/uploads via uploadImageFile —
+   // raster images, 5 MB cap enforced server-side) and held as the
+   // pending attachment until the next send. Upload failures are
+   // surfaced above the composer instead of silently dropping the
+   // file, which is what the previous setState-only handlers did.
+   const handleFileDrop = async (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
+      const file = acceptedFiles[0];
+      setUploadingAttachment(true);
+      setAttachmentError(null);
+      try {
+         const url = await uploadImageFile(file);
+         setPendingAttachment({ type: "image", url, name: file.name });
+      } catch (e: any) {
+         setAttachmentError(
+            e?.message || "Attachment upload failed. Please try again.",
+         );
+      } finally {
+         setUploadingAttachment(false);
+      }
+   };
+
    const imageUpload = useDropzone({
-      onDrop: (acceptedFiles: File[]) => {
-         if (acceptedFiles.length === 0) return;
-         setImages(acceptedFiles[0]);
-      },
+      onDrop: handleFileDrop,
       accept: { "image/*": [] },
       maxSize: 15 * 1024 * 1024,
       maxFiles: 1,
@@ -252,10 +449,7 @@ const Chat = () => {
    });
 
    const attachmentUpload = useDropzone({
-      onDrop: (acceptedFiles: File[]) => {
-         if (acceptedFiles.length === 0) return;
-         setAttachment(acceptedFiles[0]);
-      },
+      onDrop: handleFileDrop,
       maxSize: 15 * 1024 * 1024,
       maxFiles: 1,
       multiple: false,
@@ -352,6 +546,8 @@ const Chat = () => {
             <Header
                user={displayUser}
                conversation={activeConversation}
+               users={availableUsers}
+               currentUserId={currentUser?.id}
                onClose={(c) => setProfileOpen(c)}
                open={profileOpen}
                onConversationUpdated={(updated) => {
@@ -359,6 +555,10 @@ const Chat = () => {
                   setConversations((prev) =>
                      prev.map((c) => (c.id === (updated.id || activeConversation?.id) ? { ...c, ...updated } : c))
                   );
+               }}
+               onMembersChanged={(updated) => {
+                  setActiveConversation((prev: any) => ({ ...prev, ...updated }));
+                  loadConversations();
                }}
             />
 
@@ -380,6 +580,24 @@ const Chat = () => {
                      <Stack p={2} spacing={1.5}>
                         {activeConversation ? (
                            <>
+                              {/* P2-8: older-history paging */}
+                              {hasMoreOlder && messages.length > 0 && (
+                                 <Stack alignItems="center">
+                                    <Button
+                                       size="small"
+                                       variant="text"
+                                       onClick={loadOlderMessages}
+                                       disabled={loadingOlder}
+                                       startIcon={
+                                          loadingOlder ? (
+                                             <CircularProgress size={14} />
+                                          ) : undefined
+                                       }
+                                    >
+                                       Load older messages
+                                    </Button>
+                                 </Stack>
+                              )}
                               {loadingMessages && messages.length === 0 ? (
                                  <Stack alignItems="center" justifyContent="center" height={200}>
                                     <CircularProgress size={28} />
@@ -411,9 +629,24 @@ const Chat = () => {
                                                 content: m.message || "Message",
                                              })
                                           }
-                                          replyTo={replyTo}
+                                          // P2-9: the composer's replyTo is
+                                          // no longer passed to every bubble
+                                          // (it made ALL messages render a
+                                          // quote while composing). Quoted
+                                          // replies are not persisted —
+                                          // ChatMessage has no reply-to
+                                          // field; see the phase report.
                                           type={m.attachments ? "attachments" : "text"}
                                           attachments={m.attachments}
+                                          reactions={m.reactions}
+                                          myReaction={
+                                             currentUser?.id
+                                                ? m.reactions?.[currentUser.id]
+                                                : undefined
+                                          }
+                                          onReact={(unified) =>
+                                             handleReact(m.id, unified)
+                                          }
                                        />
                                     );
                                  })
@@ -456,6 +689,47 @@ const Chat = () => {
                         />
                      </Collapse>
 
+                     {/* P2-9: pending attachment (uploaded, not yet sent) */}
+                     <Collapse in={uploadingAttachment || !!pendingAttachment || !!attachmentError}>
+                        <Stack
+                           direction="row"
+                           alignItems="center"
+                           spacing={1}
+                           mb={1}
+                           px={1}
+                        >
+                           {uploadingAttachment ? (
+                              <>
+                                 <CircularProgress size={14} />
+                                 <Typography variant="body2" fontSize={12} color="textSecondary">
+                                    Uploading attachment…
+                                 </Typography>
+                              </>
+                           ) : attachmentError ? (
+                              <Typography variant="body2" fontSize={12} color="error">
+                                 {attachmentError}
+                              </Typography>
+                           ) : pendingAttachment ? (
+                              <>
+                                 <Icon
+                                    size="small"
+                                    icon="eva:attach-2-fill"
+                                 />
+                                 <Typography variant="body2" fontSize={12} noWrap>
+                                    {pendingAttachment.name} — will be sent with your next message
+                                 </Typography>
+                                 <Button
+                                    size="small"
+                                    variant="text"
+                                    onClick={() => setPendingAttachment(null)}
+                                 >
+                                    Remove
+                                 </Button>
+                              </>
+                           ) : null}
+                        </Stack>
+                     </Collapse>
+
                      {/* VOICE RECORDER OR WRITING */}
                      {state.get("showRecord") ? (
                         <VoiceRecorder />
@@ -465,6 +739,7 @@ const Chat = () => {
                            imageUpload={imageUpload}
                            user={displayUser}
                            onSendMessage={handleSendMessage}
+                           canSendWithoutText={Boolean(pendingAttachment)}
                         />
                      )}
                   </Stack>

@@ -81,6 +81,12 @@ export async function PUT(request: NextRequest) {
    try {
       const body = await request.json();
       const { conversationId, action, isMuted, name, avatar, description } = body;
+      const targetUserId =
+         typeof body.userId === "string"
+            ? body.userId
+            : typeof body.memberId === "string"
+              ? body.memberId
+              : null;
 
       if (!conversationId) {
          return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
@@ -107,6 +113,94 @@ export async function PUT(request: NextRequest) {
 
       const currentMuted = Array.isArray(conv.mutedUserIds) ? (conv.mutedUserIds as string[]) : [];
 
+      // P2-9: adminIds enforcement. Conversation.adminIds (JSON
+      // array of user IDs, set to the creator at creation) governs
+      // group settings and member management. Legacy conversations
+      // whose adminIds were never recorded (null/empty) keep the
+      // previous any-member behaviour — there is no recorded admin
+      // to enforce — while conversations WITH admins recorded
+      // require the caller to be one of them for those operations.
+      const adminIds: string[] = Array.isArray(conv.adminIds)
+         ? (conv.adminIds as string[])
+         : [];
+      const callerIsAdmin = adminIds.includes(session.id);
+      const requireAdmin = () => {
+         if (adminIds.length > 0 && !callerIsAdmin) {
+            return NextResponse.json(
+               { error: "Forbidden: only group admins can do this" },
+               { status: 403 },
+            );
+         }
+         return null;
+      };
+
+      // 0. Member management (group conversations only — a direct
+      // conversation's membership IS the pair). Adding requires an
+      // admin (when admins are recorded); removing another member
+      // requires an admin, while any member may remove themselves
+      // (leave). Removing a member also strips any admin record
+      // for them so adminIds never points at a non-member.
+      if (action === "add_member" || action === "remove_member") {
+         if (conv.type !== "group") {
+            return NextResponse.json(
+               { error: "Member management is only available for group conversations" },
+               { status: 400 },
+            );
+         }
+         if (!targetUserId) {
+            return NextResponse.json({ error: "userId is required" }, { status: 400 });
+         }
+
+         if (action === "add_member") {
+            const denied = requireAdmin();
+            if (denied) return denied;
+            const target = await prisma.user.findUnique({
+               where: { id: targetUserId },
+               select: { id: true, status: true },
+            });
+            if (!target || target.status !== "ACTIVE") {
+               return NextResponse.json(
+                  { error: "User not found or not active" },
+                  { status: 404 },
+               );
+            }
+            const nextMembers = Array.from(new Set([...convMemberIds, targetUserId]));
+            const updated = await prisma.conversation.update({
+               where: { id: conversationId },
+               data: { members: nextMembers },
+            });
+            return NextResponse.json({
+               message: "Member added",
+               conversation: updated,
+               ...updated,
+            });
+         }
+
+         // remove_member
+         if (targetUserId !== session.id) {
+            const denied = requireAdmin();
+            if (denied) return denied;
+         }
+         if (!convMemberIds.includes(targetUserId)) {
+            return NextResponse.json(
+               { error: "User is not a member of this conversation" },
+               { status: 404 },
+            );
+         }
+         const updated = await prisma.conversation.update({
+            where: { id: conversationId },
+            data: {
+               members: convMemberIds.filter((id) => id !== targetUserId),
+               adminIds: adminIds.filter((id) => id !== targetUserId),
+            },
+         });
+         return NextResponse.json({
+            message: "Member removed",
+            conversation: updated,
+            ...updated,
+         });
+      }
+
       // 1. Mute / Unmute
       if (action === "mute" || action === "unmute" || isMuted !== undefined) {
          const shouldMute = isMuted !== undefined ? Boolean(isMuted) : action === "mute";
@@ -130,7 +224,8 @@ export async function PUT(request: NextRequest) {
          });
       }
 
-      // 2. Edit Group Profile
+      // 2. Edit Group Profile — P2-9: a group-settings operation,
+      // so it is admin-gated whenever adminIds are recorded.
       if (
          action === "edit_profile" ||
          action === "update_profile" ||
@@ -141,6 +236,8 @@ export async function PUT(request: NextRequest) {
          if (conv.type !== "group") {
             return NextResponse.json({ error: "Only group conversations have editable profiles" }, { status: 400 });
          }
+         const denied = requireAdmin();
+         if (denied) return denied;
 
          const updated = await prisma.conversation.update({
             where: { id: conversationId },
