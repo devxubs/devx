@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { resolveBarcodeLookup } from "@src/lib/barcodeLookup";
 
 // Exact code lookup for barcode scanning (Phase 4, §4.1).
 //
@@ -13,6 +14,13 @@ import { prisma } from "@src/lib/prisma";
 //   3. ProductVariant.sku      (labels printed from the SKU — the
 //   4. Product.productSku / productCode   label-printing view encodes
 //      barcode || sku, so scans of SKU labels must resolve too)
+//
+// Both pools are queried and resolved together (P2-17): a code
+// carried by a variant AND a product is ambiguous — neither pool
+// silently wins. Only live records participate (non-deleted
+// variants of non-deleted products; non-deleted products), so a
+// binned product's barcode stays reusable, matching the write-side
+// uniqueness check.
 //
 // Responses:
 //   200 { matchType: "variant" | "product", matchedOn, product, variant }
@@ -57,7 +65,7 @@ export async function GET(request: NextRequest) {
    }
 
    try {
-      // 1 + 3: variant-level codes (barcode first, then sku).
+      // 1 + 3: variant-level codes (barcode or sku).
       const variantMatches = await prisma.productVariant.findMany({
          where: {
             isDeleted: false,
@@ -76,47 +84,8 @@ export async function GET(request: NextRequest) {
          },
          take: 3,
       });
-      // Barcode matches outrank sku matches for the same code.
-      const variantBarcodeMatches = variantMatches.filter((v) => v.barcode === code);
-      const variantPool = variantBarcodeMatches.length > 0 ? variantBarcodeMatches : variantMatches;
-      if (variantPool.length > 1) {
-         return NextResponse.json(
-            {
-               error: "This code is assigned to more than one variant",
-               matches: variantPool.map((v) => ({
-                  variantId: v.id,
-                  variantName: v.variantName,
-                  productId: v.productId,
-               })),
-            },
-            { status: 409 },
-         );
-      }
-      if (variantPool.length === 1) {
-         const variant = variantPool[0];
-         const product = await prisma.product.findFirst({
-            where: { id: variant.productId, isDeleted: false },
-            include: productInclude,
-         });
-         if (product) {
-            return NextResponse.json({
-               matchType: "variant",
-               matchedOn: variant.barcode === code ? "variant.barcode" : "variant.sku",
-               product,
-               variant: {
-                  id: variant.id,
-                  variantName: variant.variantName,
-                  sku: variant.sku,
-                  barcode: variant.barcode,
-                  quantity: variant.quantity,
-                  regularPrice: variant.regularPrice,
-                  salePrice: variant.salePrice,
-               },
-            });
-         }
-      }
 
-      // 2 + 4: product-level codes (barcode first, then sku / code).
+      // 2 + 4: product-level codes (barcode, sku or code).
       const productMatches = await prisma.product.findMany({
          where: {
             isDeleted: false,
@@ -129,32 +98,51 @@ export async function GET(request: NextRequest) {
          include: productInclude,
          take: 3,
       });
-      const productBarcodeMatches = productMatches.filter((p) => p.barcode === code);
-      const productPool = productBarcodeMatches.length > 0 ? productBarcodeMatches : productMatches;
-      if (productPool.length > 1) {
+
+      const decision = resolveBarcodeLookup(code, variantMatches, productMatches);
+
+      if (decision.type === "ambiguous") {
          return NextResponse.json(
-            {
-               error: "This code is assigned to more than one product",
-               matches: productPool.map((p) => ({
-                  productId: p.id,
-                  productName: p.productName,
-               })),
-            },
+            { error: decision.error, matches: decision.matches },
             { status: 409 },
          );
       }
-      if (productPool.length === 1) {
-         const product = productPool[0];
-         const matchedOn =
-            product.barcode === code
-               ? "product.barcode"
-               : product.productSku === code
-                 ? "product.productSku"
-                 : "product.productCode";
+
+      if (decision.type === "variant") {
+         const variant = decision.variant;
+         const product = await prisma.product.findFirst({
+            where: { id: variant.productId, isDeleted: false },
+            include: productInclude,
+         });
+         if (product) {
+            return NextResponse.json({
+               matchType: "variant",
+               matchedOn: decision.matchedOn,
+               product,
+               variant: {
+                  id: variant.id,
+                  variantName: variant.variantName,
+                  sku: variant.sku,
+                  barcode: variant.barcode,
+                  quantity: variant.quantity,
+                  regularPrice: variant.regularPrice,
+                  salePrice: variant.salePrice,
+               },
+            });
+         }
+         // The variant's product vanished between the two reads
+         // (deleted concurrently) — nothing sellable carries the code.
+         return NextResponse.json(
+            { error: "No product or variant carries this code" },
+            { status: 404 },
+         );
+      }
+
+      if (decision.type === "product") {
          return NextResponse.json({
             matchType: "product",
-            matchedOn,
-            product,
+            matchedOn: decision.matchedOn,
+            product: decision.product,
             variant: null,
          });
       }
