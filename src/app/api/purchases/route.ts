@@ -13,6 +13,7 @@ import {
    requestAuditContext,
 } from "@src/lib/audit";
 import { normalizePurchaseAttachments } from "@src/lib/purchaseAttachments";
+import { splitCreationPayment } from "@src/lib/utils";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -119,7 +120,32 @@ export async function POST(request: NextRequest) {
       const disc = safeMoney(discount);
       const paidAmount = safeMoney(paid);
       const total = Math.max(0, productAmount + others - disc);
-      const due = Math.max(0, total - paidAmount);
+      // C4-3 (audit C-13 / P2-12): creation-time overpayment. `due`
+      // is unchanged (it floored at 0 before, and total − paidApplied
+      // is the same value), but the excess over the total used to
+      // vanish — it was not unallocated credit (that term counts
+      // only SupplierPayment rows) and no ledger row existed for
+      // creation `paid` at all. Now, when the purchase names a
+      // supplier, the stored `paid` is the applied part (the
+      // codebase's convention: allocated supplier payments refuse
+      // overpayment rather than storing paid > total) and the
+      // excess is recorded in the transaction below as an
+      // UNALLOCATED SupplierPayment row, which every consumer of
+      // the one netPayable definition (suppliers list,
+      // payableSummary, Reports Finance) already counts as supplier
+      // credit, and the supplier ledger UI already renders as an
+      // unallocated payment (voiding it simply stops the credit —
+      // the void route touches no purchase for purchase-less rows).
+      // Without a supplier there is no one to hold credit for, so
+      // the stored `paid` keeps the entered amount exactly as
+      // before (the excess stays derivable as paid − total).
+      const { paidApplied, overpayment } = splitCreationPayment(
+         total,
+         paidAmount,
+      );
+      const recordOverpayment = overpayment > 0 && Boolean(supplierId);
+      const storedPaid = recordOverpayment ? paidApplied : paidAmount;
+      const due = Math.max(0, total - paidApplied);
 
       // Validate references before writing anything (fix instruction
       // #14): supplier and every item product must exist.
@@ -211,6 +237,11 @@ export async function POST(request: NextRequest) {
          );
       }
 
+      let creationOverpaymentCredit: {
+         amount: number;
+         supplierPaymentCustomId: string | null;
+      } | null = null;
+
       const purchase = await prisma.$transaction(async (tx) => {
          const { customId } = await generateNextEntityId("PURCHASE", tx);
          // PUR-01 fix: never fabricate a supplier invoice number. The
@@ -230,7 +261,7 @@ export async function POST(request: NextRequest) {
                othersCost: others,
                discount: disc,
                total,
-               paid: paidAmount,
+               paid: storedPaid,
                due,
                note: note || undefined,
                createdById: session.id || undefined,
@@ -270,6 +301,43 @@ export async function POST(request: NextRequest) {
             },
          );
 
+         // C4-3 (audit C-13 / P2-12): record the creation
+         // overpayment excess as an unallocated SupplierPayment —
+         // supplier credit under the one netPayable definition (see
+         // the split computation above). Same transaction, with its
+         // own PAYMENT audit row mirroring the payments route.
+         if (recordOverpayment) {
+            const { customId: spayId } = await generateNextEntityId(
+               "SUPPLIER_PAYMENT",
+               tx,
+            );
+            const creditRow = await tx.supplierPayment.create({
+               data: {
+                  customId: spayId,
+                  supplierId: supplierId as string,
+                  purchaseId: null,
+                  amount: overpayment,
+                  paymentMethod: null,
+                  paymentTxId: null,
+                  note: `Creation overpayment on purchase ${customId} — paid ৳${paidAmount.toFixed(2)} against a total of ৳${total.toFixed(2)}; the excess is held as supplier credit`,
+                  createdById: session.id || undefined,
+               },
+            });
+            creationOverpaymentCredit = {
+               amount: overpayment,
+               supplierPaymentCustomId: creditRow.customId,
+            };
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "PAYMENT",
+               entityType: "SUPPLIER_PAYMENT",
+               entityId: creditRow.id,
+               entityCustomId: creditRow.customId,
+               summary: `Supplier payment ${creditRow.customId} of ৳${overpayment.toFixed(2)} recorded as unallocated credit — creation overpayment on purchase ${customId}`,
+               ...requestAuditContext(request),
+            });
+         }
+
          // Phase 4 (D1): audit in the same transaction.
          await logAudit(tx, {
             actor: auditActorFromContext(gate),
@@ -277,14 +345,23 @@ export async function POST(request: NextRequest) {
             entityType: "PURCHASE",
             entityId: newPurchase.id,
             entityCustomId: newPurchase.customId,
-            summary: `Purchase ${newPurchase.customId} created — total ৳${total.toFixed(2)}, due ৳${due.toFixed(2)}`,
+            summary:
+               `Purchase ${newPurchase.customId} created — total ৳${total.toFixed(2)}, due ৳${due.toFixed(2)}` +
+               (recordOverpayment
+                  ? `, overpayment ৳${overpayment.toFixed(2)} held as supplier credit`
+                  : ""),
             ...requestAuditContext(request),
          });
 
          return newPurchase;
       });
 
-      return NextResponse.json(purchase, { status: 201 });
+      return NextResponse.json(
+         creationOverpaymentCredit
+            ? { ...purchase, creationOverpayment: creationOverpaymentCredit }
+            : purchase,
+         { status: 201 },
+      );
    } catch (error: any) {
       console.error("POST /api/purchases error:", error);
       // ORD-06 pattern: never leak raw internal error messages.

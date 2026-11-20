@@ -120,6 +120,75 @@ export function calculateOrderTotals(
 }
 
 /**
+ * Clamp a user-supplied money field the way the order/purchase
+ * write paths do (Phase C4, audit P2-11): non-finite input becomes
+ * 0 and negatives clamp to 0 — a negative discount must never act
+ * as a surcharge, nor a negative delivery charge / advance payment
+ * distort the totals. Pure.
+ */
+export function clampNonNegativeMoney(value: unknown): number {
+   const n = Number(value);
+   return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+/**
+ * Normalise one order line's quantity/price to EXACTLY the order
+ * PUT handler's semantics (Phase C4, audit C-12 / P2-11 — POST
+ * parity with PUT): quantity = max(1, Number(q) || 1), price =
+ * max(0, Number(p) || 0). Before this, POST stored the raw values,
+ * so a negative quantity produced a negative line (a discount the
+ * stock engine could not see — it floors line quantities to 0) and
+ * a negative price reduced the subtotal below the real sale value.
+ * Pure.
+ */
+export function normalizeOrderLineInput(line: {
+   price?: unknown;
+   quantity?: unknown;
+}): { quantity: number; price: number } {
+   return {
+      quantity: Math.max(1, Number(line.quantity) || 1),
+      price: Math.max(0, Number(line.price) || 0),
+   };
+}
+
+/**
+ * The overpaid excess of an order (Phase C4, audit C-13 / P2-12):
+ * how much of the advance payment exceeds the order total. The
+ * totals/due math is unchanged (due floors at 0) — this computed
+ * field only makes the excess VISIBLE as customer credit on API
+ * responses. Pure.
+ */
+export function overpaidAmountOf(order: {
+   advancePayment?: unknown;
+   total?: unknown;
+}): number {
+   const excess =
+      (Number(order.advancePayment) || 0) - (Number(order.total) || 0);
+   return parseFloat(Math.max(0, excess).toFixed(2));
+}
+
+/**
+ * Split a purchase CREATION payment into the part applied to the
+ * purchase itself and the excess over its total (Phase C4, audit
+ * C-13 / P2-12). The applied part is what the purchase's `paid`
+ * stores — the codebase's payment convention is that `paid` never
+ * exceeds `total` (allocated supplier payments refuse overpayment
+ * outright) — and the excess is recorded separately as unallocated
+ * supplier credit by the caller. Pure.
+ */
+export function splitCreationPayment(
+   total: number,
+   paidAmount: number,
+): { paidApplied: number; overpayment: number } {
+   const t = Math.max(0, Math.round((Number(total) || 0) * 100) / 100);
+   const p = Math.max(0, Math.round((Number(paidAmount) || 0) * 100) / 100);
+   return {
+      paidApplied: Math.min(p, t),
+      overpayment: parseFloat(Math.max(0, p - t).toFixed(2)),
+   };
+}
+
+/**
  * Generate sequential order IDs (e.g. #6012, INV-6012)
  */
 export function generateOrderIdentifiers(existingCount: number): {

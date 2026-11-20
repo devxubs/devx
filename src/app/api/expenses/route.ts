@@ -8,6 +8,7 @@ import {
    auditActorFromContext,
    requestAuditContext,
 } from "@src/lib/audit";
+import { validateUserExpenseAmount } from "@src/lib/expenses";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -75,13 +76,21 @@ export async function POST(request: NextRequest) {
 
       // EXP-01 fix: reject non-numeric amounts with 400 instead of
       // persisting NaN / throwing a 500.
-      const parsedAmount = parseFloat(amount);
-      if (!Number.isFinite(parsedAmount)) {
+      // C4-1 (audit P2-10): a USER-created expense must also be
+      // positive — a negative expense is money back in and would
+      // inflate profit through the shared formula. The system's
+      // one legitimate negative row (the CASH_REFUND "Purchase
+      // Return Refund" expense) is created internally by the
+      // returns flow via Prisma directly, never through this
+      // endpoint, so this policy cannot break refunds.
+      const amountCheck = validateUserExpenseAmount(amount);
+      if (!amountCheck.ok) {
          return NextResponse.json(
-            { error: "Expense amount must be a valid number" },
+            { error: amountCheck.error },
             { status: 400 },
          );
       }
+      const parsedAmount = amountCheck.amount;
 
       const auditCtx = requestAuditContext(request);
 

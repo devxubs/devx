@@ -27,8 +27,17 @@ import {
    buildChanges,
    ORDER_PUT_AUDIT_FIELDS,
 } from "@src/lib/audit";
+import { overpaidAmountOf } from "@src/lib/utils";
+import { lockOrderRow } from "@src/lib/orderLock";
 
 const PAYMENT_STATUS_VALUES = ["UNVERIFIED", "VERIFIED", "MISMATCHED"];
+
+class OrderLockLostError extends Error {
+   constructor() {
+      super("Order not found");
+      this.name = "OrderLockLostError";
+   }
+}
 
 export async function GET(
    request: NextRequest,
@@ -66,11 +75,21 @@ export async function GET(
          },
       });
 
-      if (!order) {
+      // C4-6 (audit C-10 / P2-24): a soft-deleted (binned) order is
+      // not visible through the live detail route — Bin has its own
+      // routes for binned entities. No frontend consumer opens the
+      // Order Details page for a binned order (the Bin UI restores
+      // via /api/bin without fetching order detail).
+      if (!order || order.isDeleted) {
          return NextResponse.json({ error: "Order not found" }, { status: 404 });
       }
 
-      return NextResponse.json(order);
+      // C4-3 (audit C-13 / P2-12): additive computed overpayment
+      // field — see the orders list route.
+      return NextResponse.json({
+         ...order,
+         overpaidAmount: overpaidAmountOf(order),
+      });
    } catch {
       return NextResponse.json({ error: "Failed to fetch order" }, { status: 500 });
    }
@@ -104,6 +123,15 @@ export async function PUT(
       });
 
       if (!existingOrder) {
+         return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      }
+
+      // C4-6 (audit C-10 / P2-24): a soft-deleted order is NOT
+      // writable — previously a PUT-with-items on a binned order
+      // re-deducted stock (wasHoldingStock=false → willHoldStock=
+      // true). 404 mirrors the purchase PUT's handling of a deleted
+      // purchase ("Purchase not found").
+      if (existingOrder.isDeleted) {
          return NextResponse.json({ error: "Order not found" }, { status: 404 });
       }
 
@@ -1017,6 +1045,13 @@ export async function PUT(
          }
 
          const updated = await prisma.$transaction(async (tx) => {
+            // C4-5 (audit R-1 / P2-22): FIRST statement — take the
+            // order-row lock so concurrent PUTs of this order
+            // serialise instead of computing stock diffs and totals
+            // against the same stale snapshot.
+            const locked = await lockOrderRow(tx, existingOrder.id);
+            if (!locked) throw new OrderLockLostError();
+
             // QA fix (S1, partial): re-run the duplicate-TxID check
             // inside the transaction (see the create path for the
             // rationale — the race narrows, it does not vanish).
@@ -1182,7 +1217,10 @@ export async function PUT(
             return updatedOrder;
          });
 
-         return NextResponse.json(updated);
+         return NextResponse.json({
+            ...updated,
+            overpaidAmount: overpaidAmountOf(updated),
+         });
       }
 
       // Non-item update path.
@@ -1224,6 +1262,11 @@ export async function PUT(
       });
 
       const updated = await prisma.$transaction(async (tx) => {
+         // C4-5 (audit R-1 / P2-22): FIRST statement — the order-row
+         // lock, exactly as in the items path above.
+         const locked = await lockOrderRow(tx, existingOrder.id);
+         if (!locked) throw new OrderLockLostError();
+
          // QA fix (S1, partial): in-transaction duplicate-TxID
          // re-check, same as the items path above.
          if (paymentTxIdUpdate) {
@@ -1349,9 +1392,15 @@ export async function PUT(
          return updatedOrder;
       });
 
-      return NextResponse.json(updated);
+      return NextResponse.json({
+         ...updated,
+         overpaidAmount: overpaidAmountOf(updated),
+      });
    } catch (err: any) {
       console.error("PUT /api/orders/[id] error:", err);
+      if (err instanceof OrderLockLostError) {
+         return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      }
       if (err instanceof InsufficientStockError) {
          return NextResponse.json(
             { error: "Insufficient stock", message: err.message },

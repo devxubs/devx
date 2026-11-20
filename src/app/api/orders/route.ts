@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { parsePagination } from "@src/lib/pagination";
-import { calculateOrderTotals } from "@src/lib/utils";
+import {
+   calculateOrderTotals,
+   clampNonNegativeMoney,
+   normalizeOrderLineInput,
+   overpaidAmountOf,
+} from "@src/lib/utils";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import {
    loadStockSettings,
@@ -21,6 +26,7 @@ import {
    findOrderWithTxId,
    duplicateTxIdMessage,
    DuplicateTxIdError,
+   orderTxIdMethodError,
 } from "@src/lib/payments";
 import {
    logAudit,
@@ -396,7 +402,14 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({
-         orders,
+         // C4-3 (audit C-13 / P2-12): additive computed field — the
+         // advance excess over the total, previously recorded
+         // nowhere (due simply floored at 0). Totals/due math is
+         // unchanged; this only makes the customer credit visible.
+         orders: orders.map((o) => ({
+            ...o,
+            overpaidAmount: overpaidAmountOf(o),
+         })),
          total,
          page,
          limit,
@@ -544,6 +557,22 @@ export async function POST(request: NextRequest) {
       const paymentSenderNumber = String(
          pricing?.paymentSenderNumber ?? body.paymentSenderNumber ?? "",
       ).trim();
+      // C4-2 (audit P2-11): a TxID is only meaningful with a mobile
+      // payment method — reject the pairing with 400 instead of
+      // storing an unreconcilable reference (neither POST nor PUT
+      // checked this before; POST now enforces the stricter rule).
+      const effectivePaymentMethod =
+         pricing?.paymentMethod || "Cash on Delivery";
+      const txMethodError = orderTxIdMethodError(
+         effectivePaymentMethod,
+         paymentTxId,
+      );
+      if (txMethodError) {
+         return NextResponse.json(
+            { error: "Validation error", message: txMethodError },
+            { status: 400 },
+         );
+      }
       if (paymentTxId) {
          const clash = await findOrderWithTxId(paymentTxId);
          if (clash) {
@@ -557,15 +586,31 @@ export async function POST(request: NextRequest) {
          }
       }
 
+      // C4-2 (audit C-12 / P2-11): POST validation parity with PUT.
+      // Line quantity/price are normalised with EXACTLY the PUT
+      // handler's clamps (quantity max(1, …), price max(0, …)) and
+      // the pricing money fields are clamped non-negative the way
+      // PUT's safeMoney does — previously a negative quantity stored
+      // a negative line (an inventory-invisible discount: the stock
+      // engine floors line quantities to 0), a negative discount
+      // acted as a surcharge, and a negative advance inflated the
+      // due. Advance is NOT capped at the total: PUT doesn't cap it
+      // either (due floors at 0), and the excess is now surfaced as
+      // overpaidAmount (C4-3) instead of being silently dropped.
+      const normalizedProducts = products.map((p: any) => {
+         const { quantity, price } = normalizeOrderLineInput(p);
+         return { ...p, quantity, price };
+      });
+
       // Compute authoritative server-side totals
       const totals = calculateOrderTotals(
-         products.map((p: any) => ({
-            price: Number(p.price) || 0,
-            quantity: Number(p.quantity) || 1,
+         normalizedProducts.map((p: any) => ({
+            price: p.price,
+            quantity: p.quantity,
          })),
-         Number(pricing?.deliveryCharge) || 0,
-         Number(pricing?.discount) || 0,
-         Number(pricing?.advancePayment) || 0,
+         clampNonNegativeMoney(pricing?.deliveryCharge),
+         clampNonNegativeMoney(pricing?.discount),
+         clampNonNegativeMoney(pricing?.advancePayment),
       );
 
       // Execute order creation + inventory deduction in an atomic transaction
@@ -633,7 +678,7 @@ export async function POST(request: NextRequest) {
                courier: body.courier ? String(body.courier) : null,
                orderTags:
                   Object.keys(initialTags).length > 0 ? initialTags : undefined,
-               paymentMethod: pricing?.paymentMethod || "Cash on Delivery",
+               paymentMethod: effectivePaymentMethod,
                paymentTxId: paymentTxId || null,
                paymentSenderNumber: paymentSenderNumber || null,
                subtotal: totals.subtotal,
@@ -645,14 +690,14 @@ export async function POST(request: NextRequest) {
                customerId,
                employeeId: session.id,
                items: {
-                  create: products.map((p: any) => ({
+                  create: normalizedProducts.map((p: any) => ({
                      productId: p.id || null,
                      variantId: p.variantId || null,
                      name: p.name || p.productName,
                      code: p.code || null,
-                     quantity: Number(p.quantity) || 1,
-                     price: Number(p.price) || 0,
-                     subtotal: (Number(p.price) || 0) * (Number(p.quantity) || 1),
+                     quantity: p.quantity,
+                     price: p.price,
+                     subtotal: p.price * p.quantity,
                   })),
                },
             },
@@ -703,7 +748,10 @@ export async function POST(request: NextRequest) {
          return createdOrder;
       });
 
-      return NextResponse.json(order, { status: 201 });
+      return NextResponse.json(
+         { ...order, overpaidAmount: overpaidAmountOf(order) },
+         { status: 201 },
+      );
    } catch (err) {
       if (err instanceof InsufficientStockError) {
          return NextResponse.json(

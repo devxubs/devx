@@ -28,6 +28,10 @@ interface OrderItemsTableProps {
    total: number | string;
    advancePayment?: number | string;
    dueAmount?: number | string;
+   /** C4-3 (audit C-13 / P2-12): advance excess over the total —
+    * customer credit owed back. Derived from advance/total when
+    * the API's computed field is not supplied. */
+   overpaidAmount?: number | string;
    isCancelled?: boolean;
 }
 
@@ -40,6 +44,7 @@ export default function OrderItemsTable({
    total = 0,
    advancePayment = 0,
    dueAmount = 0,
+   overpaidAmount,
    isCancelled = false,
 }: OrderItemsTableProps) {
    const theme = useTheme();
@@ -338,6 +343,27 @@ export default function OrderItemsTable({
                         {formatCurrency(Number(advancePayment))}
                      </Typography>
                   </Stack>
+
+                  {(() => {
+                     const excess =
+                        overpaidAmount !== undefined && overpaidAmount !== null
+                           ? Number(overpaidAmount) || 0
+                           : Math.max(
+                                0,
+                                (Number(advancePayment) || 0) -
+                                   (Number(total) || 0),
+                             );
+                     return excess > 0 ? (
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                           <Typography variant="body2" color="info.main" fontWeight={500}>
+                              Overpaid / customer credit:
+                           </Typography>
+                           <Typography variant="body2" fontWeight={700} color="info.main" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                              {formatCurrency(excess)}
+                           </Typography>
+                        </Stack>
+                     ) : null;
+                  })()}
 
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                      <Typography variant="body2" color="text.secondary" fontWeight={500}>

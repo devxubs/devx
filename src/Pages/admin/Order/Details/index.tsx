@@ -127,6 +127,7 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
                         total={order.total || 0}
                         advancePayment={order.advancePayment || 0}
                         dueAmount={order.dueAmount || 0}
+                        overpaidAmount={order.overpaidAmount}
                         isCancelled={isCancelledOrder}
                      />
 

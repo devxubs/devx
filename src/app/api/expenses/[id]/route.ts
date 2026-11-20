@@ -7,6 +7,7 @@ import {
    requestAuditContext,
    buildChanges,
 } from "@src/lib/audit";
+import { validateUserExpenseAmount } from "@src/lib/expenses";
 
 export async function GET(
    request: NextRequest,
@@ -44,6 +45,21 @@ export async function PUT(
    const { id } = await params;
    try {
       const body = await request.json();
+      // C4-1 (audit P2-10): the PUT amount was never re-validated —
+      // a non-numeric amount flowed in as NaN and surfaced as a 500.
+      // When a user changes the amount it must satisfy the same
+      // policy as creation (finite and > 0) → 400, never 500.
+      let validatedAmount: number | undefined;
+      if (body.amount !== undefined) {
+         const amountCheck = validateUserExpenseAmount(body.amount);
+         if (!amountCheck.ok) {
+            return NextResponse.json(
+               { error: amountCheck.error },
+               { status: 400 },
+            );
+         }
+         validatedAmount = amountCheck.amount;
+      }
       const auditCtx = requestAuditContext(request);
       const expense = await prisma.$transaction(async (tx) => {
          const before = await tx.expense.findUnique({ where: { id } });
@@ -51,7 +67,7 @@ export async function PUT(
             where: { id },
             data: {
                type: body.type,
-               amount: body.amount !== undefined ? parseFloat(body.amount) : undefined,
+               amount: validatedAmount,
                note: body.note !== undefined ? body.note : undefined,
             },
          });

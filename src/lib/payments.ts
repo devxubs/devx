@@ -18,6 +18,27 @@ import { prisma } from "./prisma";
 /** Methods for which a TxID / sender number is meaningful. */
 export const MOBILE_PAYMENT_METHODS = ["bKash", "Nagad", "Rocket"];
 
+/**
+ * Pure TxID/method pairing rule for ORDER payments (Phase C4,
+ * audit P2-11): a transaction ID is only meaningful for a mobile
+ * money method — a TxID supplied alongside Cash / Card / Cash on
+ * Delivery etc. is a data-entry error and the write is rejected
+ * (400) instead of storing a reference nothing can reconcile.
+ * Returns the error message, or null when the pairing is valid
+ * (empty TxID is always valid). Mirrors the supplier-payment
+ * side's discipline (supplierTxIdClashMessage gates on the same
+ * isMobilePaymentMethod check).
+ */
+export function orderTxIdMethodError(
+   method: string | null | undefined,
+   txId: string | null | undefined,
+): string | null {
+   const clean = String(txId || "").trim();
+   if (!clean) return null;
+   if (isMobilePaymentMethod(method)) return null;
+   return `A transaction ID can only be recorded with a mobile payment method (${MOBILE_PAYMENT_METHODS.join(", ")}); payment method "${method || "Cash on Delivery"}" does not use transaction IDs.`;
+}
+
 export function isMobilePaymentMethod(method?: string | null): boolean {
    if (!method) return false;
    const normalized = method.trim().toLowerCase();

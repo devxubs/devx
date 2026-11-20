@@ -41,7 +41,10 @@ export async function GET(
          },
       });
 
-      if (!customer) {
+      // C4-6 (audit C-10 / P2-24): a soft-deleted customer is not
+      // visible through the live detail route (Bin has its own
+      // routes), matching the order/purchase by-ID convention.
+      if (!customer || customer.isDeleted) {
          return NextResponse.json({ error: "Customer not found" }, { status: 404 });
       }
 
@@ -244,6 +247,17 @@ export async function PUT(
 
    try {
       const body = await request.json();
+
+      // C4-6 (audit C-10 / P2-24): a soft-deleted customer is not
+      // writable through the live route — 404, the same convention
+      // as the purchase PUT's deleted-purchase handling.
+      const existingCustomer = await prisma.customer.findUnique({
+         where: { id },
+         select: { id: true, isDeleted: true },
+      });
+      if (!existingCustomer || existingCustomer.isDeleted) {
+         return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+      }
 
       // CUS-01 fix: same phone validation / duplicate guard as create.
       let normalizedPhone: string | undefined;
