@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { resolveBarcodeLookup } from "@src/lib/barcodeLookup";
+import { hideDeletedCategory } from "@src/lib/categoryVisibility";
 
 // Exact code lookup for barcode scanning (Phase 4, §4.1).
 //
@@ -118,7 +119,9 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                matchType: "variant",
                matchedOn: decision.matchedOn,
-               product,
+               // P4-12: same deleted-category presentation as the
+               // product list/detail reads (lib/categoryVisibility).
+               product: hideDeletedCategory(product),
                variant: {
                   id: variant.id,
                   variantName: variant.variantName,
@@ -142,7 +145,7 @@ export async function GET(request: NextRequest) {
          return NextResponse.json({
             matchType: "product",
             matchedOn: decision.matchedOn,
-            product: decision.product,
+            product: hideDeletedCategory(decision.product),
             variant: null,
          });
       }

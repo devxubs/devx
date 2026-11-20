@@ -96,7 +96,32 @@ export async function PUT(
       if (body.roleId !== undefined) dataToUpdate.roleId = body.roleId;
       if (body.status !== undefined) dataToUpdate.status = body.status.toUpperCase();
       if (body.image !== undefined) dataToUpdate.image = body.image;
+      // P4-13: email changes normalise (trim + lowercase) before
+      // the duplicate check and storage, matching user creation —
+      // a case-variant of another account's email is a 409, not a
+      // unique-index 500.
+      if (body.email !== undefined) {
+         const normalizedEmail = String(body.email).trim().toLowerCase();
+         if (!normalizedEmail) {
+            return NextResponse.json({ error: "Email is required" }, { status: 400 });
+         }
+         const clash = await prisma.user.findFirst({
+            where: { email: normalizedEmail, id: { not: id } },
+            select: { id: true },
+         });
+         if (clash) {
+            return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+         }
+         dataToUpdate.email = normalizedEmail;
+      }
       if (body.password) {
+         // P4-13: same minimum length as register / user create (6).
+         if (String(body.password).length < 6) {
+            return NextResponse.json(
+               { error: "Password must be at least 6 characters" },
+               { status: 400 },
+            );
+         }
          dataToUpdate.passwordHash = await hashPassword(body.password);
       }
 
@@ -145,7 +170,12 @@ export async function PUT(
 
       const { passwordHash: _, ...safeUser } = updated;
       return NextResponse.json(safeUser);
-   } catch {
+   } catch (error: any) {
+      // P4-13: a race past the email duplicate check hits the
+      // unique index — that is a 409, not a 500.
+      if (error?.code === "P2002") {
+         return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+      }
       return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
    }
 }

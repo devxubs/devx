@@ -16,6 +16,8 @@ import {
    auditActorFromContext,
    requestAuditContext,
 } from "@src/lib/audit";
+import { hideDeletedCategory } from "@src/lib/categoryVisibility";
+import { validateProductImages } from "@src/lib/productImages";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -134,7 +136,14 @@ export async function GET(request: NextRequest) {
          prisma.product.count({ where }),
       ]);
 
-      return NextResponse.json({ products, total, page, limit });
+      // P4-12: a soft-deleted (binned) category is not presented as
+      // a live category on its products — see lib/categoryVisibility.
+      return NextResponse.json({
+         products: products.map(hideDeletedCategory),
+         total,
+         page,
+         limit,
+      });
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch products" },
@@ -234,6 +243,17 @@ export async function POST(request: NextRequest) {
       const finalCode = productCode?.trim() || customId;
       const finalSku = productSku?.trim() || customId;
       const finalBarcode = barcode?.trim() || null;
+
+      // P4-14: validate images[] entries before anything is
+      // written (lib/productImages — legacy-safe rules: image
+      // data-URLs within the 5 MB uploads cap, /uploads/ paths and
+      // http(s) URLs pass; anything else is a 400).
+      if (images !== undefined && images !== null) {
+         const imagesError = validateProductImages(images);
+         if (imagesError) {
+            return NextResponse.json({ error: imagesError }, { status: 400 });
+         }
+      }
 
       // Duplicate validations
       const existingSku = await prisma.product.findFirst({

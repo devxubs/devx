@@ -13,7 +13,10 @@ export async function GET(
    try {
       const category = await prisma.category.findUnique({
          where: { id },
-         include: { products: true },
+         // P4-12: the products include is filtered to live products —
+         // the old unfiltered include leaked soft-deleted (binned)
+         // products through the category detail response.
+         include: { products: { where: { isDeleted: false } } },
       });
 
       if (!category) {
@@ -49,7 +52,16 @@ export async function PUT(
       });
 
       return NextResponse.json(updated);
-   } catch {
+   } catch (error: any) {
+      // P4-12: renaming onto an existing category name hits the
+      // unique index — a 409, matching category POST and the other
+      // entity routes, instead of a raw 500.
+      if (error?.code === "P2002") {
+         return NextResponse.json(
+            { error: "Category already exists" },
+            { status: 409 },
+         );
+      }
       return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
    }
 }

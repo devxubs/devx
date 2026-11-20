@@ -11,6 +11,8 @@ import {
    BarcodeConflictError,
 } from "@src/lib/barcodeUniqueness";
 import { deleteUploadedFiles } from "@src/lib/uploadedFiles";
+import { hideDeletedCategory } from "@src/lib/categoryVisibility";
+import { validateProductImages } from "@src/lib/productImages";
 import {
    logAudit,
    auditActorFromContext,
@@ -67,7 +69,9 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
    }
 
-   return NextResponse.json(product);
+   // P4-12: a soft-deleted category is presented as null, exactly
+   // like an uncategorised product (lib/categoryVisibility).
+   return NextResponse.json(hideDeletedCategory(product));
 }
 
 export async function PUT(
@@ -89,6 +93,16 @@ export async function PUT(
 
       if (!existing) {
          return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+
+      // P4-14: validate images[] entries before anything is
+      // written (lib/productImages — same legacy-safe rules as
+      // product create).
+      if (body.images !== undefined && body.images !== null) {
+         const imagesError = validateProductImages(body.images);
+         if (imagesError) {
+            return NextResponse.json({ error: imagesError }, { status: 400 });
+         }
       }
 
       // Check SKU / Barcode collisions if changed

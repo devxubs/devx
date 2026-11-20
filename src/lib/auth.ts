@@ -71,7 +71,10 @@ export function signToken(user: SessionUser): string {
          role: user.role,
       },
       getJwtSecret(),
-      { expiresIn: "7d" },
+      // P4-13: pin the algorithm explicitly (the edge verifier in
+      // middleware already pins HS256; the Node side now matches
+      // instead of relying on library defaults).
+      { expiresIn: "7d", algorithm: "HS256" },
    );
 }
 
@@ -80,7 +83,9 @@ export function signToken(user: SessionUser): string {
  */
 export function verifyToken(token: string): SessionUser | null {
    try {
-      const decoded = jwt.verify(token, getJwtSecret()) as SessionUser;
+      const decoded = jwt.verify(token, getJwtSecret(), {
+         algorithms: ["HS256"],
+      }) as SessionUser;
       return decoded;
    } catch {
       return null;

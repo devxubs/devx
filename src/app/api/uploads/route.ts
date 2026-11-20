@@ -44,10 +44,16 @@ const EXT_BY_MIME: Record<string, string> = {
 };
 
 export async function POST(request: NextRequest) {
+   // P4-14: the gate accepts the product family in the same style as
+   // the product routes — holders of product_create OR
+   // product_update may upload. Previously only product_create was
+   // accepted, so staff who can edit products (but not create them)
+   // got a 403 when attaching an image during an edit.
    const gate = await requirePermission(request, [
       "products",
       "product",
       "product_create",
+      "product_update",
    ]);
    if (gate instanceof NextResponse) return gate;
 

@@ -76,11 +76,15 @@ export async function POST(request: NextRequest) {
 
       if (existing) {
          if (existing.isDeleted) {
-            // Restore from Recycle Bin and update details
+            // Restore from Recycle Bin and update details.
+            // P4-12: `deletedAt` is cleared together with isDeleted —
+            // the old restore left the deletion timestamp set, so the
+            // "live" unit still carried its bin timestamp.
             const restored = await prisma.unit.update({
                where: { id: existing.id },
                data: {
                   isDeleted: false,
+                  deletedAt: null,
                   short: trimmedShort,
                },
             });

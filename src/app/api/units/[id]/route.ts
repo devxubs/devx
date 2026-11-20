@@ -89,34 +89,44 @@ async function handleUpdate(
          }
       }
 
-      // Update unit in database using the primary key
-      const updated = await prisma.unit.update({
-         where: { id: targetUnit.id },
-         data: {
-            name: trimmedName,
-            short: trimmedShort,
-         },
-      });
+      // P4-12: the unit update and the Product.sizes rewrites below
+      // run in ONE transaction — previously the rename rewrote each
+      // product row-by-row with no transaction, so a failure midway
+      // left some products pointing at the old unit name while the
+      // unit itself already carried the new one.
+      const productsWithUnit =
+         targetUnit.name !== trimmedName
+            ? await prisma.product.findMany({
+                 where: { isDeleted: false },
+                 select: { id: true, sizes: true },
+              })
+            : [];
 
-      // Preserve product relationships: update Product.sizes if the unit name was renamed
-      if (targetUnit.name !== trimmedName) {
-         const productsWithUnit = await prisma.product.findMany({
-            where: { isDeleted: false },
-            select: { id: true, sizes: true },
+      const updated = await prisma.$transaction(async (tx) => {
+         const unit = await tx.unit.update({
+            where: { id: targetUnit.id },
+            data: {
+               name: trimmedName,
+               short: trimmedShort,
+            },
          });
 
+         // Preserve product relationships: update Product.sizes if
+         // the unit name was renamed.
          for (const prod of productsWithUnit) {
             if (Array.isArray(prod.sizes) && prod.sizes.includes(targetUnit.name)) {
                const newSizes = (prod.sizes as string[]).map((s: string) =>
                   s === targetUnit.name ? trimmedName : s
                );
-               await prisma.product.update({
+               await tx.product.update({
                   where: { id: prod.id },
                   data: { sizes: newSizes },
                });
             }
          }
-      }
+
+         return unit;
+      });
 
       return NextResponse.json(updated);
    } catch (error: any) {

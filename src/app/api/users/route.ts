@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hashPassword, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import { parsePagination } from "@src/lib/pagination";
 import {
    logAudit,
    auditActorFromContext,
@@ -47,11 +48,24 @@ export async function GET(request: NextRequest) {
    }
 
    try {
-      const users = await prisma.user.findMany({
-         where,
-         include: { role: true },
-         orderBy: { createdAt: "desc" },
-      });
+      // P4-2: the list is paginated by default — the shared
+      // parsePagination bounds (default 20, max 100) always apply
+      // and the response is { users, total, page, limit }. The
+      // previous bare-array response loaded the whole staff table
+      // unbounded. Consumers that render the full set (the User
+      // page, the employee/actor option lists) walk the bounded
+      // pages via lib/fetchAllPages and see the same rows.
+      const { page, limit, skip } = parsePagination(searchParams, 20);
+      const [users, total] = await Promise.all([
+         prisma.user.findMany({
+            where,
+            include: { role: true },
+            orderBy: { createdAt: "desc" },
+            skip,
+            take: limit,
+         }),
+         prisma.user.count({ where }),
+      ]);
 
       // Strip sensitive passwordHash and flatten role to string
       const safeUsers = users.map(({ passwordHash, role, ...rest }) => ({
@@ -60,7 +74,7 @@ export async function GET(request: NextRequest) {
          roleDetails: role,
       }));
 
-      return NextResponse.json(safeUsers);
+      return NextResponse.json({ users: safeUsers, total, page, limit });
    } catch {
       return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
    }
@@ -85,7 +99,23 @@ export async function POST(request: NextRequest) {
          return NextResponse.json({ error: "Email is required" }, { status: 400 });
       }
 
-      const existingUser = await prisma.user.findUnique({ where: { email } });
+      // P4-13: the same minimum password length the register route
+      // enforces (6) — user creation previously accepted any
+      // password, including a 1-character one.
+      if (password !== undefined && password !== null && password !== "" && String(password).length < 6) {
+         return NextResponse.json(
+            { error: "Password must be at least 6 characters" },
+            { status: 400 },
+         );
+      }
+
+      // P4-13: normalise (trim + lowercase) BEFORE the duplicate
+      // check and storage — the check previously used the raw
+      // input while storage normalised, so "A@x.com" after
+      // "a@x.com" slipped past the check and died on the unique
+      // index as a 500 instead of the intended 409.
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
       if (existingUser) {
          return NextResponse.json({ error: "Email already in use" }, { status: 409 });
       }
@@ -102,7 +132,7 @@ export async function POST(request: NextRequest) {
             data: {
                customId,
                name: name || undefined,
-               email: email.trim().toLowerCase(),
+               email: normalizedEmail,
                phoneNumber: phoneNumber || undefined,
                address: address || undefined,
                salary: salary || undefined,
@@ -134,7 +164,12 @@ export async function POST(request: NextRequest) {
          roleDetails: roleRel,
       };
       return NextResponse.json(safeUser, { status: 201 });
-   } catch {
+   } catch (error: any) {
+      // P4-13: a race past the duplicate check hits the unique
+      // index — that is a 409, not a 500.
+      if (error?.code === "P2002") {
+         return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+      }
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
    }
 }
