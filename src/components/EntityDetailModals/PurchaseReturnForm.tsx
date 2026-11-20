@@ -3,12 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
    Alert,
+   Box,
    Button,
    CircularProgress,
-   Dialog,
-   DialogActions,
-   DialogContent,
-   DialogTitle,
    FormControlLabel,
    Paper,
    Radio,
@@ -22,6 +19,7 @@ import {
    TextField,
    Typography,
 } from "@mui/material";
+import CustomModal from "@src/components/Modal";
 import { useSettings } from "@src/lib/settingsContext";
 import {
    computeReturnableQuantity,
@@ -203,17 +201,17 @@ const PurchaseReturnForm = ({
    };
 
    return (
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-         <DialogTitle>
-            <Typography variant="h6" fontWeight={700}>
-               Return Items — {purchase?.customId || "Purchase"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Returned stock is deducted immediately. The return value
-               first reduces this purchase&apos;s outstanding due.
-            </Typography>
-         </DialogTitle>
-         <DialogContent dividers>
+      <CustomModal
+         open={open}
+         onClose={onClose}
+         title={`Return Items — ${purchase?.customId || "Purchase"}`}
+         size="lg"
+      >
+         <Typography variant="body2" color="text.secondary" sx={{ mt: -1, mb: 2 }}>
+            Returned stock is deducted immediately. The return value
+            first reduces this purchase&apos;s outstanding due.
+         </Typography>
+         <Box sx={{ maxHeight: "62vh", overflowY: "auto", pr: 0.5 }}>
             {loadingReturns ? (
                <Stack alignItems="center" py={4}>
                   <CircularProgress />
@@ -413,8 +411,13 @@ const PurchaseReturnForm = ({
                   </Paper>
                </Stack>
             )}
-         </DialogContent>
-         <DialogActions sx={{ px: 3, py: 1.5 }}>
+         </Box>
+         <Stack
+            direction="row"
+            justifyContent="flex-end"
+            spacing={1.5}
+            sx={{ pt: 2 }}
+         >
             <Button
                onClick={onClose}
                variant="contained"
@@ -433,8 +436,8 @@ const PurchaseReturnForm = ({
             >
                {submitting ? "Saving…" : "Create Return"}
             </Button>
-         </DialogActions>
-      </Dialog>
+         </Stack>
+      </CustomModal>
    );
 };
 
