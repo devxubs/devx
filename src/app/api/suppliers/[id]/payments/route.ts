@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveSession, requirePermission } from "@src/lib/auth";
+import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import {
@@ -99,9 +99,13 @@ export async function GET(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
+   // Read gate (B3, audit S-1 / P1-9): the PAYMENT_GATE family (the
+   // supplier/purchase write family) guards this read because the
+   // ledger exposes payment amounts and transaction IDs.
+   const gate = await requirePermission(request, PAYMENT_GATE);
+   if (gate instanceof NextResponse) return gate;
+
    const { id } = await params;
-   const sessionGate = await requireActiveSession(request);
-   if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
       const supplier = await resolveSupplier(id);

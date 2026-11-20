@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveSession, requirePermission } from "@src/lib/auth";
+import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { isValidOrder } from "@src/lib/orderStatus";
 
@@ -7,9 +7,17 @@ export async function GET(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
+   // Read gate (B3, audit S-1 / P1-9): the customers family (the
+   // same keys the PUT/DELETE writes below use) guards this read
+   // because it returns the customer's full order history.
+   const gate = await requirePermission(request, [
+      "customers",
+      "customer",
+      "customer_view_customer",
+   ]);
+   if (gate instanceof NextResponse) return gate;
+
    const { id } = await params;
-   const sessionGate = await requireActiveSession(request);
-   if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
       const customer = await prisma.customer.findFirst({
