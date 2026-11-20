@@ -23,7 +23,13 @@ import {
    computeReturnSettlement,
    computePurchaseTotals,
    sumRecordedDueAbsorbed,
+   computeNetPurchaseQuantities,
 } from "@src/lib/purchaseReturns";
+import {
+   addStockForPurchaseItems,
+   reverseStockForPurchaseItems,
+   deductStockForPurchaseReturn,
+} from "@src/lib/stock";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -246,6 +252,137 @@ describe.skipIf(!enabled)("database integration (explicit test DB only)", () => 
                data: { total: 100, due: 20 },
             });
             expect(await recompute(80)).toEqual({ total: 100, due: 20 });
+
+            throw new Error("intentional rollback");
+         }),
+      ).rejects.toThrow("intentional rollback");
+   });
+
+   it("purchase delete/restore move NET quantities after a partial return (B2-1 / P1-3)", async () => {
+      // Mirrors the route logic at the data layer, step for step:
+      // buy 10 (stock +10) → return 3 (stock −3 via the return
+      // engine, return rows recorded) → purchase DELETE computes
+      // net = 10 − 3 = 7 and reverses exactly 7 → Bin restore
+      // re-adds exactly 7. Gross reversal would have removed 10
+      // (and failed the never-negative guard at stock 7).
+      // Everything runs in one transaction that is rolled back.
+      const marker = `integration-b21-${Date.now()}-${Math.random()
+         .toString(36)
+         .slice(2, 8)}`;
+
+      await expect(
+         prisma!.$transaction(async (tx) => {
+            const product = await tx.product.create({
+               data: {
+                  productCode: marker,
+                  productSku: marker,
+                  productName: marker,
+                  regularPrice: 10,
+                  quantity: 0,
+               },
+            });
+            const supplier = await tx.supplier.create({
+               data: { name: marker },
+            });
+            const purchase = await tx.purchase.create({
+               data: {
+                  invoice: marker,
+                  supplierId: supplier.id,
+                  productAmount: 100,
+                  total: 100,
+                  paid: 0,
+                  due: 100,
+                  items: {
+                     create: [
+                        {
+                           productId: product.id,
+                           name: marker,
+                           quantity: 10,
+                           price: 10,
+                           subtotal: 100,
+                        },
+                     ],
+                  },
+               },
+               include: { items: true },
+            });
+            const purchaseItem = purchase.items[0];
+
+            await addStockForPurchaseItems(
+               tx,
+               [{ productId: product.id, quantity: 10, variantId: null }],
+               { purchaseId: purchase.id, note: "integration B2-1 buy" },
+            );
+            expect(
+               (await tx.product.findUnique({ where: { id: product.id } }))?.quantity,
+            ).toBe(10);
+
+            // Return 3, exactly as the returns route records it.
+            const createdReturn = await tx.purchaseReturn.create({
+               data: {
+                  customId: `${marker}-pret`,
+                  purchaseId: purchase.id,
+                  supplierId: supplier.id,
+                  totalAmount: 30,
+                  settlement: "DUE_REDUCTION",
+                  creditConsumed: 30,
+                  items: {
+                     create: [
+                        {
+                           purchaseItemId: purchaseItem.id,
+                           productId: product.id,
+                           name: marker,
+                           quantity: 3,
+                           price: 10,
+                           subtotal: 30,
+                        },
+                     ],
+                  },
+               },
+            });
+            await deductStockForPurchaseReturn(
+               tx,
+               [{ productId: product.id, quantity: 3, variantId: null }],
+               { purchaseId: purchase.id, note: "integration B2-1 return" },
+            );
+            expect(
+               (await tx.product.findUnique({ where: { id: product.id } }))?.quantity,
+            ).toBe(7);
+            expect(createdReturn.id).toBeTruthy();
+
+            // The DELETE route's computation: live returns → net.
+            const liveReturns = await tx.purchaseReturn.findMany({
+               where: { purchaseId: purchase.id, isDeleted: false },
+               select: {
+                  items: {
+                     select: { productId: true, variantId: true, quantity: true },
+                  },
+               },
+            });
+            const netLines = computeNetPurchaseQuantities(
+               purchase.items,
+               liveReturns.flatMap((r) => r.items),
+            );
+            expect(netLines).toEqual([
+               { productId: product.id, variantId: null, quantity: 7 },
+            ]);
+
+            await reverseStockForPurchaseItems(tx, netLines, {
+               purchaseId: purchase.id,
+               note: "integration B2-1 delete",
+            });
+            expect(
+               (await tx.product.findUnique({ where: { id: product.id } }))?.quantity,
+            ).toBe(0);
+
+            // The Bin restore re-adds the same net 7.
+            await addStockForPurchaseItems(tx, netLines, {
+               purchaseId: purchase.id,
+               note: "integration B2-1 restore",
+            });
+            expect(
+               (await tx.product.findUnique({ where: { id: product.id } }))?.quantity,
+            ).toBe(7);
 
             throw new Error("intentional rollback");
          }),

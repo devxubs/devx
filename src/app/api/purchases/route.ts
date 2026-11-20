@@ -12,6 +12,7 @@ import {
    auditActorFromContext,
    requestAuditContext,
 } from "@src/lib/audit";
+import { normalizePurchaseAttachments } from "@src/lib/purchaseAttachments";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -236,10 +237,19 @@ export async function POST(request: NextRequest) {
                items: {
                   create: normalizedItems,
                },
+               // B2-2 (audit C-8 / P1-6): persist the attachments
+               // the form collected — descriptors of files already
+               // stored through the uploads flow, validated against
+               // the PurchaseAttachment model's fields. Created in
+               // the same transaction as the purchase itself.
+               attachments: {
+                  create: normalizePurchaseAttachments(body.attachments),
+               },
             },
             include: {
                items: true,
                supplier: true,
+               attachments: true,
             },
          });
 

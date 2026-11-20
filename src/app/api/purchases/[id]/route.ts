@@ -10,8 +10,13 @@ import {
    lockPurchaseRow,
    computePurchaseTotals,
    sumRecordedDueAbsorbed,
+   computeNetPurchaseQuantities,
    CASH_REFUND_EXPENSE_TYPE,
 } from "@src/lib/purchaseReturns";
+import {
+   normalizePurchaseAttachments,
+   reconcilePurchaseAttachments,
+} from "@src/lib/purchaseAttachments";
 import {
    logAudit,
    auditActorFromContext,
@@ -228,6 +233,38 @@ export async function PUT(
          });
          if (!fresh || fresh.isDeleted) {
             throw new Error("Purchase not found");
+         }
+
+         // B2-2 (audit C-8 / P1-6): attachments reconcile — only
+         // when the payload carries the field at all, so the
+         // note-only PUT from the purchases list (which sends no
+         // `attachments` key) can never wipe the stored set. When
+         // present, the payload IS the new set: rows whose stored
+         // URL left the payload are deleted and new URLs created,
+         // inside this same transaction (the Bin permanent-delete
+         // cascade continues to own final cleanup).
+         if (body.attachments !== undefined) {
+            const payloadAttachments = normalizePurchaseAttachments(
+               body.attachments,
+            );
+            const existingAttachments = await tx.purchaseAttachment.findMany({
+               where: { purchaseId: id },
+               select: { id: true, name: true, url: true },
+            });
+            const { toCreate, toDeleteIds } = reconcilePurchaseAttachments(
+               existingAttachments,
+               payloadAttachments,
+            );
+            if (toDeleteIds.length > 0) {
+               await tx.purchaseAttachment.deleteMany({
+                  where: { id: { in: toDeleteIds } },
+               });
+            }
+            if (toCreate.length > 0) {
+               await tx.purchaseAttachment.createMany({
+                  data: toCreate.map((a) => ({ ...a, purchaseId: id })),
+               });
+            }
          }
 
          let productAmount = Number(fresh.productAmount);
@@ -508,20 +545,33 @@ export async function DELETE(
          }
 
          if (!existing.isDeleted) {
-            await reverseStockForPurchaseItems(
-               tx,
-               existing.items
-                  .filter((it) => it.productId)
-                  .map((it) => ({
-                     productId: it.productId as string,
-                     quantity: it.quantity,
-                     variantId: it.variantId,
-                  })),
-               {
-                  purchaseId: existing.id,
-                  note: `Purchase ${existing.customId} deleted — stock reversed`,
-               },
+            // B2-1 (audit C-11 / P1-3): reverse the NET quantities —
+            // purchased minus what live purchase returns already
+            // took out of stock. Reversing the gross quantities
+            // would try to remove the returned units a second time
+            // (wrong stock, or a spurious "unsafe" refusal). Read
+            // under the Purchase-row lock taken above, like every
+            // other totals/quantity read in this transaction. The
+            // never-negative guard semantics are unchanged: if the
+            // NET reversal is still unsafe, the same clear 409
+            // error fires.
+            const liveReturns = await tx.purchaseReturn.findMany({
+               where: { purchaseId: id, isDeleted: false },
+               select: { items: { select: { productId: true, variantId: true, quantity: true } } },
+            });
+            const returnedItems = liveReturns.flatMap((r) => r.items);
+            const netLines = computeNetPurchaseQuantities(
+               existing.items,
+               returnedItems,
             );
+            const returnedUnits = returnedItems.reduce(
+               (sum, it) => sum + (Number(it.quantity) || 0),
+               0,
+            );
+            await reverseStockForPurchaseItems(tx, netLines, {
+               purchaseId: existing.id,
+               note: `Purchase ${existing.customId} deleted — stock reversed`,
+            });
 
             const deleted = await tx.purchase.update({
                where: { id },
@@ -535,7 +585,11 @@ export async function DELETE(
                entityType: "PURCHASE",
                entityId: existing.id,
                entityCustomId: existing.customId,
-               summary: `Purchase ${existing.customId || existing.id} moved to bin — stock reversed`,
+               summary:
+                  `Purchase ${existing.customId || existing.id} moved to bin — stock reversed` +
+                  (returnedUnits > 0
+                     ? ` (net of ${returnedUnits} returned unit(s))`
+                     : ""),
                ...auditCtx,
             });
 

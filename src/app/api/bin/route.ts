@@ -15,6 +15,10 @@ import {
 } from "@src/lib/audit";
 import { deleteUploadedFiles } from "@src/lib/uploadedFiles";
 import { selectCascadeDeletedVariantIds } from "@src/lib/binRestore";
+import {
+   lockPurchaseRow,
+   computeNetPurchaseQuantities,
+} from "@src/lib/purchaseReturns";
 
 export async function GET(request: NextRequest) {
    // R-2 fix (Final Review): Recycle Bin contents are deleted business
@@ -299,22 +303,33 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             // PUR-03 mirror: soft-deleting reversed the purchase's
             // stock, so restoring re-adds it in the same transaction.
+            // B2-1 (audit C-11 / P1-3): the re-add uses the NET
+            // quantities (purchased − live returns), the exact
+            // mirror of the net reversal the purchase DELETE now
+            // performs — re-adding gross would resurrect units the
+            // return flow already removed. The Purchase-row lock is
+            // taken first, the same discipline as the delete.
             await prisma.$transaction(async (tx) => {
+               await lockPurchaseRow(tx, id);
                const purchase = await tx.purchase.findUnique({
                   where: { id },
                   include: { items: true },
                });
                if (!purchase) throw new Error("Purchase not found");
+               let returnedUnits = 0;
                if (purchase.isDeleted) {
+                  const liveReturns = await tx.purchaseReturn.findMany({
+                     where: { purchaseId: id, isDeleted: false },
+                     select: { items: { select: { productId: true, variantId: true, quantity: true } } },
+                  });
+                  const returnedItems = liveReturns.flatMap((r) => r.items);
+                  returnedUnits = returnedItems.reduce(
+                     (sum, it) => sum + (Number(it.quantity) || 0),
+                     0,
+                  );
                   await addStockForPurchaseItems(
                      tx,
-                     purchase.items
-                        .filter((it) => it.productId)
-                        .map((it) => ({
-                           productId: it.productId as string,
-                           quantity: it.quantity,
-                           variantId: it.variantId,
-                        })),
+                     computeNetPurchaseQuantities(purchase.items, returnedItems),
                      {
                         purchaseId: purchase.id,
                         note: `Purchase ${purchase.customId} restored from bin — stock re-added`,
@@ -333,19 +348,33 @@ export async function POST(request: NextRequest) {
                   entityType: "PURCHASE",
                   entityId: purchase.id,
                   entityCustomId: purchase.customId,
-                  summary: `Purchase ${purchase.customId} restored from bin — stock re-added`,
+                  summary:
+                     `Purchase ${purchase.customId} restored from bin — stock re-added` +
+                     (returnedUnits > 0
+                        ? ` (net of ${returnedUnits} returned unit(s))`
+                        : ""),
                   ...requestAuditContext(request),
                });
             });
             return NextResponse.json({ message: "Purchase restored successfully" });
          } else if (action === "delete") {
-            // Interactive form (was an array transaction) so the
-            // permanent deletion is audited in the same transaction.
-            await prisma.$transaction(async (tx) => {
+            // B2-1 (audit C-11 / P1-3): FK finding — PurchaseReturn
+            // .purchase is onDelete: Restrict and PurchaseReturnItem
+            // .purchaseItem is Restrict too, and Restrict applies to
+            // the ROW, not the soft-delete flag: ANY PurchaseReturn
+            // referencing this purchase — live or already
+            // soft-deleted — blocks the hard delete (previously a
+            // raw 500). Count them first, inside the transaction,
+            // and answer a clean 409 instead.
+            const result = await prisma.$transaction(async (tx) => {
                const purchase = await tx.purchase.findUnique({
                   where: { id },
                   select: { id: true, customId: true },
                });
+               const returnCount = await tx.purchaseReturn.count({
+                  where: { purchaseId: id },
+               });
+               if (returnCount > 0) return { blocked: true, returnCount, purchase };
                await tx.purchaseAttachment.deleteMany({ where: { purchaseId: id } });
                await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
                await tx.purchase.delete({ where: { id } });
@@ -358,7 +387,17 @@ export async function POST(request: NextRequest) {
                   summary: `Purchase ${purchase?.customId || id} permanently deleted from bin`,
                   ...requestAuditContext(request),
                });
+               return { blocked: false, returnCount: 0, purchase };
             });
+            if (result.blocked) {
+               return NextResponse.json(
+                  {
+                     error:
+                        `This purchase cannot be permanently deleted because it has ${result.returnCount} purchase return record(s) linked to it. The returns must be removed first — a purchase with return history is kept for the audit trail.`,
+                  },
+                  { status: 409 },
+               );
+            }
             return NextResponse.json({ message: "Purchase permanently deleted" });
          }
       }

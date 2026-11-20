@@ -352,6 +352,192 @@ export function computePurchaseTotals(
  * settlement-type branch — see the header for why that holds).
  * Works with any Prisma-like client (root or transaction).
  */
+/**
+ * SupplierPayment.paymentMethod value used for the ledger row that
+ * records standing return credit applied to a purchase (B2-3 /
+ * audit C-9 / P1-7). The row carries no TxID and no cash — it exists
+ * so the credit application is visible in the supplier ledger and
+ * so the purchase's stored `paid` counter and the ledger total stay
+ * reconcilable. Voiding such a row reverses the credit consumption
+ * (see the supplier-payment void route).
+ */
+export const RETURN_CREDIT_PAYMENT_METHOD = "Return Credit";
+
+// ─────────────────────────────────────────────
+// B2-1 (audit C-11 / P1-3): net purchase quantities
+// ─────────────────────────────────────────────
+
+export interface PurchaseStockLine {
+   productId: string | null;
+   variantId?: string | null;
+   quantity: number;
+}
+
+export interface NetPurchaseLine {
+   productId: string;
+   variantId: string | null;
+   quantity: number;
+}
+
+/**
+ * Per product+variant NET quantities of a purchase:
+ * purchased − Σ quantities in the purchase's non-deleted return
+ * items. Purchase delete (stock reversal) and Bin restore (stock
+ * re-add) must move exactly this amount: the returned units already
+ * left stock through the return flow, so reversing/re-adding the
+ * GROSS purchased quantities would double-move them. Lines whose
+ * net reaches zero are dropped (they move nothing), snapshot lines
+ * without a product are dropped (the stock engine skips them too),
+ * and duplicate lines for the same product+variant are aggregated
+ * — variant lines are keyed separately from each other and from
+ * the product pool, mirroring the stock engine's own aggregation.
+ * Pure — routes feed it rows read under the Purchase-row lock.
+ */
+export function computeNetPurchaseQuantities(
+   purchasedItems: PurchaseStockLine[],
+   returnItems: PurchaseStockLine[],
+): NetPurchaseLine[] {
+   const keyOf = (productId: string, variantId: string | null) =>
+      `${productId}::${variantId ?? ""}`;
+   const net = new Map<string, NetPurchaseLine>();
+   for (const item of purchasedItems) {
+      if (!item.productId) continue;
+      const variantId = item.variantId ?? null;
+      const key = keyOf(item.productId, variantId);
+      const qty = Math.max(0, Math.floor(Number(item.quantity) || 0));
+      const existing = net.get(key);
+      if (existing) existing.quantity += qty;
+      else net.set(key, { productId: item.productId, variantId, quantity: qty });
+   }
+   for (const item of returnItems) {
+      if (!item.productId) continue;
+      const key = keyOf(item.productId, item.variantId ?? null);
+      const existing = net.get(key);
+      if (!existing) continue;
+      existing.quantity -= Math.max(0, Math.floor(Number(item.quantity) || 0));
+   }
+   return Array.from(net.values())
+      .map((line) => ({ ...line, quantity: Math.max(0, line.quantity) }))
+      .filter((line) => line.quantity > 0);
+}
+
+// ─────────────────────────────────────────────
+// B2-3 (audit C-9 / P1-7): standing return-credit consumption
+// ─────────────────────────────────────────────
+
+export interface StandingCreditReturn {
+   id: string;
+   customId?: string | null;
+   totalAmount: number;
+   creditConsumed: number;
+}
+
+export interface ReturnCreditAllocation {
+   returnId: string;
+   returnCustomId: string | null;
+   /** Amount of this return's standing credit consumed. */
+   amount: number;
+   /** The return's creditConsumed after this allocation. */
+   newCreditConsumed: number;
+}
+
+/**
+ * Plan how `amount` of standing return credit is consumed across a
+ * supplier's live SUPPLIER_CREDIT returns, OLDEST FIRST (the caller
+ * supplies the rows in creation order; only rows with standing
+ * credit > 0 take part). Pure — the route re-reads the rows inside
+ * its transaction, under the purchase + supplier locks, and applies
+ * exactly the returned increments, so the plan and the writes can
+ * never drift apart.
+ *
+ * Rejects (throws) when the amount is not positive, exceeds the
+ * purchase's outstanding due, or exceeds the total standing credit
+ * — a partial silent application would desync the caller's books.
+ */
+export function planReturnCreditApplication(
+   returns: StandingCreditReturn[],
+   amount: number,
+   purchaseDue: number,
+): ReturnCreditAllocation[] {
+   const requested = round2(amount);
+   if (!(requested > 0)) {
+      throw new Error("Return credit amount must be greater than zero");
+   }
+   const due = round2(purchaseDue);
+   if (requested > due) {
+      throw new Error(
+         `Return credit of ৳${requested.toFixed(2)} exceeds the outstanding due on this purchase (৳${due.toFixed(2)}).`,
+      );
+   }
+   const live = returns
+      .map((r) => ({
+         id: r.id,
+         customId: r.customId ?? null,
+         creditConsumed: round2(r.creditConsumed),
+         standing: standingCreditOf(r.totalAmount, r.creditConsumed),
+      }))
+      .filter((r) => r.standing > 0);
+   const totalStanding = round2(
+      live.reduce((sum, r) => sum + r.standing, 0),
+   );
+   if (requested > totalStanding) {
+      throw new Error(
+         `Return credit of ৳${requested.toFixed(2)} exceeds this supplier's standing return credit (৳${totalStanding.toFixed(2)}).`,
+      );
+   }
+   const allocations: ReturnCreditAllocation[] = [];
+   let remaining = requested;
+   for (const r of live) {
+      if (remaining <= 0) break;
+      const take = round2(Math.min(remaining, r.standing));
+      allocations.push({
+         returnId: r.id,
+         returnCustomId: r.customId,
+         amount: take,
+         newCreditConsumed: round2(r.creditConsumed + take),
+      });
+      remaining = round2(remaining - take);
+   }
+   return allocations;
+}
+
+/**
+ * The return-deletion guard predicate (B2-3): a SUPPLIER_CREDIT
+ * return may be deleted only while NONE of its standing credit has
+ * been consumed beyond the value `creditConsumed` was initialised
+ * to at creation (its recorded dueAbsorbed). Once a later flow has
+ * consumed standing credit, deletion is refused — that consumption
+ * cannot be unwound from the delete route. Pure; the delete route
+ * feeds it the CREATE audit row's recorded baseline and the row's
+ * current stored value.
+ */
+export function returnCreditWasConsumed(
+   baselineCreditConsumed: number,
+   currentCreditConsumed: number,
+): boolean {
+   return round2(currentCreditConsumed) > round2(baselineCreditConsumed);
+}
+
+/**
+ * Serialize standing-credit consumption per supplier on the
+ * Supplier row itself. Credit applications target one purchase
+ * (locked via lockPurchaseRow) but consume return rows that may
+ * belong to OTHER purchases of the same supplier, so the purchase
+ * lock alone cannot serialize two applications against different
+ * purchases. Must run inside the caller's transaction, after the
+ * purchase lock (one consistent lock order: purchase → supplier).
+ * Returns false when no such supplier row exists.
+ */
+export async function lockSupplierRow(
+   tx: any,
+   supplierId: string,
+): Promise<boolean> {
+   const rows = await tx.$queryRaw`
+      SELECT id FROM Supplier WHERE id = ${supplierId} FOR UPDATE
+   `;
+   return Array.isArray(rows) && rows.length > 0;
+}
+
 export async function getStandingReturnCredit(
    db: any,
    supplierId: string,

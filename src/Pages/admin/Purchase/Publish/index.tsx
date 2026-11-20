@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import Details from "./Details";
 import Pricing from "./Pricing";
 import Information from "./Information";
+import { uploadImageFile } from "@src/lib/uploadImage";
 
 export interface SupplierOption {
    id: string;
@@ -345,6 +346,56 @@ const Publish = () => {
                return;
             }
          }
+         // B2-2 (audit C-8 / P1-6): attachments the uploader
+         // collected ride in the payload — previously they were
+         // silently dropped on save. The uploader produces File
+         // objects; each new file goes through the existing uploads
+         // flow (POST /api/uploads, the same one product images
+         // use) and is sent as the { name, url, type, size }
+         // descriptor PurchaseAttachment stores. In edit mode the
+         // already-saved attachments are resent as-is so the API's
+         // replace-set reconcile keeps them; entries that already
+         // carry a stored URL (API-shaped values) pass through.
+         const attachmentDescriptors: Array<{
+            name: string;
+            url: string;
+            type?: string;
+            size?: number;
+         }> = [];
+         if (editId) {
+            for (const att of ((data as any)?.attachments || []) as any[]) {
+               if (att?.url) {
+                  attachmentDescriptors.push({
+                     name: att.name || "Attachment",
+                     url: att.url,
+                     type: att.type || undefined,
+                     size: att.size ?? undefined,
+                  });
+               }
+            }
+         }
+         for (const att of ((formData as any).attachments || []) as any[]) {
+            if (!att) continue;
+            if (typeof att === "object" && "url" in att && att.url) {
+               if (!attachmentDescriptors.some((d) => d.url === att.url)) {
+                  attachmentDescriptors.push({
+                     name: att.name || "Attachment",
+                     url: att.url,
+                     type: att.type || undefined,
+                     size: att.size ?? undefined,
+                  });
+               }
+            } else if (typeof File !== "undefined" && att instanceof File) {
+               const url = await uploadImageFile(att);
+               attachmentDescriptors.push({
+                  name: att.name,
+                  url,
+                  type: att.type || undefined,
+                  size: att.size,
+               });
+            }
+         }
+
          // Line items now include their productId (Phase 2, 2.4) so the
          // API can net stock correctly; totals are recomputed on the
          // server for both POST and PUT — client totals are advisory.
@@ -365,6 +416,7 @@ const Publish = () => {
             discount: formData.discount,
             paid: Number((formData as any).pay || 0),
             note: formData.note || "",
+            attachments: attachmentDescriptors,
          };
 
          const res = await fetch(
