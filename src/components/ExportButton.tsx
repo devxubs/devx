@@ -44,6 +44,15 @@ export interface ExportButtonProps {
    currentPageData?: any[];
    selectedData?: any[];
    defaultScope?: "selected" | "page" | "all";
+   /**
+    * Selected-only mode (table selection toolbar): the export is
+    * locked to the selected rows — the scope picker offers no
+    * current-page / all-records options and execution always uses
+    * `selectedData`, whatever the table's fetch-all loader could
+    * return. Used by the shared table system so selecting rows can
+    * never turn into a whole-dataset export.
+    */
+   selectedOnly?: boolean;
    fetchAllData?: () => Promise<any[]>;
    totalMatchingCount?: number;
    variant?: "button" | "icon" | "outlined" | "contained";
@@ -65,6 +74,7 @@ export default function ExportButton({
    currentPageData,
    selectedData,
    defaultScope,
+   selectedOnly = false,
    fetchAllData,
    totalMatchingCount,
    variant = "outlined",
@@ -80,9 +90,10 @@ export default function ExportButton({
    const { settings } = useSettings();
    const [modalOpen, setModalOpen] = useState(false);
    const [format, setFormat] = useState<"xlsx" | "docx" | "csv">("xlsx");
-   const initialScope =
-      defaultScope ||
-      (selectedData && selectedData.length > 0 ? "selected" : "page");
+   const initialScope = selectedOnly
+      ? "selected"
+      : defaultScope ||
+        (selectedData && selectedData.length > 0 ? "selected" : "page");
    const [scope, setScope] = useState<"selected" | "page" | "all">(
       initialScope,
    );
@@ -98,7 +109,7 @@ export default function ExportButton({
 
    const handleOpenModal = () => {
       setErrorMsg(null);
-      if (selectedData && selectedData.length > 0) {
+      if (selectedOnly || (selectedData && selectedData.length > 0)) {
          setScope("selected");
       } else if (scope === "selected") {
          setScope("page");
@@ -111,7 +122,7 @@ export default function ExportButton({
       setErrorMsg(null);
       try {
          let dataset: any[] = [];
-         if (scope === "selected") {
+         if (selectedOnly || scope === "selected") {
             if (!selectedData || selectedData.length === 0) {
                setErrorMsg(
                   "Please select records from the table to export selected.",
@@ -373,6 +384,7 @@ export default function ExportButton({
                         </Paper>
                      )}
 
+                     {!selectedOnly && (
                      <Paper
                         variant="outlined"
                         sx={{
@@ -402,8 +414,9 @@ export default function ExportButton({
                            }
                         />
                      </Paper>
+                     )}
 
-                     {canExportAll && (
+                     {!selectedOnly && canExportAll && (
                         <Paper
                            variant="outlined"
                            sx={{

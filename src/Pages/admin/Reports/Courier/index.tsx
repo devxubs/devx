@@ -285,6 +285,7 @@ const Courier = () => {
                         rows={courierStatRows}
                         columns={courierStatColumns}
                         loading={loading}
+                        checkBox={true}
                         canExport={true}
                         exportConfig={{
                            filename: `Courier_Performance_${new Date().toISOString().split("T")[0]}`,

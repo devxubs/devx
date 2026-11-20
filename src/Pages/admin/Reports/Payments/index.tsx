@@ -349,6 +349,7 @@ const Payments = () => {
                   rows={methodRows}
                   columns={methodColumns}
                   loading={loading}
+                  checkBox={true}
                   canExport={true}
                   exportConfig={{
                      filename: `Payment_Reconciliation_${date}`,
@@ -380,6 +381,7 @@ const Payments = () => {
                   rows={queueRows}
                   columns={queueColumns}
                   loading={loading}
+                  checkBox={true}
                   canExport={true}
                   exportConfig={{
                      filename: `Unverified_Payments_${date}`,

@@ -308,6 +308,7 @@ const Finance = () => {
                   rows={receivableRows}
                   columns={receivableColumns}
                   loading={loading}
+                  checkBox={true}
                   canExport={true}
                   exportConfig={{
                      filename: `Customer_Receivables_${new Date().toISOString().split("T")[0]}`,
@@ -358,6 +359,7 @@ const Finance = () => {
                   rows={payableRows}
                   columns={payableColumns}
                   loading={loading}
+                  checkBox={true}
                   canExport={true}
                   exportConfig={{
                      filename: `Supplier_Payables_${new Date().toISOString().split("T")[0]}`,

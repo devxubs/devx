@@ -346,6 +346,7 @@ export default function CustomTable({
             showSelectionIndicators={showSelectionIndicators}
             hideSelectionActions={hideSelectionActions}
             customSelectionToolbar={customSelectionToolbar}
+            hasRowSelection={checkBox}
             selectedRows={selectedRows}
             onClearSelection={() =>
                setRowSelectionModel({

@@ -124,6 +124,15 @@ type FilterProps = {
    canExport?: boolean;
    printConfig?: TablePrintConfig;
    selectedRows?: any[];
+   /**
+    * True when the table has checkbox row selection (CustomTable's
+    * `checkBox`). On selection-capable tables the standalone header
+    * Export is NOT rendered: export lives only in the selection
+    * toolbar, appears once at least one row is selected, and is
+    * locked to the selected rows. Tables without row selection keep
+    * the always-available header Export (page / all scopes).
+    */
+   hasRowSelection?: boolean;
    onClearSelection?: () => void;
    onToggleSelectAll?: () => void;
    isAllSelected?: boolean;
@@ -145,6 +154,7 @@ const Filter: React.FC<FilterProps> = ({
    canExport,
    printConfig,
    selectedRows = [],
+   hasRowSelection = false,
    onClearSelection,
    onToggleSelectAll,
    isAllSelected = false,
@@ -387,7 +397,13 @@ const Filter: React.FC<FilterProps> = ({
                </Button>
             )}
 
-            {/* Export Selected (ONLY if resolvedCanExport) */}
+            {/* Export Selected (ONLY if resolvedCanExport) —
+                locked to the selected rows: no page/all scopes and
+                no fetch-all loader is passed, so a selection can
+                never export the whole dataset. The exported columns
+                are the table's own export columns (the shared
+                shaping); page-specific fetch-all shaping stays with
+                the non-selection export path. */}
             {resolvedCanExport && exportColumns.length > 0 && (
                <ExportButton
                   variant="button"
@@ -395,6 +411,7 @@ const Filter: React.FC<FilterProps> = ({
                   label="Export selected"
                   selectedData={selectedRows}
                   defaultScope="selected"
+                  selectedOnly
                   filename={
                      exportConfig?.filename
                         ? `${exportConfig.filename}_Selected`
@@ -407,8 +424,6 @@ const Filter: React.FC<FilterProps> = ({
                   }
                   columns={exportColumns}
                   currentPageData={rows}
-                  fetchAllData={exportConfig?.fetchAllData}
-                  totalMatchingCount={exportConfig?.totalMatchingCount}
                   summaryRows={exportConfig?.summaryRows}
                   sx={{ textTransform: "none", fontWeight: 600 }}
                />
@@ -557,6 +572,7 @@ const Filter: React.FC<FilterProps> = ({
                            setFilterQueryData(updated);
                         }) as React.ReactElement)}
                      {resolvedCanExport &&
+                        !hasRowSelection &&
                         rows &&
                         rows.length > 0 &&
                         exportColumns.length > 0 && (
