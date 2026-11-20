@@ -184,7 +184,7 @@ export async function GET(request: NextRequest) {
          //    amount the courier collects on delivery);
          //  - COD pending: outstanding dueAmount of orders still
          //    in flight (not delivered/cancelled/failed).
-         const [orders, sourceDistribution, totalsG, dispatchedG, deliveredG, returnedAG, returnedBG, codPendingG] = await Promise.all([
+         const [orders, sourceDistribution, totalsG, dispatchedG, deliveredG, returnedAG, returnedBG, codPendingG, cardTotalsAgg, cardTotalsCount] = await Promise.all([
             prisma.order.findMany({
                where: whereOrder,
                select: {
@@ -255,6 +255,19 @@ export async function GET(request: NextRequest) {
                },
                _sum: { dueAmount: true },
             }),
+            // P2-7: card totals over the COMPLETE filtered dataset,
+            // computed server-side so the Courier tab no longer
+            // downloads every row through the export loader just to
+            // sum three numbers. Definitions match the per-row
+            // figures the tab used to sum: count = all rows;
+            // fees = Σ courierCharge (null counts as 0, which is
+            // how Prisma's _sum treats nulls); payout = Σ (total −
+            // courierCharge) = Σ total − Σ courierCharge.
+            prisma.order.aggregate({
+               where: whereOrder,
+               _sum: { total: true, courierCharge: true },
+            }),
+            prisma.order.count({ where: whereOrder }),
          ]);
 
          const statsMap = new Map<string, any>();
@@ -336,9 +349,17 @@ export async function GET(request: NextRequest) {
             };
          });
 
+         const cardFees = Number(cardTotalsAgg._sum.courierCharge || 0);
          return NextResponse.json({
             rows,
             courierStats,
+            // P2-7 (additive): server-computed card totals — see the
+            // aggregate above. Older consumers ignore this field.
+            cardTotals: {
+               count: cardTotalsCount,
+               payout: Number(cardTotalsAgg._sum.total || 0) - cardFees,
+               fees: cardFees,
+            },
             distribution: sourceDistribution.map((s) => ({
                label: s.courier || "Direct",
                value: s._count.id,
@@ -629,20 +650,36 @@ export async function GET(request: NextRequest) {
          // set BEFORE slicing, so rank labels stay global). The
          // previous response embedded the full employee set in every
          // paged response, which made the chunked export loader
-         // re-download and re-append the whole set per page. The
-         // Employees page assembles the full set for display through
-         // that same loader.
+         // re-download and re-append the whole set per page.
+         // P2-7: the tab's headline cards are now served as
+         // aggregates over the complete ranked set (additive
+         // `summary`), so the DISPLAY path reads a single page +
+         // these totals instead of assembling the full set through
+         // the export loader; the loader remains for export only.
+         // The sums are over the same ranked rows the tab used to
+         // reduce client-side — identical figures.
          return NextResponse.json({
             rows: rankedRows.slice(skip, skip + limit),
             page,
             limit,
             total: rankedRows.length,
+            summary: {
+               totalEmployees: rankedRows.length,
+               totalCompletedSales: rankedRows.reduce(
+                  (s, r) => s + Number(r.conforms || 0),
+                  0,
+               ),
+               totalRevenue: rankedRows.reduce(
+                  (s, r) => s + Number(r.revenue || 0),
+                  0,
+               ),
+            },
          });
       }
 
       // 6. PRODUCTS REPORT
       if (tab === "products") {
-         const [allProducts, lowStockPageRows, lowStockTotalRows, topSold, stockAgg, outOfStockAll] = await Promise.all([
+         const [allProducts, lowStockPageRows, lowStockTotalRows, topSold, stockAgg, outOfStockAll, totalProductsAll, lowExclusiveTotalRows] = await Promise.all([
             prisma.product.findMany({
                where: { isDeleted: false },
                select: { id: true, customId: true, productName: true, quantity: true, regularPrice: true, lowStockAlert: true },
@@ -701,6 +738,25 @@ export async function GET(request: NextRequest) {
             prisma.product.count({
                where: { isDeleted: false, quantity: 0 },
             }),
+            // P2-7: availability distribution counts over the
+            // COMPLETE catalogue, computed server-side so the
+            // Products tab no longer downloads every availability
+            // row through the export loader just to count statuses.
+            // The three statuses partition the catalogue exactly as
+            // the per-row status below does: quantity = 0 → "Out of
+            // stock"; 0 < quantity <= (lowStockAlert || 10) → "Low
+            // stock"; otherwise "In stock". The low count therefore
+            // uses the same raw-SQL predicate as the low-stock list
+            // plus quantity > 0 (out-of-stock rows also satisfy the
+            // bare predicate and are counted in their own segment).
+            prisma.product.count({ where: { isDeleted: false } }),
+            prisma.$queryRaw<any[]>`
+               SELECT COUNT(*) AS total
+               FROM Product
+               WHERE isDeleted = 0
+                 AND quantity > 0
+                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), 10)
+            `,
          ]);
 
          const lowStockList = lowStockPageRows || [];
@@ -710,10 +766,20 @@ export async function GET(request: NextRequest) {
          const totalInStock = Number(stockAgg._sum.quantity || 0);
          const outOfStockCount = outOfStockAll;
 
+         const lowExclusiveCount = Number(lowExclusiveTotalRows?.[0]?.total ?? 0);
          return NextResponse.json({
             totalInStock,
             outOfStockCount,
             lowStockCount,
+            // P2-7 (additive): complete-catalogue distribution
+            // counts for the tab's chart — in + low + out = total,
+            // by the partition argued above.
+            availabilityCounts: {
+               inStock: totalProductsAll - lowExclusiveCount - outOfStockAll,
+               low: lowExclusiveCount,
+               out: outOfStockAll,
+               total: totalProductsAll,
+            },
             page,
             limit,
             lowStockRows: lowStockList.map((p) => ({

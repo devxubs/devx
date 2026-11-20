@@ -20,7 +20,8 @@ const Courier = () => {
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
    const [error, setError] = useState<string | null>(null);
-   // KPI totals over the COMPLETE filtered dataset (see loader).
+   // KPI totals over the COMPLETE filtered dataset (P2-7: served
+   // as `cardTotals` aggregates by the reports API).
    const [cardTotals, setCardTotals] = useState<{
       count: number;
       payout: number;
@@ -51,35 +52,13 @@ const Courier = () => {
             const data = await res.json();
             setReport(data);
             setError(null);
-            // The main fetch returns one page (100 rows), so card
-            // totals summed from it silently described only that
-            // page. Page through the complete filtered row set with
-            // the same loader the exports use; if that fails, the
-            // cards fall back to the displayed page (previous
-            // behaviour) rather than showing nothing.
-            try {
-               const allRows = await fetchAllReportRows(
-                  reportParams("courier", dateRange),
-                  (d) => d.rows || [],
-               );
-               if (allRows.length > 0 || (data.rows || []).length === 0) {
-                  setCardTotals({
-                     count: allRows.length,
-                     payout: allRows.reduce(
-                        (s: number, r: any) => s + Number(r.courier_pay_to_you || 0),
-                        0,
-                     ),
-                     fees: allRows.reduce(
-                        (s: number, r: any) => s + Number(r.courier_charge || 0),
-                        0,
-                     ),
-                  });
-               } else {
-                  setCardTotals(null);
-               }
-            } catch {
-               setCardTotals(null);
-            }
+            // P2-7: card totals over the complete filtered dataset
+            // now arrive as server aggregates (`cardTotals`) on the
+            // main response — the tab no longer pages through every
+            // row via the export loader just to sum them. If an
+            // older API response lacks them, the cards fall back to
+            // the displayed page sums (previous fallback behaviour).
+            setCardTotals(data.cardTotals || null);
          } else {
             setError("Failed to load the courier report. The figures below may be out of date.");
          }

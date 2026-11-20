@@ -46,7 +46,20 @@ const Products = () => {
             return r.json();
          })
          .then((d) => {
-            if (d) setReport(d);
+            if (d) {
+               setReport(d);
+               // P2-7: distribution counts now arrive as server
+               // aggregates on the main response (availabilityCounts)
+               // — no full availability row download for display.
+               if (d.availabilityCounts) {
+                  setStockCounts({
+                     inStock: d.availabilityCounts.inStock,
+                     low: d.availabilityCounts.low,
+                     out: d.availabilityCounts.out,
+                     total: d.availabilityCounts.total,
+                  });
+               }
+            }
          })
          .catch(() =>
             setError("Failed to load the products report. The figures below may be out of date."),
@@ -54,27 +67,13 @@ const Products = () => {
          .finally(() => setLoading(false));
    }, [dateRange]);
 
-   // The main response's availabilityRows are one page (100 rows,
-   // sorted by quantity ascending — a biased sample), so chart counts
-   // are taken from the complete row set via the export loader, using
-   // the API's own per-row status. The previous chart computed its
-   // "In Stock" segment as totalInStock − outOfStockCount −
-   // lowStockCount, which subtracts PRODUCT counts from a QUANTITY
-   // sum (units) and produced a meaningless distribution.
-   useEffect(() => {
-      fetchAllReportRows(reportParams("products", dateRange), (d) => d.availabilityRows || [])
-         .then((all) => {
-            if (all.length > 0) {
-               setStockCounts({
-                  inStock: all.filter((r: any) => r.status === "In stock").length,
-                  low: all.filter((r: any) => r.status === "Low stock").length,
-                  out: all.filter((r: any) => r.status === "Out of stock").length,
-                  total: all.length,
-               });
-            }
-         })
-         .catch(() => {});
-   }, [dateRange]);
+   // P2-7: the distribution counts used to be computed here by
+   // downloading the COMPLETE availability row set through the
+   // export loader and counting per-row statuses client-side. The
+   // API now returns the identical counts as `availabilityCounts`
+   // (same per-row status partition, computed server-side), set
+   // from the main fetch above. The fallback in the chart below
+   // (API headline counts only) still applies when they are absent.
 
    useEffect(() => {
       let cancelled = false;

@@ -22,24 +22,33 @@ const Employees = () => {
    const [error, setError] = useState<string | null>(null);
    const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
-   // Phase B4b (P1-5): consume the shared toolbar search — this page
-   // already assembles the COMPLETE ranked set through the chunked
-   // loader, so the term filters that full set client-side
-   // (lib/tableSearch). The cards/graph keep the unfiltered totals.
+   // Phase B4b (P1-5): consume the shared toolbar search — the
+   // term filters the displayed ranked rows client-side
+   // (lib/tableSearch). The cards keep the unfiltered server
+   // totals (report.summary).
    const { filterQueryData } = useFilterQuery();
    const searchText = filterQueryData.searchText || "";
 
    useEffect(() => {
       let cancelled = false;
       setLoading(true);
-      // The API now paginates the ranked rows (follow-up round), so
-      // the full set this page renders — and totals from it — is
-      // assembled through the shared chunked loader, the same one
-      // the export below uses. A failed page throws and lands in
-      // the error Alert instead of silently truncating the list.
-      fetchAllReportRows(reportParams("employees", dateRange), (d) => d.rows || [])
-         .then((rows) => {
-            if (!cancelled) setReport({ rows });
+      // P2-7: the display path now reads ONE page of the ranked
+      // rows plus the server-side `summary` aggregates (totals over
+      // the complete ranked set) from a single request — ranking is
+      // computed server-side before slicing, so rank labels stay
+      // global, and the cards no longer require assembling the full
+      // employee set client-side. The chunked export loader below
+      // still assembles the complete set for EXPORT only, with its
+      // throw-on-failure contract unchanged. The table's own
+      // pagination is the CustomTable's client-side paging over
+      // this page of rows, as on the other report tabs.
+      fetch(`/api/reports?${reportParams("employees", dateRange).toString()}`)
+         .then((r) => {
+            if (!r.ok) throw new Error("Failed to load employees report");
+            return r.json();
+         })
+         .then((d) => {
+            if (!cancelled) setReport(d);
          })
          .catch(() => {
             if (!cancelled) {
@@ -126,9 +135,17 @@ const Employees = () => {
          ]),
       [report, searchText],
    );
-   const totalEmployees = rows.length;
-   const totalCompletedSales = rows.reduce((s: number, r: any) => s + Number(r.conforms || 0), 0);
-   const totalGeneratedRevenue = rows.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
+   // P2-7: headline totals are the API's complete-set aggregates;
+   // the displayed-page reductions remain only as a fallback for a
+   // response without `summary` (they equal the aggregates whenever
+   // the whole ranked set fits on the first page).
+   const totalEmployees = report?.summary?.totalEmployees ?? rows.length;
+   const totalCompletedSales =
+      report?.summary?.totalCompletedSales ??
+      rows.reduce((s: number, r: any) => s + Number(r.conforms || 0), 0);
+   const totalGeneratedRevenue =
+      report?.summary?.totalRevenue ??
+      rows.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
 
    return (
       <Stack spacing={3}>
