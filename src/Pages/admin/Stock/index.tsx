@@ -40,6 +40,7 @@ export interface StockProduct {
       variantName: string;
       sku: string;
       quantity: number;
+      lowStockAlert?: number;
       costPrice?: number | null;
       attributes?: Record<string, any> | null;
    }>;
@@ -89,6 +90,9 @@ const Stock = () => {
                      variantName: v.variantName,
                      sku: v.sku || "",
                      quantity: Number(v.quantity) || 0,
+                     // P2-19: variant-level low-stock surfacing reads
+                     // the variant's own threshold (schema default 5).
+                     lowStockAlert: Number(v.lowStockAlert ?? 5),
                      costPrice:
                         v.costPrice != null ? Number(v.costPrice) : null,
                      attributes: v.attributes ?? null,

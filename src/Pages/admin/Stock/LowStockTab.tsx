@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import Icon from "@src/components/Icon";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import {
+   effectiveVariantThreshold,
+   isVariantLowStock,
+} from "@src/lib/lowStock";
 import type { StockProduct } from "./index";
 
 // Phase 3A (3.3): low-stock restocking. A product is low when
@@ -32,7 +36,7 @@ const LowStockTab = ({
    const search = (filterQueryData.searchText || "").trim().toLowerCase();
 
    const rows = useMemo(() => {
-      const all = products
+      const productRows = products
          .filter((p) => p.quantity <= p.lowStockAlert)
          .map((p) => ({
             id: p.id,
@@ -43,19 +47,53 @@ const LowStockTab = ({
             suggestedQty: Math.max(p.lowStockAlert - p.quantity + 1, 1),
             supplierName: p.primarySupplier?.name || null,
             isVariable: p.productType === "variable",
+            isVariant: false,
+            variantId: null as string | null,
+            variantName: null as string | null,
             product: p,
          }));
+      // P2-19: variant-level low stock — a variant at or below its
+      // OWN lowStockAlert (schema default 5) is surfaced with its
+      // product context, even when the product's aggregate quantity
+      // is above the product threshold. Additive: the product rows
+      // above are unchanged.
+      const variantRows = products.flatMap((p) =>
+         (p.variants || [])
+            .filter((v) => isVariantLowStock(v.quantity, v.lowStockAlert))
+            .map((v) => {
+               const threshold = effectiveVariantThreshold(v.lowStockAlert);
+               return {
+                  id: `${p.id}::variant::${v.id}`,
+                  productName: p.productName,
+                  productSku: v.sku || p.productSku,
+                  quantity: v.quantity,
+                  threshold,
+                  suggestedQty: Math.max(threshold - v.quantity + 1, 1),
+                  supplierName: p.primarySupplier?.name || null,
+                  isVariable: true,
+                  isVariant: true,
+                  variantId: v.id as string | null,
+                  variantName: v.variantName as string | null,
+                  product: p,
+               };
+            }),
+      );
+      const all = [...productRows, ...variantRows];
       if (!search) return all;
       return all.filter(
          (r) =>
             r.productName.toLowerCase().includes(search) ||
             (r.productSku || "").toLowerCase().includes(search) ||
+            (r.variantName || "").toLowerCase().includes(search) ||
             (r.supplierName || "").toLowerCase().includes(search),
       );
    }, [products, search]);
 
    const startDraftPurchase = (row: any) => {
       const p: StockProduct = row.product;
+      const variant = row.isVariant
+         ? (p.variants || []).find((v) => v.id === row.variantId) || null
+         : null;
       const prefill = {
          supplierId: p.primarySupplier?.id || null,
          supplierName: p.primarySupplier?.name || "",
@@ -63,11 +101,11 @@ const LowStockTab = ({
             {
                productId: p.id,
                name: p.productName,
-               code: p.productSku || null,
+               code: variant?.sku || p.productSku || null,
                quantity: row.suggestedQty,
-               price: p.costPrice ?? 0,
-               variantId: null,
-               variantName: null,
+               price: variant?.costPrice ?? p.costPrice ?? 0,
+               variantId: variant ? variant.id : null,
+               variantName: variant ? variant.variantName : null,
             },
          ],
       };
@@ -86,7 +124,11 @@ const LowStockTab = ({
                <Typography variant="body2">{params.row.productName}</Typography>
                <Typography variant="caption" color="text.secondary">
                   SKU: {params.row.productSku}
-                  {params.row.isVariable ? " · Variable product" : ""}
+                  {params.row.isVariant
+                     ? ` · Variant: ${params.row.variantName}`
+                     : params.row.isVariable
+                       ? " · Variable product"
+                       : ""}
                </Typography>
             </Stack>
          ),
@@ -135,11 +177,12 @@ const LowStockTab = ({
    return (
       <Stack spacing={2}>
          <Typography variant="body2" color="text.secondary">
-            Products at or below their alert threshold. Suggested qty =
-            threshold − current stock + 1 (restock to just above the alert
-            level). Draft purchases open prefilled for your review — they
-            are never created automatically. Variable products need their
-            variant picked in the purchase form.
+            Products at or below their alert threshold, plus individual
+            variants at or below their own variant threshold. Suggested
+            qty = threshold − current stock + 1 (restock to just above
+            the alert level). Draft purchases open prefilled for your
+            review — they are never created automatically. Variable
+            products need their variant picked in the purchase form.
          </Typography>
          <CustomTable
             rows={rows}

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { parsePagination } from "@src/lib/pagination";
+import { lowStockSqlCondition } from "@src/lib/lowStock";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import {
    normalizeBarcode,
@@ -51,12 +53,18 @@ export async function GET(request: NextRequest) {
       where.productType = { equals: productType };
    }
 
+   // P2-19: "low" is resolved inside the try block below — it needs
+   // the canonical per-product predicate (quantity <= the product's
+   // OWN lowStockAlert, stored 0 meaning the default 10), which
+   // Prisma cannot express as a column-vs-column where. The previous
+   // filter hard-coded quantity <= 10 for every product.
+   let lowStockFilter = false;
    if (stockStatus && stockStatus !== "All") {
       const lower = stockStatus.toLowerCase();
       if (lower.includes("out")) {
          where.quantity = 0;
       } else if (lower.includes("low")) {
-         where.quantity = { gt: 0, lte: 10 };
+         lowStockFilter = true;
       } else if (lower.includes("in")) {
          where.quantity = { gt: 0 };
       }
@@ -69,6 +77,23 @@ export async function GET(request: NextRequest) {
    }
 
    try {
+      if (lowStockFilter) {
+         // Same approach as the Reports products low-stock query:
+         // resolve the matching ids with the canonical raw-SQL
+         // predicate (quantity > 0 keeps "low" distinct from the
+         // separate "out of stock" filter, as before), then let
+         // Prisma apply every other filter, the count and the
+         // pagination — so totals stay accurate. The condition
+         // string is built only from internal constants (no user
+         // input), via the shared lowStock helper.
+         const lowRows = await prisma.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM Product
+            WHERE isDeleted = 0 AND quantity > 0
+              AND ${Prisma.raw(lowStockSqlCondition())}
+         `;
+         where.id = { in: lowRows.map((r) => r.id) };
+      }
+
       const [products, total] = await Promise.all([
          prisma.product.findMany({
             where,
@@ -90,6 +115,9 @@ export async function GET(request: NextRequest) {
                      // Purchase picker prices variant lines at cost.
                      costPrice: true,
                      attributes: true,
+                     // P2-19: the Stock workspace surfaces
+                     // variant-level low stock from this payload.
+                     lowStockAlert: true,
                   },
                },
                _count: {
