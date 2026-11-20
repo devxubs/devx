@@ -27,16 +27,6 @@ type CategoryType = {
 
 type FormValues = z.infer<typeof productSchema>;
 
-export const categoriesData: CategoryType[] = [
-   { id: "1", customId: "CAT_1", name: "Beverages" },
-   { id: "2", customId: "CAT_2", name: "Snacks" },
-   { id: "3", customId: "CAT_3", name: "Dairy" },
-   { id: "4", customId: "CAT_4", name: "Smart Fitness Watch" },
-   { id: "5", customId: "CAT_5", name: "Wireless Earbuds" },
-   { id: "6", customId: "CAT_6", name: "Portable Bluetooth Speaker" },
-   { id: "7", customId: "CAT_7", name: "Noise-Canceling Headphones" },
-];
-
 const Categories = () => {
    const theme = useTheme();
    const { showSnackbar } = useSnackbar();

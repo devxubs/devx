@@ -24,7 +24,7 @@ import AlertDialog from "@src/components/AlertDialog";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { usePrint } from "@src/components/TablePrintDocument/PrintPortal";
 
-import { orders, orderStatuses } from "./data";
+import { orderStatuses } from "./data";
 import CreateAt from "./CreateAt";
 import User from "../Customers/CustomerInfo";
 import OrderFilter from "./OrderFilter";
