@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
    Box,
    Typography,
@@ -17,7 +17,6 @@ import {
    DialogContent,
    Snackbar,
    CircularProgress,
-   LinearProgress,
    Fade,
 } from "@mui/material";
 import { useForm, Controller } from "react-hook-form";
@@ -28,25 +27,6 @@ import { Icon } from "@iconify/react";
 import CustomBox from "@src/components/CustomBox";
 
 // Validation schemas
-const signupSchema = yup.object({
-   fullName: yup.string().required("Full name is required"),
-   businessName: yup.string().required("Business name is required"),
-   businessAddress: yup.string().required("Business address is required"),
-   mobileNumber: yup
-      .string()
-      .matches(/^\+?\d{7,15}$/, "Invalid mobile number")
-      .required("Mobile number is required"),
-   email: yup.string().email("Invalid email").required("Email is required"),
-   password: yup
-      .string()
-      .min(6, "Password must be at least 6 characters")
-      .required("Password is required"),
-   confirmPassword: yup
-      .string()
-      .oneOf([yup.ref("password")], "Passwords must match")
-      .required("Confirm password is required"),
-});
-
 const loginSchema = yup.object({
    email: yup.string().email("Invalid email").required("Email is required"),
    password: yup.string().required("Password is required"),
@@ -56,65 +36,37 @@ const forgotSchema = yup.object({
    email: yup.string().email("Invalid email").required("Email is required"),
 });
 
-function passwordStrength(password: string) {
-   let score = 0;
-   if (!password) return score;
-   if (password.length >= 6) score += 1;
-   if (/[A-Z]/.test(password)) score += 1;
-   if (/[0-9]/.test(password)) score += 1;
-   if (/[^A-Za-z0-9]/.test(password)) score += 1;
-   return score;
-}
-
-const strengthLabels = ["Weak", "Fair", "Good", "Strong"];
-
 interface FormProps {
-   fullName?: string;
-   businessName?: string;
-   businessAddress?: string;
-   mobileNumber?: string;
    email: string;
    password: string;
-   confirmPassword?: string;
 }
 
 const LoginPage = () => {
    const [showPassword, setShowPassword] = useState(false);
-   const [isSignUp, setIsSignUp] = useState(false);
    const [openForgotModal, setOpenForgotModal] = useState(false);
    const [snackbarOpen, setSnackbarOpen] = useState(false);
    const [snackbarMessage, setSnackbarMessage] = useState("");
    const [loading, setLoading] = useState(false);
-   const [passwordValue, setPasswordValue] = useState("");
 
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-   // Form for login/signup
+   // Login form. Public registration is closed (accounts are
+   // created by an administrator), so this page is sign-in only —
+   // the previous sign-up mode and dummy social buttons were
+   // removed (P2-21): the API forbids public sign-up and no social
+   // auth exists.
    const {
       control,
       handleSubmit,
       formState: { errors },
-      reset,
-      watch,
    } = useForm<FormProps>({
-      resolver: yupResolver(isSignUp ? signupSchema : loginSchema),
+      resolver: yupResolver(loginSchema),
       defaultValues: {
-         fullName: "",
-         businessName: "",
-         businessAddress: "",
-         mobileNumber: "",
          email: "",
          password: "",
-         confirmPassword: "",
       },
    });
-
-   // Watch password input for strength meter
-   const watchedPassword = watch("password", "");
-   useEffect(() => {
-      setPasswordValue(watchedPassword);
-   }, [watchedPassword]);
 
    // Form for forgot password
    const {
@@ -127,41 +79,22 @@ const LoginPage = () => {
       defaultValues: { email: "" },
    });
 
-   // Simulate async login/signup
    const onSubmit = async (data: any) => {
       setLoading(true);
       try {
-         if (isSignUp) {
-            const res = await fetch("/api/auth/register", {
-               method: "POST",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify(data),
-            });
-            if (res.ok) {
-               setSnackbarMessage("Account registered successfully! Please sign in.");
-               setSnackbarOpen(true);
-               setIsSignUp(false);
-               reset();
-            } else {
-               const errData = await res.json().catch(() => ({}));
-               setSnackbarMessage(errData.error || "Registration failed");
-               setSnackbarOpen(true);
-            }
+         const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+         });
+         if (res.ok) {
+            setSnackbarMessage("Login successful!");
+            setSnackbarOpen(true);
+            window.location.href = "/admin/dashboard";
          } else {
-            const res = await fetch("/api/auth/login", {
-               method: "POST",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify(data),
-            });
-            if (res.ok) {
-               setSnackbarMessage("Login successful!");
-               setSnackbarOpen(true);
-               window.location.href = "/admin/dashboard";
-            } else {
-               const errData = await res.json().catch(() => ({}));
-               setSnackbarMessage(errData.error || "Invalid email or password");
-               setSnackbarOpen(true);
-            }
+            const errData = await res.json().catch(() => ({}));
+            setSnackbarMessage(errData.error || "Invalid email or password");
+            setSnackbarOpen(true);
          }
       } catch {
          setSnackbarMessage("Network error. Please try again.");
@@ -182,10 +115,6 @@ const LoginPage = () => {
          setLoading(false);
       }
    };
-
-   // Dummy social login handlers
-   const handleGoogleLogin = () => { setSnackbarMessage("Google login integration in progress"); setSnackbarOpen(true); };
-   const handleGitHubLogin = () => { setSnackbarMessage("GitHub login integration in progress"); setSnackbarOpen(true); };
 
    return (
       <Box
@@ -210,12 +139,10 @@ const LoginPage = () => {
                }}
             >
                <Typography variant="h4" fontWeight={700}>
-                  {isSignUp ? "Join us today!" : "Hi, Welcome back"}
+                  Hi, Welcome back
                </Typography>
                <Typography variant="body2" sx={{ mt: 1, mb: 4 }}>
-                  {isSignUp
-                     ? "Create your account to start your journey."
-                     : "More effectively with optimized workflows."}
+                  More effectively with optimized workflows.
                </Typography>
                <Box
                   component="img"
@@ -233,7 +160,7 @@ const LoginPage = () => {
          <Box
             sx={{
                flex: 1,
-               py: isSignUp ? 2 : 6,
+               py: 6,
                px: 6,
                maxWidth: 480,
                mx: "auto",
@@ -252,114 +179,23 @@ const LoginPage = () => {
                      display: "flex",
                      flexDirection: "column",
                      justifyContent: "center",
-                     height: !isSignUp ? "100%" : "none",
+                     height: "100%",
                   }}
                >
                   <Typography variant="h5" fontWeight={600} mb={1}>
-                     {isSignUp
-                        ? "Create your account"
-                        : "Sign in to your account"}
+                     Sign in to your account
                   </Typography>
                   <Typography variant="body2" mb={3}>
-                     {isSignUp ? (
-                        <>
-                           Already have an account?{" "}
-                           <Link
-                              href="#"
-                              color="primary"
-                              onClick={() => setIsSignUp(false)}
-                           >
-                              Sign in
-                           </Link>
-                        </>
-                     ) : (
-                        <>
-                           Don’t have an account?{" "}
-                           <Link
-                              href="#"
-                              color="primary"
-                              onClick={() => setIsSignUp(true)}
-                           >
-                              Get started
-                           </Link>
-                        </>
-                     )}
+                     Accounts are created by your store administrator.
                   </Typography>
 
-                  <Fade in key={isSignUp ? "signup" : "login"}>
+                  <Fade in key="login">
                      <Box
                         component="form"
                         onSubmit={handleSubmit(onSubmit)}
                         noValidate
                      >
                         <Stack spacing={2} py={1}>
-                           {isSignUp && (
-                              <>
-                                 <Controller
-                                    name="fullName"
-                                    control={control}
-                                    render={({ field }) => (
-                                       <TextField
-                                          {...field}
-                                          fullWidth
-                                          label="Full Name"
-                                          error={!!errors.fullName}
-                                          helperText={errors.fullName?.message}
-                                          autoComplete="name"
-                                       />
-                                    )}
-                                 />
-                                 <Controller
-                                    name="businessName"
-                                    control={control}
-                                    render={({ field }) => (
-                                       <TextField
-                                          {...field}
-                                          fullWidth
-                                          label="Business Name"
-                                          error={!!errors.businessName}
-                                          helperText={
-                                             errors.businessName?.message
-                                          }
-                                          autoComplete="organization"
-                                       />
-                                    )}
-                                 />
-                                 <Controller
-                                    name="businessAddress"
-                                    control={control}
-                                    render={({ field }) => (
-                                       <TextField
-                                          {...field}
-                                          fullWidth
-                                          label="Business Address"
-                                          error={!!errors.businessAddress}
-                                          helperText={
-                                             errors.businessAddress?.message
-                                          }
-                                          autoComplete="street-address"
-                                       />
-                                    )}
-                                 />
-                                 <Controller
-                                    name="mobileNumber"
-                                    control={control}
-                                    render={({ field }) => (
-                                       <TextField
-                                          {...field}
-                                          fullWidth
-                                          label="Mobile Number"
-                                          error={!!errors.mobileNumber}
-                                          helperText={
-                                             errors.mobileNumber?.message
-                                          }
-                                          autoComplete="tel"
-                                       />
-                                    )}
-                                 />
-                              </>
-                           )}
-
                            <Controller
                               name="email"
                               control={control}
@@ -386,11 +222,7 @@ const LoginPage = () => {
                                     type={showPassword ? "text" : "password"}
                                     error={!!errors.password}
                                     helperText={errors.password?.message}
-                                    autoComplete={
-                                       isSignUp
-                                          ? "new-password"
-                                          : "current-password"
-                                    }
+                                    autoComplete="current-password"
                                     InputProps={{
                                        endAdornment: (
                                           <InputAdornment position="end">
@@ -416,124 +248,24 @@ const LoginPage = () => {
                                           </InputAdornment>
                                        ),
                                     }}
-                                    onChange={(e) => {
-                                       field.onChange(e);
-                                       setPasswordValue(e.target.value);
-                                    }}
                                  />
                               )}
                            />
 
-                           {/* Password strength meter */}
-                           {isSignUp && passwordValue.length > 0 && (
-                              <Box>
-                                 <Typography variant="caption" gutterBottom>
-                                    Password strength:{" "}
-                                    <Box
-                                       component="span"
-                                       sx={{
-                                          fontWeight: "bold",
-                                          color:
-                                             strengthLabels[
-                                                passwordStrength(
-                                                   passwordValue
-                                                ) - 1
-                                             ] === "Strong"
-                                                ? "success.main"
-                                                : strengthLabels[
-                                                     passwordStrength(
-                                                        passwordValue
-                                                     ) - 1
-                                                  ] === "Good"
-                                                ? "warning.main"
-                                                : "error.main",
-                                       }}
-                                    >
-                                       {strengthLabels[
-                                          passwordStrength(passwordValue) - 1
-                                       ] || "Weak"}
-                                    </Box>
-                                 </Typography>
-                                 <LinearProgress
-                                    variant="determinate"
-                                    value={
-                                       (passwordStrength(passwordValue) / 4) *
-                                       100
-                                    }
-                                    sx={{ height: 6, borderRadius: 2 }}
-                                    color={
-                                       passwordStrength(passwordValue) >= 3
-                                          ? "success"
-                                          : passwordStrength(passwordValue) ===
-                                            2
-                                          ? "warning"
-                                          : "error"
-                                    }
-                                 />
-                              </Box>
-                           )}
-
-                           {isSignUp && (
-                              <Controller
-                                 name="confirmPassword"
-                                 control={control}
-                                 render={({ field }) => (
-                                    <TextField
-                                       {...field}
-                                       fullWidth
-                                       label="Confirm Password"
-                                       type={showPassword ? "text" : "password"}
-                                       error={!!errors.confirmPassword}
-                                       helperText={
-                                          errors.confirmPassword?.message
-                                       }
-                                       autoComplete="new-password"
-                                       InputProps={{
-                                          endAdornment: (
-                                             <InputAdornment position="end">
-                                                <IconButton
-                                                   onClick={() =>
-                                                      setShowPassword(
-                                                         !showPassword
-                                                      )
-                                                   }
-                                                   edge="end"
-                                                   aria-label={
-                                                      showPassword
-                                                         ? "Hide password"
-                                                         : "Show password"
-                                                   }
-                                                >
-                                                   {showPassword ? (
-                                                      <Icon icon="solar:eye-closed-bold" />
-                                                   ) : (
-                                                      <Icon icon="solar:eye-bold" />
-                                                   )}
-                                                </IconButton>
-                                             </InputAdornment>
-                                          ),
-                                       }}
-                                    />
-                                 )}
-                              />
-                           )}
-
-                           {!isSignUp && (
-                              <Box
-                                 sx={{
-                                    display: "flex",
-                                    justifyContent: "flex-end",
-                                 }}
+                           <Box
+                              sx={{
+                                 display: "flex",
+                                 justifyContent: "flex-end",
+                              }}
+                           >
+                              <Link
+                                 href="#"
+                                 variant="body2"
+                                 onClick={() => setOpenForgotModal(true)}
                               >
-                                 <Link
-                                    href="#"
-                                    variant="body2"
-                                    onClick={() => setOpenForgotModal(true)}
-                                 >
-                                    Forgot password?
-                                 </Link>
-                              </Box>
-                           )}
+                                 Forgot password?
+                              </Link>
+                           </Box>
 
                            <Button
                               variant="contained"
@@ -546,37 +278,12 @@ const LoginPage = () => {
                                  loading && <CircularProgress size={20} />
                               }
                            >
-                              {isSignUp ? "Sign Up" : "Sign In"}
+                              Sign In
                            </Button>
                         </Stack>
                      </Box>
                   </Fade>
 
-                  {!isSignUp && (
-                     <Stack
-                        direction="row"
-                        spacing={2}
-                        justifyContent="center"
-                        mt={4}
-                     >
-                        <Button
-                           startIcon={<Icon icon="devicon:google" />}
-                           variant="outlined"
-                           onClick={handleGoogleLogin}
-                           disabled={loading}
-                        >
-                           Google
-                        </Button>
-                        <Button
-                           startIcon={<Icon icon="devicon:github" />}
-                           variant="outlined"
-                           onClick={handleGitHubLogin}
-                           disabled={loading}
-                        >
-                           GitHub
-                        </Button>
-                     </Stack>
-                  )}
                </Box>
             </Scrollbar>
          </Box>
