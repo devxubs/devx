@@ -132,7 +132,7 @@ export default function OrderOverviewSidebar({
    const isCancelledOrder = ["CANCELLED", "FAILED", "RETURNED"].includes(
       String(order?.status || "").toUpperCase(),
    );
-   const trackingRef = order?.referenceId || order?.courierTrackingId || "";
+   const trackingRef = order?.referenceId || order?.courierTrackingCode || order?.courierTrackingId || "";
 
    const handleCopyPhone = () => {
       if (!customer?.phone) return;

@@ -3,7 +3,7 @@
 import { Stack } from "@mui/material";
 import Filter, { FilterData, ExportTableConfig } from "./Filter";
 
-import { IconButton, alpha, useTheme, Chip, Palette } from "@mui/material";
+import { IconButton, alpha, useTheme, Chip, Palette, Tooltip } from "@mui/material";
 import {
    DataGrid,
    GridColDef,
@@ -198,21 +198,24 @@ export default function CustomTable({
                renderCell: (params: GridRenderCellParams) => {
                   return (
                      <>
-                        <IconButton
-                           size="small"
-                           onClick={(e) => {
-                              setSelectedRowParams(params);
-                              setActionMenuOpen(e.currentTarget);
-                           }}
-                        >
-                           <Icon
+                        <Tooltip title="Row actions" disableInteractive>
+                           <IconButton
                               size="small"
-                              icon="eva:more-vertical-fill"
-                              style={{
-                                 color: theme.palette.text.primary,
+                              aria-label="Row actions"
+                              onClick={(e) => {
+                                 setSelectedRowParams(params);
+                                 setActionMenuOpen(e.currentTarget);
                               }}
-                           />
-                        </IconButton>
+                           >
+                              <Icon
+                                 size="small"
+                                 icon="eva:more-vertical-fill"
+                                 style={{
+                                    color: theme.palette.text.primary,
+                                 }}
+                              />
+                           </IconButton>
+                        </Tooltip>
                      </>
                   );
                },

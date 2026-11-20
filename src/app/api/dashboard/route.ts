@@ -306,6 +306,12 @@ export async function GET(request: NextRequest) {
       // definition as Reports (revenue − expenses − purchases)
       // instead of its own revenue − expenses formula.
       const netProfit = calculateNetProfit(totalRevenue, totalExpenses, totalPurchases);
+      // P3-7 honesty note: `currentBalance` is a range-derived net
+      // (revenue − expenses − settled payouts over the selected
+      // period), NOT a stored account balance, and `refunded` above
+      // is the summed total of CANCELLED orders, not recorded
+      // refunds. Field names are kept for API compatibility; the
+      // Dashboard cards are labelled accordingly.
       const currentBalance = Math.max(totalRevenue - totalExpenses - settledPayouts, 0);
 
       // Range-bucketed income vs expenses series — P2-6: the

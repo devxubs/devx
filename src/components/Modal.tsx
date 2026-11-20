@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Stack, SxProps } from "@mui/material";
-import { Box, Typography, Fade, IconButton } from "@mui/material";
+import { Box, Typography, Fade, IconButton, Tooltip } from "@mui/material";
 import Modal, { ModalProps } from "@mui/material/Modal";
 import Icon from "./Icon";
 
@@ -85,9 +85,11 @@ export default function CustomModal({
                         </Typography>
                      )}
                      {closeIcon && (
-                        <IconButton onClick={onClose}>
-                           <Icon icon="eva:close-fill"></Icon>
-                        </IconButton>
+                        <Tooltip title="Close" disableInteractive>
+                           <IconButton onClick={onClose} aria-label="Close">
+                              <Icon icon="eva:close-fill"></Icon>
+                           </IconButton>
+                        </Tooltip>
                      )}
                   </Stack>
                )}

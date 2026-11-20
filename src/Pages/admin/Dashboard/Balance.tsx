@@ -23,7 +23,12 @@ const Balance = ({
    const router = useRouter();
 
    return (
-      <CustomCard title="Current balance">
+      // P3-7 (audit §B.2): `currentBalance` is NOT an account balance —
+      // the API derives it from the selected range (revenue − expenses
+      // − settled payouts over the period, floored at 0). The card is
+      // labelled for what the figure actually is; the API field name
+      // and the figure itself are unchanged.
+      <CustomCard title="Net over selected period">
          <Stack spacing={1}>
             <Typography variant="h4" fontWeight={700} color="primary.main">
                {formatCurrency(currentBalance)}
@@ -47,7 +52,10 @@ const Balance = ({
                </Stack>
                <Stack direction="row" justifyContent="space-between">
                   <Typography variant="subtitle2" color="textSecondary">
-                     Cancelled / Refund
+                     {/* P3-7: the `refunded` figure is the summed total
+                         of CANCELLED orders in the range — no refunds
+                         are recorded anywhere in the system. */}
+                     Cancelled Orders
                   </Typography>
                   <Typography variant="body2" fontWeight={600} color="error.main">
                      {formatCurrency(refunded)}

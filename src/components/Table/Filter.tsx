@@ -566,6 +566,11 @@ const Filter: React.FC<FilterProps> = ({
                      <TextField
                         fullWidth
                         placeholder="Search"
+                        // P3-3: a real accessible label for the search
+                        // field (it was placeholder-only, which screen
+                        // readers do not treat as a label). aria-label
+                        // keeps the visual design unchanged.
+                        inputProps={{ "aria-label": "Search" }}
                         size={isMobile ? "small" : "medium"}
                         value={searchText}
                         onChange={(e) => {

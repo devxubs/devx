@@ -29,7 +29,11 @@ export function mapOrderToInvoiceData(order: any): InvoiceOrderData {
             : "PAID",
       status: order.status || "COMPLETED",
       courier: order.courier,
-      courierTrackingId: order.courierTrackingId,
+      // P3-8: the order's real field is courierTrackingCode (schema);
+      // courierTrackingId never existed on the record, so invoices
+      // always printed without the tracking code. The invoice-side
+      // field name (InvoiceOrderData) stays — only the source changes.
+      courierTrackingId: order.courierTrackingCode || order.courierTrackingId,
       employeeName: order.employee?.name || order.employeeName,
       notes: order.orderNote || order.notes || "",
       customer: order.customer

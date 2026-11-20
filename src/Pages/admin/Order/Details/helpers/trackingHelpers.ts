@@ -133,7 +133,7 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
       isCancelled || isReturned ? order.updatedAt || order.createdAt : null,
    );
 
-   const trackingId = order.courierTrackingId || order.referenceId;
+   const trackingId = order.courierTrackingCode || order.courierTrackingId || order.referenceId;
 
    // ===================================================
    // 1. STORE PICKUP WORKFLOW (4 clear stages)
@@ -797,7 +797,7 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
       const courierTimes = formatDateTimeParts(
          order.courierSubmittedAt || order.updatedAt || order.createdAt,
       );
-      const trackingId = order.courierTrackingId || order.referenceId;
+      const trackingId = order.courierTrackingCode || order.courierTrackingId || order.referenceId;
       activities.push({
          id: "act-courier",
          action: "Courier Logistics Handover",

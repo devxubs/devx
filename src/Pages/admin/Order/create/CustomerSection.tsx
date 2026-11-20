@@ -13,6 +13,7 @@ import {
    Stack,
    TextField,
    Typography,
+   useTheme,
 } from "@mui/material";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@src/components/Icon";
@@ -31,6 +32,7 @@ const CustomerSection = ({
    onChange,
    searchCustomers,
 }: CustomerSectionProps) => {
+   const theme = useTheme();
    const [options, setOptions] = useState<ApiCustomer[]>([]);
    const [loading, setLoading] = useState(false);
    const [inputValue, setInputValue] = useState("");
@@ -180,7 +182,9 @@ const CustomerSection = ({
                <Icon
                   icon="solar:check-circle-bold"
                   size="15px"
-                  style={{ color: "#00A76F" }}
+                  // P3-8: theme accent (follows the user's accent-colour
+                  // setting) instead of the hard-coded default #00A76F.
+                  style={{ color: theme.palette.primary.main }}
                />
                <Typography variant="caption" color="textSecondary">
                   Linked to an existing customer record. Clearing

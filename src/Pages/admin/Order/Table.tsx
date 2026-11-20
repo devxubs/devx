@@ -9,8 +9,6 @@ import {
    Button,
    Typography,
    Chip,
-   Snackbar,
-   Alert,
    Autocomplete,
    MenuItem,
 } from "@mui/material";
@@ -36,6 +34,7 @@ import QuickEditModal from "./QuickEditModal";
 import ExportOrderModal from "./Export/ExportOrderModal";
 import { mapOrderToInvoiceData } from "./Details/helpers";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { OrderDetailModal, CustomerProfileModal } from "./components";
 
 const statusColor: Record<
@@ -102,6 +101,7 @@ const BULK_COURIER_STATUSES = [
 const OrderTable = () => {
    const router = useRouter();
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const { printDocument } = usePrint();
    const [status, setStatus] = useState<{
       orderRow: OrderType;
@@ -138,10 +138,7 @@ const OrderTable = () => {
    const [bulkResults, setBulkResults] = useState<any>(null);
    const [exportModalOpen, setExportModalOpen] = useState(false);
    const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
-   const [feedback, setFeedback] = useState<{
-      type: "success" | "error";
-      message: string;
-   } | null>(null);
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
 
    const handleSingleInvoicePrint = React.useCallback(
       (orderRow: any) => {
@@ -397,15 +394,12 @@ const OrderTable = () => {
             setBulkResults(data);
             loadOrders();
          } catch (err: any) {
-            setFeedback({
-               type: "error",
-               message: err?.message || "Bulk action failed",
-            });
+            showSnackbar(err?.message || "Bulk action failed", "error");
          } finally {
             setBulkWorking(false);
          }
       },
-      [bulkWorking, loadOrders],
+      [bulkWorking, loadOrders, showSnackbar],
    );
 
    // note info
@@ -800,7 +794,10 @@ const OrderTable = () => {
          <CustomModal
             open={courierModalOpen}
             onClose={() => setCourierModalOpen(false)}
-            sx={{ borderRadius: 1, width: 420 }}
+            // P3-1: responsive `size` token instead of the fixed
+            // 420px width, which overflowed small phones.
+            size="sm"
+            sx={{ borderRadius: 1 }}
             title={`Assign courier (${selectedOrders.length} orders)`}
          >
             <Stack spacing={2}>
@@ -871,7 +868,9 @@ const OrderTable = () => {
          <CustomModal
             open={Boolean(bulkResults)}
             onClose={() => setBulkResults(null)}
-            sx={{ borderRadius: 1, width: 480 }}
+            // P3-1: responsive width (95% on phones, the previous
+            // 480px from `sm` up) instead of a fixed 480px.
+            sx={{ borderRadius: 1, width: { xs: "95%", sm: 480 } }}
             title="Bulk action results"
          >
             <Stack spacing={1.5}>
@@ -919,7 +918,10 @@ const OrderTable = () => {
          <CustomModal
             open={Boolean(noteModal)}
             onClose={() => setNoteModal(null)}
-            sx={{ borderRadius: 1, width: 400 }}
+            // P3-1: responsive `size` token instead of the fixed
+            // 400px width, which overflowed small phones.
+            size="sm"
+            sx={{ borderRadius: 1 }}
             title="Note"
          >
             <Stack spacing={2}>
@@ -1066,15 +1068,9 @@ const OrderTable = () => {
                         }),
                      );
                      setEditModal(null);
-                     setFeedback({
-                        type: "success",
-                        message: "Order updated successfully",
-                     });
+                     showSnackbar("Order updated successfully", "success");
                   } catch (err: any) {
-                     setFeedback({
-                        type: "error",
-                        message: err?.message || "Failed to update order",
-                     });
+                     showSnackbar(err?.message || "Failed to update order", "error");
                      throw err;
                   } finally {
                      setIsUpdatingQuickEdit(false);
@@ -1120,23 +1116,6 @@ const OrderTable = () => {
             onClose={() => setExportModalOpen(false)}
             selectedOrders={selectedOrders}
          />
-
-
-
-         <Snackbar
-            open={Boolean(feedback)}
-            autoHideDuration={4000}
-            onClose={() => setFeedback(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-         >
-            <Alert
-               severity={feedback?.type || "info"}
-               onClose={() => setFeedback(null)}
-               variant="filled"
-            >
-               {feedback?.message}
-            </Alert>
-         </Snackbar>
       </Stack>
    );
 };

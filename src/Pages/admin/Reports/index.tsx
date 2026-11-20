@@ -111,7 +111,11 @@ const Report = () => {
                         marginRight: theme.spacing(1),
                         color: theme.palette.text.secondary,
                         minHeight: 50,
-                        width: `calc(100% / ${tabs.length} - ${theme.spacing(1)})`,
+                        // P3-6: natural tab widths — the old
+                        // calc(100% / 10) forced every tab to ~10%
+                        // inside an already-scrollable container,
+                        // cramping labels on mobile. The scrollable
+                        // Tabs variant handles overflow on its own.
                         "&.Mui-selected": {
                            color: theme.palette.common.white,
                            ...theme.applyStyles("light", {

@@ -219,8 +219,11 @@ const YearlySalesChart = ({
          )}
 
          <Stack direction="row" spacing={4} mb={2}>
-            <Stat label="Total income" value={formatCurrency(totalIncomeSum)} color="#30D987" />
-            <Stat label="Total expenses" value={formatCurrency(totalExpenseSum)} color="#FFC300" />
+            {/* P3-8: palette colours (the same success/warning the
+                chart series + tooltip use) instead of the off-palette
+                hard-coded #30D987 / #FFC300. */}
+            <Stat label="Total income" value={formatCurrency(totalIncomeSum)} color={theme.palette.success.main} />
+            <Stat label="Total expenses" value={formatCurrency(totalExpenseSum)} color={theme.palette.warning.main} />
          </Stack>
 
          {hasData ? (
