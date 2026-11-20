@@ -36,7 +36,7 @@ export default function SystemTab({
    const [isResetting, setIsResetting] = useState(false);
    const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-   const handleExportBackup = async () => {
+   const handleExportData = async () => {
       setIsExporting(true);
       try {
          const res = await fetch("/api/system/export");
@@ -45,14 +45,14 @@ export default function SystemTab({
          const url = window.URL.createObjectURL(blob);
          const a = document.createElement("a");
          a.href = url;
-         a.download = `devx_pos_backup_${new Date().toISOString().slice(0, 10)}.json`;
+         a.download = `devx_pos_export_${new Date().toISOString().slice(0, 10)}.json`;
          document.body.appendChild(a);
          a.click();
          a.remove();
          window.URL.revokeObjectURL(url);
-         setStatusMessage({ type: "success", text: "Database backup downloaded successfully!" });
+         setStatusMessage({ type: "success", text: "Data export downloaded successfully!" });
       } catch {
-         setStatusMessage({ type: "error", text: "Failed to generate database backup." });
+         setStatusMessage({ type: "error", text: "Failed to generate data export." });
       } finally {
          setIsExporting(false);
       }
@@ -82,7 +82,7 @@ export default function SystemTab({
                Notifications & System Maintenance
             </Typography>
             <Typography variant="body2" color="text.secondary">
-               Configure system alerts, automated notifications, database backups, and store factory reset.
+               Configure system alerts, automated notifications, data export, and store factory reset.
             </Typography>
          </Box>
 
@@ -107,7 +107,7 @@ export default function SystemTab({
                   value={values.notifyEmail || ""}
                   onChange={(e) => onChange("notifyEmail", e.target.value)}
                   placeholder="admin@devxpos.com"
-                  helperText="Recipient for critical alerts, low-stock warnings, and backup confirmations"
+                  helperText="Recipient for critical alerts and low-stock warnings"
                />
             </Grid>
          </Grid>
@@ -154,36 +154,43 @@ export default function SystemTab({
                 switches saved a value nothing ever read. */}
          </Grid>
 
-         {/* Backup & Disaster Recovery */}
+         {/* Data Export (P2-5: this feature is a partial export, not
+             a backup — the copy below states its exact scope, in
+             line with the deployment guide §7.) */}
          <Box sx={{ pt: 1 }}>
             <Typography variant="h6" fontWeight={600}>
-               Data Backup & Disaster Recovery
+               Data Export
             </Typography>
             <Typography variant="body2" color="text.secondary">
-               Download full database snapshots of orders, inventory, customers, suppliers, and billing records.
+               Download a partial JSON export of store data for snapshots, migration, or support evidence.
             </Typography>
          </Box>
 
          <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} spacing={2}>
-               <Stack spacing={0.5}>
-                  <Typography variant="subtitle1" fontWeight={700}>
-                     Export Complete MySQL Database
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                     Generates an instant, complete JSON export containing all tables and relation records.
-                  </Typography>
+            <Stack spacing={2}>
+               <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} spacing={2}>
+                  <Stack spacing={0.5}>
+                     <Typography variant="subtitle1" fontWeight={700}>
+                        Export Store Data (Partial)
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                        Generates a JSON export containing: settings, products, categories, units, orders (with items and customer), customers, suppliers, expenses, assets, and roles.
+                     </Typography>
+                  </Stack>
+                  <Button
+                     variant="contained"
+                     color="primary"
+                     startIcon={isExporting ? <CircularProgress size={18} color="inherit" /> : <Icon icon="solar:download-square-bold-duotone" size="small" />}
+                     onClick={handleExportData}
+                     disabled={isExporting}
+                     sx={{ whiteSpace: "nowrap" }}
+                  >
+                     {isExporting ? "Exporting..." : "Download Data Export"}
+                  </Button>
                </Stack>
-               <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={isExporting ? <CircularProgress size={18} color="inherit" /> : <Icon icon="solar:download-square-bold-duotone" size="small" />}
-                  onClick={handleExportBackup}
-                  disabled={isExporting}
-                  sx={{ whiteSpace: "nowrap" }}
-               >
-                  {isExporting ? "Exporting..." : "Download Backup"}
-               </Button>
+               <Alert severity="warning" sx={{ borderRadius: 1.5 }}>
+                  This is NOT a complete backup. It does not include users/passwords, purchases, supplier payments, purchase returns, stock movements, product variants, warehouses, notifications, chat, or audit logs, and there is no restore option for this file. A full backup requires a database dump (mysqldump) run by the administrator — see the deployment guide, §7.
+               </Alert>
             </Stack>
          </Card>
 

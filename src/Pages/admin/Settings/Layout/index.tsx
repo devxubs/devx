@@ -80,7 +80,7 @@ const tabMeta: Record<string, { title: string; subtitle: string; icon: string }>
    },
    system: {
       title: "Notifications & System Maintenance",
-      subtitle: "Configure automated alerts, download complete MySQL database backups, and factory reset.",
+      subtitle: "Configure automated alerts, download a partial data export, and factory reset.",
       icon: "solar:settings-bold",
    },
 };
