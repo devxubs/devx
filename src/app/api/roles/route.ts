@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    const gate = await requirePermission(request, ["roles", "role", "role_view", "role_view_role", "users", "user", "user_view", "user_view_user"]);
@@ -41,14 +46,30 @@ export async function POST(request: NextRequest) {
       }
 
       const { customId } = await generateNextEntityId("ROLE");
+      const auditCtx = requestAuditContext(request);
 
-      const role = await prisma.role.create({
-         data: {
-            customId,
-            name: name.trim(),
-            description: description || undefined,
-            permissions: permissions || undefined,
-         },
+      // P2-4: role creation is audited in the same transaction.
+      const role = await prisma.$transaction(async (tx) => {
+         const created = await tx.role.create({
+            data: {
+               customId,
+               name: name.trim(),
+               description: description || undefined,
+               permissions: permissions || undefined,
+            },
+         });
+
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "ROLE",
+            entityId: created.id,
+            entityCustomId: created.customId,
+            summary: `Role ${created.name} created`,
+            ...auditCtx,
+         });
+
+         return created;
       });
 
       return NextResponse.json(role, { status: 201 });

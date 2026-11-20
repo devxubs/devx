@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { sanitizeCustomConfig } from "@src/lib/customConfig";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+   buildChanges,
+} from "@src/lib/audit";
 
 /**
  * Default settings, mirroring the Prisma schema defaults exactly
@@ -175,13 +181,71 @@ export async function PUT(request: NextRequest) {
       // save (see src/lib/customConfig.ts for the audited list).
       if (body.customConfig !== undefined) dataToUpdate.customConfig = sanitizeCustomConfig(body.customConfig);
 
-      const updated = await prisma.storeSetting.upsert({
-         where: { id: "default" },
-         update: dataToUpdate,
-         create: {
-            id: "default",
-            ...dataToUpdate,
-         },
+      // P2-4: settings updates are audited in the same transaction
+      // as the upsert. The diff covers exactly the whitelisted
+      // fields this PUT writes; customConfig (a JSON blob) is
+      // compared by its serialised form so a config-only save still
+      // registers. A no-op PUT (empty diff — including the
+      // first-ever save, where there is no prior row to diff
+      // against beyond the schema defaults the GET falls back to)
+      // writes no row beyond a CREATE when the row is first
+      // persisted.
+      const auditCtx = requestAuditContext(request);
+      const updated = await prisma.$transaction(async (tx) => {
+         const before = await tx.storeSetting.findUnique({
+            where: { id: "default" },
+         });
+         const result = await tx.storeSetting.upsert({
+            where: { id: "default" },
+            update: dataToUpdate,
+            create: {
+               id: "default",
+               ...dataToUpdate,
+            },
+         });
+
+         const diffFields = Object.keys(dataToUpdate);
+         if (diffFields.length > 0) {
+            const snapshot = (row: any) =>
+               row
+                  ? {
+                       ...row,
+                       customConfig:
+                          row.customConfig != null
+                             ? JSON.stringify(row.customConfig)
+                             : null,
+                    }
+                  : null;
+            if (!before) {
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "CREATE",
+                  entityType: "SETTING",
+                  entityId: result.id,
+                  summary: "Store settings created",
+                  ...auditCtx,
+               });
+            } else {
+               const changes = buildChanges(
+                  snapshot(before),
+                  snapshot(result),
+                  diffFields,
+               );
+               if (changes) {
+                  await logAudit(tx, {
+                     actor: auditActorFromContext(gate),
+                     action: "UPDATE",
+                     entityType: "SETTING",
+                     entityId: result.id,
+                     summary: "Store settings updated",
+                     changes,
+                     ...auditCtx,
+                  });
+               }
+            }
+         }
+
+         return result;
       });
 
       return NextResponse.json(updated);

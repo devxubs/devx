@@ -405,16 +405,48 @@ export async function POST(request: NextRequest) {
       // 4. SUPPLIER HANDLING
       if (type === "supplier") {
          if (action === "restore") {
-            await prisma.supplier.update({
-               where: { id },
-               data: { isDeleted: false, deletedAt: null },
+            // P2-4: audited in the same transaction, mirroring the
+            // expense/product bin pattern.
+            await prisma.$transaction(async (tx) => {
+               const supplier = await tx.supplier.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!supplier) throw new Error("Supplier not found");
+               await tx.supplier.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "SUPPLIER",
+                  entityId: supplier.id,
+                  entityCustomId: supplier.customId,
+                  summary: `Supplier ${supplier.customId || supplier.name} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Supplier restored successfully" });
          } else if (action === "delete") {
-            await prisma.$transaction([
-               prisma.purchase.updateMany({ where: { supplierId: id }, data: { supplierId: null } }),
-               prisma.supplier.delete({ where: { id } }),
-            ]);
+            await prisma.$transaction(async (tx) => {
+               const supplier = await tx.supplier.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!supplier) throw new Error("Supplier not found");
+               await tx.purchase.updateMany({ where: { supplierId: id }, data: { supplierId: null } });
+               await tx.supplier.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "SUPPLIER",
+                  entityId: supplier.id,
+                  entityCustomId: supplier.customId,
+                  summary: `Supplier ${supplier.customId || supplier.name} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Supplier permanently deleted" });
          }
       }
@@ -592,13 +624,47 @@ export async function POST(request: NextRequest) {
       // 7. ASSET HANDLING
       if (type === "asset") {
          if (action === "restore") {
-            await prisma.asset.update({
-               where: { id },
-               data: { isDeleted: false, deletedAt: null },
+            // P2-4: audited in the same transaction, mirroring the
+            // expense/product bin pattern.
+            await prisma.$transaction(async (tx) => {
+               const asset = await tx.asset.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!asset) throw new Error("Asset not found");
+               await tx.asset.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "ASSET",
+                  entityId: asset.id,
+                  entityCustomId: asset.customId,
+                  summary: `Asset ${asset.customId || asset.name} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Asset restored successfully" });
          } else if (action === "delete") {
-            await prisma.asset.delete({ where: { id } });
+            await prisma.$transaction(async (tx) => {
+               const asset = await tx.asset.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!asset) throw new Error("Asset not found");
+               await tx.asset.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "ASSET",
+                  entityId: asset.id,
+                  entityCustomId: asset.customId,
+                  summary: `Asset ${asset.customId || asset.name} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Asset permanently deleted" });
          }
       }
@@ -606,16 +672,48 @@ export async function POST(request: NextRequest) {
       // 8. CUSTOMER HANDLING
       if (type === "customer") {
          if (action === "restore") {
-            await prisma.customer.update({
-               where: { id },
-               data: { isDeleted: false, deletedAt: null },
+            // P2-4: audited in the same transaction, mirroring the
+            // expense/product bin pattern.
+            await prisma.$transaction(async (tx) => {
+               const customer = await tx.customer.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!customer) throw new Error("Customer not found");
+               await tx.customer.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "CUSTOMER",
+                  entityId: customer.id,
+                  entityCustomId: customer.customId,
+                  summary: `Customer ${customer.customId || customer.name} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Customer restored successfully" });
          } else if (action === "delete") {
-            await prisma.$transaction([
-               prisma.order.updateMany({ where: { customerId: id }, data: { customerId: null } }),
-               prisma.customer.delete({ where: { id } }),
-            ]);
+            await prisma.$transaction(async (tx) => {
+               const customer = await tx.customer.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!customer) throw new Error("Customer not found");
+               await tx.order.updateMany({ where: { customerId: id }, data: { customerId: null } });
+               await tx.customer.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "CUSTOMER",
+                  entityId: customer.id,
+                  entityCustomId: customer.customId,
+                  summary: `Customer ${customer.customId || customer.name} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Customer permanently deleted" });
          }
       }
@@ -623,16 +721,48 @@ export async function POST(request: NextRequest) {
       // 9. CATEGORY HANDLING
       if (type === "category") {
          if (action === "restore") {
-            await prisma.category.update({
-               where: { id },
-               data: { isDeleted: false, deletedAt: null },
+            // P2-4: audited in the same transaction, mirroring the
+            // expense/product bin pattern.
+            await prisma.$transaction(async (tx) => {
+               const category = await tx.category.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!category) throw new Error("Category not found");
+               await tx.category.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "CATEGORY",
+                  entityId: category.id,
+                  entityCustomId: category.customId,
+                  summary: `Category ${category.customId || category.name} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Category restored successfully" });
          } else if (action === "delete") {
-            await prisma.$transaction([
-               prisma.product.updateMany({ where: { categoryId: id }, data: { categoryId: null } }),
-               prisma.category.delete({ where: { id } }),
-            ]);
+            await prisma.$transaction(async (tx) => {
+               const category = await tx.category.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!category) throw new Error("Category not found");
+               await tx.product.updateMany({ where: { categoryId: id }, data: { categoryId: null } });
+               await tx.category.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "CATEGORY",
+                  entityId: category.id,
+                  entityCustomId: category.customId,
+                  summary: `Category ${category.customId || category.name} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Category permanently deleted" });
          }
       }
@@ -640,13 +770,47 @@ export async function POST(request: NextRequest) {
       // 10. UNIT HANDLING
       if (type === "unit") {
          if (action === "restore") {
-            await prisma.unit.update({
-               where: { id },
-               data: { isDeleted: false, deletedAt: null },
+            // P2-4: audited in the same transaction, mirroring the
+            // expense/product bin pattern.
+            await prisma.$transaction(async (tx) => {
+               const unit = await tx.unit.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!unit) throw new Error("Unit not found");
+               await tx.unit.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "UNIT",
+                  entityId: unit.id,
+                  entityCustomId: unit.customId,
+                  summary: `Unit ${unit.customId || unit.name} restored from bin`,
+                  ...requestAuditContext(request),
+               });
             });
             return NextResponse.json({ message: "Unit restored successfully" });
          } else if (action === "delete") {
-            await prisma.unit.delete({ where: { id } });
+            await prisma.$transaction(async (tx) => {
+               const unit = await tx.unit.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!unit) throw new Error("Unit not found");
+               await tx.unit.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "UNIT",
+                  entityId: unit.id,
+                  entityCustomId: unit.customId,
+                  summary: `Unit ${unit.customId || unit.name} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
             return NextResponse.json({ message: "Unit permanently deleted" });
          }
       }

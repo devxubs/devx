@@ -11,6 +11,12 @@ import {
    BarcodeConflictError,
 } from "@src/lib/barcodeUniqueness";
 import { deleteUploadedFiles } from "@src/lib/uploadedFiles";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+   buildChanges,
+} from "@src/lib/audit";
 
 export async function GET(
    request: NextRequest,
@@ -143,6 +149,7 @@ export async function PUT(
          );
       }
       const qtyDiff = newQty - existing.quantity;
+      const auditCtx = requestAuditContext(request);
 
       const product = await prisma.$transaction(async (tx) => {
          const p = await tx.product.update({
@@ -322,6 +329,35 @@ export async function PUT(
             }
          }
 
+         // P2-4: product updates are audited in the same transaction
+         // over the catalog fields that identify/price the product
+         // (variant quantity edits surface through `quantity`, the
+         // product total). A no-op PUT (empty diff) writes no row,
+         // mirroring the expense/purchase PUT pattern.
+         const productChanges = buildChanges(existing, p, [
+            "productName",
+            "productSku",
+            "barcode",
+            "regularPrice",
+            "salePrice",
+            "costPrice",
+            "quantity",
+            "status",
+            "categoryId",
+         ]);
+         if (productChanges) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "UPDATE",
+               entityType: "PRODUCT",
+               entityId: p.id,
+               entityCustomId: p.customId,
+               summary: `Product ${p.customId || p.productName} updated`,
+               changes: productChanges,
+               ...auditCtx,
+            });
+         }
+
          return p;
       });
 
@@ -428,16 +464,35 @@ export async function DELETE(
       // can tell the two apart (previously every variant's stamp
       // was overwritten, and restore un-flagged none of them).
       const deletedAt = new Date();
-      await prisma.$transaction([
-         prisma.product.update({
+      const auditCtx = requestAuditContext(request);
+      // P2-4: the soft delete is audited in the same transaction
+      // (interactive form of the previous array transaction, so the
+      // audit row shares the delete's commit — the bin pattern).
+      await prisma.$transaction(async (tx) => {
+         const before = await tx.product.findUnique({
+            where: { id },
+            select: { id: true, customId: true, productName: true, isDeleted: true },
+         });
+         await tx.product.update({
             where: { id },
             data: { isDeleted: true, deletedAt },
-         }),
-         prisma.productVariant.updateMany({
+         });
+         await tx.productVariant.updateMany({
             where: { productId: id, isDeleted: false },
             data: { isDeleted: true, deletedAt },
-         }),
-      ]);
+         });
+         if (before && !before.isDeleted) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "DELETE",
+               entityType: "PRODUCT",
+               entityId: before.id,
+               entityCustomId: before.customId,
+               summary: `Product ${before.customId || before.productName} moved to bin`,
+               ...auditCtx,
+            });
+         }
+      });
 
       return NextResponse.json({ success: true, message: "Product deleted" });
    } catch {

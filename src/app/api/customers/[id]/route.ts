@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { isValidOrder } from "@src/lib/orderStatus";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+   buildChanges,
+} from "@src/lib/audit";
 
 export async function GET(
    request: NextRequest,
@@ -272,14 +278,43 @@ export async function PUT(
          }
       }
 
-      const updated = await prisma.customer.update({
-         where: { id },
-         data: {
-            name: body.name !== undefined ? body.name.trim() : undefined,
-            email: body.email !== undefined ? body.email.trim() : undefined,
-            phone: normalizedPhone,
-            address: body.address !== undefined ? body.address : undefined,
-         },
+      const auditCtx = requestAuditContext(request);
+      // P2-4: customer updates are audited in the same transaction;
+      // a no-op PUT (empty diff) writes no row.
+      const updated = await prisma.$transaction(async (tx) => {
+         const before = await tx.customer.findUnique({ where: { id } });
+         const result = await tx.customer.update({
+            where: { id },
+            data: {
+               name: body.name !== undefined ? body.name.trim() : undefined,
+               email: body.email !== undefined ? body.email.trim() : undefined,
+               phone: normalizedPhone,
+               address: body.address !== undefined ? body.address : undefined,
+            },
+         });
+
+         if (before) {
+            const changes = buildChanges(before, result, [
+               "name",
+               "email",
+               "phone",
+               "address",
+            ]);
+            if (changes) {
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "UPDATE",
+                  entityType: "CUSTOMER",
+                  entityId: result.id,
+                  entityCustomId: result.customId,
+                  summary: `Customer ${result.customId || result.name} updated`,
+                  changes,
+                  ...auditCtx,
+               });
+            }
+         }
+
+         return result;
       });
 
       return NextResponse.json(updated);
@@ -298,7 +333,26 @@ export async function DELETE(
    const { id } = await params;
 
    try {
-      await prisma.customer.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
+      const auditCtx = requestAuditContext(request);
+      // P2-4: the soft delete is audited in the same transaction.
+      await prisma.$transaction(async (tx) => {
+         const before = await tx.customer.findUnique({ where: { id } });
+         await tx.customer.update({
+            where: { id },
+            data: { isDeleted: true, deletedAt: new Date() },
+         });
+         if (before && !before.isDeleted) {
+            await logAudit(tx, {
+               actor: auditActorFromContext(gate),
+               action: "DELETE",
+               entityType: "CUSTOMER",
+               entityId: before.id,
+               entityCustomId: before.customId,
+               summary: `Customer ${before.customId || before.name} moved to bin`,
+               ...auditCtx,
+            });
+         }
+      });
       return NextResponse.json({ message: "Customer moved to Recycle Bin" });
    } catch {
       return NextResponse.json({ error: "Failed to delete customer" }, { status: 500 });

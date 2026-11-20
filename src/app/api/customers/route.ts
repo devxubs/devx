@@ -6,6 +6,11 @@ import {
    fetchCustomerListPage,
    parseCustomerListParams,
 } from "@src/lib/customerList";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 // ── Customer list (Phase B4a, P1-13) ───────────────────────────────────
 // The list is paginated IN THE DATABASE: derived-stat filtering,
@@ -104,15 +109,31 @@ export async function POST(request: NextRequest) {
       }
 
       const { customId } = await generateNextEntityId("CUSTOMER");
+      const auditCtx = requestAuditContext(request);
 
-      const customer = await prisma.customer.create({
-         data: {
-            customId,
-            name,
-            email: email || null,
-            phone: normalizedPhone,
-            address: address || null,
-         },
+      // P2-4: customer creation is audited in the same transaction.
+      const customer = await prisma.$transaction(async (tx) => {
+         const created = await tx.customer.create({
+            data: {
+               customId,
+               name,
+               email: email || null,
+               phone: normalizedPhone,
+               address: address || null,
+            },
+         });
+
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "CUSTOMER",
+            entityId: created.id,
+            entityCustomId: created.customId,
+            summary: `Customer ${created.customId || created.name} created — ${created.name}`,
+            ...auditCtx,
+         });
+
+         return created;
       });
 
       return NextResponse.json(customer, { status: 201 });

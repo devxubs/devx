@@ -235,6 +235,58 @@ export async function POST(request: NextRequest) {
                }
 
                // action === "courier"
+               // P2-13 (audit C-14): compare before/after FIRST, like
+               // the single-order flow — re-assigning the courier an
+               // order already has is a no-op and must write neither
+               // an AuditLog row nor a legacy history event (the
+               // previous code wrote both unconditionally, so
+               // re-assigning the same courier to 50 orders produced
+               // 50 false change records). The duplicate-ID dedupe
+               // above is unchanged.
+               const courierChanges: Record<
+                  string,
+                  { from: string | null; to: string | null }
+               > = {};
+               if ((order.courier || null) !== courierName) {
+                  courierChanges.courier = {
+                     from: order.courier || null,
+                     to: courierName,
+                  };
+               }
+               if (
+                  courierStatus !== undefined &&
+                  (order.courierStatus || null) !== courierStatus
+               ) {
+                  courierChanges.courierStatus = {
+                     from: order.courierStatus || null,
+                     to: courierStatus,
+                  };
+               }
+               // Marking "In Courier" in bulk means the parcels were
+               // handed over — stamp the submission time if it was
+               // never recorded. The stamp is bookkeeping, not a
+               // courier change: on its own it still applies, but
+               // (mirroring the single-order PUT, whose audit diff
+               // does not cover courierSubmittedAt) it writes no
+               // audit row and no history event.
+               const stampSubmittedAt =
+                  courierStatus === "In Courier" && !order.courierSubmittedAt
+                     ? new Date()
+                     : undefined;
+               if (Object.keys(courierChanges).length === 0) {
+                  if (stampSubmittedAt) {
+                     await tx.order.update({
+                        where: { id: order.id },
+                        data: { courierSubmittedAt: stampSubmittedAt },
+                     });
+                  }
+                  return {
+                     ok: true,
+                     displayId,
+                     note: "Courier already set",
+                  };
+               }
+
                const auditEvent = {
                   id: `act-audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
                   action: "Courier Assigned (Bulk)",
@@ -256,13 +308,7 @@ export async function POST(request: NextRequest) {
                   data: {
                      courier: courierName,
                      courierStatus: courierStatus !== undefined ? courierStatus : undefined,
-                     // Marking "In Courier" in bulk means the parcels
-                     // were handed over — stamp the submission time
-                     // if it was never recorded.
-                     courierSubmittedAt:
-                        courierStatus === "In Courier" && !order.courierSubmittedAt
-                           ? new Date()
-                           : undefined,
+                     courierSubmittedAt: stampSubmittedAt,
                      orderTags: {
                         ...existingTags,
                         auditHistory: [auditEvent, ...existingHistory],
@@ -270,31 +316,10 @@ export async function POST(request: NextRequest) {
                   },
                });
 
-               // Phase 4 (D1): audit in the same transaction.
-               // Follow-up round: the diff records only the courier
-               // fields this flow actually changed — previously it
-               // always claimed `courier` changed (a phantom entry
-               // when the same courier was re-assigned) and never
-               // recorded courierStatus.
-               const courierChanges: Record<
-                  string,
-                  { from: string | null; to: string | null }
-               > = {};
-               if ((order.courier || null) !== courierName) {
-                  courierChanges.courier = {
-                     from: order.courier || null,
-                     to: courierName,
-                  };
-               }
-               if (
-                  courierStatus !== undefined &&
-                  (order.courierStatus || null) !== courierStatus
-               ) {
-                  courierChanges.courierStatus = {
-                     from: order.courierStatus || null,
-                     to: courierStatus,
-                  };
-               }
+               // Phase 4 (D1): audit in the same transaction — only
+               // reached on a real courier change, with the exact
+               // fields that changed (the follow-up round's diff
+               // fix, now gated by the no-op skip above).
                await logAudit(tx, {
                   actor: auditActorRef,
                   action: "UPDATE",
@@ -302,10 +327,7 @@ export async function POST(request: NextRequest) {
                   entityId: order.id,
                   entityCustomId: displayId,
                   summary: `Order ${displayId} courier set to ${courierName} (bulk)`,
-                  changes:
-                     Object.keys(courierChanges).length > 0
-                        ? courierChanges
-                        : null,
+                  changes: courierChanges,
                   ...auditCtx,
                });
                return { ok: true, displayId };

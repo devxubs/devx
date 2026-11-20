@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { hashPassword, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    // R-1 fix (Final Review): the staff list exposes every employee's
@@ -87,21 +92,39 @@ export async function POST(request: NextRequest) {
 
       const passwordHash = password ? await hashPassword(password) : undefined;
       const { customId } = await generateNextEntityId("USER");
+      const auditCtx = requestAuditContext(request);
 
-      const newUser = await prisma.user.create({
-         data: {
-            customId,
-            name: name || undefined,
-            email: email.trim().toLowerCase(),
-            phoneNumber: phoneNumber || undefined,
-            address: address || undefined,
-            salary: salary || undefined,
-            passwordHash,
-            roleId: roleId || undefined,
-            status: status ? (status.toUpperCase() as any) : "ACTIVE",
-            image: image || undefined,
-         },
-         include: { role: true },
+      // P2-4: user CREATE joins the audited mutations (PUT
+      // privileged ops and LOGIN were already logged) — creation and
+      // audit row share one transaction, the expense-create pattern.
+      const newUser = await prisma.$transaction(async (tx) => {
+         const created = await tx.user.create({
+            data: {
+               customId,
+               name: name || undefined,
+               email: email.trim().toLowerCase(),
+               phoneNumber: phoneNumber || undefined,
+               address: address || undefined,
+               salary: salary || undefined,
+               passwordHash,
+               roleId: roleId || undefined,
+               status: status ? (status.toUpperCase() as any) : "ACTIVE",
+               image: image || undefined,
+            },
+            include: { role: true },
+         });
+
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "USER",
+            entityId: created.id,
+            entityCustomId: created.customId,
+            summary: `User ${created.name || created.email} created`,
+            ...auditCtx,
+         });
+
+         return created;
       });
 
       const { passwordHash: _, role: roleRel, ...rest } = newUser;

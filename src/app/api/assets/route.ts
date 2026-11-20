@@ -3,6 +3,11 @@ import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import { parsePagination } from "@src/lib/pagination";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -62,15 +67,31 @@ export async function POST(request: NextRequest) {
       }
 
       const { customId } = await generateNextEntityId("ASSET");
+      const auditCtx = requestAuditContext(request);
 
-      const asset = await prisma.asset.create({
-         data: {
-            customId,
-            name: name.trim(),
-            category: category || undefined,
-            value: parseFloat(value) || 0,
-            description: description || undefined,
-         },
+      // P2-4: asset creation is audited in the same transaction.
+      const asset = await prisma.$transaction(async (tx) => {
+         const created = await tx.asset.create({
+            data: {
+               customId,
+               name: name.trim(),
+               category: category || undefined,
+               value: parseFloat(value) || 0,
+               description: description || undefined,
+            },
+         });
+
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "ASSET",
+            entityId: created.id,
+            entityCustomId: created.customId,
+            summary: `Asset ${created.customId || created.name} created — ${created.name}`,
+            ...auditCtx,
+         });
+
+         return created;
       });
 
       return NextResponse.json(asset, { status: 201 });

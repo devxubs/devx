@@ -25,6 +25,7 @@ import {
    auditActorFromContext,
    requestAuditContext,
    buildChanges,
+   ORDER_PUT_AUDIT_FIELDS,
 } from "@src/lib/audit";
 
 const PAYMENT_STATUS_VALUES = ["UNVERIFIED", "VERIFIED", "MISMATCHED"];
@@ -454,21 +455,56 @@ export async function PUT(
          // changing only one of those wrote an audit row whose diff
          // was empty), and a genuinely no-op PUT — empty diff —
          // writes no UPDATE audit row at all.
-         const changes = buildChanges(existingOrder, updatedOrder, [
-            "status",
-            "paymentStatus",
-            "paymentTxId",
-            "paymentMethod",
-            "courier",
-            "deliveryCharge",
-            "discount",
-            "total",
-            "dueAmount",
-            "advancePayment",
-            "courierConsignmentId",
-            "courierTrackingCode",
-            "courierProviderStatus",
+         // P2-13 (audit C-15): the column list (ORDER_PUT_AUDIT_FIELDS
+         // in lib/audit) now also covers courierStatus,
+         // paymentSenderNumber, orderSource and cancellationReason.
+         // The four notes are not columns — they live in the
+         // orderTags JSON — so they are diffed here from tag
+         // snapshots (trimmed, empty treated as null, mirroring how
+         // the handler writes them; customerNote falls back to the
+         // orderNote column, the same fallback the note-history
+         // builder above uses).
+         const columnChanges = buildChanges(existingOrder, updatedOrder, [
+            ...ORDER_PUT_AUDIT_FIELDS,
          ]);
+         const noteValue = (tags: any, key: string, fallback?: unknown) => {
+            const raw =
+               tags && typeof tags === "object" ? tags[key] : undefined;
+            const value = raw !== undefined ? raw : fallback;
+            return String(value || "").trim() || null;
+         };
+         const updatedTags =
+            updatedOrder?.orderTags &&
+            typeof updatedOrder.orderTags === "object"
+               ? updatedOrder.orderTags
+               : {};
+         const noteChanges = buildChanges(
+            {
+               courierNote: noteValue(existingTags, "courierNote"),
+               customerNote: noteValue(
+                  existingTags,
+                  "customerNote",
+                  existingOrder.orderNote,
+               ),
+               packingNote: noteValue(existingTags, "packingNote"),
+               employeeNote: noteValue(existingTags, "employeeNote"),
+            },
+            {
+               courierNote: noteValue(updatedTags, "courierNote"),
+               customerNote: noteValue(
+                  updatedTags,
+                  "customerNote",
+                  updatedOrder?.orderNote,
+               ),
+               packingNote: noteValue(updatedTags, "packingNote"),
+               employeeNote: noteValue(updatedTags, "employeeNote"),
+            },
+            ["courierNote", "customerNote", "packingNote", "employeeNote"],
+         );
+         const changes =
+            columnChanges || noteChanges
+               ? { ...columnChanges, ...noteChanges }
+               : null;
          if (!changes) return;
          await logAudit(tx, {
             actor: { id: auditActor.id, label: auditActor.name },

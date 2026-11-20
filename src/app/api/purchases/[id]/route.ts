@@ -22,6 +22,7 @@ import {
    auditActorFromContext,
    requestAuditContext,
    buildChanges,
+   PURCHASE_PUT_AUDIT_FIELDS,
 } from "@src/lib/audit";
 
 export async function GET(
@@ -478,13 +479,13 @@ export async function PUT(
          // Phase 4 (D1): audit in the same transaction.
          // Follow-up round: a no-op PUT (empty computed diff)
          // writes no UPDATE audit row.
+         // P2-13 (audit C-15): the diff (PURCHASE_PUT_AUDIT_FIELDS
+         // in lib/audit) also covers the non-money fields this PUT
+         // can change — supplierId, invoice, note — which previously
+         // wrote no row when they were the only change. (The PUT
+         // writes no date field, so none is diffed.)
          const purchaseChanges = buildChanges(fresh, result, [
-            "total",
-            "due",
-            "paid",
-            "productAmount",
-            "othersCost",
-            "discount",
+            ...PURCHASE_PUT_AUDIT_FIELDS,
          ]);
          if (purchaseChanges) {
             await logAudit(tx, {

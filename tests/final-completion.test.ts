@@ -74,8 +74,11 @@ describe("audit writer + request context", () => {
                })[name] || null,
          },
       };
+      // S-8 / P2-4: the audit IP now follows getClientIp — x-real-ip
+      // wins; the FIRST x-forwarded-for hop (198.51.100.4 here) is
+      // client-controlled and must never be the logged address.
       expect(requestAuditContext(request as any)).toEqual({
-         ipAddress: "198.51.100.4",
+         ipAddress: "192.0.2.1",
          userAgent: "Browser",
       });
    });

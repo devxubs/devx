@@ -22,6 +22,7 @@
  */
 import type { NextRequest } from "next/server";
 import { prisma } from "./prisma";
+import { getClientIp } from "./rateLimit";
 import type { AuthContext, SessionUser } from "./auth";
 
 export const AUDIT_ACTIONS = [
@@ -44,8 +45,67 @@ export const AUDIT_ENTITY_TYPES = [
    "EXPENSE",
    "PRODUCT",
    "USER",
+   // P2-4 coverage extension: catalog / party / configuration
+   // entities audited from their own CRUD routes and the Recycle
+   // Bin pairs. The AuditLog.entityType column is a plain string,
+   // so these join the existing vocabulary without a schema change.
+   "ROLE",
+   "SETTING",
+   "CUSTOMER",
+   "SUPPLIER",
+   "ASSET",
+   "CATEGORY",
+   "UNIT",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
+
+/**
+ * Order columns diffed by the single-order PUT audit
+ * (orders/[id] `writeOrderAudit`). P2-13: courierStatus,
+ * paymentSenderNumber, orderSource and cancellationReason join the
+ * original money/status/courier set — a PUT changing only one of
+ * them previously wrote no audit row at all. The four order notes
+ * are NOT columns (they live in the orderTags JSON) and are diffed
+ * separately by the handler from tag snapshots.
+ */
+export const ORDER_PUT_AUDIT_FIELDS = [
+   "status",
+   "paymentStatus",
+   "paymentTxId",
+   "paymentSenderNumber",
+   "paymentMethod",
+   "orderSource",
+   "cancellationReason",
+   "courier",
+   "courierStatus",
+   "deliveryCharge",
+   "discount",
+   "total",
+   "dueAmount",
+   "advancePayment",
+   "courierConsignmentId",
+   "courierTrackingCode",
+   "courierProviderStatus",
+   "orderNote",
+] as const;
+
+/**
+ * Purchase columns diffed by the purchase PUT audit. P2-13: the
+ * non-money fields the PUT can change (supplierId, invoice, note)
+ * join the original money-only set. The handler writes no date
+ * field, so none is diffed.
+ */
+export const PURCHASE_PUT_AUDIT_FIELDS = [
+   "total",
+   "due",
+   "paid",
+   "productAmount",
+   "othersCost",
+   "discount",
+   "supplierId",
+   "invoice",
+   "note",
+] as const;
 
 export interface AuditActor {
    id: string | null;
@@ -77,19 +137,23 @@ export interface AuditRequestContext {
 }
 
 /**
- * Best-effort client IP / user-agent from the request, following the
- * same header precedence as the login rate limiter (first
- * x-forwarded-for entry, then x-real-ip).
+ * Best-effort client IP / user-agent from the request.
+ *
+ * S-8 / P2-4 fix: the IP derivation is now THE SAME as the login
+ * rate limiter's (`getClientIp` in lib/rateLimit) — `x-real-ip`
+ * first, else the LAST `x-forwarded-for` hop. The previous code took
+ * the FIRST forwarded hop, which is exactly the client-controlled,
+ * spoofable value the limiter refuses to trust: the actor being
+ * audited could forge their own logged IP. `getClientIp` returns
+ * "unknown" when no proxy header exists; the audit column stores
+ * NULL for that case, as before.
  */
 export function requestAuditContext(
    request: NextRequest,
 ): AuditRequestContext {
-   const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      null;
+   const ip = getClientIp(request);
    return {
-      ipAddress: ip,
+      ipAddress: ip === "unknown" ? null : ip,
       userAgent: request.headers.get("user-agent") || null,
    };
 }

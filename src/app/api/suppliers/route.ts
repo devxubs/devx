@@ -4,6 +4,11 @@ import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import { parsePagination } from "@src/lib/pagination";
 import { standingCreditOf } from "@src/lib/purchaseReturns";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -152,15 +157,31 @@ export async function POST(request: NextRequest) {
       }
 
       const { customId } = await generateNextEntityId("SUPPLIER");
+      const auditCtx = requestAuditContext(request);
 
-      const supplier = await prisma.supplier.create({
-         data: {
-            customId,
-            name: name.trim(),
-            email: email || null,
-            phone: phone || null,
-            address: address || null,
-         },
+      // P2-4: supplier creation is audited in the same transaction.
+      const supplier = await prisma.$transaction(async (tx) => {
+         const created = await tx.supplier.create({
+            data: {
+               customId,
+               name: name.trim(),
+               email: email || null,
+               phone: phone || null,
+               address: address || null,
+            },
+         });
+
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "SUPPLIER",
+            entityId: created.id,
+            entityCustomId: created.customId,
+            summary: `Supplier ${created.customId || created.name} created — ${created.name}`,
+            ...auditCtx,
+         });
+
+         return created;
       });
 
       return NextResponse.json(supplier, { status: 201 });

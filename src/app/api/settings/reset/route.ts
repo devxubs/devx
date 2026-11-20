@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function POST(request: NextRequest) {
    // SEC-01 fix: resetting every store setting is administrator-only.
@@ -55,13 +60,27 @@ export async function POST(request: NextRequest) {
          customConfig: {},
       };
 
-      const settings = await prisma.storeSetting.upsert({
-         where: { id: "default" },
-         update: defaultData,
-         create: {
-            id: "default",
-            ...defaultData,
-         },
+      // P2-4: the factory reset is a settings mutation — audited in
+      // the same transaction as the upsert, like the settings PUT.
+      const auditCtx = requestAuditContext(request);
+      const settings = await prisma.$transaction(async (tx) => {
+         const result = await tx.storeSetting.upsert({
+            where: { id: "default" },
+            update: defaultData,
+            create: {
+               id: "default",
+               ...defaultData,
+            },
+         });
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "UPDATE",
+            entityType: "SETTING",
+            entityId: result.id,
+            summary: "Store settings reset to factory defaults",
+            ...auditCtx,
+         });
+         return result;
       });
 
       return NextResponse.json({ message: "Settings restored to defaults", settings });

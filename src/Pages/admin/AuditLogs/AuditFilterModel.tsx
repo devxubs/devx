@@ -24,6 +24,13 @@ const ENTITY_TYPE_OPTIONS = [
    "EXPENSE",
    "PRODUCT",
    "USER",
+   "ROLE",
+   "SETTING",
+   "CUSTOMER",
+   "SUPPLIER",
+   "ASSET",
+   "CATEGORY",
+   "UNIT",
 ];
 const ACTION_OPTIONS = [
    "CREATE",

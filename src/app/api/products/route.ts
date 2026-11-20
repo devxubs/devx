@@ -11,6 +11,11 @@ import {
    findPayloadDuplicateBarcode,
    barcodeConflictMessage,
 } from "@src/lib/barcodeUniqueness";
+import {
+   logAudit,
+   auditActorFromContext,
+   requestAuditContext,
+} from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -334,6 +339,8 @@ export async function POST(request: NextRequest) {
          initialQty = 0;
       }
 
+      const auditCtx = requestAuditContext(request);
+
       // Execute comprehensive database write in a single safe transaction
       const product = await prisma.$transaction(async (tx) => {
          const p = await tx.product.create({
@@ -505,6 +512,18 @@ export async function POST(request: NextRequest) {
                }
             }
          }
+
+         // P2-4: product creation is audited in the same
+         // transaction (catalog mutations were previously unlogged).
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "CREATE",
+            entityType: "PRODUCT",
+            entityId: p.id,
+            entityCustomId: p.customId,
+            summary: `Product ${p.customId || p.productName} created — ${p.productName}`,
+            ...auditCtx,
+         });
 
          return p;
       });
