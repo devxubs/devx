@@ -114,6 +114,16 @@ export default function TablePrintDocument({
                      customization={{
                         ...settings,
                         ...(settings?.customConfig || {}),
+                        // P2-20: the Settings invoice template choice
+                        // is persisted as customConfig.invoiceTemplateId
+                        // (legacy: a root invoiceTemplateId field); the
+                        // renderer selects on `templateId`, which
+                        // nothing used to pass — the chosen template
+                        // never reached a real print.
+                        templateId:
+                           settings?.customConfig?.invoiceTemplateId ||
+                           (settings as any)?.invoiceTemplateId ||
+                           undefined,
                      }}
                   />
                </div>

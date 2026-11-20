@@ -36,12 +36,20 @@ export default function InvoiceRenderer({
    const invoiceFooter = customization.invoiceFooter || L.defaultFooter;
    const accentColor = customization.accentColor || templateMeta.accent || "#0F766E";
 
-   const showCustomer = customization.showCustomerInfo !== false;
-   const showCourier = customization.showCourierInfo !== false;
-   const showCashier = customization.showCashierName !== false;
+   // P2-20: the Settings visibility toggles persist under the
+   // *OnReceipt names (in customConfig, spread into the
+   // customization by the print document); accept them as fallbacks
+   // for the canonical names so the saved toggles actually apply.
+   const showCustomer =
+      (customization.showCustomerInfo ?? customization.showCustomerOnReceipt) !== false;
+   const showCourier =
+      (customization.showCourierInfo ?? customization.showCourierOnReceipt) !== false;
+   const showCashier =
+      (customization.showCashierName ?? customization.showCashierOnReceipt) !== false;
    const showBarcode = customization.showBarcode !== false;
    const showSku = customization.showSkuColumn !== false;
-   const showTerms = customization.showTerms !== false;
+   const showTerms =
+      (customization.showTerms ?? customization.showTermsOnReceipt) !== false;
    const showSign = customization.showSignatureBox !== false;
 
    const formatMoney = (val?: number) => `৳ ${Number(val || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

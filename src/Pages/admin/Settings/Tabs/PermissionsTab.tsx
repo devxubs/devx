@@ -2,14 +2,9 @@
 
 import React from "react";
 import {
-   Grid,
    Stack,
    Typography,
    Box,
-   FormControlLabel,
-   Switch,
-   Card,
-   CardContent,
    Chip,
    Button,
    Table,
@@ -28,9 +23,8 @@ interface PermissionsTabProps {
    onConfigChange: (key: string, value: any) => void;
 }
 
-export default function PermissionsTab({ values, onConfigChange }: PermissionsTabProps) {
+export default function PermissionsTab(_props: PermissionsTabProps) {
    const router = useRouter();
-   const customConfig = values.customConfig || {};
 
    const roles = [
       {
@@ -61,7 +55,7 @@ export default function PermissionsTab({ values, onConfigChange }: PermissionsTa
                   Users, Roles & Security Permissions
                </Typography>
                <Typography variant="body2" color="text.secondary">
-                  Define operational boundaries and permissions for Cashiers, Managers, and Admins.
+                  Role boundaries for Cashiers, Managers, and Admins are managed in the role matrix.
                </Typography>
             </Box>
             <Stack direction="row" spacing={1}>
@@ -110,120 +104,12 @@ export default function PermissionsTab({ values, onConfigChange }: PermissionsTa
             </Table>
          </TableContainer>
 
-         <Box sx={{ pt: 1 }}>
-            <Typography variant="h6" fontWeight={600}>
-               Cashier & Terminal Restrictions
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Prevent unauthorized discounts, voided orders, or cost leakage at checkout counters.
-            </Typography>
-         </Box>
-
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={customConfig.cashierCanDiscount ?? true}
-                              onChange={(e) => onConfigChange("cashierCanDiscount", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Cashiers Can Apply Custom Discounts
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Allow cashier counter staff to apply manual discounts on the POS terminal
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={customConfig.requireApprovalForVoid ?? true}
-                              onChange={(e) => onConfigChange("requireApprovalForVoid", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Require Manager Approval to Void / Cancel Orders
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Mandate manager authorization before an active or completed invoice can be cancelled
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={customConfig.cashiersCanViewCost ?? false}
-                              onChange={(e) => onConfigChange("cashiersCanViewCost", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Allow Cashiers to View Cost Prices
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Hide purchase/wholesale cost figures from cashier terminal screens when disabled
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={customConfig.managerCanAccessSettings ?? false}
-                              onChange={(e) => onConfigChange("managerCanAccessSettings", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Allow Managers Access to Store Settings
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Grant Store Managers permission to modify taxes, printers, and store profile
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-         </Grid>
+         {/* P2-20: the four "Cashier & Terminal Restrictions" toggles
+             (cashierCanDiscount, requireApprovalForVoid,
+             cashiersCanViewCost, managerCanAccessSettings) were
+             removed — write-only customConfig keys. Real permissions
+             live in the role matrix (Roles page); these switches
+             saved values no permission check ever read. */}
       </Stack>
    );
 }

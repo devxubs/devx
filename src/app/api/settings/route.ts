@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { sanitizeCustomConfig } from "@src/lib/customConfig";
 
 /**
  * Default settings, mirroring the Prisma schema defaults exactly
@@ -165,9 +166,14 @@ export async function PUT(request: NextRequest) {
       if (body.prefixAsset !== undefined) dataToUpdate.prefixAsset = body.prefixAsset.trim();
       if (body.prefixRole !== undefined) dataToUpdate.prefixRole = body.prefixRole.trim();
       if (body.prefixBilling !== undefined) dataToUpdate.prefixBilling = body.prefixBilling.trim();
+      // P2-20: prefixWarehouse was missing from this whitelist (and
+      // from PrefixesTab), so the warehouse prefix — consumed by
+      // generateNextEntityId — could never be edited.
+      if (body.prefixWarehouse !== undefined) dataToUpdate.prefixWarehouse = body.prefixWarehouse.trim();
 
-      // Custom Config
-      if (body.customConfig !== undefined) dataToUpdate.customConfig = body.customConfig;
+      // Custom Config — P2-20: dead write-only keys are stripped on
+      // save (see src/lib/customConfig.ts for the audited list).
+      if (body.customConfig !== undefined) dataToUpdate.customConfig = sanitizeCustomConfig(body.customConfig);
 
       const updated = await prisma.storeSetting.upsert({
          where: { id: "default" },

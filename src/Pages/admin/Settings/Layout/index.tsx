@@ -45,17 +45,17 @@ const tabMeta: Record<string, { title: string; subtitle: string; icon: string }>
    },
    products: {
       title: "Products & Inventory",
-      subtitle: "Manage low-stock alert limits, auto-generated SKU/barcodes, and measurement units.",
+      subtitle: "Manage low-stock alert limits and auto-generated SKU/barcodes.",
       icon: "solar:box-bold",
    },
    customers: {
       title: "Customers & Suppliers",
-      subtitle: "Configure customer phone requirements, loyalty reward points, and supplier credit terms.",
+      subtitle: "Customer and supplier behaviour — currently no store-level settings.",
       icon: "solar:users-group-two-rounded-bold",
    },
    expenses: {
       title: "Purchases & Expenses",
-      subtitle: "Set standard expense categories, purchase tax rates, and inventory receiving rules.",
+      subtitle: "Set the default expense category.",
       icon: "solar:wallet-money-bold",
    },
    invoices: {
@@ -65,7 +65,7 @@ const tabMeta: Record<string, { title: string; subtitle: string; icon: string }>
    },
    permissions: {
       title: "Users & Security Permissions",
-      subtitle: "Manage role boundaries, cashier discount permissions, and managerial authorization.",
+      subtitle: "Role boundaries are managed in the role matrix.",
       icon: "solar:shield-user-bold",
    },
    prefixes: {
@@ -75,7 +75,7 @@ const tabMeta: Record<string, { title: string; subtitle: string; icon: string }>
    },
    appearance: {
       title: "Appearance & Theme",
-      subtitle: "Switch between Dark and Light mode, pick primary accent colors, and configure table density.",
+      subtitle: "Display preferences are edited in the header appearance drawer.",
       icon: "solar:palette-bold",
    },
    system: {

@@ -29,10 +29,8 @@ interface SystemTabProps {
 export default function SystemTab({
    values,
    onChange,
-   onConfigChange,
    onResetDefaults,
 }: SystemTabProps) {
-   const customConfig = values.customConfig || {};
    const [openResetDialog, setOpenResetDialog] = useState(false);
    const [isExporting, setIsExporting] = useState(false);
    const [isResetting, setIsResetting] = useState(false);
@@ -119,7 +117,7 @@ export default function SystemTab({
                Automated Alert Triggers
             </Typography>
             <Typography variant="body2" color="text.secondary">
-               Choose which events trigger proactive alerts in the notification drawer and email.
+               Choose which events trigger proactive alerts in the notification drawer.
             </Typography>
          </Box>
 
@@ -149,55 +147,11 @@ export default function SystemTab({
                </Card>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <CustomSwitch
-                              checked={customConfig.dailySalesEmail ?? false}
-                              onChange={(e) => onConfigChange("dailySalesEmail", e.target.checked)}
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Daily Sales & Revenue Digest
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Send an automated evening revenue summary report to the notification email
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <CustomSwitch
-                              checked={customConfig.notifyOnCancelledOrder ?? true}
-                              onChange={(e) => onConfigChange("notifyOnCancelledOrder", e.target.checked)}
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Order Void & Cancellation Alerts
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Instantly alert store administrator whenever a cashier voids an active order
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
+            {/* P2-20: the "Daily Sales & Revenue Digest" and "Order
+                Void & Cancellation Alerts" toggles were removed —
+                they were write-only customConfig keys: no mailer and
+                no cancellation-notification producer exists, so the
+                switches saved a value nothing ever read. */}
          </Grid>
 
          {/* Backup & Disaster Recovery */}

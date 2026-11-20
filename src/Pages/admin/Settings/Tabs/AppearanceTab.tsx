@@ -2,17 +2,14 @@
 
 import React from "react";
 import {
-   Grid,
    Stack,
    Typography,
    Box,
    Card,
    CardContent,
-   FormControlLabel,
    Button,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import CustomSwitch from "@src/components/CustomSwitch";
 
 interface AppearanceTabProps {
    values: any;
@@ -24,11 +21,8 @@ interface AppearanceTabProps {
 // to maintain a SECOND editor for theme mode, accent colour and
 // sidebar layout — duplicating the header appearance drawer and
 // writing the same globalState/localStorage keys from two places. The
-// header drawer is canonical now: this tab delegates to it and keeps
-// only the store-level preference that lives in Settings alone
-// (compact table density, saved in customConfig).
-export default function AppearanceTab({ values, onConfigChange }: AppearanceTabProps) {
-   const customConfig = values.customConfig || {};
+// header drawer is canonical now: this tab delegates to it.
+export default function AppearanceTab(_props: AppearanceTabProps) {
 
    const openAppearanceDrawer = () => {
       window.dispatchEvent(new CustomEvent("devx:open-appearance"));
@@ -78,39 +72,9 @@ export default function AppearanceTab({ values, onConfigChange }: AppearanceTabP
             </CardContent>
          </Card>
 
-         {/* Store-level display preference (Settings-only, saved with
-             the store configuration — not part of the header drawer). */}
-         <Box sx={{ pt: 1 }}>
-            <Typography variant="subtitle2" fontWeight={600} mb={1.5}>
-               Table Density
-            </Typography>
-            <Grid container spacing={2}>
-               <Grid size={{ xs: 12, md: 6 }}>
-                  <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                     <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                        <FormControlLabel
-                           control={
-                              <CustomSwitch
-                                 checked={customConfig.compactTableDensity ?? false}
-                                 onChange={(e) => onConfigChange("compactTableDensity", e.target.checked)}
-                              />
-                           }
-                           label={
-                              <Box>
-                                 <Typography variant="subtitle2" fontWeight={600}>
-                                    Compact Table Density
-                                 </Typography>
-                                 <Typography variant="caption" color="text.secondary">
-                                    Show more rows per page with tighter table padding
-                                 </Typography>
-                              </Box>
-                           }
-                        />
-                     </CardContent>
-                  </Card>
-               </Grid>
-            </Grid>
-         </Box>
+         {/* P2-20: the "Compact Table Density" toggle was removed —
+             it wrote customConfig.compactTableDensity, which no table
+             component ever read, so the switch changed nothing. */}
       </Stack>
    );
 }

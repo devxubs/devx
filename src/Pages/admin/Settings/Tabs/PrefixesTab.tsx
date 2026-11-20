@@ -113,6 +113,13 @@ const prefixDefinitions: PrefixItem[] = [
       defaultPrefix: "BILL_",
       icon: "solar:card-recive-bold-duotone",
    },
+   {
+      key: "prefixWarehouse",
+      label: "Warehouses",
+      description: "Storage locations and distribution warehouse IDs",
+      defaultPrefix: "WH_",
+      icon: "solar:inbox-bold-duotone",
+   },
 ];
 
 export default function PrefixesTab({ values, onChange }: PrefixesTabProps) {

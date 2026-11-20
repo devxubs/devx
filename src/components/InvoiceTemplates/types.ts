@@ -65,6 +65,16 @@ export interface InvoiceCustomization {
    showCustomerInfo?: boolean;
    showCourierInfo?: boolean;
    showCashierName?: boolean;
+   // Settings-side names for the same visibility toggles (P2-20):
+   // the Settings UI persists showCustomerOnReceipt /
+   // showCashierOnReceipt / showCourierOnReceipt /
+   // showTermsOnReceipt in customConfig, and the print document
+   // spreads customConfig into the customization — the renderer
+   // accepts either name, the canonical field above winning.
+   showCustomerOnReceipt?: boolean;
+   showCashierOnReceipt?: boolean;
+   showCourierOnReceipt?: boolean;
+   showTermsOnReceipt?: boolean;
    showBarcode?: boolean;
    showSkuColumn?: boolean;
    showSubtotalBreakdown?: boolean;

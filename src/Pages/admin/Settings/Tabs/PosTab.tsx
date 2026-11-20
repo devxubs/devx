@@ -30,17 +30,7 @@ const paymentMethods = [
    "Cash on Delivery",
 ];
 
-const orderStatuses = [
-   "COMPLETED",
-   "CONFIRMED",
-   "PROCESSING",
-   "SHIPPED",
-   "DELIVERED",
-   "PENDING",
-];
-
-export default function PosTab({ values, onChange, onConfigChange }: PosTabProps) {
-   const customConfig = values.customConfig || {};
+export default function PosTab({ values, onChange }: PosTabProps) {
 
    return (
       <Stack spacing={3}>
@@ -54,6 +44,12 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
          </Box>
 
          {/* Pricing & Fees */}
+         {/* P2-20: "Default Order Status" (customConfig.defaultOrderStatus)
+             was removed — no order flow read it; new orders take the
+             status chosen in the order form. The "Allow Partial & Due
+             Payments", "Auto-trigger Receipt Print" and "Round Final
+             Order Totals" toggles below were likewise write-only and
+             have been removed. */}
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <TextField
@@ -136,23 +132,6 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-               <TextField
-                  select
-                  fullWidth
-                  label="Default Order Status"
-                  size="small"
-                  value={customConfig.defaultOrderStatus || "COMPLETED"}
-                  onChange={(e) => onConfigChange("defaultOrderStatus", e.target.value)}
-                  helperText="Initial status assigned to POS counter sales"
-               >
-                  {orderStatuses.map((st) => (
-                     <MenuItem key={st} value={st}>
-                        {st}
-                     </MenuItem>
-                  ))}
-               </TextField>
-            </Grid>
          </Grid>
 
          <Box sx={{ pt: 1 }}>
@@ -160,7 +139,7 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                POS Checkout Policies & Controls
             </Typography>
             <Typography variant="body2" color="text.secondary">
-               Configure stock verification, partial payments, and terminal automation.
+               Configure stock verification for checkout.
             </Typography>
          </Box>
 
@@ -191,83 +170,8 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                </Card>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={customConfig.allowDuePayment ?? true}
-                              onChange={(e) => onConfigChange("allowDuePayment", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Allow Partial & Due Payments
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Permit customer orders with an advance payment and due balance
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={customConfig.autoPrintReceipt ?? false}
-                              onChange={(e) => onConfigChange("autoPrintReceipt", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Auto-trigger Receipt Print
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Automatically launch browser print dialog upon submitting an order
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={customConfig.roundTotals ?? false}
-                              onChange={(e) => onConfigChange("roundTotals", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Round Final Order Totals
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Round fractions to nearest whole currency unit for cash transactions
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
          </Grid>
       </Stack>
    );
