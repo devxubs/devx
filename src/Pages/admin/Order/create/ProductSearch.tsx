@@ -127,7 +127,8 @@ const ProductSearch = ({ searchProducts, onAdd, onScan, currencySymbol = "৳" }
                            {option.productName}
                         </Typography>
                         <Typography variant="caption" color="textSecondary">
-                           SKU: {option.productSku || option.productCode || "—"} ·{" "}
+                           SKU: {option.productSku || option.productCode || "—"}
+                           {option.barcode ? ` · Barcode: ${option.barcode}` : ""} ·{" "}
                            {stock > 0 ? `${stock} ${option.salesUnit || option.baseUnit || "Piece"} in stock` : "Out of stock"}
                         </Typography>
                      </Box>

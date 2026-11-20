@@ -21,6 +21,7 @@ import {
 import React, { useState } from "react";
 import { Controller } from "react-hook-form";
 import Icon from "@src/components/Icon";
+import Barcode from "@src/components/Barcode";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import { PurchaseTypes } from "..";
 import type { ProductOption, SupplierOption } from "./index";
@@ -167,6 +168,7 @@ const Details = ({
                                                   variants: found.variants || [],
                                                   name: found.name,
                                                   code: found.code,
+                                                  barcode: found.barcode || null,
                                                   quantity: 1,
                                                   price: found.price,
                                                }
@@ -309,6 +311,13 @@ const Details = ({
                                                             variantName: v
                                                                ? v.variantName
                                                                : null,
+                                                            // Selected variant's
+                                                            // barcode, falling
+                                                            // back to the
+                                                            // product's.
+                                                            barcode: v
+                                                               ? v.barcode || opt?.barcode || null
+                                                               : opt?.barcode || null,
                                                             code: v
                                                                ? v.sku
                                                                : updated[idx].code,
@@ -380,6 +389,28 @@ const Details = ({
                                                    Variant: {row.variantName}
                                                 </Typography>
                                              ) : null}
+                                             {/* Selected product's barcode,
+                                                 inside the line's Name cell
+                                                 (variant barcode when a
+                                                 variant is chosen, product
+                                                 barcode otherwise). */}
+                                             {row.barcode && (
+                                                <Stack spacing={0.25} sx={{ pt: 0.5 }}>
+                                                   <Barcode
+                                                      value={row.barcode}
+                                                      height={18}
+                                                      moduleWidth={0.7}
+                                                      showText={false}
+                                                   />
+                                                   <Typography
+                                                      variant="caption"
+                                                      color="text.secondary"
+                                                      sx={{ fontFamily: "monospace" }}
+                                                   >
+                                                      {row.barcode}
+                                                   </Typography>
+                                                </Stack>
+                                             )}
                                           </Stack>
                                        </TableCell>
                                        <TableCell align="left">

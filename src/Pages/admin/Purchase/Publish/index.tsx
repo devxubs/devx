@@ -28,6 +28,7 @@ export interface ProductVariantOption {
    id: string;
    variantName: string;
    sku: string;
+   barcode?: string | null;
    quantity: number;
    costPrice: number;
    attributes?: Record<string, any> | null;
@@ -37,6 +38,7 @@ export interface ProductOption {
    id: string;
    name: string;
    code: string;
+   barcode?: string | null;
    price: number;
    // INV-02: variable products carry their live variants so purchase
    // lines can target a variant.
@@ -199,12 +201,14 @@ const Publish = () => {
                   id: p.id,
                   name: p.productName,
                   code: p.productCode || p.productSku || "",
+                  barcode: p.barcode || null,
                   price: Number(p.costPrice ?? p.regularPrice ?? 0),
                   productType: p.productType || "simple",
                   variants: (p.variants || []).map((v: any) => ({
                      id: v.id,
                      variantName: v.variantName,
                      sku: v.sku || "",
+                     barcode: v.barcode || null,
                      quantity: Number(v.quantity) || 0,
                      costPrice: Number(v.costPrice ?? 0),
                      attributes: v.attributes ?? null,
@@ -252,6 +256,7 @@ const Publish = () => {
                   variantName: it.variant?.variantName || null,
                   name: it.name,
                   code: it.code || null,
+                  barcode: it.variant?.barcode || it.product?.barcode || null,
                   quantity: it.quantity,
                   price: Number(it.price),
                })),

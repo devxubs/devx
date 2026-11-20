@@ -32,6 +32,7 @@ import {
 } from "@mui/material";
 
 import Icon from "@src/components/Icon";
+import Barcode from "@src/components/Barcode";
 import { formatBDT, lineDiscountAmount, lineTotal, num } from "./orderCalculations";
 import type { OrderLine } from "./types";
 
@@ -100,6 +101,9 @@ const ProductTable = ({
          variantId: variant.id,
          variantName: variant.variantName,
          code: variant.sku || line.code,
+         // The line shows the SELECTED variant's barcode; a variant
+         // without its own barcode falls back to the product's.
+         barcode: variant.barcode || line.productBarcode,
          stock: variantStock,
          listPrice: num(variant.salePrice ?? variant.regularPrice),
          quantity: Math.max(1, Math.min(line.quantity, Math.max(1, variantStock))),
@@ -313,6 +317,32 @@ const ProductTable = ({
                                           })}
                                        </Select>
                                     </FormControl>
+                                 )}
+
+                                 {/* Selected product's barcode, inside
+                                     the line's product cell (variant
+                                     barcode when a variant is chosen,
+                                     product barcode otherwise). */}
+                                 {line.barcode && (
+                                    <Box sx={{ mt: 0.5 }}>
+                                       <Barcode
+                                          value={line.barcode}
+                                          height={18}
+                                          moduleWidth={0.7}
+                                          showText={false}
+                                       />
+                                       <Typography
+                                          variant="caption"
+                                          color="textSecondary"
+                                          sx={{
+                                             fontFamily: "monospace",
+                                             display: "block",
+                                             lineHeight: 1.1,
+                                          }}
+                                       >
+                                          {line.barcode}
+                                       </Typography>
+                                    </Box>
                                  )}
                               </Box>
                            </Stack>

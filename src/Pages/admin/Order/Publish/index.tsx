@@ -102,6 +102,9 @@ const Publish = () => {
                   variants: [],
                   name: it.name,
                   code: it.code || it.variant?.sku || "",
+                  productBarcode: it.product?.barcode || null,
+                  barcode:
+                     it.variant?.barcode || it.product?.barcode || null,
                   image: it.product?.images?.[0] || null,
                   stock:
                      (it.variantId

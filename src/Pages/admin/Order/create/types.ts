@@ -26,6 +26,7 @@ export interface ApiProduct {
    productName: string;
    productSku?: string | null;
    productCode?: string | null;
+   barcode?: string | null;
    quantity: number;
    regularPrice: number | string;
    salePrice?: number | string | null;
@@ -66,6 +67,14 @@ export interface OrderLine {
    name: string;
    /** SKU shown in the table and submitted as the item code. */
    code: string;
+   /** The product's own barcode (kept for fallback display). */
+   productBarcode: string | null;
+   /**
+    * Barcode shown in the line's product cell: the selected
+    * variant's barcode when a variant is chosen, otherwise the
+    * product's. Null when neither level carries a barcode.
+    */
+   barcode: string | null;
    image?: string | null;
    /** Available stock captured when the product was added/refreshed. */
    stock: number;

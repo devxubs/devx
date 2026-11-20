@@ -204,6 +204,10 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
                code: preselect
                   ? preselect.sku || product.productSku || product.productCode || ""
                   : product.productSku || product.productCode || "",
+               productBarcode: product.barcode || null,
+               barcode: preselect
+                  ? preselect.barcode || product.barcode || null
+                  : product.barcode || null,
                image: Array.isArray(product.images) ? product.images[0] : null,
                stock: preselect ? Math.max(0, num(preselect.quantity)) : stock,
                unit: product.salesUnit || product.baseUnit || "Piece",

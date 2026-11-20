@@ -336,7 +336,7 @@ export async function GET(request: NextRequest) {
                   include: {
                      product: true,
                      variant: {
-                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                        select: { id: true, variantName: true, sku: true, barcode: true, attributes: true, quantity: true },
                      },
                   },
                },

@@ -54,7 +54,7 @@ export async function GET(
                   include: {
                      product: true,
                      variant: {
-                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                        select: { id: true, variantName: true, sku: true, barcode: true, attributes: true, quantity: true },
                      },
                   },
                },
@@ -92,7 +92,7 @@ export async function PUT(
                   include: {
                      product: true,
                      variant: {
-                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                        select: { id: true, variantName: true, sku: true, barcode: true, attributes: true, quantity: true },
                      },
                   },
                } },
@@ -1098,7 +1098,7 @@ export async function PUT(
                   include: {
                      product: true,
                      variant: {
-                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                        select: { id: true, variantName: true, sku: true, barcode: true, attributes: true, quantity: true },
                      },
                   },
                },
@@ -1259,7 +1259,7 @@ export async function PUT(
                   include: {
                      product: true,
                      variant: {
-                        select: { id: true, variantName: true, sku: true, attributes: true, quantity: true },
+                        select: { id: true, variantName: true, sku: true, barcode: true, attributes: true, quantity: true },
                      },
                   },
                },
