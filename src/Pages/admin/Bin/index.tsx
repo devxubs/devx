@@ -4,7 +4,6 @@ import {
    Alert,
    Button,
    IconButton,
-   Snackbar,
    Stack,
    Tab,
    Tabs,
@@ -13,6 +12,8 @@ import {
    useTheme,
 } from "@mui/material";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
+import { TableSkeleton } from "@src/components/SkeletonLoader";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -40,6 +41,9 @@ const tabs = [
    "Suppliers",
    "Expenses",
    "Assets",
+   // Rider D-0a: warehouses are soft-deletable (P2-1) and the Bin
+   // API now lists them, so they get a tab like every other entity.
+   "Warehouses",
    // Phase 1 (1.8): the "Users" tab is removed. The Bin API (BIN-01
    // fix) deliberately excludes users — accounts have no soft-delete,
    // and INACTIVE/SUSPENDED status is managed in User Management — so
@@ -48,6 +52,7 @@ const tabs = [
 
 const Bin = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const [val, setVal] = React.useState(0);
    const router = useRouter();
    const params = useSearchParams();
@@ -59,11 +64,7 @@ const Bin = () => {
    // be visible with a retry, and restore/delete must confirm via
    // Snackbar instead of failing silently.
    const [loadError, setLoadError] = useState<string | null>(null);
-   const [snackbar, setSnackbar] = useState<{
-      open: boolean;
-      message: string;
-      severity: "success" | "error";
-   }>({ open: false, message: "", severity: "success" });
+   // P3-2: feedback goes through the central snackbar (useSnackbar).
    const [deleteConfirmItem, setDeleteConfirmItem] = useState<any | null>(null);
    const [selectedDetail, setSelectedDetail] = useState<{ type: string; id: string } | null>(null);
 
@@ -96,24 +97,20 @@ const Bin = () => {
             body: JSON.stringify({ type: item.type, id: item.id, action }),
          });
          if (!res.ok) throw new Error("request failed");
-         setSnackbar({
-            open: true,
-            message:
-               action === "restore"
-                  ? "Item restored successfully."
-                  : "Item permanently deleted.",
-            severity: "success",
-         });
+         showSnackbar(
+            action === "restore"
+               ? "Item restored successfully."
+               : "Item permanently deleted.",
+            "success",
+         );
          loadBinItems();
       } catch {
-         setSnackbar({
-            open: true,
-            message:
-               action === "restore"
-                  ? "Failed to restore the item."
-                  : "Failed to delete the item.",
-            severity: "error",
-         });
+         showSnackbar(
+            action === "restore"
+               ? "Failed to restore the item."
+               : "Failed to delete the item.",
+            "error",
+         );
       }
    };
 
@@ -128,6 +125,7 @@ const Bin = () => {
       suppliers: "supplier",
       expenses: "expense",
       assets: "asset",
+      warehouses: "warehouse",
    };
    const normalizedTab = (tab || "products").toLowerCase();
    const targetType = tabToTypeMap[normalizedTab] || normalizedTab.replace(/s$/, "");
@@ -335,22 +333,13 @@ const Bin = () => {
             </Alert>
          )}
 
-         <CustomTable rows={filteredItems} columns={tableColumns} />
-
-         <Snackbar
-            open={snackbar.open}
-            autoHideDuration={3000}
-            onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-         >
-            <Alert
-               severity={snackbar.severity}
-               onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-               sx={{ width: "100%" }}
-            >
-               {snackbar.message}
-            </Alert>
-         </Snackbar>
+         {/* P3-4: sibling list pages show a TableSkeleton while
+             loading; Bin passed no loading visual at all. */}
+         {loading ? (
+            <TableSkeleton rows={7} cols={4} />
+         ) : (
+            <CustomTable rows={filteredItems} columns={tableColumns} />
+         )}
 
          {/* Permanent delete confirmation dialog */}
          <AlertDialog

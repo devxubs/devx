@@ -197,6 +197,8 @@ describe("AUDIT_ENTITY_TYPES (P2-4)", () => {
          "ASSET",
          "CATEGORY",
          "UNIT",
+         // Rider D-0a: Bin warehouse restore/permanent-delete rows.
+         "WAREHOUSE",
       ]) {
          expect(AUDIT_ENTITY_TYPES).toContain(t);
       }

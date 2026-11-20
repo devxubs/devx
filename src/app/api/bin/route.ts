@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
          customers,
          categories,
          units,
+         warehouses,
       ] = await Promise.all([
          prisma.product.findMany({
             where: { isDeleted: true },
@@ -73,6 +74,14 @@ export async function GET(request: NextRequest) {
             select: { id: true, customId: true, name: true, deletedAt: true, updatedAt: true },
          }),
          prisma.unit.findMany({
+            where: { isDeleted: true },
+            select: { id: true, customId: true, name: true, deletedAt: true, updatedAt: true },
+         }),
+         // Rider D-0a (completes P2-1): warehouse soft-delete landed
+         // in Phase C1, but the Bin had no warehouse branch, so a
+         // deleted warehouse had no restore path. It is listed here
+         // exactly like the other soft-deleted entities.
+         prisma.warehouse.findMany({
             where: { isDeleted: true },
             select: { id: true, customId: true, name: true, deletedAt: true, updatedAt: true },
          }),
@@ -150,6 +159,14 @@ export async function GET(request: NextRequest) {
             name: `Unit: ${u.name}`,
             deletedAt: u.deletedAt,
             updatedAt: u.updatedAt,
+         })),
+         ...warehouses.map((w) => ({
+            id: w.id,
+            customId: w.customId,
+            type: "warehouse",
+            name: `Warehouse: ${w.name}`,
+            deletedAt: w.deletedAt,
+            updatedAt: w.updatedAt,
          })),
          // BIN-01 fix: INACTIVE/SUSPENDED users are NOT deleted
          // records and no longer appear in the Recycle Bin. The User
@@ -812,6 +829,90 @@ export async function POST(request: NextRequest) {
                });
             });
             return NextResponse.json({ message: "Unit permanently deleted" });
+         }
+      }
+
+      // 11. WAREHOUSE HANDLING (rider D-0a, completes P2-1)
+      if (type === "warehouse") {
+         if (action === "restore") {
+            // Audited in the same transaction, mirroring the
+            // CUSTOMER/SUPPLIER bin pattern above.
+            await prisma.$transaction(async (tx) => {
+               const warehouse = await tx.warehouse.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true },
+               });
+               if (!warehouse) throw new Error("Warehouse not found");
+               await tx.warehouse.update({
+                  where: { id },
+                  data: { isDeleted: false, deletedAt: null },
+               });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "RESTORE",
+                  entityType: "WAREHOUSE",
+                  entityId: warehouse.id,
+                  entityCustomId: warehouse.customId,
+                  summary: `Warehouse ${warehouse.customId || warehouse.name} restored from bin`,
+                  ...requestAuditContext(request),
+               });
+            });
+            return NextResponse.json({ message: "Warehouse restored successfully" });
+         } else if (action === "delete") {
+            // Permanent delete respects the SAME guards as the
+            // warehouse DELETE route (warehouses/[id]): the default
+            // warehouse cannot be deleted, and a warehouse whose
+            // stock mirror does not sum to zero cannot be deleted.
+            // The guards run inside the transaction and answer a
+            // clean 409, mirroring the purchase/product blocked
+            // pattern above.
+            const result = await prisma.$transaction(async (tx) => {
+               const warehouse = await tx.warehouse.findUnique({
+                  where: { id },
+                  select: { id: true, customId: true, name: true, isDefault: true },
+               });
+               if (!warehouse) throw new Error("Warehouse not found");
+               if (warehouse.isDefault) {
+                  return { blocked: "default" as const, heldUnits: 0, warehouse };
+               }
+               const stockAgg = await tx.productWarehouseStock.aggregate({
+                  where: { warehouseId: id },
+                  _sum: { quantity: true },
+               });
+               const heldUnits = Number(stockAgg._sum.quantity || 0);
+               if (heldUnits !== 0) {
+                  return { blocked: "stock" as const, heldUnits, warehouse };
+               }
+               await tx.warehouse.delete({ where: { id } });
+               await logAudit(tx, {
+                  actor: auditActorFromContext(gate),
+                  action: "DELETE",
+                  entityType: "WAREHOUSE",
+                  entityId: warehouse.id,
+                  entityCustomId: warehouse.customId,
+                  summary: `Warehouse ${warehouse.customId || warehouse.name} permanently deleted from bin`,
+                  ...requestAuditContext(request),
+               });
+               return { blocked: null, heldUnits: 0, warehouse };
+            });
+            if (result.blocked === "default") {
+               return NextResponse.json(
+                  {
+                     error:
+                        "Cannot delete the default warehouse. Set another warehouse as default first.",
+                  },
+                  { status: 409 },
+               );
+            }
+            if (result.blocked === "stock") {
+               return NextResponse.json(
+                  {
+                     error: `Warehouse still holds stock (${result.heldUnits} units in the warehouse mirror). Adjust or move that stock before deleting.`,
+                  },
+                  { status: 409 },
+               );
+            }
+            return NextResponse.json({ message: "Warehouse permanently deleted" });
          }
       }
 

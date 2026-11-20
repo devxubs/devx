@@ -56,6 +56,10 @@ export const AUDIT_ENTITY_TYPES = [
    "ASSET",
    "CATEGORY",
    "UNIT",
+   // Phase D (rider D-0a): warehouses join the Bin audit pairs —
+   // a soft-deleted warehouse restored / permanently deleted from
+   // the Bin writes a WAREHOUSE row, mirroring CUSTOMER/SUPPLIER.
+   "WAREHOUSE",
 ] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 

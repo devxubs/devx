@@ -31,6 +31,7 @@ const ENTITY_TYPE_OPTIONS = [
    "ASSET",
    "CATEGORY",
    "UNIT",
+   "WAREHOUSE",
 ];
 const ACTION_OPTIONS = [
    "CREATE",

@@ -15,6 +15,7 @@ import {
    findOrderWithTxId,
    duplicateTxIdMessage,
    DuplicateTxIdError,
+   orderTxIdMethodError,
 } from "@src/lib/payments";
 import {
    normalizeOrderStatus,
@@ -345,18 +346,22 @@ export async function PUT(
       }
 
       // 4. Audit Courier Changes
-      const existingTrackingId = (existingOrder as any).courierTrackingId || existingOrder.referenceId;
+      // P3-8: the real field is courierTrackingCode (schema) — the
+      // phantom courierTrackingId this block used to read never
+      // exists on the record or in the PUT whitelist, so courier
+      // tracking changes never produced this audit event.
+      const existingTrackingId = (existingOrder as any).courierTrackingCode || existingOrder.referenceId;
       if (
          (body.courier !== undefined && body.courier !== existingOrder.courier) ||
-         (body.courierTrackingId !== undefined &&
-            body.courierTrackingId !== existingTrackingId)
+         (body.courierTrackingCode !== undefined &&
+            body.courierTrackingCode !== existingTrackingId)
       ) {
          const oldCourierStr = `${existingOrder.courier || "None"}${
             existingTrackingId ? ` (${existingTrackingId})` : ""
          }`;
          const newCourierStr = `${body.courier || existingOrder.courier || "None"}${
-            body.courierTrackingId || existingTrackingId
-               ? ` (${body.courierTrackingId || existingTrackingId})`
+            body.courierTrackingCode || existingTrackingId
+               ? ` (${body.courierTrackingCode || existingTrackingId})`
                : ""
          }`;
 
@@ -411,6 +416,50 @@ export async function PUT(
                   { status: 409 },
                );
             }
+         }
+      }
+      // Rider D-0b (completes P2-11): TxID ↔ method parity with
+      // POST. POST rejects a TxID supplied with a non-mobile method
+      // (orderTxIdMethodError); PUT never checked, so an edit could
+      // store the same unreconcilable pairing. The check runs HERE,
+      // on the shared pre-branch code, so it covers BOTH PUT paths
+      // (items and non-items) exactly once. It validates the
+      // EFFECTIVE pair — the method/TxID the order will carry after
+      // this edit — but only when the payload actually carries a
+      // TxID or method change: a stored TxID re-sent unchanged with
+      // its stored method (Publish/QuickEdit re-submit both fields
+      // on every save) self-excludes, mirroring the duplicate-TxID
+      // check above, so editing an unrelated field of an order with
+      // a legacy pairing never false-positives.
+      const carriedMethod =
+         body.paymentMethod !== undefined
+            ? body.paymentMethod
+            : body.pricing?.paymentMethod;
+      const txIdChanged =
+         rawTxId !== undefined &&
+         (String(rawTxId || "").trim() || null) !==
+            (existingOrder.paymentTxId || null);
+      const methodChanged =
+         carriedMethod !== undefined &&
+         String(carriedMethod) !== String(existingOrder.paymentMethod || "");
+      if (txIdChanged || methodChanged) {
+         const effectiveTxId =
+            rawTxId !== undefined
+               ? String(rawTxId || "").trim() || null
+               : existingOrder.paymentTxId;
+         const effectiveMethod =
+            carriedMethod !== undefined
+               ? carriedMethod
+               : existingOrder.paymentMethod;
+         const txMethodError = orderTxIdMethodError(
+            effectiveMethod,
+            effectiveTxId,
+         );
+         if (txMethodError) {
+            return NextResponse.json(
+               { error: "Validation error", message: txMethodError },
+               { status: 400 },
+            );
          }
       }
       const paymentSenderUpdate: string | null | undefined =
