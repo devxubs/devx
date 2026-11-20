@@ -299,6 +299,16 @@ const OrderTable = () => {
                   ? o.status.charAt(0) + o.status.slice(1).toLowerCase()
                   : "Pending",
                orderNote: o.orderNote || "",
+               // QA fix B: the Note column shows the Employee Note,
+               // which lives inside orderTags (already selected by the
+               // list API); orderNote above stays the legacy Customer
+               // Note for Details/QuickEdit compatibility.
+               employeeNote: String(
+                  (typeof o.orderTags === "object" && o.orderTags !== null
+                     ? o.orderTags
+                     : {}
+                  )?.employeeNote || "",
+               ),
                orderSource: o.orderSource || "Direct",
                createdAt: o.createdAt,
                updatedAt: o.updatedAt,
@@ -404,7 +414,7 @@ const OrderTable = () => {
 
    // note info
    const [noteModal, setNoteModal] = useState<OrderType | null>(null);
-   const [note, setNote] = useState(noteModal?.orderNote || "");
+   const [note, setNote] = useState(noteModal?.employeeNote || "");
 
    // quick edit info
    const [editModal, setEditModal] = useState<OrderType | null>(null);
@@ -467,11 +477,11 @@ const OrderTable = () => {
          renderCell: (params) => {
             return (
                <>
-                  <Tooltip title={params.row.orderNote} disableInteractive>
+                  <Tooltip title={params.row.employeeNote} disableInteractive>
                      <IconButton
                         onClick={() => {
                            setNoteModal(params.row);
-                           setNote(params.row.orderNote);
+                           setNote(params.row.employeeNote);
                         }}
                      >
                         <Icon icon="solar:add-square-broken" size="small" />
@@ -960,7 +970,7 @@ const OrderTable = () => {
                         setOrderRows((prev) =>
                            prev.map((or) =>
                               or.id === targetId
-                                 ? { ...or, orderNote: note }
+                                 ? { ...or, employeeNote: note }
                                  : or,
                            ),
                         );
@@ -969,12 +979,12 @@ const OrderTable = () => {
                            await fetch(`/api/orders/${targetId}`, {
                               method: "PUT",
                               headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ orderNote: note }),
+                              body: JSON.stringify({ employeeNote: note }),
                            });
                         } catch {}
                      }}
                   >
-                     {noteModal?.orderNote.length ? "Update note" : "Add note"}
+                     {noteModal?.employeeNote.length ? "Update note" : "Add note"}
                   </Button>
                </Stack>
             </Stack>

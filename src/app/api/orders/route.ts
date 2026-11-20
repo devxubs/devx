@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { parsePagination } from "@src/lib/pagination";
@@ -204,14 +205,41 @@ export async function GET(request: NextRequest) {
       }
    }
 
-   // 9. Note filter
+   // 9. Note filter — matches the Employee Note displayed in the
+   // Orders List Note column (QA fix B). The employee note lives in
+   // the orderTags JSON; the legacy orderNote column holds the
+   // Customer Note and is no longer what this filter searches.
+   // "Has Note" = employeeNote present and non-empty; "No Note" =
+   // key missing, JSON null, or empty string; any other value is a
+   // substring search. All three go through the AND list so they
+   // combine restrictively with the other filters (and never clobber
+   // the §21 orderTags presence check, which assigns where.orderTags).
    if (note && note !== "All" && note !== "All Time") {
       if (note === "Has Note") {
-         where.orderNote = { not: null };
+         where.AND = [
+            ...(where.AND || []),
+            { orderTags: { path: ["employeeNote"], not: "" } },
+         ];
       } else if (note === "No Note") {
-         where.orderNote = null;
+         where.AND = [
+            ...(where.AND || []),
+            {
+               OR: [
+                  { orderTags: { path: ["employeeNote"], equals: "" } },
+                  {
+                     orderTags: {
+                        path: ["employeeNote"],
+                        equals: Prisma.JsonNull,
+                     },
+                  },
+               ],
+            },
+         ];
       } else {
-         where.orderNote = { contains: note };
+         where.AND = [
+            ...(where.AND || []),
+            { orderTags: { path: ["employeeNote"], string_contains: note } },
+         ];
       }
    }
 

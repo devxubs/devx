@@ -75,6 +75,7 @@ export interface OrderType {
    invoiceNo: string;
    status: string;
    orderNote: string;
+   employeeNote: string;
    orderSource: string;
    createdAt: string;
    updatedAt?: string;
