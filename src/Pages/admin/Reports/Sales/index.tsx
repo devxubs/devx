@@ -127,9 +127,12 @@ const Sales = () => {
    // no longer presented as the "Total orders" trend.
    // KPI cards use the shared compact formatter (lib/utils), like
    // every other Reports tab; the table below keeps exact values.
-   // NOTE on the last card's title: the API's returnedCount counts
-   // CANCELLED + FAILED orders (there is no RETURNED order status),
-   // so the card is labelled "Cancelled / Failed", not "Returned".
+   // NOTE on the last card's title: the API's cancelledFailedCount
+   // counts CANCELLED + FAILED orders (there is no RETURNED order
+   // status), so the card is labelled "Cancelled / Failed", not
+   // "Returned". (The API also still sends the old `returnedCount`
+   // name as a deprecated alias; the frontend reads the honest name
+   // and falls back to the alias for older responses.)
    const analyticsCards = [
       {
          title: "Total orders",
@@ -151,7 +154,9 @@ const Sales = () => {
       },
       {
          title: "Cancelled / Failed",
-         value: formatCompactNumber(report?.returnedCount ?? 0),
+         value: formatCompactNumber(
+            report?.cancelledFailedCount ?? report?.returnedCount ?? 0,
+         ),
          isPositive: false,
       },
    ];
@@ -191,11 +196,14 @@ const Sales = () => {
                      },
                      {
                         label: "Cancelled / Failed",
-                        value: report?.returnedCount || 0,
+                        value:
+                           report?.cancelledFailedCount ??
+                           report?.returnedCount ??
+                           0,
                      },
                      {
                         label: "Other Status",
-                        value: Math.max((report?.totalOrders || 0) - (report?.completedCount || 0) - (report?.returnedCount || 0), 0),
+                        value: Math.max((report?.totalOrders || 0) - (report?.completedCount || 0) - (report?.cancelledFailedCount ?? report?.returnedCount ?? 0), 0),
                      },
                   ]}
                />

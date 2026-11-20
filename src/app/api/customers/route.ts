@@ -3,14 +3,21 @@ import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { parsePagination } from "@src/lib/pagination";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   INVALID_ORDER_STATUSES,
+   DELIVERED_ORDER_STATUSES,
+} from "@src/lib/orderStatus";
 
 // ── Customer statistics (list upgrade) ─────────────────────────────────
-// "Valid orders" follow the existing business rules used by the customer
-// analytics helpers: an order counts towards a customer's purchase
-// statistics when it is not soft-deleted and not CANCELLED / FAILED.
-// (RETURNED is part of the documented rule set but does not exist in the
-// OrderStatus enum, so it can never occur in stored data.)
-const EXCLUDED_ORDER_STATUSES = ["CANCELLED", "FAILED"] as const;
+// "Valid orders" follow the ONE canonical definition in
+// lib/orderStatus (Phase B1, P1-2 — this list's definition, now shared
+// by Finance receivables, the customer detail totals, the Reports
+// Customers tab and the orders-list customerType aggregation): an
+// order counts towards a customer's purchase statistics when it is
+// not soft-deleted and not CANCELLED / FAILED. (RETURNED is part of
+// the documented rule set but does not exist in the OrderStatus enum,
+// so it can never occur in stored data.)
+const EXCLUDED_ORDER_STATUSES = INVALID_ORDER_STATUSES;
 
 type CustomerStats = {
    totalOrders: number;
@@ -261,19 +268,22 @@ export async function GET(request: NextRequest) {
             status: { notIn: [...EXCLUDED_ORDER_STATUSES] },
          };
 
-         // Delivered/completed order count — same delivered definition as
-         // the customer analytics helpers (status DELIVERED/COMPLETED or
-         // courierStatus DELIVERED), over non-deleted orders.
+         // Delivered order count — Phase B1 (P1-2): a VALID order
+         // whose ORDER status is DELIVERED / COMPLETED (the revenue-
+         // recognition pair). The old definition also counted any
+         // order whose free-text courierStatus said "DELIVERED" —
+         // including a CANCELLED order — which disagreed with every
+         // revenue figure in the system.
          if (deliveredCheck) {
             const delivered = await prisma.order.groupBy({
                by: ["customerId"],
                where: {
                   customerId: { in: matchedIds },
                   isDeleted: false,
-                  OR: [
-                     { status: { in: ["DELIVERED", "COMPLETED"] } },
-                     { courierStatus: "DELIVERED" },
-                  ],
+                  status: {
+                     in: [...DELIVERED_ORDER_STATUSES],
+                     notIn: [...EXCLUDED_ORDER_STATUSES],
+                  },
                },
                _count: { _all: true },
             });

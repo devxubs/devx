@@ -3,6 +3,10 @@ import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { calculateNetProfit } from "@src/lib/finance";
 import { standingCreditOf } from "@src/lib/purchaseReturns";
+import {
+   VALID_ORDER_WHERE,
+   INVALID_ORDER_STATUSES,
+} from "@src/lib/orderStatus";
 
 export async function GET(request: NextRequest) {
    const gate = await requirePermission(request, ["reports", "report", "report_view", "report_view_report"]);
@@ -102,7 +106,7 @@ export async function GET(request: NextRequest) {
             }),
          );
 
-         const [orders, totalOrders, totalRevenueAgg, completedCount, returnedCount, trendData] = await Promise.all([
+         const [orders, totalOrders, totalRevenueAgg, completedCount, cancelledFailedCount, trendData] = await Promise.all([
             prisma.order.findMany({
                where: whereOrder,
                include: { customer: true, items: true },
@@ -130,7 +134,13 @@ export async function GET(request: NextRequest) {
             totalOrders,
             totalRevenue,
             completedCount,
-            returnedCount,
+            // Phase B1 (P1-2): this count is CANCELLED + FAILED orders
+            // — there is no RETURNED order status and no sales-return
+            // flow yet, so the honest name is `cancelledFailedCount`.
+            // `returnedCount` is kept as a deprecated alias with the
+            // same value so existing consumers keep working.
+            cancelledFailedCount,
+            returnedCount: cancelledFailedCount,
             trendData,
             page,
             limit,
@@ -345,7 +355,11 @@ export async function GET(request: NextRequest) {
          // the Active/Repeat headline counts — counts only orders
          // placed inside the selected range when one is given.
          const orderRangeWhere = hasDate ? { createdAt: dateFilter } : {};
+         // Phase B1 (P1-2): soft-deleted customers appear nowhere —
+         // the list and the headline count both filter isDeleted,
+         // exactly like every other customer surface.
          const customers = await prisma.customer.findMany({
+            where: { isDeleted: false },
             orderBy: { createdAt: "desc" },
             skip,
             take: limit,
@@ -361,11 +375,16 @@ export async function GET(request: NextRequest) {
          // Headline counts describe ALL customers, not just this page.
          const [totalCustomersAll, orderGroups, pageOrderStats] =
             await Promise.all([
-               prisma.customer.count(),
+               prisma.customer.count({ where: { isDeleted: false } }),
+               // Headline Active/Repeat counts use the canonical
+               // valid-order rule (P1-2): only VALID orders make a
+               // customer active or returning — the old groupBy
+               // counted CANCELLED/FAILED orders too.
                prisma.order.groupBy({
                   by: ["customerId"],
                   where: {
                      isDeleted: false,
+                     status: { notIn: [...INVALID_ORDER_STATUSES] },
                      customerId: { not: null },
                      ...orderRangeWhere,
                   },
@@ -402,7 +421,14 @@ export async function GET(request: NextRequest) {
                lastOrderAt: null,
             };
             const count = Number(group._count?.id || 0);
-            stats.totalOrders += count;
+            // Per-row Total Orders and Last Order At are canonical
+            // (P1-2): they count VALID orders only, matching the
+            // Customers list. Completed/Failed stay as their own
+            // breakdown columns over all statuses.
+            const isValidGroup = !(
+               INVALID_ORDER_STATUSES as readonly string[]
+            ).includes(group.status);
+            if (isValidGroup) stats.totalOrders += count;
             if (group.status === "COMPLETED" || group.status === "DELIVERED") {
                stats.completedOrders += count;
             }
@@ -413,6 +439,7 @@ export async function GET(request: NextRequest) {
                ? new Date(group._max.createdAt)
                : null;
             if (
+               isValidGroup &&
                groupLast &&
                (!stats.lastOrderAt || groupLast > stats.lastOrderAt)
             ) {
@@ -956,9 +983,13 @@ export async function GET(request: NextRequest) {
             }),
             // Receivables are a CURRENT-state figure (all outstanding
             // dues, not just this period's), grouped per customer.
+            // Phase B1 (P1-2): the canonical valid-order rule applies
+            // — the old filter counted dues from CANCELLED/FAILED
+            // orders, so Finance disagreed with the Customers list
+            // and the Dashboard about the same customer's due.
             prisma.order.groupBy({
                by: ["customerId"],
-               where: { isDeleted: false, dueAmount: { gt: 0 } },
+               where: { ...VALID_ORDER_WHERE, dueAmount: { gt: 0 } },
                _sum: { dueAmount: true },
                _count: { id: true },
                orderBy: { _sum: { dueAmount: "desc" } },
@@ -1030,7 +1061,7 @@ export async function GET(request: NextRequest) {
                ? prisma.order.groupBy({
                     by: ["customerId"],
                     where: {
-                       isDeleted: false,
+                       ...VALID_ORDER_WHERE,
                        dueAmount: { gt: 0 },
                        customerId: { in: receivableCustomerIds },
                     },

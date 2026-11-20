@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
+import { isValidOrder } from "@src/lib/orderStatus";
 
 export async function GET(
    request: NextRequest,
@@ -31,7 +32,29 @@ export async function GET(
       }
 
       const orders = customer.orders || [];
-      const totalOrders = orders.length;
+
+      // Phase B1 (P1-2): the purchase totals below use the ONE
+      // canonical valid-order definition (lib/orderStatus) — the
+      // same one the Customers list and the Dashboard use. The old
+      // totals counted every non-deleted order, so a cancelled
+      // due-bearing order inflated this profile's figures while the
+      // list showed a different due for the same customer.
+      // `totalOrders` is therefore the VALID order count; the
+      // delivered / failed / unshipped-cancelled breakdown further
+      // down stays an operational courier-outcome breakdown over ALL
+      // non-deleted orders (failed and cancelled parcels are exactly
+      // what it exists to show), and the full order history in
+      // `orders` is unchanged.
+      const validOrders = orders.filter(isValidOrder);
+      const totalOrders = validOrders.length;
+      const totalPaid = validOrders.reduce(
+         (sum, o) => sum + Number(o.advancePayment || 0),
+         0,
+      );
+      const totalDue = validOrders.reduce(
+         (sum, o) => sum + Number(o.dueAmount || 0),
+         0,
+      );
 
       // Helper to check if order is delivered
       const isDelivered = (o: any) =>
@@ -50,7 +73,11 @@ export async function GET(
          return false;
       };
 
-      const deliveredOrdersList = orders.filter(isDelivered);
+      // Delivered is counted inside the valid-order universe (a
+      // CANCELLED order is never a delivered purchase); failed and
+      // unshipped-cancelled stay counts over ALL non-deleted orders —
+      // they are the courier-outcome breakdown, not purchase totals.
+      const deliveredOrdersList = validOrders.filter(isDelivered);
       const deliveredOrders = deliveredOrdersList.length;
 
       const failedOrdersList = orders.filter(isCourierFailed);
@@ -61,12 +88,9 @@ export async function GET(
       );
       const unshippedCancelled = unshippedCancelledList.length;
 
-      const pendingOrders = Math.max(
-         0,
-         totalOrders - deliveredOrders - failedOrders - unshippedCancelled,
-      );
+      const pendingOrders = Math.max(0, totalOrders - deliveredOrders);
 
-      const totalAmountOrdered = orders.reduce(
+      const totalAmountOrdered = validOrders.reduce(
          (sum, o) => sum + Number(o.total || 0),
          0,
       );
@@ -164,6 +188,10 @@ export async function GET(
             unshippedCancelled,
             totalAmountOrdered,
             totalAmountDelivered,
+            // Canonical money totals over valid orders (P1-2): the
+            // same figures the Customers list shows for this customer.
+            totalPaid,
+            totalDue,
             successRate: overallSuccessRate,
          },
          courierStats,
@@ -181,6 +209,8 @@ export async function GET(
             deliveredOrders,
             unsuccessfulOrders: failedOrders + unshippedCancelled,
             pendingOrders,
+            totalPaid,
+            totalDue,
             successRate: overallSuccessRate,
          },
       });
