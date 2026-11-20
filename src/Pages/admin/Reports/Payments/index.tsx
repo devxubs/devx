@@ -345,10 +345,18 @@ const Payments = () => {
                   No orders were recorded for this date, so there is nothing to reconcile.
                </Typography>
             ) : (
+               // Phase B4b (P1-5): toolbar search suppressed on both
+               // tables of this tab (hideSearch). The method table is
+               // a per-method aggregate, and the verification queue
+               // below is already served by this page's dedicated
+               // server-side Transaction-ID search (all dates) plus
+               // the reconciliation date — a second, page-local
+               // toolbar term with a different scope would mislead.
                <CustomTable
                   rows={methodRows}
                   columns={methodColumns}
                   loading={loading}
+                  hideSearch
                   checkBox={true}
                   canExport={true}
                   exportConfig={{
@@ -381,6 +389,7 @@ const Payments = () => {
                   rows={queueRows}
                   columns={queueColumns}
                   loading={loading}
+                  hideSearch
                   checkBox={true}
                   canExport={true}
                   exportConfig={{

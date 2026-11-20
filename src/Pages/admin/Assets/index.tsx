@@ -19,6 +19,7 @@ import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { AssetDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { useSettings } from "@src/lib/settingsContext";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
 import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -63,6 +64,13 @@ const AssetsSchema = yup.object({
 const Asset = () => {
    const theme = useTheme();
    const { formatCurrency } = useSettings();
+   // Phase B4b (P1-5): consume the shared toolbar search — the
+   // assets API already accepts `search` (name / category / customId),
+   // so the term is passed server-side exactly like Expenses does.
+   // Previously the box rendered and showed a Keyword chip while this
+   // page never read the term, so it filtered nothing.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
    const [detailAssetId, setDetailAssetId] = useState<string | null>(null);
 
    // Phase 2 (2.3): global-search deep link — /admin/assets?asset=<id>
@@ -120,7 +128,14 @@ const Asset = () => {
       setLoading(true);
       setLoadError(null);
       try {
-         const res = await fetch("/api/assets");
+         // Only the `search` param is added — with no page/limit
+         // params the API keeps its bare-array response shape.
+         const term = searchText.trim();
+         const res = await fetch(
+            term
+               ? `/api/assets?search=${encodeURIComponent(term)}`
+               : "/api/assets",
+         );
          if (res.ok) {
             const data = await res.json();
             const mapped = (Array.isArray(data) ? data : []).map((a: any) => ({
@@ -141,7 +156,7 @@ const Asset = () => {
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [searchText]);
 
    useEffect(() => {
       loadAssets();

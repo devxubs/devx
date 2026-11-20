@@ -68,6 +68,11 @@ interface DataTableProps {
    // When `serverPagination` is set, the grid renders only the rows it
    // is given (one server page), reports `rowCount` as the total, and
    // reports page changes through `onPaginationModelChange`.
+   // Phase B4b (P1-5): hide the toolbar search box (and its Keyword
+   // chip) for tables that do not consume the shared `searchText`
+   // term — see Filter's `hideSearch`. Default false: every existing
+   // caller keeps the search box.
+   hideSearch?: boolean;
    serverPagination?: boolean;
    rowCount?: number;
    paginationModel?: { page: number; pageSize: number };
@@ -94,6 +99,7 @@ export default function CustomTable({
    hideFooterSelectedRowCount = false,
    hideSelectionActions = false,
    customSelectionToolbar,
+   hideSearch = false,
    serverPagination = false,
    rowCount,
    paginationModel: controlledPaginationModel,
@@ -342,6 +348,7 @@ export default function CustomTable({
             canPrint={canPrint}
             canExport={canExport}
             printConfig={printConfig}
+            hideSearch={hideSearch}
             hideSelectionToolbar={hideSelectionToolbar}
             showSelectionIndicators={showSelectionIndicators}
             hideSelectionActions={hideSelectionActions}

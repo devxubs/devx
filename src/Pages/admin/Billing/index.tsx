@@ -26,6 +26,8 @@ import CustomModal from "@src/components/Modal";
 import Modal from "./Modal";
 import PrintButton from "@src/components/PrintButton";
 import { useSettings } from "@src/lib/settingsContext";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 interface InfoCardProps {
    title: string;
@@ -61,6 +63,13 @@ const InfoCard = ({ title, value, icon }: InfoCardProps) => {
 
 const Billing = () => {
    const { settings, formatCurrency } = useSettings();
+   // Phase B4b (P1-5): consume the shared toolbar search. The billing
+   // API accepts no search parameter and returns the complete
+   // transaction set, so the term filters the loaded rows client-side
+   // (lib/tableSearch) over the displayed fields. The metrics cards
+   // keep describing the complete set — only the table rows filter.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
    const [openModal, setOpenModal] = useState(false);
    const [loading, setLoading] = useState(true);
    const [billingData, setBillingData] = useState<any[]>([]);
@@ -240,6 +249,18 @@ Thank you for using DevX POS Settlement Gateway!
       },
    ];
 
+   const filteredBillingData = React.useMemo(
+      () =>
+         filterRowsBySearch(billingData, searchText, [
+            "customId",
+            "id",
+            "paymentMethod",
+            "status",
+            "description",
+         ]),
+      [billingData, searchText],
+   );
+
    const availableBalance = Math.max(metrics.totalSettled - metrics.totalCharges, 0);
 
    return (
@@ -326,7 +347,7 @@ Thank you for using DevX POS Settlement Gateway!
 
                <Grid size={12}>
                   <CustomTable
-                     rows={billingData}
+                     rows={filteredBillingData}
                      columns={columns}
                      checkBox={true}
                      canPrint={true}

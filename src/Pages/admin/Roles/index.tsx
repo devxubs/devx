@@ -4,6 +4,8 @@ import { Button, Chip, Stack, Typography, useTheme } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import Icon from "@src/components/Icon";
 import CustomTable, { MenuItem } from "@src/components/Table";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import Scrollbar from "react-browser-scrollbar";
@@ -142,6 +144,29 @@ const Roles = () => {
 
    const [roleToDelete, setRoleToDelete] = useState<any>(null);
 
+   // Phase B4b (P1-5): consume the shared toolbar search — roles are
+   // a small fully-loaded set, so the term filters client-side
+   // (lib/tableSearch) over the displayed name / ID and the granted
+   // permission modules the Permissions cell renders (so searching a
+   // module name finds the roles that grant it).
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
+   const filteredRoles = React.useMemo(
+      () =>
+         filterRowsBySearch(rolesData, searchText, [
+            "name",
+            "customId",
+            "id",
+            (r: any) => {
+               const summary = summarizePermissions(r.permissions);
+               return summary.fullAccess
+                  ? "full access"
+                  : summary.modules.join(" ");
+            },
+         ]),
+      [rolesData, searchText],
+   );
+
    const actionMenu: MenuItem[] = [
       {
          label: "edit",
@@ -192,7 +217,7 @@ const Roles = () => {
             </Stack>
             <Stack>
                <CustomTable
-                  rows={rolesData}
+                  rows={filteredRoles}
                   columns={columns}
                   menuItems={actionMenu}
                />

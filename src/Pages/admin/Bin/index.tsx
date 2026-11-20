@@ -13,6 +13,8 @@ import {
    useTheme,
 } from "@mui/material";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState, useMemo } from "react";
 import Icon from "@src/components/Icon";
@@ -129,9 +131,22 @@ const Bin = () => {
    };
    const normalizedTab = (tab || "products").toLowerCase();
    const targetType = tabToTypeMap[normalizedTab] || normalizedTab.replace(/s$/, "");
+   // Phase B4b (P1-5): consume the shared toolbar search — the bin
+   // loads its complete item set in one fetch, so the term filters
+   // the active tab's rows client-side (lib/tableSearch) over the
+   // displayed name / ID fields, on top of the existing tab filter.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
    const filteredItems = useMemo(
-      () => binItems.filter((i) => i.type === targetType || i.type === normalizedTab),
-      [binItems, targetType, normalizedTab],
+      () =>
+         filterRowsBySearch(
+            binItems.filter(
+               (i) => i.type === targetType || i.type === normalizedTab,
+            ),
+            searchText,
+            ["name", "customId", "id"],
+         ),
+      [binItems, targetType, normalizedTab, searchText],
    );
 
    const tableColumns: ColumnConfig[] = [

@@ -14,6 +14,8 @@ import { useSettings } from "@src/lib/settingsContext";
 import { ProductDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const Products = () => {
    const { formatCurrency, settings } = useSettings();
@@ -125,10 +127,29 @@ const Products = () => {
       },
    ];
 
-   const lowStockRows = allLowStockRows ?? report?.lowStockRows ?? [];
+   // Phase B4b (P1-5): consume the shared toolbar search — the
+   // monitor renders the complete low-stock set (assembled through
+   // the chunked loader above), so the term filters that full set
+   // client-side (lib/tableSearch) over the displayed fields.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
+   const lowStockRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(
+            allLowStockRows ?? report?.lowStockRows ?? [],
+            searchText,
+            ["id", "name", "status"],
+         ),
+      [allLowStockRows, report, searchText],
+   );
    const totalInStock = report?.totalInStock || 0;
    const outOfStockCount = report?.outOfStockCount || 0;
-   const lowStockCount = report?.lowStockCount || lowStockRows.length;
+   // The headline count keeps describing the UNFILTERED set (the
+   // API figure, or the complete loaded rows as its fallback) —
+   // toolbar search narrows the table only, never the card.
+   const lowStockCount =
+      report?.lowStockCount ||
+      (allLowStockRows ?? report?.lowStockRows ?? []).length;
    const topProducts = report?.topProducts || [];
 
    const graphData = topProducts.length

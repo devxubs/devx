@@ -18,6 +18,8 @@ import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useSettings } from "@src/lib/settingsContext";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 import React, { useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -175,6 +177,25 @@ const Suppliers = () => {
    const [suppliers, setSuppliers] = useState<SuppliersTypes[]>([]);
    const [loading, setLoading] = useState(false);
 
+   // Phase B4b (P1-5): consume the shared toolbar search. The
+   // suppliers API accepts no search parameter and this page loads
+   // the complete list, so the term filters the loaded rows
+   // client-side (lib/tableSearch) over the displayed fields.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
+   const filteredSuppliers = React.useMemo(
+      () =>
+         filterRowsBySearch(suppliers, searchText, [
+            "name",
+            "number",
+            "email",
+            "address",
+            "customId",
+            "id",
+         ]),
+      [suppliers, searchText],
+   );
+
    const loadSuppliers = React.useCallback(async () => {
       setLoading(true);
       try {
@@ -304,7 +325,7 @@ const Suppliers = () => {
             <TableSkeleton rows={5} cols={6} />
          ) : (
             <CustomTable
-               rows={suppliers}
+               rows={filteredSuppliers}
                columns={columns}
                checkBox={true}
                hideSelectionActions={true}

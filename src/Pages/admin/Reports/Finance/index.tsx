@@ -27,6 +27,8 @@ import { useSettings } from "@src/lib/settingsContext";
 import { DEFAULT_FILTERS } from "@src/Pages/admin/Customers/components/customerFilterUtils";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const Finance = () => {
    const router = useRouter();
@@ -94,6 +96,16 @@ const Finance = () => {
       id: m.method,
       ...m,
    }));
+   // Phase B4b (P1-5): one shared toolbar term for this page's four
+   // tables. The two worklists (receivables / payables) consume it
+   // client-side (lib/tableSearch) over their displayed name / phone
+   // / ID fields; the two aggregate breakdowns above them (expenses
+   // by type, payments by method) are suppressed via hideSearch —
+   // all four tables share this page's filter store, and the
+   // aggregates must never show a Keyword chip for a term they do
+   // not consume. Worklist headings/totals keep the unfiltered rows.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
    const receivableRows = (report?.receivables?.rows || []).map((r: any) => ({
       id: r.customerId || r.customer,
       ...r,
@@ -104,6 +116,32 @@ const Finance = () => {
       ...r,
       oldestDueAtLabel: r.oldestDueAt ? new Date(r.oldestDueAt).toLocaleDateString() : "—",
    }));
+   const filteredReceivableRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(
+            (report?.receivables?.rows || []).map((r: any) => ({
+               id: r.customerId || r.customer,
+               ...r,
+               oldestDueAtLabel: r.oldestDueAt ? new Date(r.oldestDueAt).toLocaleDateString() : "—",
+            })),
+            searchText,
+            ["customer", "phone", "customerCustomId"],
+         ),
+      [report, searchText],
+   );
+   const filteredPayableRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(
+            (report?.payables?.rows || []).map((r: any) => ({
+               id: r.supplierId,
+               ...r,
+               oldestDueAtLabel: r.oldestDueAt ? new Date(r.oldestDueAt).toLocaleDateString() : "—",
+            })),
+            searchText,
+            ["supplier", "phone", "supplierCustomId"],
+         ),
+      [report, searchText],
+   );
 
    const expenseColumns = [
       { field: "type", headerName: "Expense Type", width: 220 },
@@ -260,7 +298,7 @@ const Finance = () => {
                         No expenses recorded for this period.
                      </Typography>
                   ) : (
-                     <CustomTable rows={expenseTypeRows} columns={expenseColumns} loading={loading} />
+                     <CustomTable rows={expenseTypeRows} columns={expenseColumns} loading={loading} hideSearch />
                   )}
                </Stack>
             </Grid>
@@ -274,7 +312,7 @@ const Finance = () => {
                         No orders recorded for this period.
                      </Typography>
                   ) : (
-                     <CustomTable rows={methodRows} columns={methodColumns} loading={loading} />
+                     <CustomTable rows={methodRows} columns={methodColumns} loading={loading} hideSearch />
                   )}
                </Stack>
             </Grid>
@@ -305,7 +343,7 @@ const Finance = () => {
                </Typography>
             ) : (
                <CustomTable
-                  rows={receivableRows}
+                  rows={filteredReceivableRows}
                   columns={receivableColumns}
                   loading={loading}
                   checkBox={true}
@@ -356,7 +394,7 @@ const Finance = () => {
                </Typography>
             ) : (
                <CustomTable
-                  rows={payableRows}
+                  rows={filteredPayableRows}
                   columns={payableColumns}
                   loading={loading}
                   checkBox={true}

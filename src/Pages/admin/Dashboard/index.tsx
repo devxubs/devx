@@ -347,11 +347,17 @@ const Dashboard = () => {
                   />
                </Grid>
 
-               {/* Employee Ranking Table */}
+               {/* Employee Ranking Table — Phase B4b (P1-5): the
+                   toolbar search is suppressed here (hideSearch).
+                   This is a small ranked leaderboard, not a record
+                   list: text search over a ranking is meaningless,
+                   and the term was previously accepted, chipped as
+                   "Keyword", and silently ignored. */}
                <Grid size={{ xs: 12, md: 12 }}>
                   <CustomTable
                      rows={rankedRows}
                      columns={columns}
+                     hideSearch
                   />
                </Grid>
             </Grid>

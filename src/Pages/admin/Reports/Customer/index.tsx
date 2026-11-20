@@ -9,6 +9,8 @@ import AnalyticsCard from "@cmp/AnalyticsCard";
 import { CustomerDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 export const customerOrderData: any[] = [];
 
@@ -18,6 +20,12 @@ const Customer = () => {
    const [error, setError] = useState<string | null>(null);
    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+   // Phase B4b (P1-5): consume the shared toolbar search — the
+   // reports API has no search parameter, so the term filters the
+   // displayed customer rows client-side (lib/tableSearch). The
+   // headline cards keep their complete-dataset figures.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
 
    const loadCustomerReport = useCallback(async () => {
       setLoading(true);
@@ -112,6 +120,18 @@ const Customer = () => {
    ];
 
    const rows = report?.rows || [];
+   const filteredRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(report?.rows || [], searchText, [
+            "customerName",
+            "phone",
+            "email",
+            "address",
+            "customId",
+            "id",
+         ]),
+      [report, searchText],
+   );
    const totalCustomers = report?.totalCustomers || rows.length;
    const activeCustomers = report?.activeCustomers || rows.filter((r: any) => r.totalOrders > 0).length;
    const repeatCustomers = report?.returningCustomers || rows.filter((r: any) => r.totalOrders > 1).length;
@@ -170,7 +190,7 @@ const Customer = () => {
                   </Typography>
 
                   <CustomTable
-                     rows={rows}
+                     rows={filteredRows}
                      columns={columns}
                      loading={loading}
                      checkBox={true}

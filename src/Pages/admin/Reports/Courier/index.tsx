@@ -11,6 +11,8 @@ import { useSettings } from "@src/lib/settingsContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const Courier = () => {
    const theme = useTheme();
@@ -26,6 +28,15 @@ const Courier = () => {
    } | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+   // Phase B4b (P1-5): consume the shared toolbar search on the
+   // Courier details table below (client-side over the displayed
+   // rows — the reports API has no search parameter). The
+   // Performance-by-courier table above it is a per-courier
+   // aggregate, so its search is suppressed via hideSearch instead:
+   // both tables share this page's filter store, and the aggregate
+   // must never show a Keyword chip for a term it does not consume.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
 
    const loadCourierReport = useCallback(async () => {
       setLoading(true);
@@ -139,6 +150,15 @@ const Courier = () => {
    ];
 
    const rows = report?.rows || [];
+   const filteredRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(report?.rows || [], searchText, [
+            "id",
+            "source",
+            "courier_submitted_at",
+         ]),
+      [report, searchText],
+   );
    // Card totals come from the complete filtered dataset (cardTotals,
    // loaded above); the displayed-page sums remain only as a fallback
    // if the complete fetch failed. NOTE on the first card's title:
@@ -284,6 +304,7 @@ const Courier = () => {
                      <CustomTable
                         rows={courierStatRows}
                         columns={courierStatColumns}
+                        hideSearch
                         loading={loading}
                         checkBox={true}
                         canExport={true}
@@ -325,7 +346,7 @@ const Courier = () => {
                      Courier details
                   </Typography>
                   <CustomTable
-                     rows={rows}
+                     rows={filteredRows}
                      columns={columns}
                      loading={loading}
                      checkBox={true}

@@ -3,10 +3,12 @@
 import { Alert, Stack, Typography } from "@mui/material";
 import CustomTable from "@src/components/Table";
 import DateRangePicker from "@src/components/DateRange";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSettings } from "@src/lib/settingsContext";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 // Phase 1: the old ExpenseChart was intentionally not rendered — it
 // was built entirely on hard-coded example data (invented daily
 // expenses for Dec 2025), not on the reports API. The table below is
@@ -21,6 +23,11 @@ const Expenses = () => {
    const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
+   // Phase B4b (P1-5): consume the shared toolbar search — the
+   // reports API has no search parameter, so the term filters the
+   // displayed expense rows client-side (lib/tableSearch).
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
 
    const loadExpensesReport = useCallback(async () => {
       setLoading(true);
@@ -77,6 +84,17 @@ const Expenses = () => {
    ];
 
    const rows = report?.rows || [];
+   const filteredRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(report?.rows || [], searchText, [
+            "id",
+            "type",
+            "note",
+            "date",
+            "amount",
+         ]),
+      [report, searchText],
+   );
 
    return (
       <Stack spacing={3}>
@@ -100,7 +118,7 @@ const Expenses = () => {
                Expenses Report
             </Typography>
             <CustomTable
-               rows={rows}
+               rows={filteredRows}
                columns={columns}
                loading={loading}
                checkBox={true}

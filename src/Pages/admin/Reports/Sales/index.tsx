@@ -12,6 +12,8 @@ import { useSettings } from "@src/lib/settingsContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const statusColor: Record<
    string,
@@ -43,6 +45,13 @@ const Sales = () => {
    const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+   // Phase B4b (P1-5): consume the shared toolbar search. The reports
+   // API has no search parameter, so the term filters the displayed
+   // order rows client-side (lib/tableSearch) over the table's own
+   // fields. The KPI cards / totals keep describing the complete
+   // date-filtered dataset — only the table rows filter.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
 
    const loadSalesReport = useCallback(async () => {
       setLoading(true);
@@ -166,6 +175,20 @@ const Sales = () => {
    // so each point needs its real date — the previous "Day 1…7"
    // strings parsed as 1 Jan 2001 and the graph's own month filter
    // dropped every point, leaving an always-empty chart.
+   const filteredOrders = React.useMemo(
+      () =>
+         filterRowsBySearch(report?.orders || [], searchText, [
+            "id",
+            "payment",
+            "status",
+            "amount",
+            (r: any) => r.customer?.name,
+            (r: any) => r.customer?.phone,
+            (r: any) => r.customer?.email,
+         ]),
+      [report, searchText],
+   );
+
    const trendEnd =
       dateRange[1] && dateRange[1].getTime() < Date.now() ? dateRange[1] : new Date();
    const trendValues: number[] = report?.trendData || [];
@@ -237,7 +260,7 @@ const Sales = () => {
                      Orders Table
                   </Typography>
                   <CustomTable
-                     rows={report?.orders || []}
+                     rows={filteredOrders}
                      columns={columns}
                      loading={loading}
                      checkBox={true}

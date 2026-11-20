@@ -143,6 +143,17 @@ type FilterProps = {
       selectedRows: any[],
       onClearSelection?: () => void,
    ) => React.ReactNode;
+   /**
+    * Phase B4b (P1-5): suppress the toolbar search for tables that do
+    * not (and should not) consume `searchText` — aggregate breakdowns
+    * and the Dashboard ranking. When true the search box is not
+    * rendered AND the "Keyword" chip can never render for this table,
+    * even if the shared filter store carries a term (e.g. set by a
+    * sibling table on the same page or by a crafted URL): an
+    * unconsumed term must never look like an active filter. Default
+    * false preserves the current behaviour on every other page.
+    */
+   hideSearch?: boolean;
 };
 
 const Filter: React.FC<FilterProps> = ({
@@ -162,6 +173,7 @@ const Filter: React.FC<FilterProps> = ({
    showSelectionIndicators = true,
    hideSelectionActions = false,
    customSelectionToolbar,
+   hideSearch = false,
 }) => {
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -323,9 +335,14 @@ const Filter: React.FC<FilterProps> = ({
       filterQueryData.customerData || {},
    ).filter(([key, value]) => key !== "_raw" && isActive(value));
 
+   // P1-5: on a search-suppressed table the stored term is not an
+   // active filter — it drives neither the Keyword chip nor the
+   // Clear-all affordance for this table instance.
+   const searchActive = !hideSearch && isActive(filterQueryData.searchText);
+
    const hasAnyFilter = useMemo(() => {
       return (
-         isActive(filterQueryData.searchText) ||
+         searchActive ||
          isActive(filterQueryData.userRole) ||
          isActive(filterQueryData.productStock) ||
          activeOrderFilters.length > 0 ||
@@ -333,7 +350,7 @@ const Filter: React.FC<FilterProps> = ({
          activeCustomerFilters.length > 0
       );
    }, [
-      filterQueryData.searchText,
+      searchActive,
       filterQueryData.userRole,
       filterQueryData.productStock,
       activeOrderFilters,
@@ -532,35 +549,41 @@ const Filter: React.FC<FilterProps> = ({
                alignItems="center"
                justifyContent="space-between"
             >
-               {/* Search Box */}
-               <FormControl
-                  variant="outlined"
-                  sx={{
-                     flex: isMobile ? "1 1 100%" : "1 1 320px",
-                     minWidth: isMobile ? 0 : 240,
-                     maxWidth: isMobile ? "100%" : 420,
-                  }}
-               >
-                  <TextField
-                     fullWidth
-                     placeholder="Search"
-                     size={isMobile ? "small" : "medium"}
-                     value={searchText}
-                     onChange={(e) => {
-                        setFilterQueryData({
-                           searchText: e.target.value,
-                        });
-                        setSearchText(e.target.value);
+               {/* Search Box — suppressed entirely on hideSearch
+                   tables (P1-5); a flex spacer keeps the actions on
+                   the right, exactly where they sit next to a box. */}
+               {hideSearch ? (
+                  <Stack sx={{ flex: 1 }} />
+               ) : (
+                  <FormControl
+                     variant="outlined"
+                     sx={{
+                        flex: isMobile ? "1 1 100%" : "1 1 320px",
+                        minWidth: isMobile ? 0 : 240,
+                        maxWidth: isMobile ? "100%" : 420,
                      }}
-                     InputProps={{
-                        startAdornment: (
-                           <InputAdornment position="start">
-                              <Icon icon="eva:search-fill" />
-                           </InputAdornment>
-                        ),
-                     }}
-                  />
-               </FormControl>
+                  >
+                     <TextField
+                        fullWidth
+                        placeholder="Search"
+                        size={isMobile ? "small" : "medium"}
+                        value={searchText}
+                        onChange={(e) => {
+                           setFilterQueryData({
+                              searchText: e.target.value,
+                           });
+                           setSearchText(e.target.value);
+                        }}
+                        InputProps={{
+                           startAdornment: (
+                              <InputAdornment position="start">
+                                 <Icon icon="eva:search-fill" />
+                              </InputAdornment>
+                           ),
+                        }}
+                     />
+                  </FormControl>
+               )}
                {/* Right Side: Compact Selection Toolbar when selected, OR Normal Actions when none selected */}
                {isSelectionActive ? (
                   renderSelectionToolbar()
@@ -604,8 +627,9 @@ const Filter: React.FC<FilterProps> = ({
                flexWrap="wrap"
                gap={1}
             >
-               {/* Search Text */}
-               {isActive(filterQueryData.searchText) && (
+               {/* Search Text — never rendered on hideSearch tables,
+                   even when the shared store carries a term (P1-5). */}
+               {searchActive && (
                   <FilterChipWrapper title="Keyword">
                      <Chip
                         label={filterQueryData.searchText}

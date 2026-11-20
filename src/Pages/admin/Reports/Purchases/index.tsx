@@ -9,6 +9,8 @@ import { useSettings } from "@src/lib/settingsContext";
 import { PurchaseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const Purchases = () => {
    const { formatCurrency, settings } = useSettings();
@@ -20,6 +22,12 @@ const Purchases = () => {
    const [supplierCount, setSupplierCount] = useState<number | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailPurchaseId, setDetailPurchaseId] = useState<string | null>(null);
+   // Phase B4b (P1-5): consume the shared toolbar search — the
+   // reports API has no search parameter, so the term filters the
+   // displayed purchase rows client-side (lib/tableSearch). The
+   // cards keep their complete-dataset figures.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
 
    const loadPurchasesReport = useCallback(async () => {
       setLoading(true);
@@ -89,6 +97,17 @@ const Purchases = () => {
    ];
 
    const rows = report?.rows || [];
+   const filteredRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(report?.rows || [], searchText, [
+            "id",
+            "supplier",
+            "status",
+            "date",
+            "totalAmount",
+         ]),
+      [report, searchText],
+   );
    const totalAmount = report?.totalAmount || 0;
    const totalCount = report?.totalCount || rows.length;
 
@@ -145,7 +164,7 @@ const Purchases = () => {
                   </Typography>
 
                   <CustomTable
-                     rows={rows}
+                     rows={filteredRows}
                      columns={columns}
                      loading={loading}
                      checkBox={true}

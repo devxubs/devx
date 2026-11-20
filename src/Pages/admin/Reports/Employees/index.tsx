@@ -12,6 +12,8 @@ import { useSettings } from "@src/lib/settingsContext";
 import { EmployeeDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
+import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const Employees = () => {
    const { formatCurrency, settings } = useSettings();
@@ -20,6 +22,12 @@ const Employees = () => {
    const [error, setError] = useState<string | null>(null);
    const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+   // Phase B4b (P1-5): consume the shared toolbar search — this page
+   // already assembles the COMPLETE ranked set through the chunked
+   // loader, so the term filters that full set client-side
+   // (lib/tableSearch). The cards/graph keep the unfiltered totals.
+   const { filterQueryData } = useFilterQuery();
+   const searchText = filterQueryData.searchText || "";
 
    useEffect(() => {
       let cancelled = false;
@@ -107,6 +115,17 @@ const Employees = () => {
    ];
 
    const rows = report?.rows || [];
+   const filteredRows: any[] = React.useMemo(
+      () =>
+         filterRowsBySearch(report?.rows || [], searchText, [
+            "name",
+            "email",
+            "role",
+            "customId",
+            "rank",
+         ]),
+      [report, searchText],
+   );
    const totalEmployees = rows.length;
    const totalCompletedSales = rows.reduce((s: number, r: any) => s + Number(r.conforms || 0), 0);
    const totalGeneratedRevenue = rows.reduce((s: number, r: any) => s + Number(r.revenue || 0), 0);
@@ -178,7 +197,7 @@ const Employees = () => {
                   </Typography>
 
                   <CustomTable
-                     rows={rows}
+                     rows={filteredRows}
                      columns={rankSalesmanColumns}
                      loading={loading}
                      checkBox={true}
