@@ -16,6 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Item from "./Item";
 import Scrollbar from "react-browser-scrollbar";
 import { orderStatuses } from "../../Order/data";
+import { storedToEditorState, editorStateToStored } from "./permissions";
 
 export interface Permission {
    id: number;
@@ -191,7 +192,11 @@ const data: DataItem[] = [
             allow: false,
          },
          ...orderStatuses.map((status, index) => ({
-            id: 4 + index,
+            // Ids must stay unique within the category: 1–4 are the
+            // CRUD permissions above (Delete is 4), so statuses
+            // start at 5. (Previously the first status shared id 4
+            // with Delete, and toggling one toggled both.)
+            id: 5 + index,
             name: status,
             allow: false,
          })),
@@ -313,18 +318,15 @@ const data: DataItem[] = [
       ],
    },
    {
+      // P0-3: previously TWO categories were both named "Chat"
+      // (one holding only Delete, one holding the other six), so
+      // the two groups collided on the shared category name and
+      // could not be addressed independently. They are merged into
+      // one Chat category here. Every permission keeps its exact
+      // name, so every stored key ("chat_delete",
+      // "chat_view_chat", "chat_send_message", …) is unchanged —
+      // no key any route checks was renamed.
       id: 12,
-      name: "Chat",
-      permissions: [
-         {
-            id: 1,
-            name: "Delete",
-            allow: false,
-         },
-      ],
-   },
-   {
-      id: 13,
       name: "Chat",
       permissions: [
          {
@@ -355,6 +357,11 @@ const data: DataItem[] = [
          {
             id: 6,
             name: "Remove Member",
+            allow: false,
+         },
+         {
+            id: 7,
+            name: "Delete",
             allow: false,
          },
       ],
@@ -435,6 +442,13 @@ const Publish = () => {
    const [role, setRole] = useState(data);
    const [roleName, setRoleName] = useState("");
    const [submitting, setSubmitting] = useState(false);
+   // Granted keys the checkbox catalogue cannot represent (seed
+   // broad grants, legacy keys) — carried through to the next save
+   // verbatim so editing a role never drops them (P0-3).
+   const [extraPermissions, setExtraPermissions] = useState<
+      Record<string, boolean>
+   >({});
+   const [searchQuery, setSearchQuery] = useState("");
 
    useEffect(() => {
       if (!id) return;
@@ -444,6 +458,14 @@ const Publish = () => {
             if (res.ok) {
                const r = await res.json();
                setRoleName(r.name || "");
+               // P0-3 (audit C-3): hydrate the checkbox state from
+               // the role's stored permissions (any stored shape).
+               // Previously only the name was loaded and the boxes
+               // stayed all-unchecked, so saving wiped every
+               // permission the user did not re-tick.
+               const hydrated = storedToEditorState(r.permissions, data);
+               setRole(hydrated.categories);
+               setExtraPermissions(hydrated.extraPermissions);
             }
          } catch {}
       };
@@ -470,14 +492,12 @@ const Publish = () => {
       }
       setSubmitting(true);
       try {
-         const permissionSummary: Record<string, boolean> = {};
-         role.forEach((cat) => {
-            cat.permissions.forEach((perm) => {
-               if (perm.allow) {
-                  permissionSummary[`${cat.name}_${perm.name}`.toLowerCase().replace(/\s+/g, "_")] = true;
-               }
-            });
-         });
+         // Checkbox keys plus the preserved non-catalogue grants —
+         // saving an unchanged role is a permission no-op (P0-3).
+         const permissionSummary = editorStateToStored(
+            role,
+            extraPermissions,
+         );
 
          const url = id ? `/api/roles/${id}` : "/api/roles";
          const method = id ? "PUT" : "POST";
@@ -532,14 +552,12 @@ const Publish = () => {
                      flex: !isMobile ? 0.4 : 1,
                   }}
                   onChange={(e) => {
-                     // Handle search logic here
-                     setRole(
-                        data.filter((item) => {
-                           return item.name
-                              .toLowerCase()
-                              .includes(e.target.value.toLowerCase());
-                        }),
-                     );
+                     // Filter the VISIBLE categories only — the full
+                     // checkbox state in `role` is left untouched.
+                     // (Previously this replaced the state with the
+                     // pristine catalogue, discarding hydrated and
+                     // ticked permissions before save.)
+                     setSearchQuery(e.target.value);
                   }}
                />
                <TextField
@@ -555,7 +573,13 @@ const Publish = () => {
             </Stack>
 
             <Masonry columns={{ xs: 1, md: 2 }} spacing={2} sequential>
-               {role.map((item) => (
+               {role
+                  .filter((item) =>
+                     item.name
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()),
+                  )
+                  .map((item) => (
                   <Item
                      key={item.id}
                      id={item.id}
