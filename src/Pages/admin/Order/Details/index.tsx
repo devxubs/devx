@@ -16,6 +16,7 @@ import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
 import CustomerDetailModal from "@src/Pages/admin/Customers/CustomerDetailModal";
 import QuickEditModal from "../QuickEditModal";
+import { displayOrderDiscount, displayOrderTax } from "@src/lib/orderMoney";
 import { useOrderDetails } from "./hooks/useOrderDetails";
 import { OrderDetailsPageProps } from "./types";
 import {
@@ -118,12 +119,20 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
                <Grid size={{ xs: 12, lg: 8 }}>
                   <Stack spacing={3}>
                      {/* SECTION 1: ORDER ITEMS & FINANCIAL SETTLEMENT */}
+                     {/* O1 display: OrderItemsTable prints discount AND
+                         tax rows, so show the TRUE breakdown from
+                         orderTags (overall discount / tax amount) —
+                         the stored discount is the tax-folded
+                         submitted value and the Order model has no
+                         tax field. Rows reconcile:
+                         Subtotal − Overall Discount + Tax + Delivery
+                         = Total. */}
                      <OrderItemsTable
                         items={order.items || []}
                         subtotal={order.subtotal || 0}
                         deliveryCharge={order.deliveryCharge || 0}
-                        discount={order.discount || 0}
-                        tax={order.tax || 0}
+                        discount={displayOrderDiscount(order)}
+                        tax={displayOrderTax(order)}
                         total={order.total || 0}
                         advancePayment={order.advancePayment || 0}
                         dueAmount={order.dueAmount || 0}

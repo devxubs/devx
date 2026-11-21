@@ -54,6 +54,19 @@ export default function InvoiceRenderer({
 
    const formatMoney = (val?: number) => `৳ ${Number(val || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+   // O1: order.discount is the OVERALL discount and order.tax the
+   // tax amount (true breakdown from orderTags, mapped in
+   // invoiceHelpers). Templates WITHOUT a tax row (thermal, A5,
+   // elegant-border) must print the FOLDED discount
+   // (overall − tax — the value stored on the order) so their rows
+   // still sum to the total: Subtotal − Folded + Delivery = Total.
+   // The default A4 template below prints the tax row, so it uses
+   // order.discount / order.tax unchanged.
+   const foldedDiscount = Math.max(
+      0,
+      (Number(order.discount) || 0) - (Number(order.tax) || 0),
+   );
+
    // ─────────────────────────────────────────────────────────────────────────────
    // 1. THERMAL POS RECEIPTS (80mm & 58mm)
    // ─────────────────────────────────────────────────────────────────────────────
@@ -153,10 +166,10 @@ export default function InvoiceRenderer({
                      <span>{formatMoney(order.deliveryCharge)}</span>
                   </Stack>
                )}
-               {Boolean(order.discount) && (
+               {Boolean(foldedDiscount) && (
                   <Stack direction="row" justifyContent="space-between">
                      <span>{L.discount}:</span>
-                     <span>-{formatMoney(order.discount)}</span>
+                     <span>-{formatMoney(foldedDiscount)}</span>
                   </Stack>
                )}
                <Divider sx={{ my: 0.25, borderStyle: "dashed", borderColor: "#000" }} />
@@ -310,10 +323,10 @@ export default function InvoiceRenderer({
                         <Typography variant="caption">{formatMoney(order.deliveryCharge)}</Typography>
                      </Stack>
                   )}
-                  {Boolean(order.discount) && (
+                  {Boolean(foldedDiscount) && (
                      <Stack direction="row" justifyContent="space-between">
                         <Typography variant="caption">{L.discount}:</Typography>
-                        <Typography variant="caption">-{formatMoney(order.discount)}</Typography>
+                        <Typography variant="caption">-{formatMoney(foldedDiscount)}</Typography>
                      </Stack>
                   )}
                   <Divider />
@@ -422,10 +435,10 @@ export default function InvoiceRenderer({
                         <Typography variant="body2">{formatMoney(order.deliveryCharge)}</Typography>
                      </Stack>
                   )}
-                  {Boolean(order.discount) && (
+                  {Boolean(foldedDiscount) && (
                      <Stack direction="row" justifyContent="space-between">
                         <Typography variant="body2">{L.discount}:</Typography>
-                        <Typography variant="body2">-{formatMoney(order.discount)}</Typography>
+                        <Typography variant="body2">-{formatMoney(foldedDiscount)}</Typography>
                      </Stack>
                   )}
                   <Divider />

@@ -1,4 +1,8 @@
 import { InvoiceOrderData } from "@src/components/InvoiceTemplates/types";
+import {
+   parseOrderTags,
+   orderTagNumber,
+} from "@src/lib/orderMoney";
 
 /**
  * Maps an order database record or row object into the standardized InvoiceOrderData
@@ -10,6 +14,16 @@ export function mapOrderToInvoiceData(order: any): InvoiceOrderData {
       : Array.isArray(order.products)
         ? order.products
         : [];
+
+   // O1 display: the true discount/tax breakdown lives in orderTags
+   // (the stored discount column is the tax-folded submitted value
+   // and the Order model has no tax field). InvoiceRenderer's
+   // tax-row templates print these two values as-is; its templates
+   // WITHOUT a tax row fold them back (discount − tax) so their
+   // printed rows still sum to the total.
+   const tags = parseOrderTags(order.orderTags);
+   const tagOverallDiscount = orderTagNumber(tags, "overallDiscount");
+   const tagTaxAmount = orderTagNumber(tags, "taxAmount");
 
    return {
       id: order.id,
@@ -59,8 +73,10 @@ export function mapOrderToInvoiceData(order: any): InvoiceOrderData {
       })),
       subtotal: Number(order.pricing?.subtotal ?? order.subtotal ?? 0),
       deliveryCharge: Number(order.pricing?.deliveryCharge ?? order.deliveryCharge ?? 0),
-      discount: Number(order.pricing?.discount ?? order.discount ?? 0),
-      tax: Number(order.pricing?.tax ?? order.tax ?? 0),
+      discount: Number(
+         order.pricing?.discount ?? tagOverallDiscount ?? order.discount ?? 0,
+      ),
+      tax: Number(order.pricing?.tax ?? tagTaxAmount ?? order.tax ?? 0),
       total: Number(order.pricing?.total ?? order.total ?? 0),
       advancePayment: Number(order.pricing?.advancePayment ?? order.advancePayment ?? order.paid ?? 0),
       dueAmount: Number(order.pricing?.dueAmount ?? order.dueAmount ?? order.due ?? 0),

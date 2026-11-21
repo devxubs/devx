@@ -26,6 +26,7 @@ import Icon from "@src/components/Icon";
 import { useSettings } from "@src/lib/settingsContext";
 
 import { mergeLineVariants } from "@src/lib/orderLineVariants";
+import { parseOrderTags, rehydratedDiscountValue } from "@src/lib/orderMoney";
 import { useOrderCreate } from "../create/useOrderCreate";
 import SectionCard from "../create/SectionCard";
 import CustomerSection from "../create/CustomerSection";
@@ -83,7 +84,9 @@ const Publish = () => {
             if (!res.ok) return;
             const o = await res.json();
             if (cancelled) return;
-            const tags = (o.orderTags || {}) as any;
+            // orderTags may arrive as an object or a JSON string —
+            // parse it the way the rest of the codebase does.
+            const tags = parseOrderTags(o.orderTags);
             // P2-2: load each line product's LIVE variants so the
             // variant selector renders on edit and the variant can be
             // changed (the PUT already nets stock per product+variant).
@@ -161,7 +164,12 @@ const Publish = () => {
                paymentTxId: o.paymentTxId || "",
                paymentSenderNumber: o.paymentSenderNumber || "",
                discountType: "amount",
-               discountValue: Number(o.discount) || 0,
+               // O1: o.discount is the stored SUBMITTED discount
+               // (overall − tax, folded because the Order model has
+               // no tax column). Hydrate with the OVERALL discount
+               // from orderTags (fallback: stored + taxAmount), or a
+               // no-op edit of a taxed order inflates its total.
+               discountValue: rehydratedDiscountValue(o),
                taxEnabled: Number(tags.taxAmount) > 0,
                taxRate: Number(tags.taxRate) || 0,
                deliveryCharge: Number(o.deliveryCharge) || 0,

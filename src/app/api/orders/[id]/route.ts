@@ -30,6 +30,7 @@ import {
 } from "@src/lib/audit";
 import { overpaidAmountOf } from "@src/lib/utils";
 import { lockOrderRow } from "@src/lib/orderLock";
+import { resolvePutMoneyField } from "@src/lib/orderMoney";
 
 const PAYMENT_STATUS_VALUES = ["UNVERIFIED", "VERIFIED", "MISMATCHED"];
 
@@ -172,6 +173,19 @@ export async function PUT(
                 })()
               : {};
 
+      // O1/O2: the money fields are read at the top level (Quick
+      // Edit, Order Details) or inside the pricing object (the
+      // Publish edit page submits the same payload shape as its
+      // create mode) — the same fallback the TxID/sender/method
+      // reads below already use. Resolved ONCE here so both PUT
+      // paths (items and non-items) and the write gates below can
+      // never drift: previously the pricing-nested delivery charge /
+      // discount / advance were silently dropped and totals
+      // recomputed from the old stored values.
+      const rawDeliveryCharge = resolvePutMoneyField(body, "deliveryCharge");
+      const rawDiscount = resolvePutMoneyField(body, "discount");
+      const rawAdvancePayment = resolvePutMoneyField(body, "advancePayment");
+
       // Fetch actual authenticated user details to ensure accurate audit actor info
       let authUser: any = null;
       if (session.id) {
@@ -298,13 +312,14 @@ export async function PUT(
          }
       }
 
-      // 3. Audit Payment Changes
+      // 3. Audit Payment Changes (advance resolved top-level or
+      // pricing-nested, like the money writes below)
       if (
-         body.advancePayment !== undefined &&
-         Number(body.advancePayment) !== Number(existingOrder.advancePayment || 0)
+         rawAdvancePayment !== undefined &&
+         Number(rawAdvancePayment) !== Number(existingOrder.advancePayment || 0)
       ) {
          const oldAdv = Number(existingOrder.advancePayment || 0);
-         const newAdv = Number(body.advancePayment);
+         const newAdv = Number(rawAdvancePayment);
          newAuditEvents.push({
             id: `act-audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             action: "Payment Updated",
@@ -1040,20 +1055,18 @@ export async function PUT(
             return Number.isFinite(n) ? Math.max(0, n) : fallback;
          };
          const delivery = safeMoney(
-            body.deliveryCharge !== undefined
-               ? body.deliveryCharge
+            rawDeliveryCharge !== undefined
+               ? rawDeliveryCharge
                : existingOrder.deliveryCharge,
             Number(existingOrder.deliveryCharge || 0),
          );
          const discount = safeMoney(
-            body.discount !== undefined
-               ? body.discount
-               : existingOrder.discount,
+            rawDiscount !== undefined ? rawDiscount : existingOrder.discount,
             Number(existingOrder.discount || 0),
          );
          const advance = safeMoney(
-            body.advancePayment !== undefined
-               ? body.advancePayment
+            rawAdvancePayment !== undefined
+               ? rawAdvancePayment
                : existingOrder.advancePayment,
             Number(existingOrder.advancePayment || 0),
          );
@@ -1199,9 +1212,9 @@ export async function PUT(
                data: {
                   subtotal: calculatedSubtotal,
                   deliveryCharge:
-                     body.deliveryCharge !== undefined ? delivery : undefined,
+                     rawDeliveryCharge !== undefined ? delivery : undefined,
                   discount:
-                     body.discount !== undefined ? discount : undefined,
+                     rawDiscount !== undefined ? discount : undefined,
                   total: calculatedTotal,
                   dueAmount: calculatedDue,
                   status: normalizedStatus,
@@ -1229,7 +1242,7 @@ export async function PUT(
                   courierProviderStatus: courierProviderStatusUpdate,
                   courierLastSyncAt: courierStamp,
                   advancePayment:
-                     body.advancePayment !== undefined ? advance : undefined,
+                     rawAdvancePayment !== undefined ? advance : undefined,
                   cancellationReason:
                      body.cancellationReason !== undefined
                         ? body.cancellationReason
@@ -1283,16 +1296,16 @@ export async function PUT(
       // transition out of a terminal status re-deducts it
       // (validated). Both happen in the same transaction as the update.
       const effectiveDelivery =
-         body.deliveryCharge !== undefined
-            ? Math.max(0, Number(body.deliveryCharge) || 0)
+         rawDeliveryCharge !== undefined
+            ? Math.max(0, Number(rawDeliveryCharge) || 0)
             : Number(existingOrder.deliveryCharge || 0);
       const effectiveDiscount =
-         body.discount !== undefined
-            ? Math.max(0, Number(body.discount) || 0)
+         rawDiscount !== undefined
+            ? Math.max(0, Number(rawDiscount) || 0)
             : Number(existingOrder.discount || 0);
       const effectiveAdvance =
-         body.advancePayment !== undefined
-            ? Math.max(0, Number(body.advancePayment) || 0)
+         rawAdvancePayment !== undefined
+            ? Math.max(0, Number(rawAdvancePayment) || 0)
             : Number(existingOrder.advancePayment || 0);
       const recomputedTotal = Math.max(
          0,
@@ -1398,11 +1411,11 @@ export async function PUT(
                courierProviderStatus: courierProviderStatusUpdate,
                courierLastSyncAt: courierStamp,
                deliveryCharge:
-                  body.deliveryCharge !== undefined ? effectiveDelivery : undefined,
+                  rawDeliveryCharge !== undefined ? effectiveDelivery : undefined,
                discount:
-                  body.discount !== undefined ? effectiveDiscount : undefined,
+                  rawDiscount !== undefined ? effectiveDiscount : undefined,
                advancePayment:
-                  body.advancePayment !== undefined ? effectiveAdvance : undefined,
+                  rawAdvancePayment !== undefined ? effectiveAdvance : undefined,
                total: recomputedTotal,
                dueAmount: recomputedDue,
                cancellationReason:
