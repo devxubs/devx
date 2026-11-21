@@ -107,10 +107,10 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    return (
       <Stack
          sx={{
-            bgcolor: alpha(toneColor, isDark ? 0.09 : 0.05),
+            bgcolor: alpha(toneColor, isDark ? 0.055 : 0.05),
             p: 2.5,
-            border: `1px solid ${alpha(toneColor, isDark ? 0.28 : 0.22)}`,
-            boxShadow: `inset 3px 0 0 ${alpha(toneColor, 0.9)}, ${theme.shadows[20]}`,
+            border: `1px solid ${alpha(toneColor, isDark ? 0.18 : 0.16)}`,
+            boxShadow: `inset 2px 0 0 ${alpha(toneColor, 0.9)}, ${theme.shadows[20]}`,
             borderRadius: 1.5,
          }}
       >
