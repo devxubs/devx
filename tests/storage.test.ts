@@ -5,8 +5,10 @@ import path from "path";
 import {
    deleteFile,
    fileUrl,
+   readStoredFile,
    resolveStoredFilePath,
    saveFile,
+   storedFileContentType,
    storedFileNameFromUrl,
 } from "@src/lib/storage";
 
@@ -52,6 +54,43 @@ describe("storage local implementation", () => {
       expect(resolveStoredFilePath("../secret")).toBeNull();
       expect(resolveStoredFilePath("sub/dir.png")).toBeNull();
       expect(resolveStoredFilePath("..\\secret")).toBeNull();
+   });
+
+   it("maps only the uploadable raster extensions to content types", () => {
+      expect(storedFileContentType("a.png")).toBe("image/png");
+      expect(storedFileContentType("a.JPG")).toBe("image/jpeg");
+      expect(storedFileContentType("a.jpeg")).toBe("image/jpeg");
+      expect(storedFileContentType("a.webp")).toBe("image/webp");
+      expect(storedFileContentType("a.gif")).toBe("image/gif");
+      expect(storedFileContentType("a.avif")).toBe("image/avif");
+      // Never servable: scriptable / arbitrary / extensionless names.
+      expect(storedFileContentType("a.svg")).toBeNull();
+      expect(storedFileContentType("a.html")).toBeNull();
+      expect(storedFileContentType("noext")).toBeNull();
+      expect(storedFileContentType("")).toBeNull();
+      expect(storedFileContentType(null)).toBeNull();
+      expect(storedFileContentType(undefined)).toBeNull();
+   });
+
+   it("reads back a saved file with its content type (serving path)", async () => {
+      // Regression coverage for the product-create upload bug: the
+      // file POST /api/uploads writes must be readable through the
+      // same storage surface the /uploads/[filename] route serves,
+      // immediately — no server restart in between.
+      const stored = await saveFile(Buffer.from("fresh-image"), ".jpg");
+      const read = await readStoredFile(stored.filename);
+      expect(read?.contentType).toBe("image/jpeg");
+      expect(read?.buffer.toString()).toBe("fresh-image");
+   });
+
+   it("readStoredFile returns null for missing, foreign and traversal names", async () => {
+      await expect(readStoredFile("missing.png")).resolves.toBeNull();
+      await expect(readStoredFile("../secret.png")).resolves.toBeNull();
+      await expect(readStoredFile("sub/dir.png")).resolves.toBeNull();
+      await expect(readStoredFile("..\\secret.png")).resolves.toBeNull();
+      await expect(readStoredFile("notes.txt")).resolves.toBeNull();
+      await expect(readStoredFile("")).resolves.toBeNull();
+      await expect(readStoredFile(null)).resolves.toBeNull();
    });
 
    it("deletes app-minted URLs and ignores foreign values", async () => {

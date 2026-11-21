@@ -12,10 +12,11 @@ import { saveFile } from "@src/lib/storage";
 // and only its URL ("/uploads/<file>") is stored on the record.
 // Existing data-URL images are untouched and keep rendering.
 //
-// Storage: UPLOAD_DIR env var, default <project>/public/uploads —
-// files under public/ are served by Next.js at /uploads/<file>.
-// If UPLOAD_DIR points elsewhere, that directory must be exposed at
-// /uploads/ by the web server / reverse proxy.
+// Storage: UPLOAD_DIR env var, default <project>/public/uploads.
+// Files are served at /uploads/<file> by the route handler in
+// src/app/uploads/[filename] (NOT by Next.js static public/
+// serving, which ignores files added after the production server
+// started — freshly uploaded images 404'd until a restart).
 //
 // HONEST LIMITATION: local disk is NOT persistent on serverless or
 // ephemeral hosts (e.g. Vercel) — uploads would vanish between
