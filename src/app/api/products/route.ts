@@ -121,6 +121,8 @@ export async function GET(request: NextRequest) {
                      salePrice: true,
                      // Purchase picker prices variant lines at cost.
                      costPrice: true,
+                     // O6: order pickers disable non-ACTIVE variants.
+                     status: true,
                      attributes: true,
                      // P2-19: the Stock workspace surfaces
                      // variant-level low stock from this payload.

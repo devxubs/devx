@@ -415,11 +415,25 @@ export const QuickEditItemsSection: React.FC<QuickEditItemsSectionProps> = ({
                                                            .filter(Boolean)
                                                            .join(" · ")
                                                       : "";
+                                                   // O6: a non-ACTIVE variant
+                                                   // cannot be newly assigned —
+                                                   // the line's CURRENT variant
+                                                   // stays selectable so an
+                                                   // unrelated edit is never
+                                                   // trapped (the PUT applies
+                                                   // the same rule).
+                                                   const vInactive =
+                                                      Boolean(v.status) &&
+                                                      v.status !== "ACTIVE";
                                                    return (
                                                       <MenuItem
                                                          key={v.id}
                                                          value={v.id}
-                                                         disabled={Number(v.quantity) <= 0}
+                                                         disabled={
+                                                            Number(v.quantity) <= 0 ||
+                                                            (vInactive &&
+                                                               v.id !== item.variantId)
+                                                         }
                                                       >
                                                          <Box>
                                                             <Typography variant="body2">
@@ -432,6 +446,9 @@ export const QuickEditItemsSection: React.FC<QuickEditItemsSectionProps> = ({
                                                             >
                                                                SKU: {v.sku} · Stock:{" "}
                                                                {Number(v.quantity) || 0}
+                                                               {vInactive
+                                                                  ? " · Inactive"
+                                                                  : ""}
                                                             </Typography>
                                                          </Box>
                                                       </MenuItem>

@@ -23,6 +23,8 @@ export interface ProductVariantOption {
    quantity: number;
    regularPrice: number | string;
    salePrice?: number | string | null;
+   /** O6: non-ACTIVE variants are not selectable in order lines. */
+   status?: string | null;
    attributes?: Record<string, string> | null;
    isDeleted?: boolean;
 }

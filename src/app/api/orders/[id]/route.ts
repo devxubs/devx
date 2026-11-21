@@ -28,6 +28,10 @@ import {
    buildChanges,
    ORDER_PUT_AUDIT_FIELDS,
 } from "@src/lib/audit";
+import {
+   planOrderStockDiffs,
+   variantAssignmentError,
+} from "@src/lib/orderLineVariants";
 import { overpaidAmountOf } from "@src/lib/utils";
 import { lockOrderRow } from "@src/lib/orderLock";
 import { resolvePutMoneyField } from "@src/lib/orderMoney";
@@ -887,12 +891,14 @@ export async function PUT(
             });
          }
 
-         // Step 3b (INV-02): validate variant references against the
-         // authoritative product ids. A variant must exist and belong
-         // to the line's product. The isDeleted check applies only
-         // when the line is new or its variant actually changed — an
-         // unrelated edit must not fail because a variant on an old
-         // line was archived after the sale.
+         // Step 3b (INV-02 + O6): validate variant references against
+         // the authoritative product ids, via the pure
+         // variantAssignmentError decision (lib/orderLineVariants).
+         // A variant must exist and belong to the line's product.
+         // The isDeleted / status checks apply only when the line
+         // is new or its variant actually changed — an unrelated
+         // edit must not fail because a variant on an old line was
+         // archived or deactivated after the sale.
          const requestedVariantIds = Array.from(
             new Set(
                finalItemsData
@@ -903,34 +909,25 @@ export async function PUT(
          if (requestedVariantIds.length > 0) {
             const foundVariants = await prisma.productVariant.findMany({
                where: { id: { in: requestedVariantIds } },
-               select: { id: true, productId: true, variantName: true, isDeleted: true },
+               select: { id: true, productId: true, variantName: true, isDeleted: true, status: true },
             });
             const variantById = new Map(foundVariants.map((v) => [v.id, v]));
             for (const it of finalItemsData) {
                if (!it.variantId) continue;
-               const variant = variantById.get(it.variantId);
                const existingItem = it.orderItemId
                   ? existingItemsMap.get(it.orderItemId)
                   : undefined;
                const variantChanged =
                   !existingItem || (existingItem.variantId ?? null) !== it.variantId;
-               if (!variant || variant.productId !== it.productId) {
-                  return NextResponse.json(
-                     {
-                        error: "Invalid variant",
-                        message: `Variant '${it.variantId}' does not belong to product '${it.name}'.`,
-                     },
-                     { status: 400 },
-                  );
-               }
-               if (variantChanged && variant.isDeleted) {
-                  return NextResponse.json(
-                     {
-                        error: "Variant unavailable",
-                        message: `Variant '${variant.variantName}' is archived/deleted and cannot be added to an order.`,
-                     },
-                     { status: 400 },
-                  );
+               const rejection = variantAssignmentError({
+                  variantId: it.variantId,
+                  lineName: it.name,
+                  lineProductId: it.productId,
+                  variant: variantById.get(it.variantId),
+                  variantChanged,
+               });
+               if (rejection) {
+                  return NextResponse.json(rejection, { status: 400 });
                }
             }
          }
@@ -978,43 +975,18 @@ export async function PUT(
             isDeleted: existingOrder.isDeleted,
          });
 
-         // INV-02: differences are netted per product + variant —
-         // moving a line from variant A to variant B of the same
-         // product must restore A and deduct B, not net to zero.
-         const stockDiffMap = new Map<
-            string,
-            { productId: string; variantId: string | null; diff: number }
-         >();
-         const addStockDiff = (
-            productId: string,
-            variantId: string | null,
-            delta: number,
-         ) => {
-            const key = `${productId}::${variantId ?? ""}`;
-            const current = stockDiffMap.get(key);
-            if (current) current.diff += delta;
-            else stockDiffMap.set(key, { productId, variantId, diff: delta });
-         };
-
-         if (wasHoldingStock) {
-            for (const existingIt of existingOrder.items) {
-               if (existingIt.productId) {
-                  addStockDiff(
-                     existingIt.productId,
-                     existingIt.variantId ?? null,
-                     -existingIt.quantity,
-                  );
-               }
-            }
-         }
-
-         if (willHoldStock) {
-            for (const newIt of finalItemsData) {
-               if (newIt.productId) {
-                  addStockDiff(newIt.productId, newIt.variantId, newIt.quantity);
-               }
-            }
-         }
+         // INV-02 + O6: differences are netted per product +
+         // variant — moving a line from variant A to variant B of
+         // the same product must restore A and deduct B, not net
+         // to zero. The netting itself is the pure
+         // planOrderStockDiffs helper (lib/orderLineVariants),
+         // computed from the complete before/after sets above.
+         const stockDiffs = planOrderStockDiffs(
+            existingOrder.items,
+            finalItemsData,
+            wasHoldingStock,
+            willHoldStock,
+         );
 
          // Step 5: Identify items to create, update, and delete
          const incomingOrderItemIds = new Set(
@@ -1168,7 +1140,7 @@ export async function PUT(
             // against available stock (ORD-01), warehouse stock is
             // mirrored (INV-01), and movements match the net change.
             const stockSettings = await loadStockSettings(tx);
-            for (const { productId, variantId, diff } of stockDiffMap.values()) {
+            for (const { productId, variantId, diff } of stockDiffs) {
                if (diff === 0) continue;
                await applyStockDifference(tx, productId, diff, {
                   settings: stockSettings,

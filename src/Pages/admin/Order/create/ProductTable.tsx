@@ -293,11 +293,25 @@ const ProductTable = ({
                                                 0,
                                                 num(v.quantity),
                                              );
+                                             // O6: a non-ACTIVE variant
+                                             // cannot be newly assigned —
+                                             // the line's CURRENT variant
+                                             // stays selectable so an
+                                             // unrelated edit is never
+                                             // trapped (the PUT applies
+                                             // the same rule).
+                                             const vInactive =
+                                                Boolean(v.status) &&
+                                                v.status !== "ACTIVE";
                                              return (
                                                 <MenuItem
                                                    key={v.id}
                                                    value={v.id}
-                                                   disabled={vStock <= 0}
+                                                   disabled={
+                                                      vStock <= 0 ||
+                                                      (vInactive &&
+                                                         v.id !== line.variantId)
+                                                   }
                                                 >
                                                    <Box>
                                                       <Typography variant="body2">
@@ -310,6 +324,9 @@ const ProductTable = ({
                                                       >
                                                          SKU: {v.sku} · Stock:{" "}
                                                          {vStock}
+                                                         {vInactive
+                                                            ? " · Inactive"
+                                                            : ""}
                                                       </Typography>
                                                    </Box>
                                                 </MenuItem>
