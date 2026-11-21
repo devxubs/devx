@@ -78,13 +78,14 @@ const Finance = () => {
    // keep exact values.
    const currencySymbol = settings.currencySymbol || "৳";
    const cards = [
-      { title: "Revenue (completed/delivered)", value: formatCompactNumber(report?.revenue ?? 0, { currencySymbol }), isPositive: true },
-      { title: "Expenses", value: formatCompactNumber(report?.expensesTotal ?? 0, { currencySymbol }), isPositive: false },
-      { title: "Purchases", value: formatCompactNumber(report?.purchasesTotal ?? 0, { currencySymbol }), isPositive: false },
+      { title: "Revenue (completed/delivered)", value: formatCompactNumber(report?.revenue ?? 0, { currencySymbol }), isPositive: true, tone: "success" as const },
+      { title: "Expenses", value: formatCompactNumber(report?.expensesTotal ?? 0, { currencySymbol }), isPositive: false, tone: "warning" as const },
+      { title: "Purchases", value: formatCompactNumber(report?.purchasesTotal ?? 0, { currencySymbol }), isPositive: false, tone: "info" as const },
       {
          title: "Net Profit (Revenue − Expenses − Purchases)",
          value: formatCompactNumber(report?.netProfit ?? 0, { currencySymbol }),
          isPositive: Number(report?.netProfit ?? 0) >= 0,
+         tone: (Number(report?.netProfit ?? 0) >= 0 ? "success" : "error") as "success" | "error",
       },
    ];
 
@@ -271,7 +272,7 @@ const Finance = () => {
          <Grid container spacing={2}>
             {cards.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>
-                  <AnalyticsCard title={item.title} value={item.value} isPositive={item.isPositive} />
+                  <AnalyticsCard title={item.title} value={item.value} isPositive={item.isPositive} tone={item.tone} />
                </Grid>
             ))}
          </Grid>

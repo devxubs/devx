@@ -120,6 +120,7 @@ const Purchases = () => {
                   title={"Total Purchases"}
                   isPositive={true}
                   value={formatCompactNumber(totalCount)}
+                  tone="primary"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -129,6 +130,7 @@ const Purchases = () => {
                   value={formatCompactNumber(totalAmount, {
                      currencySymbol: settings.currencySymbol || "৳",
                   })}
+                  tone="warning"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -138,6 +140,7 @@ const Purchases = () => {
                   // a count of currently-active suppliers.
                   title={"Distinct Suppliers"}
                   isPositive={true}
+                  tone="info"
                   value={formatCompactNumber(
                      supplierCount ?? new Set(rows.map((r: any) => r.supplier)).size,
                   )}

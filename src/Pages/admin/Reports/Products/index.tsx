@@ -179,6 +179,7 @@ const Products = () => {
                   title={"Total Items in Stock"}
                   isPositive={true}
                   value={formatCompactNumber(totalInStock)}
+                  tone="primary"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -186,6 +187,7 @@ const Products = () => {
                   title={"Low Stock Alerts"}
                   isPositive={false}
                   value={formatCompactNumber(lowStockCount)}
+                  tone="warning"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -193,6 +195,7 @@ const Products = () => {
                   title={"Out of Stock"}
                   isPositive={false}
                   value={formatCompactNumber(outOfStockCount)}
+                  tone="error"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -202,6 +205,7 @@ const Products = () => {
                   title={"Top Product Units Sold"}
                   isPositive={true}
                   value={formatCompactNumber(topProducts[0]?.sold || 0)}
+                  tone="success"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 4 }}>

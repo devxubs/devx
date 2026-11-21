@@ -57,7 +57,8 @@ export default function CustomerOrderStatistics({
                      sx={{
                         p: 1.5,
                         borderRadius: 1.5,
-                        bgcolor: "background.paper",
+                        bgcolor: alpha(theme.palette.primary.main, 0.04),
+                        borderColor: alpha(theme.palette.primary.main, 0.2),
                         display: "flex",
                         flexDirection: "column",
                         gap: 0.5,
@@ -95,7 +96,8 @@ export default function CustomerOrderStatistics({
                      sx={{
                         p: 1.5,
                         borderRadius: 1.5,
-                        bgcolor: "background.paper",
+                        bgcolor: alpha(theme.palette.success.main, 0.04),
+                        borderColor: alpha(theme.palette.success.main, 0.2),
                         display: "flex",
                         flexDirection: "column",
                         gap: 0.5,
@@ -138,7 +140,8 @@ export default function CustomerOrderStatistics({
                      sx={{
                         p: 1.5,
                         borderRadius: 1.5,
-                        bgcolor: "background.paper",
+                        bgcolor: alpha(theme.palette.error.main, 0.04),
+                        borderColor: alpha(theme.palette.error.main, 0.2),
                         display: "flex",
                         flexDirection: "column",
                         gap: 0.5,
@@ -181,7 +184,8 @@ export default function CustomerOrderStatistics({
                      sx={{
                         p: 1.5,
                         borderRadius: 1.5,
-                        bgcolor: "background.paper",
+                        bgcolor: alpha(theme.palette.warning.main, 0.04),
+                        borderColor: alpha(theme.palette.warning.main, 0.2),
                         display: "flex",
                         flexDirection: "column",
                         gap: 0.5,
@@ -224,7 +228,8 @@ export default function CustomerOrderStatistics({
                      sx={{
                         p: 1.5,
                         borderRadius: 1.5,
-                        bgcolor: "background.paper",
+                        bgcolor: alpha(theme.palette.info.main, 0.04),
+                        borderColor: alpha(theme.palette.info.main, 0.2),
                         display: "flex",
                         flexDirection: "column",
                         gap: 0.5,
@@ -262,7 +267,8 @@ export default function CustomerOrderStatistics({
                      sx={{
                         p: 1.5,
                         borderRadius: 1.5,
-                        bgcolor: "background.paper",
+                        bgcolor: alpha(theme.palette.success.main, 0.04),
+                        borderColor: alpha(theme.palette.success.main, 0.2),
                         display: "flex",
                         flexDirection: "column",
                         gap: 0.5,

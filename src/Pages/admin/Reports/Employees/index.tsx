@@ -163,6 +163,7 @@ const Employees = () => {
                   title={"Total Employees"}
                   isPositive={true}
                   value={formatCompactNumber(totalEmployees)}
+                  tone="primary"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -170,6 +171,7 @@ const Employees = () => {
                   title={"Completed Sales"}
                   isPositive={true}
                   value={formatCompactNumber(totalCompletedSales)}
+                  tone="success"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -179,6 +181,7 @@ const Employees = () => {
                   value={formatCompactNumber(totalGeneratedRevenue, {
                      currencySymbol: settings.currencySymbol || "৳",
                   })}
+                  tone="success"
                />
             </Grid>
 

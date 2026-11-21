@@ -49,21 +49,25 @@ const Summary = () => {
          title: "Total Revenue",
          value: formatCompactNumber(report?.totalRevenue ?? 0, { currencySymbol }),
          isPositive: true,
+         tone: "success" as const,
       },
       {
          title: "Total Orders",
          value: formatCompactNumber(report?.totalOrders ?? 0),
          isPositive: true,
+         tone: "primary" as const,
       },
       {
          title: "Total Products",
          value: formatCompactNumber(report?.totalProducts ?? 0),
          isPositive: true,
+         tone: "info" as const,
       },
       {
          title: "Total Customers",
          value: formatCompactNumber(report?.totalCustomers ?? 0),
          isPositive: true,
+         tone: "primary" as const,
       },
    ];
 
@@ -104,6 +108,7 @@ const Summary = () => {
                      title={item.title}
                      value={item.value}
                      isPositive={item.isPositive}
+                     tone={item.tone}
                   />
                </Grid>
             ))}

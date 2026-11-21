@@ -181,6 +181,7 @@ const Dashboard = () => {
          title: "Completed Orders",
          value: metrics?.completedOrders ?? 0,
          isPositive: true,
+         tone: "success" as const,
       },
       {
          // P3-7: this remainder is total − completed − cancelled,
@@ -191,16 +192,19 @@ const Dashboard = () => {
          title: "Other Orders",
          value: (metrics?.totalOrders || 0) - (metrics?.completedOrders || 0) - (metrics?.cancelledOrders || 0),
          isPositive: true,
+         tone: "secondary" as const,
       },
       {
          title: "Cancelled Orders",
          value: metrics?.cancelledOrders ?? 0,
          isPositive: false,
+         tone: "error" as const,
       },
       {
          title: "Low Stock Alerts",
          value: metrics?.lowStockCount ?? 0,
          isPositive: false,
+         tone: "warning" as const,
       },
    ];
 
@@ -212,21 +216,25 @@ const Dashboard = () => {
          title: "Pending Orders",
          value: metrics?.kpis?.pendingOrders ?? 0,
          isPositive: true,
+         tone: "info" as const,
       },
       {
          title: "Today's Orders",
          value: metrics?.kpis?.todaysOrders ?? 0,
          isPositive: true,
+         tone: "primary" as const,
       },
       {
          title: "Customer Due (Total)",
          value: formatCurrency(metrics?.kpis?.totalCustomerDue ?? 0),
          isPositive: false,
+         tone: "error" as const,
       },
       {
          title: "Orders in Range",
          value: metrics?.totalOrders ?? 0,
          isPositive: true,
+         tone: "info" as const,
       },
    ];
 

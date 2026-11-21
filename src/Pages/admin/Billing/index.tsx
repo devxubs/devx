@@ -13,10 +13,12 @@ import {
    DialogActions,
    Divider,
    Box,
+   alpha,
+   useTheme,
 } from "@mui/material";
 import { GridCellParams } from "@mui/x-data-grid";
 
-import AnalyticsCard from "@cmp/AnalyticsCard";
+import AnalyticsCard, { StatTone } from "@cmp/AnalyticsCard";
 import Icon from "@src/components/Icon";
 import { formatCompactNumber } from "@src/lib/utils";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
@@ -33,17 +35,24 @@ interface InfoCardProps {
    title: string;
    value: number | string;
    icon: string;
+   tone?: StatTone;
 }
 
-const InfoCard = ({ title, value, icon }: InfoCardProps) => {
+const InfoCard = ({ title, value, icon, tone = "primary" }: InfoCardProps) => {
+   const theme = useTheme();
+   // Same premium tint tokens as AnalyticsCard (soft tone background +
+   // faint tone border), adapted to this card's divider-border design.
+   const toneColor =
+      tone === "neutral" ? theme.palette.text.primary : theme.palette[tone].main;
+   const isDark = theme.palette.mode === "dark";
    return (
       <Stack
          className="billing_info_card"
          spacing={2}
          borderRight={1}
          borderRadius={2}
-         borderColor={"divider"}
-         bgcolor={"background.paper"}
+         borderColor={alpha(toneColor, isDark ? 0.28 : 0.22)}
+         bgcolor={alpha(toneColor, isDark ? 0.09 : 0.05)}
          boxShadow={"15"}
          p={2}
          px={3}
@@ -291,6 +300,7 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Total Settled Payouts"}
                      value={`${settings.currencySymbol || "৳"} ${formatCompactNumber(metrics.totalSettled)}`}
                      isPositive={true}
+                     tone="success"
                   />
                </Grid>
                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -298,6 +308,7 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Available Net Balance"}
                      value={`${settings.currencySymbol || "৳"} ${formatCompactNumber(availableBalance)}`}
                      isPositive={true}
+                     tone="primary"
                   />
                </Grid>
                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -305,6 +316,7 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Pending Settlements"}
                      value={`${settings.currencySymbol || "৳"} ${formatCompactNumber(metrics.totalPending)}`}
                      isPositive={false}
+                     tone="warning"
                   />
                </Grid>
 
@@ -313,6 +325,7 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Total Transactions"}
                      value={billingData.length}
                      icon={"solar:cart-large-bold-duotone"}
+                     tone="primary"
                   />
                </Grid>
                <Grid size={{ xs: 12, sm: 4, md: 4 }}>
@@ -326,6 +339,7 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Settlement Fee Rate (per payout)"}
                      value={"1.5%"}
                      icon={"solar:hand-money-bold-duotone"}
+                     tone="info"
                   />
                </Grid>
                <Grid size={{ xs: 12, sm: 4, md: 4 }}>
@@ -333,6 +347,7 @@ Thank you for using DevX POS Settlement Gateway!
                      title={"Total Service Charges"}
                      value={`${settings.currencySymbol || "৳"} ${Number(metrics.totalCharges).toFixed(2)}`}
                      icon={"solar:wallet-money-bold-duotone"}
+                     tone="warning"
                   />
                </Grid>
 

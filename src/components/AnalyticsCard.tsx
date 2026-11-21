@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Stack, Typography, Box, useTheme } from "@mui/material";
+import { Stack, Typography, Box, useTheme, alpha } from "@mui/material";
 import dynamic from "next/dynamic";
 import useGlobalState from "@src/handler/globalState";
 import { formatCompactNumber } from "@src/lib/utils";
@@ -10,11 +10,29 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
    ssr: false,
 });
 
+// Premium summary-card tone system: each metric gets a soft tinted
+// surface derived from its palette tone — a low-alpha background, a
+// faint tone-tinted border, and a slim inset accent bar on the left.
+// Alpha-based, so it composites correctly over both dark and light
+// theme backgrounds. Assign by metric meaning: money in / positive
+// outcomes → success, headline totals → primary, secondary counts →
+// info, pending / money out / attention → warning, negative outcomes
+// → error, loyalty/special → secondary, plain neutral → neutral.
+export type StatTone =
+   | "primary"
+   | "secondary"
+   | "info"
+   | "success"
+   | "warning"
+   | "error"
+   | "neutral";
+
 interface AnalyticsCardProps {
    title: string;
    value: number | string;
    percentage?: string;
    isPositive?: boolean;
+   tone?: StatTone;
    // Optional real trend series (7 values, Mon → Sun). Phase 1: when no
    // real series exists, omit this prop — the card renders without a
    // sparkline instead of drawing invented trend data.
@@ -29,9 +47,16 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    isPositive = true,
    data,
    currency,
+   tone = "primary",
 }) => {
    const colorState = useGlobalState.get("color");
    const theme = useTheme();
+
+   const toneColor =
+      tone === "neutral"
+         ? theme.palette.text.primary
+         : theme.palette[tone].main;
+   const isDark = theme.palette.mode === "dark";
 
    // ✅ Daily labels (Mon - Sun)
    const dailyLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -82,9 +107,10 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
    return (
       <Stack
          sx={{
-            bgcolor: "background.paper",
+            bgcolor: alpha(toneColor, isDark ? 0.09 : 0.05),
             p: 2.5,
-            boxShadow: 20,
+            border: `1px solid ${alpha(toneColor, isDark ? 0.28 : 0.22)}`,
+            boxShadow: `inset 3px 0 0 ${alpha(toneColor, 0.9)}, ${theme.shadows[20]}`,
             borderRadius: 1.5,
          }}
       >

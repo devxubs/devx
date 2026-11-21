@@ -147,6 +147,7 @@ const Sales = () => {
          title: "Total orders",
          value: formatCompactNumber(report?.totalOrders ?? 0),
          isPositive: true,
+         tone: "primary" as const,
       },
       {
          title: "Total revenue",
@@ -154,12 +155,14 @@ const Sales = () => {
             currencySymbol: settings.currencySymbol || "৳",
          }),
          isPositive: true,
+         tone: "success" as const,
          data: report?.trendData,
       },
       {
          title: "Completed orders",
          value: formatCompactNumber(report?.completedCount ?? 0),
          isPositive: true,
+         tone: "success" as const,
       },
       {
          title: "Cancelled / Failed",
@@ -167,6 +170,7 @@ const Sales = () => {
             report?.cancelledFailedCount ?? report?.returnedCount ?? 0,
          ),
          isPositive: false,
+         tone: "error" as const,
       },
    ];
 

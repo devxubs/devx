@@ -153,6 +153,7 @@ const Customer = () => {
                   title={"Total Customers"}
                   isPositive={true}
                   value={formatCompactNumber(totalCustomers)}
+                  tone="primary"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -160,6 +161,7 @@ const Customer = () => {
                   title={"Active Customers"}
                   isPositive={true}
                   value={formatCompactNumber(activeCustomers)}
+                  tone="success"
                />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
@@ -167,6 +169,7 @@ const Customer = () => {
                   title={"Repeat Customers"}
                   isPositive={true}
                   value={formatCompactNumber(repeatCustomers)}
+                  tone="secondary"
                />
             </Grid>
             <Grid size={{ xs: 12 }}>

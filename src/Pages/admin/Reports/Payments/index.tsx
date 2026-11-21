@@ -135,11 +135,11 @@ const Payments = () => {
    // tables below keep exact values.
    const currencySymbol = settings.currencySymbol || "৳";
    const cards = [
-      { title: "Orders (selected day)", value: formatCompactNumber(totals.orders), isPositive: true },
-      { title: "Advance Collected", value: formatCompactNumber(totals.advanceCollected, { currencySymbol }), isPositive: true },
-      { title: "Due / COD Expected", value: formatCompactNumber(totals.dueExpected, { currencySymbol }), isPositive: true },
-      { title: "Verified Payments", value: formatCompactNumber(totals.verified), isPositive: true },
-      { title: "Awaiting Verification", value: formatCompactNumber(totals.unverified + totals.mismatched), isPositive: false },
+      { title: "Orders (selected day)", value: formatCompactNumber(totals.orders), isPositive: true, tone: "primary" as const },
+      { title: "Advance Collected", value: formatCompactNumber(totals.advanceCollected, { currencySymbol }), isPositive: true, tone: "success" as const },
+      { title: "Due / COD Expected", value: formatCompactNumber(totals.dueExpected, { currencySymbol }), isPositive: true, tone: "warning" as const },
+      { title: "Verified Payments", value: formatCompactNumber(totals.verified), isPositive: true, tone: "info" as const },
+      { title: "Awaiting Verification", value: formatCompactNumber(totals.unverified + totals.mismatched), isPositive: false, tone: "warning" as const },
    ];
 
    const methodColumns = [
@@ -331,7 +331,7 @@ const Payments = () => {
          <Grid container spacing={2}>
             {cards.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 2.4 }}>
-                  <AnalyticsCard title={item.title} value={item.value} isPositive={item.isPositive} />
+                  <AnalyticsCard title={item.title} value={item.value} isPositive={item.isPositive} tone={item.tone} />
                </Grid>
             ))}
          </Grid>

@@ -165,16 +165,19 @@ const Courier = () => {
          title: "Total Orders",
          value: formatCompactNumber(totalSubmitted),
          isPositive: true,
+         tone: "primary" as const,
       },
       {
          title: "Courier Net Payout",
          value: formatCompactNumber(totalPaidToYou, { currencySymbol }),
          isPositive: true,
+         tone: "success" as const,
       },
       {
          title: "Total Courier Fees",
          value: formatCompactNumber(totalCharges, { currencySymbol }),
          isPositive: false,
+         tone: "warning" as const,
       },
    ];
 
@@ -245,6 +248,7 @@ const Courier = () => {
                      title={item.title}
                      value={item.value}
                      isPositive={item.isPositive}
+                     tone={item.tone}
                   />
                </Grid>
             ))}
