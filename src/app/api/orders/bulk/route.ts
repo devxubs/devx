@@ -14,6 +14,7 @@ import {
    normalizeOrderStatus,
    ORDER_STATUSES,
 } from "@src/lib/orderStatus";
+import { resolveSubmittedCourierStatus } from "@src/lib/courierSubmission";
 
 // Bulk order actions (Phase 3B, roadmap 3.5).
 //
@@ -100,10 +101,43 @@ export async function POST(request: NextRequest) {
             { status: 400 },
          );
       }
-      const courierStatus =
-         action === "courier" && body.courierStatus
-            ? String(body.courierStatus).trim()
-            : undefined;
+      // O4: the applied courier status resolves as — an explicitly
+      // provided status (validated against the supported list; an
+      // explicit empty string means "keep current"), else the
+      // configured Default Courier Status from the settings
+      // singleton's customConfig, else no status (the exact pre-O4
+      // behaviour when the setting is unset). A settings read
+      // failure must not fail the bulk action: it falls back to
+      // "no default".
+      let courierStatus: string | undefined;
+      if (action === "courier") {
+         const provided = Object.prototype.hasOwnProperty.call(
+            body,
+            "courierStatus",
+         );
+         let settingsConfig: unknown = null;
+         if (!provided) {
+            const settingRow = await prisma.storeSetting
+               .findUnique({
+                  where: { id: "default" },
+                  select: { customConfig: true },
+               })
+               .catch(() => null);
+            settingsConfig = settingRow?.customConfig ?? null;
+         }
+         const resolved = resolveSubmittedCourierStatus({
+            provided,
+            value: body.courierStatus,
+            customConfig: settingsConfig,
+         });
+         if (!resolved.ok) {
+            return NextResponse.json(
+               { error: "Validation error", message: resolved.message },
+               { status: 400 },
+            );
+         }
+         courierStatus = resolved.courierStatus;
+      }
 
       // Audit actor, resolved once (same shape as the single-order PUT).
       const authUser = session.id

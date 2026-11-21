@@ -35,6 +35,13 @@ import ExportOrderModal from "./Export/ExportOrderModal";
 import { mapOrderToInvoiceData } from "./Details/helpers";
 import { useSettings } from "@src/lib/settingsContext";
 import { useSnackbar } from "@src/lib/snackbarContext";
+import {
+   COURIER_STATUSES,
+   resolveDefaultCourierStatus,
+   partitionBulkResults,
+   selectCourierPrintRows,
+   formatFailedOrdersSummary,
+} from "@src/lib/courierSubmission";
 import { OrderDetailModal, CustomerProfileModal } from "./components";
 
 const statusColor: Record<
@@ -89,14 +96,9 @@ const BULK_COURIERS = [
    "E-Courier",
    "Manual/Direct",
 ];
-const BULK_COURIER_STATUSES = [
-   "Pending",
-   "In Courier",
-   "Delivered",
-   "Returned",
-   "Hold",
-   "Cancelled",
-];
+// O4: the supported courier statuses live in lib/courierSubmission
+// (one shared list for this modal, Settings, and the APIs).
+const BULK_COURIER_STATUSES = COURIER_STATUSES;
 
 const OrderTable = () => {
    const router = useRouter();
@@ -386,7 +388,7 @@ const OrderTable = () => {
    // dialog shows exactly which orders failed and why.
    const runBulk = React.useCallback(
       async (payload: Record<string, any>, rows: any[]) => {
-         if (!rows || rows.length === 0 || bulkWorking) return;
+         if (!rows || rows.length === 0 || bulkWorking) return null;
          setBulkWorking(true);
          try {
             const res = await fetch("/api/orders/bulk", {
@@ -403,8 +405,10 @@ const OrderTable = () => {
             }
             setBulkResults(data);
             loadOrders();
+            return data;
          } catch (err: any) {
             showSnackbar(err?.message || "Bulk action failed", "error");
+            return null;
          } finally {
             setBulkWorking(false);
          }
@@ -678,6 +682,15 @@ const OrderTable = () => {
                         disabled={bulkWorking}
                         onClick={() => {
                            setSelectedOrders(selectedRows);
+                           // O4: pre-select the configured Default
+                           // Courier Status (Settings → System); the
+                           // user can still change it or pick
+                           // "Keep current" before submitting.
+                           setBulkCourierStatus(
+                              resolveDefaultCourierStatus(
+                                 settings?.customConfig,
+                              ) || "",
+                           );
                            setCourierModalOpen(true);
                         }}
                      >
@@ -853,17 +866,43 @@ const OrderTable = () => {
                      variant="contained"
                      color="primary"
                      disabled={!bulkCourier.trim() || bulkWorking}
-                     onClick={() => {
+                     onClick={async () => {
                         setCourierModalOpen(false);
-                        runBulk(
+                        // courierStatus is always sent (possibly
+                        // ""): an explicit empty value means "keep
+                        // current" and must not be overridden by
+                        // the server-side default (O4).
+                        const data = await runBulk(
                            {
                               action: "courier",
                               courier: bulkCourier.trim(),
-                              ...(bulkCourierStatus
-                                 ? { courierStatus: bulkCourierStatus }
-                                 : {}),
+                              courierStatus: bulkCourierStatus,
                            },
                            selectedOrders,
+                        );
+                        // O3: open the invoices of the SUCCESSFULLY
+                        // submitted orders together on the existing
+                        // print page (one batch print, each invoice
+                        // intact). A total failure — or a failed
+                        // request — never navigates to print; the
+                        // results dialog above already lists every
+                        // per-order outcome.
+                        if (!data) return;
+                        const { succeeded, failed } = partitionBulkResults(
+                           data.results || [],
+                        );
+                        if (succeeded.length === 0) return;
+                        if (failed.length > 0) {
+                           showSnackbar(
+                              `Courier submitted for ${succeeded.length} order(s); ${failed.length} failed: ${formatFailedOrdersSummary(failed)}`,
+                              "error",
+                           );
+                        }
+                        handleBatchInvoicePrint(
+                           selectCourierPrintRows(
+                              selectedOrders,
+                              data.results || [],
+                           ),
                         );
                      }}
                   >

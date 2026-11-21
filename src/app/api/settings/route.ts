@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { sanitizeCustomConfig } from "@src/lib/customConfig";
+import { validateDefaultCourierStatusInConfig } from "@src/lib/courierSubmission";
 import {
    logAudit,
    auditActorFromContext,
@@ -179,7 +180,20 @@ export async function PUT(request: NextRequest) {
 
       // Custom Config — P2-20: dead write-only keys are stripped on
       // save (see src/lib/customConfig.ts for the audited list).
-      if (body.customConfig !== undefined) dataToUpdate.customConfig = sanitizeCustomConfig(body.customConfig);
+      // O4: the Default Courier Status lives in this blob
+      // (customConfig.defaultCourierStatus); an unsupported value is
+      // rejected here, on save, instead of being stored and then
+      // silently misapplied at courier submission time.
+      if (body.customConfig !== undefined) {
+         const courierVerdict = validateDefaultCourierStatusInConfig(body.customConfig);
+         if (!courierVerdict.ok) {
+            return NextResponse.json(
+               { error: "Validation error", message: courierVerdict.message },
+               { status: 400 },
+            );
+         }
+         dataToUpdate.customConfig = sanitizeCustomConfig(body.customConfig);
+      }
 
       // P2-4: settings updates are audited in the same transaction
       // as the upsert. The diff covers exactly the whitelisted

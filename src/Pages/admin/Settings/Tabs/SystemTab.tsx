@@ -13,11 +13,16 @@ import {
    Button,
    Alert,
    CircularProgress,
+   MenuItem,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomSwitch from "@src/components/CustomSwitch";
 import AlertDialog from "@src/components/AlertDialog";
 import CourierProvidersCard from "./CourierProvidersCard";
+import {
+   COURIER_STATUSES,
+   resolveDefaultCourierStatus,
+} from "@src/lib/courierSubmission";
 
 interface SystemTabProps {
    values: any;
@@ -29,6 +34,7 @@ interface SystemTabProps {
 export default function SystemTab({
    values,
    onChange,
+   onConfigChange,
    onResetDefaults,
 }: SystemTabProps) {
    const [openResetDialog, setOpenResetDialog] = useState(false);
@@ -193,6 +199,42 @@ export default function SystemTab({
                </Alert>
             </Stack>
          </Card>
+
+         {/* Default Courier Status (O4) — persisted in customConfig
+             via the same mechanism as Default Expense Category;
+             applied by the bulk courier submission when no explicit
+             status is chosen. */}
+         <Box sx={{ pt: 1 }}>
+            <Typography variant="h6" fontWeight={600}>
+               Courier
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+               Choose the courier status new bulk courier submissions start
+               with. Leave it unset to keep the current behaviour.
+            </Typography>
+            <Grid container spacing={2}>
+               <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField
+                     select
+                     fullWidth
+                     label="Default Courier Status"
+                     size="small"
+                     value={resolveDefaultCourierStatus(values.customConfig) || ""}
+                     onChange={(e) =>
+                        onConfigChange("defaultCourierStatus", e.target.value)
+                     }
+                     helperText="Pre-selected in the bulk courier dialog and applied automatically on submission"
+                  >
+                     <MenuItem value="">— No default —</MenuItem>
+                     {COURIER_STATUSES.map((s) => (
+                        <MenuItem key={s} value={s}>
+                           {s}
+                        </MenuItem>
+                     ))}
+                  </TextField>
+               </Grid>
+            </Grid>
+         </Box>
 
          {/* Courier Providers (Phase 4, D4) — env-credential status */}
          <CourierProvidersCard />

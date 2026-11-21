@@ -16,6 +16,11 @@
  *     renderer consumes them via the print document's customization
  *     (the four *OnReceipt keys and the template id are mapped onto
  *     the renderer's field names at the consumption sites).
+ *   - defaultCourierStatus (O4) — the bulk courier submission
+ *     applies it when no explicit courier status is chosen (read
+ *     server-side by POST /api/orders/bulk and pre-selected in the
+ *     orders-list bulk courier modal; validated on save against
+ *     COURIER_STATUSES in src/lib/courierSubmission.ts).
  *
  * DEAD keys (no consumer exists — UI removed, and stripped here on
  * save so they stop being persisted):
