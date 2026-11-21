@@ -486,7 +486,7 @@ const OrderTable = () => {
          headerName: "ID",
          flex: 0.3,
          renderCell: (params: any) => (
-            <Stack direction="row" spacing={0.75} alignItems="center">
+            <Stack direction="column" spacing={0.5} alignItems="flex-start">
                <Typography
                   variant="body2"
                   fontWeight={600}
