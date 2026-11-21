@@ -137,6 +137,9 @@ const OrderTable = () => {
    const [bulkCourier, setBulkCourier] = useState("");
    const [bulkCourierStatus, setBulkCourierStatus] = useState("");
    const [bulkWorking, setBulkWorking] = useState(false);
+   // O7: bulk delete confirmation (existing AlertDialog, same as
+   // the single-order delete).
+   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
    const [bulkResults, setBulkResults] = useState<any>(null);
    const [exportModalOpen, setExportModalOpen] = useState(false);
    const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
@@ -312,6 +315,8 @@ const OrderTable = () => {
                   )?.employeeNote || "",
                ),
                orderSource: o.orderSource || "Direct",
+               // O8: advisory duplicate flag from the list API.
+               duplicateOf: Array.isArray(o.duplicateOf) ? o.duplicateOf : [],
                createdAt: o.createdAt,
                updatedAt: o.updatedAt,
                timestamps: {
@@ -369,6 +374,33 @@ const OrderTable = () => {
          setLoading(false);
       }
    }, [orderTab, filterQueryData, paginationModel]);
+
+   // O5: any filter change (filter-modal values, search text, status
+   // tab/chips — everything that feeds the list query lives in
+   // filterQueryData / orderTab) must clear the bulk selection, so
+   // orders hidden by the new filter can never be bulk-acted on.
+   // CustomTable owns the checkbox state internally, so the clear is
+   // done by (a) dropping the parent's selectedOrders and (b)
+   // bumping selectionResetKey, which remounts CustomTable with an
+   // empty selection model (its pagination is controlled from here,
+   // so the remount loses nothing). Selection made AFTER the filter
+   // change is untouched — the signature only changes when the
+   // filter itself changes.
+   const [selectionResetKey, setSelectionResetKey] = useState(0);
+   const filterSignature = React.useMemo(
+      () => JSON.stringify({ tab: orderTab, filter: filterQueryData }),
+      [orderTab, filterQueryData],
+   );
+   const prevFilterSignatureRef = React.useRef(filterSignature);
+   const clearSelection = React.useCallback(() => {
+      setSelectedOrders([]);
+      setSelectionResetKey((k) => k + 1);
+   }, []);
+   useEffect(() => {
+      if (prevFilterSignatureRef.current === filterSignature) return;
+      prevFilterSignatureRef.current = filterSignature;
+      clearSelection();
+   }, [filterSignature, clearSelection]);
 
    // Any tab / filter / search change returns to the first page so the
    // requested page can never point past the filtered result set.
@@ -454,25 +486,42 @@ const OrderTable = () => {
          headerName: "ID",
          flex: 0.3,
          renderCell: (params: any) => (
-            <Typography
-               variant="body2"
-               fontWeight={600}
-               color="primary.main"
-               sx={{
-                  cursor: "pointer",
-                  "&:hover": { textDecoration: "underline" },
-               }}
-               onClick={() => {
-                  const targetId =
-                     params.row.orderCode ||
-                     params.row.customId ||
-                     params.row.orderId ||
-                     params.row.id;
-                  router.push(`/admin/order/${targetId}`);
-               }}
-            >
-               {params.row.orderCode || params.row.orderId || params.row.customId || params.row.id}
-            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center">
+               <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  color="primary.main"
+                  sx={{
+                     cursor: "pointer",
+                     "&:hover": { textDecoration: "underline" },
+                  }}
+                  onClick={() => {
+                     const targetId =
+                        params.row.orderCode ||
+                        params.row.customId ||
+                        params.row.orderId ||
+                        params.row.id;
+                     router.push(`/admin/order/${targetId}`);
+                  }}
+               >
+                  {params.row.orderCode || params.row.orderId || params.row.customId || params.row.id}
+               </Typography>
+               {/* O8: non-blocking possible-duplicate marker. */}
+               {Array.isArray(params.row.duplicateOf) &&
+                  params.row.duplicateOf.length > 0 && (
+                     <Tooltip
+                        title={`Possible duplicate of ${params.row.duplicateOf.join(", ")}`}
+                        disableInteractive
+                     >
+                        <Chip
+                           label="Duplicate?"
+                           size="small"
+                           color="warning"
+                           sx={{ fontWeight: 700, fontSize: "0.65rem" }}
+                        />
+                     </Tooltip>
+                  )}
+            </Stack>
          ),
       },
       {
@@ -520,6 +569,24 @@ const OrderTable = () => {
          headerName: "Date",
          renderCell: (params) => {
             const d = new Date(params.row.createdAt);
+            const dateOnly = d.toLocaleDateString();
+            const timeOnly = d.toLocaleTimeString();
+
+            return <CreateAt date={dateOnly} time={timeOnly} />;
+         },
+      },
+      {
+         // O9: Updated column — the order's updatedAt, formatted
+         // exactly like the Created ("Date") column above. No
+         // createdAt fallback: a missing updatedAt renders an em
+         // dash. (The list API already selects updatedAt, and the
+         // row mapping already carries it.)
+         field: "updatedAt",
+         headerName: "Updated",
+         renderCell: (params) => {
+            if (!params.row.updatedAt) return "—";
+            const d = new Date(params.row.updatedAt);
+            if (Number.isNaN(d.getTime())) return "—";
             const dateOnly = d.toLocaleDateString();
             const timeOnly = d.toLocaleTimeString();
 
@@ -614,7 +681,24 @@ const OrderTable = () => {
                }}
             />
          </Stack>
+         {/* O10: the filtered count — `totalOrders` is the list API's
+             filtered `total` for the ACTIVE filters (refreshed on
+             every filter apply/clear/change), not the page size and
+             not the unfiltered count. */}
+         <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="flex-end"
+            px={2}
+            pb={1}
+         >
+            <Typography variant="body2" color="text.secondary">
+               {totalOrders} order{totalOrders === 1 ? "" : "s"} matching
+               current filters
+            </Typography>
+         </Stack>
          <CustomTable
+            key={`orders-table-${selectionResetKey}`}
             rows={orderRows as OrderType[]}
             columns={columns}
             serverPagination
@@ -695,6 +779,25 @@ const OrderTable = () => {
                         }}
                      >
                         <Icon icon="solar:delivery-bold" size="small" />
+                     </IconButton>
+                  </Tooltip>
+                  {/* O7: bulk delete — soft-delete to the Bin via
+                      POST /api/orders/bulk action "delete", behind
+                      the existing AlertDialog confirmation. */}
+                  <Tooltip title="Delete selected orders (move to Bin)" disableInteractive>
+                     <IconButton
+                        aria-label="Delete selected orders"
+                        disabled={bulkWorking}
+                        onClick={() => {
+                           setSelectedOrders(selectedRows);
+                           setBulkDeleteOpen(true);
+                        }}
+                     >
+                        <Icon
+                           icon="solar:trash-bin-trash-bold"
+                           size="small"
+                           color="error"
+                        />
                      </IconButton>
                   </Tooltip>
                </Stack>
@@ -1146,6 +1249,26 @@ const OrderTable = () => {
                try {
                   await fetch(`/api/orders/${targetId}`, { method: "DELETE" });
                } catch {}
+            }}
+         />
+         {/* O7: bulk delete confirmation. The bulk-results dialog
+             (already used by status/courier) then reports every
+             per-order outcome, including which orders failed and
+             why; the selection is cleared after any success. */}
+         <AlertDialog
+            open={bulkDeleteOpen}
+            type={"delete"}
+            title={`Are you sure you want to delete <b>${selectedOrders.length}</b> selected order(s)? They will be moved to the Bin and their stock released.`}
+            onClose={() => setBulkDeleteOpen(false)}
+            onConfirm={async () => {
+               setBulkDeleteOpen(false);
+               const data = await runBulk(
+                  { action: "delete" },
+                  selectedOrders,
+               );
+               if (data && Number(data.succeeded || 0) > 0) {
+                  clearSelection();
+               }
             }}
          />
          <OrderDetailModal

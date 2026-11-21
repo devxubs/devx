@@ -35,6 +35,11 @@ import {
    requestAuditContext,
 } from "@src/lib/audit";
 import { buildNoteCreatedEvents } from "@src/lib/orderNoteEvents";
+import {
+   findDuplicateMatches,
+   dhakaDayKey,
+   type DuplicateOrderInput,
+} from "@src/lib/duplicateOrders";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -498,6 +503,95 @@ export async function GET(request: NextRequest) {
          statusCounts[g.status] = g._count.id;
       });
 
+      // O8: possible-duplicate flags for THIS page only, without
+      // N+1 queries — one bounded candidate query fetches valid
+      // orders created on the same Asia/Dhaka calendar day(s) as
+      // the page's orders AND sharing one of the page's raw customer
+      // phone numbers; the exact rule (normalised phone + item
+      // signature + total + Dhaka day + valid state) is then applied
+      // in memory by the pure helper in lib/duplicateOrders.
+      const toDuplicateInput = (o: any): DuplicateOrderInput => ({
+         id: o.id,
+         customId: o.customId,
+         orderCode: o.orderCode,
+         orderId: o.orderId,
+         customerPhone: o.customer?.phone || null,
+         total: Number(o.total || 0),
+         createdAt: o.createdAt,
+         status: o.status,
+         isDeleted: o.isDeleted,
+         items: (o.items || []).map((it: any) => ({
+            productId: it.productId || null,
+            variantId: it.variantId || null,
+            quantity: it.quantity,
+         })),
+      });
+      let duplicateMatches = new Map<string, string[]>();
+      try {
+         const pageInputs = orders.map(toDuplicateInput);
+         const rawPhones = Array.from(
+            new Set(
+               pageInputs
+                  .map((o) => o.customerPhone)
+                  .filter((p): p is string => Boolean(p && p.trim())),
+            ),
+         );
+         if (rawPhones.length > 0 && pageInputs.length > 0) {
+            const dayKeys = pageInputs
+               .map((o) => dhakaDayKey(o.createdAt))
+               .filter(Boolean)
+               .sort();
+            // Dhaka is UTC+6 year-round: a Dhaka day starts at
+            // 18:00Z the previous UTC day.
+            const rangeStart = new Date(
+               `${dayKeys[0]}T00:00:00.000+06:00`,
+            );
+            const rangeEnd = new Date(
+               new Date(
+                  `${dayKeys[dayKeys.length - 1]}T00:00:00.000+06:00`,
+               ).getTime() +
+                  24 * 60 * 60 * 1000,
+            );
+            const candidates = await prisma.order.findMany({
+               where: {
+                  isDeleted: false,
+                  status: { notIn: ["CANCELLED", "FAILED"] as any },
+                  createdAt: { gte: rangeStart, lt: rangeEnd },
+                  customer: { phone: { in: rawPhones } },
+               },
+               select: {
+                  id: true,
+                  customId: true,
+                  orderCode: true,
+                  orderId: true,
+                  status: true,
+                  total: true,
+                  isDeleted: true,
+                  createdAt: true,
+                  customer: { select: { phone: true } },
+                  items: {
+                     select: {
+                        productId: true,
+                        variantId: true,
+                        quantity: true,
+                     },
+                  },
+               },
+            });
+            const byId = new Map<string, DuplicateOrderInput>();
+            for (const input of pageInputs) byId.set(input.id, input);
+            for (const c of candidates) {
+               if (!byId.has(c.id)) byId.set(c.id, toDuplicateInput(c));
+            }
+            duplicateMatches = findDuplicateMatches(
+               Array.from(byId.values()),
+            );
+         }
+      } catch {
+         // Duplicate flags are advisory only — never fail the list.
+         duplicateMatches = new Map();
+      }
+
       return NextResponse.json({
          // C4-3 (audit C-13 / P2-12): additive computed field — the
          // advance excess over the total, previously recorded
@@ -506,6 +600,10 @@ export async function GET(request: NextRequest) {
          orders: orders.map((o) => ({
             ...o,
             overpaidAmount: overpaidAmountOf(o),
+            // O8: advisory duplicate flag + the matching orders'
+            // display ids (empty array when there is no match).
+            duplicateOf: duplicateMatches.get(o.id) || [],
+            isPossibleDuplicate: duplicateMatches.has(o.id),
          })),
          total,
          page,

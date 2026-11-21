@@ -38,7 +38,22 @@ interface BulkResult {
 }
 
 export async function POST(request: NextRequest) {
-   const gate = await requirePermission(request, ["orders", "order", "order_update"]);
+   // O7: the permission gate is action-dependent — "delete" must
+   // pass the SAME gate as the single-order DELETE
+   // (order_delete), while status/courier keep the update gate.
+   // Peek at the action on a clone so the body below is still
+   // parsed exactly once from the original request.
+   const peekedAction = await request
+      .clone()
+      .json()
+      .then((b: any) => b?.action)
+      .catch(() => undefined);
+   const gate = await requirePermission(
+      request,
+      peekedAction === "delete"
+         ? ["orders", "order", "order_delete"]
+         : ["orders", "order", "order_update"],
+   );
    if (gate instanceof NextResponse) return gate;
    const session = gate.session;
 
@@ -54,9 +69,9 @@ export async function POST(request: NextRequest) {
            )
          : [];
 
-      if (action !== "status" && action !== "courier") {
+      if (action !== "status" && action !== "courier" && action !== "delete") {
          return NextResponse.json(
-            { error: "Validation error", message: 'action must be "status" or "courier".' },
+            { error: "Validation error", message: 'action must be "status", "courier" or "delete".' },
             { status: 400 },
          );
       }
@@ -266,6 +281,51 @@ export async function POST(request: NextRequest) {
                      ...auditCtx,
                   });
                   return { ok: true, displayId };
+               }
+
+               if (action === "delete") {
+                  // O7: mirror the single-order DELETE exactly —
+                  // soft-delete to the Bin (never permanent), stock
+                  // released exactly once via orderHoldsStock (an
+                  // already-deleted order is rejected above by the
+                  // shared `!order || order.isDeleted` guard, and a
+                  // CANCELLED/FAILED order restores nothing), and a
+                  // DELETE AuditLog row in the same transaction.
+                  // The single DELETE appends no orderTags history
+                  // event, so neither does this.
+                  const stockRestored = orderHoldsStock(order);
+                  if (stockRestored) {
+                     await restoreStockForItems(
+                        tx,
+                        order.items
+                           .filter((it) => it.productId)
+                           .map((it) => ({
+                              productId: it.productId as string,
+                              quantity: it.quantity,
+                              variantId: it.variantId,
+                           })),
+                        {
+                           orderId: order.id,
+                           note: `Order ${displayId} deleted (bulk) — stock restored`,
+                        },
+                     );
+                  }
+                  await tx.order.update({
+                     where: { id: order.id },
+                     data: { isDeleted: true, deletedAt: new Date() },
+                  });
+                  await logAudit(tx, {
+                     actor: auditActorRef,
+                     action: "DELETE",
+                     entityType: "ORDER",
+                     entityId: order.id,
+                     entityCustomId: displayId,
+                     summary: stockRestored
+                        ? `Order ${displayId} moved to bin (bulk) — stock restored`
+                        : `Order ${displayId} moved to bin (bulk) — no stock restored (order was ${order.status})`,
+                     ...auditCtx,
+                  });
+                  return { ok: true, displayId, note: "Moved to bin" };
                }
 
                // action === "courier"

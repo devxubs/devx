@@ -81,6 +81,8 @@ export interface OrderType {
    orderSource: string;
    createdAt: string;
    updatedAt?: string;
+   /** O8: display ids of possible-duplicate orders (empty if none). */
+   duplicateOf?: string[];
    cancellationReason?: string;
 
    timestamps: OrderTimestampsType;
