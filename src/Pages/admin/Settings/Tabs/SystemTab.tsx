@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
    Grid,
    Stack,
@@ -23,20 +23,6 @@ import {
    COURIER_STATUSES,
    resolveDefaultCourierStatus,
 } from "@src/lib/courierSubmission";
-import {
-   DEFAULT_RANKING_SETTINGS,
-   parseRankingSettings,
-   type RankingSettings,
-   type RankingWeights,
-} from "@src/lib/rankingSettings";
-
-const RANKING_WEIGHT_FIELDS: { key: keyof RankingWeights; label: string }[] = [
-   { key: "completedSales", label: "Completed Sales Weight (%)" },
-   { key: "netRevenue", label: "Net Revenue Weight (%)" },
-   { key: "confirmationRate", label: "Confirmation Rate Weight (%)" },
-   { key: "handlingQuality", label: "Handling Quality Weight (%)" },
-   { key: "cancellationControl", label: "Cancellation Control Weight (%)" },
-];
 
 interface SystemTabProps {
    values: any;
@@ -55,35 +41,6 @@ export default function SystemTab({
    const [isExporting, setIsExporting] = useState(false);
    const [isResetting, setIsResetting] = useState(false);
    const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-   // Employee Ranking settings (plan §6): edited locally, written
-   // into customConfig.employeeRankingSettings through the SAME
-   // onConfigChange flow the courier default uses, and saved by the
-   // page-level Save Settings (whole customConfig PUT). The server
-   // validates strictly and rejects an invalid object with a 400.
-   // Local state is re-seeded whenever the loaded settings change
-   // (initial load / discard), falling back to the defaults.
-   const [rankingSettings, setRankingSettings] = useState<RankingSettings>(
-      () => parseRankingSettings(values.customConfig) || DEFAULT_RANKING_SETTINGS,
-   );
-   const storedRankingJson = JSON.stringify(
-      values.customConfig?.employeeRankingSettings ?? null,
-   );
-   useEffect(() => {
-      setRankingSettings(parseRankingSettings(values.customConfig));
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [storedRankingJson]);
-
-   const updateRankingSettings = (next: RankingSettings) => {
-      setRankingSettings(next);
-      onConfigChange("employeeRankingSettings", next);
-   };
-
-   const rankingWeightSum = RANKING_WEIGHT_FIELDS.reduce(
-      (sum, f) => sum + (Number(rankingSettings.weights[f.key]) || 0),
-      0,
-   );
-   const rankingWeightsValid = rankingWeightSum === 100;
 
    const handleExportData = async () => {
       setIsExporting(true);
@@ -277,187 +234,6 @@ export default function SystemTab({
                   </TextField>
                </Grid>
             </Grid>
-         </Box>
-
-         {/* Employee Ranking (plan §6 / §8 Step 6) — weights, targets
-             and behaviour for the Dashboard performance ranking.
-             Saved through the same settings PUT as everything else
-             on this page; the server validates the object and a 400
-             message is surfaced by the save flow. */}
-         <Box sx={{ pt: 1 }}>
-            <Typography variant="h6" fontWeight={600}>
-               Employee Ranking
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-               Scoring weights and targets for the Dashboard employee
-               performance ranking. Changes affect live calculations
-               immediately and never alter finalized month snapshots.
-            </Typography>
-            <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-               <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-                  <Stack spacing={2.5}>
-                     <Grid container spacing={2}>
-                        {RANKING_WEIGHT_FIELDS.map((f) => (
-                           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={f.key}>
-                              <TextField
-                                 fullWidth
-                                 type="number"
-                                 size="small"
-                                 label={f.label}
-                                 value={rankingSettings.weights[f.key]}
-                                 onChange={(e) =>
-                                    updateRankingSettings({
-                                       ...rankingSettings,
-                                       weights: {
-                                          ...rankingSettings.weights,
-                                          [f.key]: e.target.value === "" ? 0 : Number(e.target.value),
-                                       },
-                                    })
-                                 }
-                                 inputProps={{ min: 0, step: 1 }}
-                              />
-                           </Grid>
-                        ))}
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                           <Box
-                              sx={{
-                                 height: "100%",
-                                 display: "flex",
-                                 alignItems: "center",
-                                 px: 1.5,
-                                 py: 1,
-                                 borderRadius: 1,
-                                 border: "1px solid",
-                                 borderColor: rankingWeightsValid ? "success.main" : "error.main",
-                                 color: rankingWeightsValid ? "success.main" : "error.main",
-                              }}
-                           >
-                              <Typography variant="body2" fontWeight={700}>
-                                 Weights total: {rankingWeightSum} / 100
-                              </Typography>
-                           </Box>
-                        </Grid>
-                     </Grid>
-                     {!rankingWeightsValid && (
-                        <Alert severity="error" sx={{ borderRadius: 1.5 }}>
-                           employeeRankingSettings.weights must sum to exactly 100 (got {rankingWeightSum}).
-                        </Alert>
-                     )}
-
-                     <Grid container spacing={2}>
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                           <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              label="Sales Target (monthly)"
-                              value={rankingSettings.salesTargetMonthly}
-                              onChange={(e) =>
-                                 updateRankingSettings({
-                                    ...rankingSettings,
-                                    salesTargetMonthly: e.target.value === "" ? 0 : Number(e.target.value),
-                                 })
-                              }
-                              inputProps={{ min: 0, step: 1 }}
-                              helperText="Completed orders per month for a full S1 score"
-                           />
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                           <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              label="Revenue Target (monthly, ৳)"
-                              value={rankingSettings.revenueTargetMonthly}
-                              onChange={(e) =>
-                                 updateRankingSettings({
-                                    ...rankingSettings,
-                                    revenueTargetMonthly: e.target.value === "" ? 0 : Number(e.target.value),
-                                 })
-                              }
-                              inputProps={{ min: 0, step: 1000 }}
-                              helperText="Net revenue per month for a full S2 score"
-                           />
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                           <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              label="Minimum Eligible Orders"
-                              value={rankingSettings.minEligibleOrders}
-                              onChange={(e) =>
-                                 updateRankingSettings({
-                                    ...rankingSettings,
-                                    minEligibleOrders: e.target.value === "" ? 0 : Number(e.target.value),
-                                 })
-                              }
-                              inputProps={{ min: 1, step: 1 }}
-                              helperText="Handled orders needed to be ranked (below = Provisional)"
-                           />
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                           <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              label="Cancellation Penalty"
-                              value={rankingSettings.cancellationPenalty}
-                              onChange={(e) =>
-                                 updateRankingSettings({
-                                    ...rankingSettings,
-                                    cancellationPenalty: e.target.value === "" ? 0 : Number(e.target.value),
-                                 })
-                              }
-                              inputProps={{ min: 0, step: 0.1 }}
-                              helperText="Multiplier applied to the attributable-cancellation rate"
-                           />
-                        </Grid>
-                        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                           <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              label="Processing SLA (hours)"
-                              value={rankingSettings.processingSlaHours}
-                              onChange={(e) =>
-                                 updateRankingSettings({
-                                    ...rankingSettings,
-                                    processingSlaHours: e.target.value === "" ? 0 : Number(e.target.value),
-                                 })
-                              }
-                              inputProps={{ min: 0, step: 1 }}
-                              helperText="Confirm within this many hours of creation to count as on-time"
-                           />
-                        </Grid>
-                     </Grid>
-
-                     <FormControlLabel
-                        control={
-                           <CustomSwitch
-                              checked={Boolean(rankingSettings.autoRecalculate)}
-                              onChange={(e) =>
-                                 updateRankingSettings({
-                                    ...rankingSettings,
-                                    autoRecalculate: e.target.checked,
-                                 })
-                              }
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Auto Recalculate
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 On: rankings are calculated live on every view. Off: finalized months are served from snapshots; the current month stays live.
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </Stack>
-               </CardContent>
-            </Card>
          </Box>
 
          {/* Courier Providers (Phase 4, D4) — env-credential status */}
