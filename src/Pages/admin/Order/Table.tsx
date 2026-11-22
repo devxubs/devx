@@ -31,7 +31,6 @@ import OrderFilter from "./OrderFilter";
 import OrderTab, { StatusProps } from "./OrderTab";
 import { OrderType } from "./type";
 import QuickEditModal from "./QuickEditModal";
-import { CancellationReasonDialog } from "./components/CancellationCategoryFields";
 import ExportOrderModal from "./Export/ExportOrderModal";
 import { mapOrderToInvoiceData } from "./Details/helpers";
 import { useSettings } from "@src/lib/settingsContext";
@@ -141,11 +140,6 @@ const OrderTable = () => {
    // O7: bulk delete confirmation (existing AlertDialog, same as
    // the single-order delete).
    const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-   // D2 (plan §4.5 / Step 7): cancellations from the row status menu
-   // and the bulk status menu must capture a structured category
-   // first — these hold the pending cancel until the dialog confirms.
-   const [rowCancelOrder, setRowCancelOrder] = useState<OrderType | null>(null);
-   const [bulkCancelOpen, setBulkCancelOpen] = useState(false);
    const [bulkResults, setBulkResults] = useState<any>(null);
    const [exportModalOpen, setExportModalOpen] = useState(false);
    const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
@@ -877,20 +871,6 @@ const OrderTable = () => {
                   orderStatuses?.map((s) => ({
                      label: s,
                      onClick: async (l) => {
-                        // D2: a fresh transition into Cancelled goes
-                        // through the category dialog first (an order
-                        // already Cancelled keeps the existing
-                        // no-op behaviour and its stored reason).
-                        if (
-                           l === "Cancelled" &&
-                           String(status.orderRow?.status || "")
-                              .toUpperCase()
-                              .replace(/_/g, "") !== "CANCELLED"
-                        ) {
-                           setRowCancelOrder(status.orderRow);
-                           setStatus((prev) => ({ ...prev, anchorEl: null }));
-                           return;
-                        }
                         const targetId = status.orderRow.id;
                         setOrderRows((prev) =>
                            prev.map((or) =>
@@ -926,13 +906,6 @@ const OrderTable = () => {
                   label: s,
                   onClick: () => {
                      setBulkStatusAnchor(null);
-                     // D2: bulk-cancelling requires the category
-                     // dialog; the token-prefixed reason rides the
-                     // existing bulk payload.
-                     if ((statusLabelToApi[s] || s.toUpperCase()) === "CANCELLED") {
-                        setBulkCancelOpen(true);
-                        return;
-                     }
                      runBulk(
                         { action: "status", status: statusLabelToApi[s] || s.toUpperCase() },
                         selectedOrders,
@@ -942,51 +915,6 @@ const OrderTable = () => {
                onClose={() => setBulkStatusAnchor(null)}
             />
          </CustomPopover>
-
-         {/* D2: row status menu → Cancelled requires a category.
-             Confirm applies the same optimistic update + PUT as the
-             direct menu action, plus the token-prefixed reason. */}
-         <CancellationReasonDialog
-            open={Boolean(rowCancelOrder)}
-            title={`Cancel order ${rowCancelOrder?.orderCode || rowCancelOrder?.orderId || ""}`}
-            onClose={() => setRowCancelOrder(null)}
-            onConfirm={async (cancellationReason) => {
-               const target = rowCancelOrder;
-               setRowCancelOrder(null);
-               if (!target) return;
-               setOrderRows((prev) =>
-                  prev.map((or) =>
-                     or.id === target.id ? { ...or, status: "Cancelled" } : or,
-                  ),
-               );
-               try {
-                  await fetch(`/api/orders/${target.id}`, {
-                     method: "PUT",
-                     headers: { "Content-Type": "application/json" },
-                     body: JSON.stringify({
-                        status: "CANCELLED",
-                        cancellationReason,
-                     }),
-                  });
-               } catch {}
-            }}
-         />
-
-         {/* D2: bulk status → Cancelled requires a category; the
-             reason rides the existing bulk payload. */}
-         <CancellationReasonDialog
-            open={bulkCancelOpen}
-            title={`Cancel ${selectedOrders.length} selected order${selectedOrders.length === 1 ? "" : "s"}`}
-            confirmLabel="Cancel orders"
-            onClose={() => setBulkCancelOpen(false)}
-            onConfirm={(cancellationReason) => {
-               setBulkCancelOpen(false);
-               runBulk(
-                  { action: "status", status: "CANCELLED", cancellationReason },
-                  selectedOrders,
-               );
-            }}
-         />
 
          {/* Phase 3B (3.5): bulk courier assignment */}
          <CustomModal

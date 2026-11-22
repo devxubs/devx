@@ -26,7 +26,6 @@ import {
    type OrderCreateFormState,
    type OrderLine,
 } from "./types";
-import { buildCancellationReason } from "../components/CancellationCategoryFields";
 
 export const DRAFT_STORAGE_KEY = "devxpos_order_create_draft_v1";
 
@@ -51,15 +50,8 @@ const initialForm = (defaults?: Partial<OrderCreateFormState>): OrderCreateFormS
    taxRate: 0,
    deliveryCharge: 0,
    notes: { ...EMPTY_NOTES },
-   cancellationCategory: "",
-   cancellationNote: "",
    ...defaults,
 });
-
-/** Canonical-ish status key for equality checks ("Out for Delivery"
- * and "OUT_FOR_DELIVERY" collapse to the same key). */
-const statusKey = (s?: string | null) =>
-   String(s || "").toUpperCase().replace(/[\s_]+/g, "");
 
 export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    const [form, setForm] = useState<OrderCreateFormState>(() => initialForm(defaults));
@@ -70,11 +62,6 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    const [draftMeta, setDraftMeta] = useState<DraftMeta | null>(null);
    const [restorableDraft, setRestorableDraft] = useState<(OrderCreateFormState & DraftMeta) | null>(null);
    const [isDirty, setIsDirty] = useState(false);
-   // D2: the status the form was hydrated with (edit mode). A fresh
-   // form counts as "Pending", so creating directly as Cancelled
-   // also requires a category; editing an already-Cancelled order
-   // does not.
-   const [initialStatus, setInitialStatus] = useState("Pending");
    const submitLock = useRef(false);
 
    const patch = useCallback((partial: Partial<OrderCreateFormState>) => {
@@ -98,10 +85,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          // Drafts saved before Phase 3B have no TxID fields.
          paymentTxId: state.paymentTxId ?? "",
          paymentSenderNumber: state.paymentSenderNumber ?? "",
-         cancellationCategory: state.cancellationCategory ?? "",
-         cancellationNote: state.cancellationNote ?? "",
       });
-      setInitialStatus(state.status || "Pending");
       setIsDirty(false);
    }, []);
 
@@ -324,18 +308,8 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       }
       if (!form.paymentMethod) errors.push("Payment method is required");
       if (!form.status) errors.push("Order status is required");
-      // D2: transitioning INTO Cancelled (including creating an
-      // order directly as Cancelled) requires a category; editing
-      // an already-Cancelled order does not.
-      if (
-         statusKey(form.status) === "CANCELLED" &&
-         statusKey(initialStatus) !== "CANCELLED" &&
-         !form.cancellationCategory
-      ) {
-         errors.push("Select a cancellation category before cancelling this order");
-      }
       return errors;
-   }, [form, totals.grandTotal, initialStatus]);
+   }, [form, totals.grandTotal]);
 
    // ── Payload ──────────────────────────────────────────────────────────────
    const buildPayload = useCallback(
@@ -371,19 +345,6 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          orderNote: form.notes.customer || "",
          orderSource: form.orderSource || "Direct",
          status: form.status || "Pending",
-         // D2: token-prefixed cancellation reason, sent ONLY on a
-         // fresh transition into Cancelled — an edit that keeps an
-         // already-Cancelled order cancelled omits the field, so the
-         // PUT leaves its stored reason untouched.
-         ...(statusKey(form.status) === "CANCELLED" &&
-         statusKey(initialStatus) !== "CANCELLED"
-            ? {
-                 cancellationReason: buildCancellationReason(
-                    form.cancellationCategory,
-                    form.cancellationNote,
-                 ),
-              }
-            : {}),
          // Phase 2 (2.5): the four notes stay separate fields, the
          // courier rides along, and the tax/discount breakdown goes in
          // orderTags — all persisted by the POST in one transaction.
@@ -399,7 +360,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
             overallDiscount: totals.overallDiscount,
          },
       }),
-      [form, totals, initialStatus],
+      [form, totals],
    );
 
    const clearDraft = useCallback(() => {
@@ -495,12 +456,6 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       patch,
       hydrate,
       totals,
-      /** D2: status at hydrate time + whether this save transitions
-       * INTO Cancelled (drives the category fields on the page). */
-      initialStatus,
-      isCancelling:
-         statusKey(form.status) === "CANCELLED" &&
-         statusKey(initialStatus) !== "CANCELLED",
       submitting,
       savingDraft,
       submitError,

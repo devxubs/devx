@@ -16,10 +16,6 @@ export interface UseQuickEditOrderReturn {
    setPricing: React.Dispatch<React.SetStateAction<QuickEditPricingData>>;
    status: string;
    setStatus: React.Dispatch<React.SetStateAction<string>>;
-   /** Status the order was loaded with (D2: distinguishes a fresh
-    * transition INTO CANCELLED from editing an already-cancelled
-    * order, which must not be forced to re-categorise). */
-   initialStatus: string;
    orderSource: string;
    setOrderSource: React.Dispatch<React.SetStateAction<string>>;
    courier: string;
@@ -63,7 +59,6 @@ export const useQuickEditOrder = ({
    });
 
    const [status, setStatus] = useState<string>("PENDING");
-   const [initialStatus, setInitialStatus] = useState<string>("PENDING");
    const [orderSource, setOrderSource] = useState<string>("Direct Sales");
    const [courier, setCourier] = useState<string>("None");
    const [orderNote, setOrderNote] = useState<string>("");
@@ -115,7 +110,6 @@ export const useQuickEditOrder = ({
       });
 
       setStatus(data.status || "PENDING");
-      setInitialStatus(data.status || "PENDING");
       setOrderSource(data.orderSource || "Direct Sales");
       setCourier(data.courier || "None");
       setOrderNote(data.orderNote || data.notes || "");
@@ -203,7 +197,6 @@ export const useQuickEditOrder = ({
       setPricing,
       status,
       setStatus,
-      initialStatus,
       orderSource,
       setOrderSource,
       courier,
