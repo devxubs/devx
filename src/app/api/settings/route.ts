@@ -4,6 +4,10 @@ import { prisma } from "@src/lib/prisma";
 import { sanitizeCustomConfig } from "@src/lib/customConfig";
 import { validateDefaultCourierStatusInConfig } from "@src/lib/courierSubmission";
 import {
+   RANKING_SETTINGS_KEY,
+   validateRankingSettings,
+} from "@src/lib/rankingSettings";
+import {
    logAudit,
    auditActorFromContext,
    requestAuditContext,
@@ -191,6 +195,29 @@ export async function PUT(request: NextRequest) {
                { error: "Validation error", message: courierVerdict.message },
                { status: 400 },
             );
+         }
+         // Employee ranking settings live in this blob too
+         // (customConfig.employeeRankingSettings); an invalid
+         // object is rejected here, on save, with the validator's
+         // specific message — same treatment as the courier
+         // default above (see src/lib/rankingSettings.ts).
+         if (
+            body.customConfig &&
+            typeof body.customConfig === "object" &&
+            !Array.isArray(body.customConfig) &&
+            RANKING_SETTINGS_KEY in body.customConfig
+         ) {
+            const rankingVerdict = validateRankingSettings(
+               (body.customConfig as Record<string, unknown>)[
+                  RANKING_SETTINGS_KEY
+               ],
+            );
+            if (!rankingVerdict.ok) {
+               return NextResponse.json(
+                  { error: "Validation error", message: rankingVerdict.error },
+                  { status: 400 },
+               );
+            }
          }
          dataToUpdate.customConfig = sanitizeCustomConfig(body.customConfig);
       }

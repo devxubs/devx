@@ -21,6 +21,11 @@
  *     server-side by POST /api/orders/bulk and pre-selected in the
  *     orders-list bulk courier modal; validated on save against
  *     COURIER_STATUSES in src/lib/courierSubmission.ts).
+ *   - employeeRankingSettings — the employee performance ranking
+ *     engine reads its weights, monthly targets and thresholds
+ *     from it via parseRankingSettings in
+ *     src/lib/rankingSettings.ts (validated on save by the
+ *     settings PUT route against that module's validator).
  *
  * DEAD keys (no consumer exists — UI removed, and stripped here on
  * save so they stop being persisted):
