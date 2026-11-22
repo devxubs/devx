@@ -114,6 +114,12 @@ export interface OrderCreateFormState {
    taxRate: number;
    deliveryCharge: number;
    notes: OrderNotesState;
+   /** D2 (plan §4.5 / Step 7): structured cancellation category
+    * token (CUSTOMER / DUPLICATE / SYSTEM / STAFF_ERROR) + optional
+    * free-text note, required only when the save transitions the
+    * order INTO Cancelled. Optional so older drafts stay valid. */
+   cancellationCategory?: string;
+   cancellationNote?: string;
 }
 
 export interface OrderTotals {

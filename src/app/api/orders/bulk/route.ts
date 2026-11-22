@@ -108,6 +108,17 @@ export async function POST(request: NextRequest) {
          }
          nextStatus = normalized;
       }
+      // D2 (plan §4.5 / Step 7): a bulk cancellation may carry the
+      // token-prefixed cancellationReason the UI captured
+      // ("STAFF_ERROR: …" etc.). It is honoured ONLY for a CANCELLED
+      // target; without this the bulk payload silently dropped the
+      // reason — no column write, no AuditLog change — and bulk
+      // cancellations could never be classified by the ranking
+      // engine. Absent/empty keeps the exact previous behaviour.
+      const bulkCancellationReason =
+         action === "status" && nextStatus === "CANCELLED"
+            ? String(body.cancellationReason || "").trim()
+            : "";
       const courierName =
          action === "courier" ? String(body.courier || "").trim() : "";
       if (action === "courier" && !courierName) {
@@ -260,6 +271,12 @@ export async function POST(request: NextRequest) {
                         status: target as any,
                         total,
                         dueAmount: due,
+                        // D2: persist the captured cancellation
+                        // reason on the order row (only when one was
+                        // supplied for a CANCELLED target).
+                        ...(bulkCancellationReason
+                           ? { cancellationReason: bulkCancellationReason }
+                           : {}),
                         orderTags: {
                            ...existingTags,
                            auditHistory: [auditEvent, ...existingHistory],
@@ -277,6 +294,17 @@ export async function POST(request: NextRequest) {
                      summary: `Order ${displayId} status changed from ${order.status} to ${target} (bulk)`,
                      changes: {
                         status: { from: order.status, to: target },
+                        // D2: the ranking attribution reads
+                        // changes.cancellationReason.to for the
+                        // cancel-class transition.
+                        ...(bulkCancellationReason
+                           ? {
+                                cancellationReason: {
+                                   from: order.cancellationReason ?? null,
+                                   to: bulkCancellationReason,
+                                },
+                             }
+                           : {}),
                      },
                      ...auditCtx,
                   });

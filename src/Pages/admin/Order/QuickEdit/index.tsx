@@ -1,5 +1,10 @@
-import React, { useState, useCallback } from "react";
-import { Box, Stack } from "@mui/material";
+import React, { useState, useCallback, useEffect } from "react";
+import { Box, Paper, Stack, Typography } from "@mui/material";
+import Icon from "@src/components/Icon";
+import {
+   CancellationCategoryFields,
+   buildCancellationReason,
+} from "../components/CancellationCategoryFields";
 import { useParams } from "next/navigation";
 import { QuickEditModalProps } from "./types";
 import {
@@ -57,6 +62,7 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
       pricing,
       status,
       setStatus,
+      initialStatus,
       orderSource,
       setOrderSource,
       courier,
@@ -71,6 +77,23 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
       calculatedSubtotal,
       onOrderFetched: initNotes,
    });
+
+   // D2 (plan §4.5 / Step 7): a transition INTO CANCELLED requires a
+   // structured category. Editing an order that is ALREADY cancelled
+   // (initialStatus === CANCELLED) never forces a category and never
+   // rewrites its existing cancellationReason — the field is simply
+   // omitted from the PUT in that case.
+   const [cancellationCategory, setCancellationCategory] = useState("");
+   const [cancellationNote, setCancellationNote] = useState("");
+   const isCancelling =
+      String(status || "").toUpperCase() === "CANCELLED" &&
+      String(initialStatus || "").toUpperCase() !== "CANCELLED";
+
+   // Fresh category state per order opened in this modal.
+   useEffect(() => {
+      setCancellationCategory("");
+      setCancellationNote("");
+   }, [effectiveOrderId]);
 
    // Wrapped remove item with error validation
    const onRemoveProduct = useCallback(
@@ -116,6 +139,13 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
             setErrorMessage(`Price for "${p.name}" cannot be negative.`);
             return;
          }
+      }
+
+      if (isCancelling && !cancellationCategory) {
+         setErrorMessage(
+            "Select a cancellation category before cancelling this order.",
+         );
+         return;
       }
 
       setErrorMessage(null);
@@ -174,6 +204,16 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
                   paymentTxId: pricing.paymentTxId,
                   paymentSenderNumber: pricing.paymentSenderNumber,
                   status,
+                  // D2: token-prefixed reason, sent ONLY on a fresh
+                  // transition into CANCELLED (see isCancelling).
+                  ...(isCancelling
+                     ? {
+                          cancellationReason: buildCancellationReason(
+                             cancellationCategory,
+                             cancellationNote,
+                          ),
+                       }
+                     : {}),
                   orderSource,
                   orderNote: customerNote,
                   customerNote,
@@ -246,6 +286,42 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
                   onChangeCourier={setCourier}
                   disabled={isBusy}
                />
+
+               {/* 1b. D2: cancellation category — shown only when this
+                   save transitions the order INTO CANCELLED. */}
+               {isCancelling && (
+                  <Paper
+                     variant="outlined"
+                     sx={{
+                        p: { xs: 2, sm: 2.5 },
+                        borderRadius: 1,
+                        bgcolor: "background.paper",
+                        borderColor: "divider",
+                     }}
+                  >
+                     <Stack spacing={2}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                           <Icon
+                              icon="solar:close-circle-bold"
+                              size="small"
+                              style={{
+                                 color: "var(--mui-palette-error-main, #FF5630)",
+                              }}
+                           />
+                           <Typography variant="subtitle2" fontWeight={700}>
+                              Cancellation Details
+                           </Typography>
+                        </Stack>
+                        <CancellationCategoryFields
+                           category={cancellationCategory}
+                           onCategoryChange={setCancellationCategory}
+                           reasonText={cancellationNote}
+                           onReasonTextChange={setCancellationNote}
+                           disabled={isBusy}
+                        />
+                     </Stack>
+                  </Paper>
+               )}
 
                {/* 2. Order Items & Catalog Product Addition */}
                <QuickEditItemsSection

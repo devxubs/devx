@@ -890,6 +890,17 @@ export async function POST(request: NextRequest) {
                orderId,
                invoiceNo,
                status: normalizedStatus as any,
+               // D2 (plan §4.5 / Step 7): an order created directly
+               // in CANCELLED stores the token-prefixed reason the
+               // Publish flow captured; previously the POST silently
+               // dropped it, so direct-cancel creations could never
+               // be classified. Any other status ignores the field.
+               cancellationReason:
+                  normalizedStatus === "CANCELLED" &&
+                  typeof body.cancellationReason === "string" &&
+                  body.cancellationReason.trim()
+                     ? body.cancellationReason.trim()
+                     : undefined,
                orderNote: orderNote || null,
                orderSource: orderSource || null,
                courier: body.courier ? String(body.courier) : null,

@@ -38,6 +38,7 @@ import ChargesSection from "../create/ChargesSection";
 import OrderSummaryPanel from "../create/OrderSummaryPanel";
 import NotesSection from "../create/NotesSection";
 import Breadcrumbs from "@src/components/Breadcrumbs";
+import { CancellationCategoryFields } from "../components/CancellationCategoryFields";
 
 const toTitleStatus = (s?: string | null) =>
    s
@@ -338,6 +339,27 @@ const Publish = () => {
                         courier={form.courier}
                         onChange={(p) => patch(p)}
                      />
+                     {/* D2: shown only when this save transitions the
+                         order INTO Cancelled (incl. creating directly
+                         as Cancelled); submit is blocked without a
+                         category (see useOrderCreate validate). */}
+                     {oc.isCancelling && (
+                        <SectionCard
+                           title="Cancellation Details"
+                           subtitle="A category is required to cancel this order"
+                        >
+                           <CancellationCategoryFields
+                              category={form.cancellationCategory || ""}
+                              onCategoryChange={(v) =>
+                                 patch({ cancellationCategory: v })
+                              }
+                              reasonText={form.cancellationNote || ""}
+                              onReasonTextChange={(v) =>
+                                 patch({ cancellationNote: v })
+                              }
+                           />
+                        </SectionCard>
+                     )}
                      <PaymentSection
                         paymentMethod={form.paymentMethod}
                         advancePayment={form.advancePayment}
