@@ -28,6 +28,10 @@ type Props = {
    size?: "small" | "medium";
    title?: string;
    type?: "single" | "range" | "month-year";
+   /** Optional Cancel button in the picker footer: closes the
+    * popover without applying (pending selection is discarded).
+    * Off by default so existing usages keep their exact footer. */
+   showCancel?: boolean;
 };
 
 export default function DateRangePickerCustom({
@@ -36,6 +40,7 @@ export default function DateRangePickerCustom({
    size,
    title,
    type = "range",
+   showCancel = false,
 }: Props) {
    const theme = useTheme();
 
@@ -417,6 +422,15 @@ export default function DateRangePickerCustom({
                   p={1}
                   borderTop={`1px solid ${theme.palette.divider}`}
                >
+                  {showCancel && (
+                     <Button
+                        size="small"
+                        color="inherit"
+                        onClick={() => setAnchorEl(null)}
+                     >
+                        Cancel
+                     </Button>
+                  )}
                   <Button size="small" onClick={handleReset}>
                      Reset
                   </Button>

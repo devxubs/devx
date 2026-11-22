@@ -10,14 +10,13 @@ import Scrollbar from "react-browser-scrollbar";
 import SalesOverview from "./SalesOverview";
 import Balance from "./Balance";
 import { useSettings } from "@src/lib/settingsContext";
-import {
-   PRESET_OPTIONS,
-   presetRange,
-   fmtLocalDate,
-   type DatePresetKey,
-} from "@src/lib/dateRanges";
 import DashboardRangeButton from "./components/DashboardRangeButton";
-import RankingSection from "./Ranking";
+import EmployeeRanking from "./EmployeeRanking";
+
+const fmtLocalDate = (d: Date) =>
+   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+   ).padStart(2, "0")}`;
 
 export const SellerProFile = ({ name, url, customId }: { name: string; url: string; customId?: string }) => (
    <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
@@ -31,45 +30,25 @@ const Dashboard = () => {
    const [metrics, setMetrics] = useState<any>(null);
    const [loading, setLoading] = useState(true);
    const [loadError, setLoadError] = useState(false);
-   // Part 1 (plan §5): single-button date filter. Default preset
-   // is This Month (decision D8). Range math lives in the shared
-   // src/lib/dateRanges.ts helper (Monday-start weeks, browser-local
-   // YYYY-MM-DD exactly as before).
-   const [preset, setPreset] = useState<DatePresetKey>("thisMonth");
-   const [customRange, setCustomRange] = useState<[Date | null, Date | null]>([
-      null,
-      null,
-   ]);
+   // Date filter (owner revision 2026-11-22): a single Date Range
+   // Picker control — no preset menu. The default range is This
+   // Month (1st of the current month → today). The picker commits
+   // only on Apply; the applied range drives every Dashboard
+   // figure and the employee ranking via the same startDate /
+   // endDate params as before (browser-local YYYY-MM-DD).
+   const [range, setRange] = useState<[Date | null, Date | null]>(() => {
+      const now = new Date();
+      return [new Date(now.getFullYear(), now.getMonth(), 1), now];
+   });
 
    const rangeParams = useCallback((): { startDate: string; endDate: string } | null => {
-      if (preset === "custom") {
-         const [s, e] = customRange;
-         return s && e
-            ? { startDate: fmtLocalDate(s), endDate: fmtLocalDate(e) }
-            : null;
-      }
-      return presetRange(preset);
-   }, [preset, customRange]);
+      const [s, e] = range;
+      return s && e
+         ? { startDate: fmtLocalDate(s), endDate: fmtLocalDate(e) }
+         : null;
+   }, [range]);
 
-   // Button label: the preset name for single-day presets, otherwise
-   // the formatted range (e.g. "1 Nov – 30 Nov 2026"); Custom
-   // shows its own dates.
    const currentRange = rangeParams();
-   const fmtRangeDay = (iso: string, withYear: boolean) =>
-      new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
-         day: "numeric",
-         month: "short",
-         ...(withYear ? { year: "numeric" as const } : {}),
-      });
-   const rangeButtonLabel = (() => {
-      if (preset === "today" || preset === "yesterday") {
-         return (
-            PRESET_OPTIONS.find((o) => o.key === preset)?.label || preset
-         );
-      }
-      if (!currentRange) return "Custom Date Range";
-      return `${fmtRangeDay(currentRange.startDate, false)} – ${fmtRangeDay(currentRange.endDate, true)}`;
-   })();
 
    const loadDashboard = useCallback(async () => {
       const rp = rangeParams();
@@ -202,20 +181,11 @@ const Dashboard = () => {
 
    return (
       <Stack spacing={3} py={1}>
-         {/* Part 1 (plan §5): single-button date filter \u2014 one
-             button + popover replaces the preset Chip row and the
-             inline custom picker. */}
+         {/* Date filter: one control — the Date Range Picker
+             itself. Clicking it opens the picker directly (Start /
+             End selection, Apply / Cancel); no preset menu. */}
          <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
-            <DashboardRangeButton
-               preset={preset}
-               label={rangeButtonLabel}
-               customRange={customRange}
-               onPresetChange={(key) => setPreset(key)}
-               onCustomApply={(range) => {
-                  setCustomRange(range);
-                  setPreset("custom");
-               }}
-            />
+            <DashboardRangeButton value={range} onApply={setRange} />
             {rangeLabel && (
                <Typography variant="caption" color="text.secondary">
                   Showing: {rangeLabel}
@@ -295,15 +265,11 @@ const Dashboard = () => {
                   />
                </Grid>
 
-               {/* Employee Performance Ranking (plan §8 Step 5):
-                   the legacy creator-based ranking table is replaced
-                   by the new ranking section, fed by the ranking API
-                   for the same Dashboard range. */}
+               {/* Employee Ranking (restored simple system): Top 3
+                   + full ranking table, fed by the Dashboard API's
+                   rankedEmployees for the same selected range. */}
                <Grid size={{ xs: 12, md: 12 }}>
-                  <RankingSection
-                     startDate={currentRange?.startDate ?? null}
-                     endDate={currentRange?.endDate ?? null}
-                  />
+                  <EmployeeRanking employees={metrics?.rankedEmployees || []} />
                </Grid>
             </Grid>
          </Scrollbar>
