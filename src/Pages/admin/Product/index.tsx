@@ -32,8 +32,9 @@ import CustomModal from "@src/components/Modal";
 import { useSettings } from "@src/lib/settingsContext";
 import { useSnackbar } from "@src/lib/snackbarContext";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { usePrint } from "@src/components/TablePrintDocument/PrintPortal";
 import ExportProductModal from "./ExportProductModal";
-import BarcodeLabelsModal from "./BarcodeLabelsModal";
+import { itemsForProduct } from "./BarcodeLabelsModal";
 
 export type ProductType = {
    id: string;
@@ -200,7 +201,8 @@ export const ProductsView = ({
 const Product = () => {
    const theme = useTheme();
    const router = useRouter();
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
+   const { printDocument } = usePrint();
    const { showSnackbar } = useSnackbar();
    const { filterQueryData } = useFilterQuery();
 
@@ -221,7 +223,6 @@ const Product = () => {
    );
    const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
    const [exportModalOpen, setExportModalOpen] = useState(false);
-   const [labelsModalOpen, setLabelsModalOpen] = useState(false);
    const [categories, setCategories] = useState<string[]>([]);
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
    const [viewProduct, setViewProduct] = useState<any>(null);
@@ -463,20 +464,37 @@ const Product = () => {
       setDeleteDialog(null);
    };
 
+   const handleBarcodePrint = (selected?: any[]) => {
+      const targets =
+         selected && selected.length > 0 ? selected : selectedProducts;
+      if (!targets || targets.length === 0) return;
+
+      const labels = targets.flatMap((p) =>
+         itemsForProduct(p, formatCurrency),
+      );
+      if (labels.length === 0) {
+         showSnackbar(
+            "No barcode or SKU found for the selected product(s).",
+            "warning",
+         );
+         return;
+      }
+
+      printDocument({
+         title: "Product Barcode Labels",
+         selectedRecords: [],
+         columns: [],
+         settings,
+         isLabelSheet: true,
+         labels,
+      });
+   };
+
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
          <Stack spacing={2} py={2}>
             {/* Header */}
             <Stack direction={"row"} justifyContent={"flex-end"} spacing={2}>
-               <Button
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<Icon icon="solar:barcode-linear" />}
-                  onClick={() => setLabelsModalOpen(true)}
-                  sx={{ textTransform: "none", fontWeight: 600 }}
-               >
-                  Print Labels
-               </Button>
                <Button
                   variant="contained"
                   color="primary"
@@ -529,13 +547,14 @@ const Product = () => {
                      onSelectionChange={(selected) =>
                         setSelectedProducts(selected)
                      }
-                     customSelectionToolbar={() => (
+                     customSelectionToolbar={(selectedRows) => (
                         <Stack direction="row" spacing={1} alignItems="center">
                            <Tooltip
                               title="Export selected products"
                               disableInteractive
                            >
                               <IconButton
+                                 aria-label="Export selected products"
                                  onClick={() => setExportModalOpen(true)}
                               >
                                  <Icon
@@ -543,6 +562,29 @@ const Product = () => {
                                     size="small"
                                  />
                               </IconButton>
+                           </Tooltip>
+                           <Tooltip
+                              title="Barcode Print"
+                              disableInteractive
+                           >
+                              <Button
+                                 size="small"
+                                 variant="outlined"
+                                 color="primary"
+                                 startIcon={
+                                    <Icon icon="solar:barcode-linear" />
+                                 }
+                                 onClick={() =>
+                                    handleBarcodePrint(selectedRows)
+                                 }
+                                 sx={{
+                                    textTransform: "none",
+                                    fontWeight: 600,
+                                    whiteSpace: "nowrap",
+                                 }}
+                              >
+                                 Barcode Print
+                              </Button>
                            </Tooltip>
                         </Stack>
                      )}
@@ -753,15 +795,6 @@ const Product = () => {
             open={exportModalOpen}
             onClose={() => setExportModalOpen(false)}
             selectedProducts={selectedProducts}
-         />
-
-         {/* Barcode label printing (Phase 4, §4.1) — seeded with the
-             table's current selection; more products can be added
-             inside the dialog. */}
-         <BarcodeLabelsModal
-            open={labelsModalOpen}
-            onClose={() => setLabelsModalOpen(false)}
-            initialProducts={selectedProducts}
          />
       </Scrollbar>
    );

@@ -35,7 +35,7 @@ const num = (v: any) => {
    return Number.isNaN(n) ? 0 : n;
 };
 
-function itemsForProduct(product: any, formatPrice: (n: number) => string): LabelQueueItem[] {
+export function itemsForProduct(product: any, formatPrice: (n: number) => string): LabelQueueItem[] {
    const items: LabelQueueItem[] = [];
    const variants = Array.isArray(product.variants) ? product.variants : [];
    const isVariable = product.productType === "Variable" && variants.length > 0;
