@@ -90,7 +90,7 @@ const Layout = () => {
    const selectedTab = query.get("tab") || "general";
    const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
 
-   const { settings, loading, updateSettings, resetSettings } = useSettings();
+   const { settings, loading, updateSettings, getLastSaveError, resetSettings } = useSettings();
    const { showSnackbar } = useSnackbar();
    const [formValues, setFormValues] = useState<any>({});
    const [isSaving, setIsSaving] = useState(false);
@@ -129,7 +129,13 @@ const Layout = () => {
          if (success) {
             showSnackbar("Store settings saved and updated successfully!", "success");
          } else {
-            showSnackbar("Failed to save settings. Please try again.", "error");
+            const serverError = getLastSaveError();
+            showSnackbar(
+               serverError
+                  ? `Failed to save settings: ${serverError}`
+                  : "Failed to save settings. Please try again.",
+               "error",
+            );
          }
       } catch {
          showSnackbar("An unexpected error occurred while saving.", "error");

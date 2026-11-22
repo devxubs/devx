@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 
 export interface StoreSettings {
    storeName: string;
@@ -114,6 +114,10 @@ interface SettingsContextType {
    settings: StoreSettings;
    loading: boolean;
    updateSettings: (newSettings: Partial<StoreSettings>) => Promise<boolean>;
+   // Server message from the most recent failed updateSettings call
+   // (e.g. a 400 validation error), or null. Lets save handlers surface
+   // the API's exact reason instead of a generic failure toast.
+   getLastSaveError: () => string | null;
    resetSettings: () => Promise<boolean>;
    refreshSettings: () => Promise<void>;
    formatCurrency: (amount: number | string | null | undefined) => string;
@@ -123,6 +127,7 @@ const SettingsContext = createContext<SettingsContextType>({
    settings: defaultSettings,
    loading: false,
    updateSettings: async () => false,
+   getLastSaveError: () => null,
    resetSettings: async () => false,
    refreshSettings: async () => {},
    formatCurrency: (amt) => `৳${Number(amt || 0).toFixed(2)}`,
@@ -156,6 +161,9 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
       refreshSettings();
    }, [refreshSettings]);
 
+   const lastSaveErrorRef = useRef<string | null>(null);
+   const getLastSaveError = useCallback(() => lastSaveErrorRef.current, []);
+
    const updateSettings = async (newSettings: Partial<StoreSettings>): Promise<boolean> => {
       try {
          const res = await fetch("/api/settings", {
@@ -164,6 +172,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
             body: JSON.stringify(newSettings),
          });
          if (res.ok) {
+            lastSaveErrorRef.current = null;
             const saved = await res.json();
             setSettings((prev) => ({
                ...prev,
@@ -174,8 +183,18 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
             }));
             return true;
          }
+         try {
+            const body = await res.json();
+            lastSaveErrorRef.current =
+               (typeof body?.message === "string" && body.message) ||
+               (typeof body?.error === "string" && body.error) ||
+               null;
+         } catch {
+            lastSaveErrorRef.current = null;
+         }
          return false;
       } catch {
+         lastSaveErrorRef.current = null;
          return false;
       }
    };
@@ -215,6 +234,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
             settings,
             loading,
             updateSettings,
+            getLastSaveError,
             resetSettings,
             refreshSettings,
             formatCurrency,
