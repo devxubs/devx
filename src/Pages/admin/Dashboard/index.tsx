@@ -1,17 +1,23 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Stack, Typography, Avatar, Box, Chip, Alert, Button } from "@mui/material";
+import { Grid, Stack, Typography, Avatar, Alert, Button } from "@mui/material";
 import AnalyticsCard from "@src/components/AnalyticsCard";
-import DateRangePickerCustom from "@src/components/DateRange";
 import { DashboardSkeleton } from "@src/components/SkeletonLoader";
 import SalesByGender from "./SalesByGender";
 import YearlySalesChart from "./YearlySalesChart";
 import Scrollbar from "react-browser-scrollbar";
 import SalesOverview from "./SalesOverview";
 import Balance from "./Balance";
-import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { useSettings } from "@src/lib/settingsContext";
+import {
+   PRESET_OPTIONS,
+   presetRange,
+   fmtLocalDate,
+   type DatePresetKey,
+} from "@src/lib/dateRanges";
+import DashboardRangeButton from "./components/DashboardRangeButton";
+import RankingSection from "./Ranking";
 
 export const SellerProFile = ({ name, url, customId }: { name: string; url: string; customId?: string }) => (
    <Stack spacing={1} direction="row" alignItems="center" height={"100%"}>
@@ -20,61 +26,50 @@ export const SellerProFile = ({ name, url, customId }: { name: string; url: stri
    </Stack>
 );
 
-// Phase 3B (3.9): dashboard range presets. Every period figure on
-// the page honours the selected range; the API aggregates are
-// bounded by it server-side.
-const RANGE_PRESETS = [
-   { key: "today", label: "Today" },
-   { key: "7d", label: "Last 7 days" },
-   { key: "30d", label: "Last 30 days" },
-   { key: "month", label: "This month" },
-   { key: "custom", label: "Custom" },
-] as const;
-type RangePresetKey = (typeof RANGE_PRESETS)[number]["key"];
-
-const fmtLocalDate = (d: Date) =>
-   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate(),
-   ).padStart(2, "0")}`;
-
 const Dashboard = () => {
    const { formatCurrency } = useSettings();
    const [metrics, setMetrics] = useState<any>(null);
    const [loading, setLoading] = useState(true);
    const [loadError, setLoadError] = useState(false);
-   const [preset, setPreset] = useState<RangePresetKey>("30d");
+   // Part 1 (plan §5): single-button date filter. Default preset
+   // is This Month (decision D8). Range math lives in the shared
+   // src/lib/dateRanges.ts helper (Monday-start weeks, browser-local
+   // YYYY-MM-DD exactly as before).
+   const [preset, setPreset] = useState<DatePresetKey>("thisMonth");
    const [customRange, setCustomRange] = useState<[Date | null, Date | null]>([
       null,
       null,
    ]);
 
    const rangeParams = useCallback((): { startDate: string; endDate: string } | null => {
-      const now = new Date();
-      switch (preset) {
-         case "today":
-            return { startDate: fmtLocalDate(now), endDate: fmtLocalDate(now) };
-         case "7d": {
-            const s = new Date(now);
-            s.setDate(s.getDate() - 6);
-            return { startDate: fmtLocalDate(s), endDate: fmtLocalDate(now) };
-         }
-         case "month": {
-            const s = new Date(now.getFullYear(), now.getMonth(), 1);
-            return { startDate: fmtLocalDate(s), endDate: fmtLocalDate(now) };
-         }
-         case "custom": {
-            const [s, e] = customRange;
-            return s && e
-               ? { startDate: fmtLocalDate(s), endDate: fmtLocalDate(e) }
-               : null;
-         }
-         default: {
-            const s = new Date(now);
-            s.setDate(s.getDate() - 29);
-            return { startDate: fmtLocalDate(s), endDate: fmtLocalDate(now) };
-         }
+      if (preset === "custom") {
+         const [s, e] = customRange;
+         return s && e
+            ? { startDate: fmtLocalDate(s), endDate: fmtLocalDate(e) }
+            : null;
       }
+      return presetRange(preset);
    }, [preset, customRange]);
+
+   // Button label: the preset name for single-day presets, otherwise
+   // the formatted range (e.g. "1 Nov – 30 Nov 2026"); Custom
+   // shows its own dates.
+   const currentRange = rangeParams();
+   const fmtRangeDay = (iso: string, withYear: boolean) =>
+      new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
+         day: "numeric",
+         month: "short",
+         ...(withYear ? { year: "numeric" as const } : {}),
+      });
+   const rangeButtonLabel = (() => {
+      if (preset === "today" || preset === "yesterday") {
+         return (
+            PRESET_OPTIONS.find((o) => o.key === preset)?.label || preset
+         );
+      }
+      if (!currentRange) return "Custom Date Range";
+      return `${fmtRangeDay(currentRange.startDate, false)} – ${fmtRangeDay(currentRange.endDate, true)}`;
+   })();
 
    const loadDashboard = useCallback(async () => {
       const rp = rangeParams();
@@ -116,61 +111,6 @@ const Dashboard = () => {
            year: "numeric",
         })}`
       : "";
-
-   const columns: ColumnConfig[] = [
-      {
-         field: "seller",
-         headerName: "Seller",
-         flex: 1,
-         renderCell: (params: any) => {
-            const row = params.row;
-            return (
-               <SellerProFile
-                  name={row.seller?.name || row.name}
-                  url={row.seller?.url || row.avatar}
-               />
-            );
-         },
-      },
-      // The API's "call" is the count of orders the employee handled —
-      // labelled honestly instead of implying phone calls.
-      { field: "call", headerName: "Orders Handled" },
-      { field: "conform", headerName: "Confirmed" },
-      { field: "cancel", headerName: "Cancelled" },
-      {
-         field: "rank",
-         headerName: "Rank",
-         renderCell: (params: any) => {
-            const rank = String(params.row.rank || "Top 1");
-            const colorMap: Record<string, "primary" | "secondary" | "success" | "warning" | "error" | "default"> = {
-               "Top 1": "primary",
-               "Top 2": "secondary",
-               "Top 3": "success",
-               "Top 4": "warning",
-               "Top 5": "error",
-               "A": "primary",
-               "B": "secondary",
-               "C": "success",
-               "D": "warning",
-               "E": "error",
-            };
-            const chipColor = colorMap[rank] || params.row.color || "primary";
-
-            return (
-               <Chip
-                  label={rank}
-                  color={chipColor}
-                  size="small"
-                  sx={{
-                     fontWeight: 700,
-                     borderRadius: 1,
-                     minWidth: 62,
-                  }}
-               />
-            );
-         },
-      },
-   ];
 
    // Phase 1 (NEW-04): values only — the hard-coded percentage labels
    // ("+100%", "-5%") and invented sparkline arrays have been removed.
@@ -238,21 +178,6 @@ const Dashboard = () => {
       },
    ];
 
-   const rankedRows = (metrics?.rankedEmployees || []).map((emp: any) => ({
-      id: emp.id,
-      seller: {
-         name: emp.name,
-         url: emp.avatar,
-      },
-      name: emp.name,
-      avatar: emp.avatar,
-      call: emp.call,
-      conform: emp.conform,
-      cancel: emp.cancel,
-      rank: emp.rank,
-      color: emp.color,
-   }));
-
    if (loading && !metrics) {
       return <DashboardSkeleton />;
    }
@@ -277,27 +202,20 @@ const Dashboard = () => {
 
    return (
       <Stack spacing={3} py={1}>
-         {/* Phase 3B (3.9): range selector — presets + custom range
-             via the shared DateRange component. */}
+         {/* Part 1 (plan §5): single-button date filter \u2014 one
+             button + popover replaces the preset Chip row and the
+             inline custom picker. */}
          <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
-            {RANGE_PRESETS.map((p) => (
-               <Chip
-                  key={p.key}
-                  label={p.label}
-                  color={preset === p.key ? "primary" : "default"}
-                  variant={preset === p.key ? "filled" : "outlined"}
-                  clickable
-                  onClick={() => setPreset(p.key)}
-               />
-            ))}
-            {preset === "custom" && (
-               <DateRangePickerCustom
-                  title="Date range"
-                  size="small"
-                  value={customRange}
-                  onChange={(v) => setCustomRange(v)}
-               />
-            )}
+            <DashboardRangeButton
+               preset={preset}
+               label={rangeButtonLabel}
+               customRange={customRange}
+               onPresetChange={(key) => setPreset(key)}
+               onCustomApply={(range) => {
+                  setCustomRange(range);
+                  setPreset("custom");
+               }}
+            />
             {rangeLabel && (
                <Typography variant="caption" color="text.secondary">
                   Showing: {rangeLabel}
@@ -377,17 +295,14 @@ const Dashboard = () => {
                   />
                </Grid>
 
-               {/* Employee Ranking Table — Phase B4b (P1-5): the
-                   toolbar search is suppressed here (hideSearch).
-                   This is a small ranked leaderboard, not a record
-                   list: text search over a ranking is meaningless,
-                   and the term was previously accepted, chipped as
-                   "Keyword", and silently ignored. */}
+               {/* Employee Performance Ranking (plan §8 Step 5):
+                   the legacy creator-based ranking table is replaced
+                   by the new ranking section, fed by the ranking API
+                   for the same Dashboard range. */}
                <Grid size={{ xs: 12, md: 12 }}>
-                  <CustomTable
-                     rows={rankedRows}
-                     columns={columns}
-                     hideSearch
+                  <RankingSection
+                     startDate={currentRange?.startDate ?? null}
+                     endDate={currentRange?.endDate ?? null}
                   />
                </Grid>
             </Grid>
