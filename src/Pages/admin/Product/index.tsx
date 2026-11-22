@@ -567,24 +567,17 @@ const Product = () => {
                               title="Barcode Print"
                               disableInteractive
                            >
-                              <Button
-                                 size="small"
-                                 variant="outlined"
-                                 color="primary"
-                                 startIcon={
-                                    <Icon icon="solar:barcode-linear" />
-                                 }
+                              <IconButton
+                                 aria-label="Barcode Print"
                                  onClick={() =>
                                     handleBarcodePrint(selectedRows)
                                  }
-                                 sx={{
-                                    textTransform: "none",
-                                    fontWeight: 600,
-                                    whiteSpace: "nowrap",
-                                 }}
                               >
-                                 Barcode Print
-                              </Button>
+                                 <Icon
+                                    icon="solar:barcode-bold-duotone"
+                                    size="small"
+                                 />
+                              </IconButton>
                            </Tooltip>
                         </Stack>
                      )}
