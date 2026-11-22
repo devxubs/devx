@@ -874,3 +874,58 @@ model ChatMessage {
   @@index([senderId])
   @@index([createdAt])
 }
+
+// ─────────────────────────────────────────────
+// EMPLOYEE RANKING SNAPSHOTS (Phase 2, plan §7)
+// Immutable finalized monthly ranking periods. Create-once + read-only:
+// no update/delete API exists, so settings changes and live recalculations
+// can never alter a finalized period. Employee/finalizer ids are plain
+// strings (no FK) so history survives user deletion/renames.
+// ─────────────────────────────────────────────
+
+model EmployeeRankingSnapshot {
+  id               String   @id @default(cuid())
+  periodKey        String   @unique // "2026-11"
+  periodStart      DateTime // first day 00:00 (server-local convention)
+  periodEnd        DateTime // last day 23:59:59.999
+  settingsSnapshot Json // full employeeRankingSettings used
+  weightsSnapshot  Json // denormalized weights for cheap display
+  finalizedById    String? // plain string, no FK — history survives user deletion
+  finalizedByLabel String? // actor name snapshot (AuditLog pattern)
+  finalizedAt      DateTime @default(now())
+  entries          EmployeeRankingEntry[]
+  createdAt        DateTime @default(now())
+
+  @@index([periodStart])
+}
+
+model EmployeeRankingEntry {
+  id                       String                  @id @default(cuid())
+  snapshotId               String
+  snapshot                 EmployeeRankingSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  employeeId               String // plain string, NO FK (history survives user deletion)
+  employeeCustomId         String? // EP_n snapshot
+  employeeName             String // snapshot (survives renames)
+  roleName                 String?
+  rank                     Int? // null for Provisional
+  provisional              Boolean                 @default(false)
+  finalScore               Decimal                 @db.Decimal(5, 2)
+  completedSalesScore      Decimal                 @db.Decimal(5, 2)
+  netRevenueScore          Decimal                 @db.Decimal(5, 2)
+  confirmationRateScore    Decimal                 @db.Decimal(5, 2)
+  handlingQualityScore     Decimal                 @db.Decimal(5, 2)
+  cancellationControlScore Decimal                 @db.Decimal(5, 2)
+  completedSales           Int
+  netRevenue               Decimal                 @db.Decimal(12, 2)
+  confirmationDecisions    Int // Conf + CancPre denominator
+  confirmations            Int
+  slaOnTime                Int
+  slaEvaluated             Int
+  eligibleOrders           Int // H(E)
+  attributableCancellations Int // A(E)
+  evidence                 Json // { auditLogTransitions, auditHistoryTransitions, impliedTransitions, unattributedOrders }
+  createdAt                DateTime                @default(now())
+
+  @@unique([snapshotId, employeeId])
+  @@index([employeeId])
+}
