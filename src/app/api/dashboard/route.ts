@@ -132,7 +132,6 @@ export async function GET(request: NextRequest) {
          payoutSum,
          lowStockIdRows,
          recentOrders,
-         allEmployees,
          categoryDistribution,
          pendingOrders,
          todaysOrders,
@@ -192,20 +191,6 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: "desc" },
             include: { customer: true },
          }),
-         // P2-6: employee order figures come from the groupBy
-         // below — the nested ordersHandled load (every handled
-         // order row for every active employee) is gone. The user
-         // query itself keeps the same ACTIVE filter and fields.
-         prisma.user.findMany({
-            where: { status: "ACTIVE" },
-            select: {
-               id: true,
-               customId: true,
-               name: true,
-               image: true,
-               role: { select: { name: true } },
-            },
-         }),
          // P2-6: category stock totals come from the product
          // groupBy below instead of loading every product row of
          // the first 4 categories. Same take: 4, same selection.
@@ -242,44 +227,6 @@ export async function GET(request: NextRequest) {
             id: { in: lowStockIdRows.map((r) => r.id) },
          },
       });
-
-      // P2-6: per-employee handled-order figures via ONE groupBy
-      // (employee × status) over the same population the nested
-      // load used: non-deleted orders in the requested range,
-      // attributed via Order.employeeId (the ordersHandled
-      // relation). Groups for non-ACTIVE users are simply never
-      // read below, exactly as the nested load never returned them.
-      const employeeOrderStats = await prisma.order.groupBy({
-         by: ["employeeId", "status"],
-         where: {
-            isDeleted: false,
-            createdAt: rangeWhere,
-            employeeId: { not: null },
-         },
-         _count: { id: true },
-         _sum: { total: true },
-      });
-      const handledByEmployee = new Map<
-         string,
-         { handled: number; confirmed: number; cancelled: number; totalSales: number }
-      >();
-      for (const g of employeeOrderStats as any[]) {
-         if (!g.employeeId) continue;
-         const stats = handledByEmployee.get(g.employeeId) || {
-            handled: 0,
-            confirmed: 0,
-            cancelled: 0,
-            totalSales: 0,
-         };
-         const count = Number(g._count?.id || 0);
-         stats.handled += count;
-         if (g.status === "COMPLETED" || g.status === "DELIVERED") {
-            stats.confirmed += count;
-            stats.totalSales += Number(g._sum?.total || 0);
-         }
-         if (g.status === "CANCELLED") stats.cancelled += count;
-         handledByEmployee.set(g.employeeId, stats);
-      }
 
       // P2-6: per-category stock totals via ONE product groupBy
       // over the same population the nested load summed:
@@ -357,94 +304,11 @@ export async function GET(request: NextRequest) {
       const monthlyExpenses = bucketDefs.map((b) => b.expenses);
       const seriesLabels = bucketDefs.map((b) => b.label);
 
-      // Employee Ranking Calculation with deterministic tie-breaking.
-      // P2-6: the figures come from the employee × status groupBy
-      // above — handled = all groups, confirmed = COMPLETED +
-      // DELIVERED, cancelled = CANCELLED, totalSales = the summed
-      // totals of the confirmed groups. Identical definitions to
-      // the previous per-order JS pass over ordersHandled.
-      const calculatedRankings = allEmployees.map((emp) => {
-         const handledStats = handledByEmployee.get(emp.id) || {
-            handled: 0,
-            confirmed: 0,
-            cancelled: 0,
-            totalSales: 0,
-         };
-         const handledCount = handledStats.handled;
-         const confirmedCount = handledStats.confirmed;
-         const cancelledCount = handledStats.cancelled;
-         const totalSales = handledStats.totalSales;
-
-         return {
-            id: emp.id,
-            customId: emp.customId || emp.id,
-            name: emp.name || "Employee",
-            avatar: emp.image || "/images/avatar-25.webp",
-            role: emp.role?.name || "Staff",
-            call: handledCount,
-            conform: confirmedCount,
-            cancel: cancelledCount,
-            totalSales,
-         };
-      });
-
-      // Sort by confirmedCount DESC, then totalSales DESC, then handledCount DESC
-      calculatedRankings.sort((a, b) => {
-         if (b.conform !== a.conform) return b.conform - a.conform;
-         if (b.totalSales !== a.totalSales) return b.totalSales - a.totalSales;
-         return b.call - a.call;
-      });
-
-      // Assign ranks with proper tie-handling
-      let currentRank = 1;
-      const rankedEmployees = calculatedRankings.map((emp, index) => {
-         if (index > 0) {
-            const prev = calculatedRankings[index - 1];
-            // If strictly lower performance than previous employee, increment rank
-            if (emp.conform < prev.conform || (emp.conform === prev.conform && emp.totalSales < prev.totalSales)) {
-               currentRank = index + 1;
-            }
-         }
-
-         let rankBadge = `Top ${currentRank}`;
-         let color: "primary" | "secondary" | "success" | "warning" | "error" | "default" = "default";
-
-         if (currentRank === 1) {
-            rankBadge = "Top 1";
-            color = "primary";
-         } else if (currentRank === 2) {
-            rankBadge = "Top 2";
-            color = "secondary";
-         } else if (currentRank === 3) {
-            rankBadge = "Top 3";
-            color = "success";
-         } else if (currentRank === 4) {
-            rankBadge = "Top 4";
-            color = "warning";
-         } else if (currentRank === 5) {
-            rankBadge = "Top 5";
-            color = "error";
-         } else {
-            rankBadge = `Top ${currentRank}`;
-            color = "default";
-         }
-
-         return {
-            id: emp.id,
-            seller: {
-               name: emp.name,
-               url: emp.avatar,
-            },
-            name: emp.name,
-            avatar: emp.avatar,
-            call: emp.call,
-            conform: emp.conform,
-            cancel: emp.cancel,
-            rank: rankBadge,
-            rankNumber: currentRank,
-            color,
-         };
-      });
+      // Phase 2 ranking: the legacy creator-based employee ranking
+      // (the Order.employeeId groupBy + `rankedEmployees` payload)
+      // is REMOVED from this route — employee ranking now comes
+      // from GET /api/employees/ranking (attribution-based engine,
+      // src/lib/ranking/*). No other dashboard figure changed.
 
       // Distribution data for RadialBar / Category distribution
       const distributionLabels: string[] = [];
@@ -488,7 +352,6 @@ export async function GET(request: NextRequest) {
             totalCustomerDue: Number(customerDueAgg._sum?.dueAmount || 0),
             lowStockCount,
          },
-         rankedEmployees,
          distribution: {
             labels: distributionLabels,
             series: distributionSeries,
