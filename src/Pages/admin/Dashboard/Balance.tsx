@@ -25,9 +25,9 @@ const Balance = ({
    return (
       // P3-7 (audit §B.2): `currentBalance` is NOT an account balance —
       // the API derives it from the selected range (revenue − expenses
-      // − settled payouts over the period, floored at 0). The card is
-      // labelled for what the figure actually is; the API field name
-      // and the figure itself are unchanged.
+      // − settled payouts over the period). BUG-A1: the value is
+      // signed — a loss period shows the true negative figure here
+      // (it was previously floored at 0, hiding losses).
       <CustomCard title="Net over selected period">
          <Stack spacing={1}>
             <Typography variant="h4" fontWeight={700} color="primary.main">

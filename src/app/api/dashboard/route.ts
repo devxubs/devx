@@ -313,7 +313,12 @@ export async function GET(request: NextRequest) {
       // is the summed total of CANCELLED orders, not recorded
       // refunds. Field names are kept for API compatibility; the
       // Dashboard cards are labelled accordingly.
-      const currentBalance = Math.max(totalRevenue - totalExpenses - settledPayouts, 0);
+      // BUG-A1 (Full Live QA Audit 2026-11-25): the figure is NO
+      // LONGER floored at 0 — the floor made a loss-making period
+      // display "Net over selected period: ৳0.00" while the same
+      // card showed negative Net Earnings. The true signed value is
+      // returned so losses are visible.
+      const currentBalance = totalRevenue - totalExpenses - settledPayouts;
 
       // Range-bucketed income vs expenses series — P2-6: the
       // per-bucket aggregate fan-out (one query per bucket per
