@@ -1,12 +1,12 @@
-import React, { useEffect } from "react";
+import React from "react";
 import {
+   Alert,
    Chip,
    CircularProgress,
    Stack,
    Typography,
    useTheme,
 } from "@mui/material";
-import { useSnackbar } from "@src/lib/snackbarContext";
 
 interface QuickEditHeaderProps {
    effectiveOrderId?: string;
@@ -26,14 +26,14 @@ export const QuickEditHeader: React.FC<QuickEditHeaderProps> = ({
    onClearError,
 }) => {
    const theme = useTheme();
-   const { showSnackbar } = useSnackbar();
 
-   useEffect(() => {
-      if (errorMessage) {
-         showSnackbar(errorMessage, "error");
-         onClearError?.();
-      }
-   }, [errorMessage, onClearError, showSnackbar]);
+   // BUG-C1 follow-through (Full Live QA Audit fix round): save
+   // errors — including the server's "An order in status CANCELLED
+   // cannot be changed to PENDING" rejection — were surfaced only
+   // as a transient snackbar that fired and auto-cleared, so a
+   // blocked save looked like it silently did nothing. The error
+   // now renders as a persistent inline alert at the top of the
+   // modal until the user dismisses it or saves successfully.
 
    const getStatusColor = (
       st: string,
@@ -47,6 +47,11 @@ export const QuickEditHeader: React.FC<QuickEditHeaderProps> = ({
 
    return (
       <Stack spacing={1.5}>
+         {errorMessage && (
+            <Alert severity="error" onClose={onClearError}>
+               {errorMessage}
+            </Alert>
+         )}
          {/* Order Badges Header Banner */}
          {effectiveOrderId && (
             <Stack

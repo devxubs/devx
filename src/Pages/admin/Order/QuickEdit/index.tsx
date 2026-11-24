@@ -147,7 +147,13 @@ export const QuickEdit: React.FC<QuickEditModalProps> = ({
       try {
          // Update full order details via atomic API transaction if order ID is present
          if (effectiveOrderId) {
-            const res = await fetch(`/api/orders/${effectiveOrderId}`, {
+            // BUG-C1 follow-through (found during live verification):
+            // legacy order IDs can contain "#" (e.g. "#6002") — raw in
+            // a URL, "#" starts a fragment, so the request went to
+            // PUT /api/orders/ (405, empty body) and the server's real
+            // error message never reached the user, only the generic
+            // fallback below. Always encode path identifiers.
+            const res = await fetch(`/api/orders/${encodeURIComponent(effectiveOrderId)}`, {
                method: "PUT",
                headers: { "Content-Type": "application/json" },
                body: JSON.stringify({

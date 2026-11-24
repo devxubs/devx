@@ -129,7 +129,10 @@ export const useQuickEditOrder = ({
       let isMounted = true;
       setIsFetchingOrder(true);
 
-      fetch(`/api/orders/${effectiveOrderId}`)
+      // encodeURIComponent: legacy IDs containing "#" would
+      // otherwise truncate the URL at the fragment (see QuickEdit
+      // submit handler).
+      fetch(`/api/orders/${encodeURIComponent(effectiveOrderId)}`)
          .then((r) => (r.ok ? r.json() : null))
          .then((data) => {
             if (!isMounted || !data) return;
