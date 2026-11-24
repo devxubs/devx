@@ -206,6 +206,15 @@ export default function CustomTable({
                            <IconButton
                               size="small"
                               aria-label="Row actions"
+                              // OBS-D3 (Full Live QA Audit 2026-11-25):
+                              // the first click on this button only
+                              // showed the tooltip — the grid's own
+                              // mousedown (cell focus/selection
+                              // handling) swallowed the interaction, so
+                              // the menu needed a second click. Keeping
+                              // the mousedown inside the button lets
+                              // the click open the menu first time.
+                              onMouseDown={(e) => e.stopPropagation()}
                               onClick={(e) => {
                                  setSelectedRowParams(params);
                                  setActionMenuOpen(e.currentTarget);

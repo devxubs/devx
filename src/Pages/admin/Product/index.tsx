@@ -426,6 +426,10 @@ const Product = () => {
                   variants: Array.isArray(p.variants) ? p.variants : [],
                   stock: p.quantity,
                   quantity: p.quantity,
+                  // OBS-D2 follow-through: the Status column read
+                  // row.status, but this mapping never carried it —
+                  // every chip rendered empty. The API returns it.
+                  status: p.status || "ACTIVE",
                   stockValue,
                   category: p.category?.name || "General",
                   productType: p.productType || "Standard",

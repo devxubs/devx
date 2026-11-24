@@ -101,7 +101,7 @@ const Expense = () => {
 
    // Phase 2 (2.10): expense-category suggestions — the distinct types
    // already present in the data, plus the Settings default category.
-   const { settings } = useSettings();
+   const { settings, formatCurrency } = useSettings();
    const [knownTypes, setKnownTypes] = useState<string[]>([]);
    useEffect(() => {
       fetch("/api/expenses?limit=100")
@@ -273,7 +273,7 @@ const Expense = () => {
                <Typography variant="body2" color="text.secondary">
                   Total expenses:{" "}
                   <Box component="span" fontWeight={700} color="text.primary">
-                     ৳ {totalAmount.toFixed(2)}
+                     {formatCurrency(totalAmount)}
                   </Box>{" "}
                   ({totalExpenses} {totalExpenses === 1 ? "record" : "records"})
                </Typography>
@@ -451,11 +451,23 @@ const Expense = () => {
                               // in use (plus the Settings default),
                               // instead of blind free text. freeSolo —
                               // a brand-new category can still be typed.
+                              // OBS-H2 (Full Live QA Audit 2026-11-25):
+                              // typed text never reached the form —
+                              // MUI only commits freeSolo input on blur
+                              // when autoSelect is set, so the field
+                              // stayed "" and submit failed with
+                              // "Type is required" while the text sat
+                              // visibly in the box. Sync real typing
+                              // (reason "input") into the field;
+                              // selections keep flowing via onChange.
                               <CustomAutocomplete
                                  label="Type"
                                  placeholder="Select or type a category"
                                  options={categoryOptions}
                                  value={field.value || null}
+                                 onInputChange={(_: any, v: string, reason: string) => {
+                                    if (reason === "input") field.onChange(v);
+                                 }}
                                  onChange={(v: any) =>
                                     field.onChange(
                                        typeof v === "string"
