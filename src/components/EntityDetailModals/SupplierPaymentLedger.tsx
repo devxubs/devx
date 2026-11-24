@@ -453,8 +453,8 @@ const SupplierPaymentLedger = ({
 
          <AlertDialog
             open={Boolean(voidTarget)}
-            type={"error"}
-            title={`Void payment "${voidTarget?.customId || ""}" (${formatCurrency(Number(voidTarget?.amount || 0))})? Its allocation will be reversed.`}
+            type={"delete"}
+            title={`Void payment "${voidTarget?.customId || "this payment"}" (${formatCurrency(Number(voidTarget?.amount || 0))})? Its allocation will be reversed.`}
             onConfirm={handleVoid}
             onClose={() => setVoidTarget(null)}
          />

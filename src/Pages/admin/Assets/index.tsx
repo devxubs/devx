@@ -542,8 +542,8 @@ const Asset = () => {
                   setDeleteItem(null);
                }
             }}
-            type={"error"}
-            title={`Are you sure want to delete "${deleteItem?.name}"?`}
+            type={"delete"}
+            title={`Are you sure want to delete "${deleteItem?.name || "this asset"}"?`}
          />
       </Stack>
    );

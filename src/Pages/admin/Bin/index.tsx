@@ -355,7 +355,7 @@ const Bin = () => {
          <AlertDialog
             open={Boolean(deleteConfirmItem)}
             onClose={() => setDeleteConfirmItem(null)}
-            type="error"
+            type={"delete"}
             title={`Are you sure you want to permanently delete <b>${deleteConfirmItem?.name || deleteConfirmItem?.customId || "this item"}</b>?`}
             onConfirm={async () => {
                if (deleteConfirmItem) {

@@ -116,7 +116,7 @@ const Suppliers = () => {
                sx={{ fontFamily: "monospace", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
                onClick={() => setDetailSupplierId(params.row.customId || params.row.id)}
             >
-               {params.row.customId || params.row.id}
+               {params.row.customId || "—"}
             </Typography>
          ),
       },
@@ -209,9 +209,14 @@ const Suppliers = () => {
             (d) => (Array.isArray(d) ? d : d.suppliers || []),
             (d) => d.total,
          );
-         const mapped = data.map((s: any, idx: number) => ({
+         const mapped = data.map((s: any) => ({
             id: s.id,
-            customId: s.customId || `SUP_${idx + 1}`,
+            // OBS-E06 (Full Live QA Audit 2026-11-25): no positional
+            // fallback — `SUP_${idx + 1}` invented IDs that collided
+            // with real sequence IDs (two suppliers displayed as
+            // SUP_1). Rows without a customId show "—" in the ID
+            // column and open by their real id.
+            customId: s.customId || "",
             name: s.name,
             email: s.email || "-",
             number: s.phone || "-",
@@ -362,8 +367,9 @@ const Suppliers = () => {
                         (d) => d.suppliers || [],
                         (d) => d.total,
                      );
-                     return suppliers.map((s: any, idx: number) => ({
-                        id: s.customId || `SUP_${idx + 1}`,
+                     return suppliers.map((s: any) => ({
+                        // OBS-E06: exports must not invent IDs either.
+                        id: s.customId || "",
                         name: s.name,
                         number: s.phone || "-",
                         address: s.address || "-",
@@ -575,8 +581,8 @@ const Suppliers = () => {
          </CustomModal>
          <AlertDialog
             open={Boolean(deleteOpen)}
-            type={"error"}
-            title={`Are you sure want to delete "${deleteOpen?.name}"?`}
+            type={"delete"}
+            title={`Are you sure want to delete "${deleteOpen?.name || "this supplier"}"?`}
             onConfirm={async () => {
                if (deleteOpen) {
                   try {

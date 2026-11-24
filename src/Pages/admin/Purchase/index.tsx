@@ -594,8 +594,8 @@ const Purchase = () => {
                   setDeleteItem(null);
                }
             }}
-            type={"error"}
-            title={`Are you sure want to delete "${deleteItem?.invoice}"?`}
+            type={"delete"}
+            title={`Are you sure want to delete "${deleteItem?.invoice || "this purchase"}"?`}
          />
 
          <PurchaseDetailModal
