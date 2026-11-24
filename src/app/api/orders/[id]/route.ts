@@ -51,7 +51,7 @@ export async function GET(
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["orders", "order", "order_view_order", "order_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {
@@ -239,6 +239,25 @@ export async function PUT(
       const newAuditEvents: any[] = [];
       const nowIso = new Date().toISOString();
 
+      // OBS-C1 (Full Live QA Audit 2026-11-25): Quick Edit uses the
+      // string "None" as its no-courier placeholder. Sent verbatim,
+      // "None" !== null made every save of a courier-less order log
+      // a spurious "Courier Info Updated — None → None" timeline
+      // entry, and the update below stored the literal text "None"
+      // as the order's courier. Normalize once here: undefined =
+      // not provided, null = no courier, otherwise the name. A
+      // stored legacy "None" reads as no courier too.
+      const normalizedCourier: string | null | undefined =
+         body.courier === undefined
+            ? undefined
+            : body.courier === "None" || body.courier === ""
+              ? null
+              : body.courier;
+      const existingCourierNorm: string | null =
+         !existingOrder.courier || existingOrder.courier === "None"
+            ? null
+            : existingOrder.courier;
+
       // 1. Audit Note Updates (Courier, Customer, Packing, Employee) with Before & After diff
       const noteDefs = [
          {
@@ -393,14 +412,15 @@ export async function PUT(
       // tracking changes never produced this audit event.
       const existingTrackingId = (existingOrder as any).courierTrackingCode || existingOrder.referenceId;
       if (
-         (body.courier !== undefined && body.courier !== existingOrder.courier) ||
+         (normalizedCourier !== undefined &&
+            normalizedCourier !== existingCourierNorm) ||
          (body.courierTrackingCode !== undefined &&
             body.courierTrackingCode !== existingTrackingId)
       ) {
-         const oldCourierStr = `${existingOrder.courier || "None"}${
+         const oldCourierStr = `${existingCourierNorm || "None"}${
             existingTrackingId ? ` (${existingTrackingId})` : ""
          }`;
-         const newCourierStr = `${body.courier || existingOrder.courier || "None"}${
+         const newCourierStr = `${(normalizedCourier !== undefined ? normalizedCourier : existingCourierNorm) || "None"}${
             body.courierTrackingCode || existingTrackingId
                ? ` (${body.courierTrackingCode || existingTrackingId})`
                : ""
@@ -419,7 +439,10 @@ export async function PUT(
             },
             timestamp: nowIso,
             icon: "solar:delivery-bold",
-            badgeLabel: body.courier || existingOrder.courier || "Courier",
+            badgeLabel:
+               (normalizedCourier !== undefined
+                  ? normalizedCourier
+                  : existingCourierNorm) || "Courier",
             isImportant: true,
          });
       }
@@ -1225,8 +1248,7 @@ export async function PUT(
                   paymentTxId: paymentTxIdUpdate,
                   paymentSenderNumber: paymentSenderUpdate,
                   paymentStatus: paymentStatusUpdate as any,
-                  courier:
-                     body.courier !== undefined ? body.courier : undefined,
+                  courier: normalizedCourier,
                   courierStatus:
                      body.courierStatus !== undefined
                         ? body.courierStatus
@@ -1395,7 +1417,7 @@ export async function PUT(
                paymentTxId: paymentTxIdUpdate,
                paymentSenderNumber: paymentSenderUpdate,
                paymentStatus: paymentStatusUpdate as any,
-               courier: body.courier !== undefined ? body.courier : undefined,
+               courier: normalizedCourier,
                courierStatus:
                   body.courierStatus !== undefined
                      ? body.courierStatus
