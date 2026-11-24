@@ -138,7 +138,12 @@ const EmployeeRanking = ({
       color: emp.color,
    }));
 
-   const top3 = rows.slice(0, 3);
+   // OBS-A5: the Top-3 strip only features employees who actually
+   // performed in the range — a 0-sales "Top 1" card is worse than
+   // no card. The full table below still lists everyone.
+   const top3 = rows
+      .filter((r) => (r.conform || 0) > 0 || (r.totalSales || 0) > 0)
+      .slice(0, 3);
 
    return (
       <Stack spacing={2}>

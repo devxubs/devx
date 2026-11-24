@@ -208,11 +208,15 @@ export async function GET(request: NextRequest) {
             },
          }),
          // P2-6: category stock totals come from the product
-         // groupBy below instead of loading every product row of
-         // the first 4 categories. Same take: 4, same selection.
+         // groupBy below instead of loading every product row.
+         // OBS-A2 (Full Live QA Audit 2026-11-25): ALL categories
+         // are loaded now — the old take: 4 silently dropped every
+         // category past the fourth from the distribution (the
+         // donut showed 163 units of 295 in stock). The assembly
+         // below keeps the top 4 slices and folds the rest into
+         // "Other" so the chart total is the real stock total.
          prisma.category.findMany({
             select: { id: true, name: true },
-            take: 4,
          }),
          // Phase 3B owner KPIs — current state, not range-bounded.
          prisma.order.count({ where: { isDeleted: false, status: "PENDING" } }),
@@ -284,15 +288,14 @@ export async function GET(request: NextRequest) {
 
       // P2-6: per-category stock totals via ONE product groupBy
       // over the same population the nested load summed:
-      // non-deleted products of the (up to) 4 selected categories.
-      const categoryIds = categoryDistribution.map((c) => c.id);
-      const categoryStockStats = categoryIds.length
-         ? await prisma.product.groupBy({
-              by: ["categoryId"],
-              where: { isDeleted: false, categoryId: { in: categoryIds } },
-              _sum: { quantity: true },
-           })
-         : [];
+      // non-deleted products. OBS-A2: no longer restricted to the
+      // selected categories — every category's stock is summed so
+      // the "Other" fold below is exact.
+      const categoryStockStats = await prisma.product.groupBy({
+         by: ["categoryId"],
+         where: { isDeleted: false },
+         _sum: { quantity: true },
+      });
       const stockByCategory = new Map<string, number>(
          (categoryStockStats as any[])
             .filter((g) => g.categoryId)
@@ -425,6 +428,12 @@ export async function GET(request: NextRequest) {
          let rankBadge = `Top ${currentRank}`;
          let color: "primary" | "secondary" | "success" | "warning" | "error" | "default" = "default";
 
+         // OBS-A5 (Full Live QA Audit 2026-11-25): with no completed
+         // sales and no revenue, a "Top 1 / Top 2" badge celebrates
+         // a 0–0 tie. Employees with zero performance in the range
+         // get an unranked marker instead.
+         const hasPerformance = emp.conform > 0 || emp.totalSales > 0;
+
          if (currentRank === 1) {
             rankBadge = "Top 1";
             color = "primary";
@@ -442,6 +451,11 @@ export async function GET(request: NextRequest) {
             color = "error";
          } else {
             rankBadge = `Top ${currentRank}`;
+            color = "default";
+         }
+
+         if (!hasPerformance) {
+            rankBadge = "—";
             color = "default";
          }
 
@@ -474,13 +488,28 @@ export async function GET(request: NextRequest) {
       // empty so the UI shows an empty state. The previous code inflated
       // zero quantities to 1 and invented "Beverages/Snacks/Electronics"
       // 50/30/20 data when the database had none.
-      categoryDistribution.forEach((cat) => {
-         // P2-6: the groupBy sum over the category's non-deleted
-         // products — the same total the nested load reduced to.
-         const totalQty = stockByCategory.get(cat.id) || 0;
+      // OBS-A2: rank categories by stock, keep the four largest
+      // slices, and fold every remaining category into one "Other"
+      // slice — the donut's total is now the true stock total
+      // instead of only the first four categories'.
+      const rankedCategories = categoryDistribution
+         .map((cat) => ({
+            name: cat.name,
+            totalQty: stockByCategory.get(cat.id) || 0,
+         }))
+         .sort((a, b) => b.totalQty - a.totalQty);
+      const topCategories = rankedCategories.slice(0, 4);
+      const otherQty = rankedCategories
+         .slice(4)
+         .reduce((sum, c) => sum + c.totalQty, 0);
+      topCategories.forEach((cat) => {
          distributionLabels.push(cat.name);
-         distributionSeries.push(totalQty);
+         distributionSeries.push(cat.totalQty);
       });
+      if (rankedCategories.length > 4 && otherQty > 0) {
+         distributionLabels.push("Other");
+         distributionSeries.push(otherQty);
+      }
 
       return NextResponse.json({
          totalOrders,

@@ -60,9 +60,15 @@ const SalesOverview = ({
    const { formatCurrency } = useSettings();
 
    const baseTotal = totalRevenue > 0 ? totalRevenue : 1;
-   const profitPercent = Math.round(Math.max((netProfit / baseTotal) * 100, 0));
-   const expensePercent = Math.round(Math.min((totalExpenses / baseTotal) * 100, 100));
+   // OBS-A4 (Full Live QA Audit 2026-11-25): the percentage LABELS
+   // were floored/capped into meaninglessness — a loss showed
+   // "0%" profit and expenses at 339% of revenue showed "100%".
+   // Labels now carry the true signed ratio to revenue; only the
+   // progress BAR values are clamped to the 0–100 a bar can draw.
+   const profitPercent = Math.round((netProfit / baseTotal) * 100);
+   const expensePercent = Math.round((totalExpenses / baseTotal) * 100);
    const incomePercent = totalRevenue > 0 ? 100 : 0;
+   const clampBar = (v: number) => Math.min(100, Math.max(0, v));
 
    return (
       <CustomCard title="Sales & Performance Overview" subtitle="Revenue vs Expense distribution">
@@ -86,7 +92,7 @@ const SalesOverview = ({
                      </Typography>
                   </Typography>
                </Stack>
-               <CustomProgress color="primary" value={profitPercent} />
+               <CustomProgress color="primary" value={clampBar(profitPercent)} />
             </Stack>
 
             {/* Total Revenue */}
@@ -130,7 +136,7 @@ const SalesOverview = ({
                      </Typography>
                   </Typography>
                </Stack>
-               <CustomProgress color="warning" value={expensePercent} />
+               <CustomProgress color="warning" value={clampBar(expensePercent)} />
             </Stack>
          </Stack>
       </CustomCard>
