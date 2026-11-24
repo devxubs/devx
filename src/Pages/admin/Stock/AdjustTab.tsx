@@ -2,7 +2,6 @@
 
 import React, { useMemo, useState } from "react";
 import {
-   Alert,
    Button,
    FormControl,
    InputLabel,
@@ -14,6 +13,7 @@ import {
    ToggleButtonGroup,
    Typography,
 } from "@mui/material";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import type { StockProduct } from "./index";
 
 // Phase 3A (3.2): manual stock adjustment. Posts to POST
@@ -27,6 +27,7 @@ interface AdjustTabProps {
 }
 
 const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
+   const { showSnackbar } = useSnackbar();
    const [productId, setProductId] = useState("");
    const [variantId, setVariantId] = useState("");
    const [direction, setDirection] = useState<"increase" | "decrease">(
@@ -35,8 +36,6 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
    const [quantity, setQuantity] = useState("");
    const [reason, setReason] = useState("");
    const [submitting, setSubmitting] = useState(false);
-   const [error, setError] = useState<string | null>(null);
-   const [success, setSuccess] = useState<string | null>(null);
 
    const product = useMemo(
       () => products.find((p) => p.id === productId) || null,
@@ -52,23 +51,21 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
    const available = variant ? variant.quantity : product?.quantity;
 
    const handleSubmit = async () => {
-      setError(null);
-      setSuccess(null);
       if (!product) {
-         setError("Select a product first.");
+         showSnackbar("Select a product first.", "error");
          return;
       }
       if (isVariable && !variantId) {
-         setError(`Select a variant for "${product.productName}".`);
+         showSnackbar(`Select a variant for "${product.productName}".`, "error");
          return;
       }
       const qty = Number(quantity);
       if (!Number.isInteger(qty) || qty < 1) {
-         setError("Quantity must be a whole number of at least 1.");
+         showSnackbar("Quantity must be a whole number of at least 1.", "error");
          return;
       }
       if (!reason.trim()) {
-         setError("A reason is required for a stock adjustment.");
+         showSnackbar("A reason is required for a stock adjustment.", "warning");
          return;
       }
       setSubmitting(true);
@@ -91,12 +88,12 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
          const target = variant
             ? `${product.productName} (${variant.variantName}) — new variant stock: ${data.variantQuantity}`
             : `${product.productName} — new stock: ${data.productQuantity}`;
-         setSuccess(`Adjustment saved. ${target}.`);
+         showSnackbar(`Adjustment saved. ${target}.`, "success");
          setQuantity("");
          setReason("");
          onAdjusted();
       } catch (err: any) {
-         setError(err.message || "Failed to adjust stock");
+         showSnackbar(err.message || "Failed to adjust stock", "error");
       } finally {
          setSubmitting(false);
       }
@@ -194,9 +191,6 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
             multiline
             minRows={2}
          />
-
-         {error && <Alert severity="error">{error}</Alert>}
-         {success && <Alert severity="success">{success}</Alert>}
 
          <Stack direction="row" justifyContent="flex-end">
             <Button

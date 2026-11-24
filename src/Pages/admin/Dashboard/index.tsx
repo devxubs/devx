@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Stack, Typography, Avatar, Alert, Button } from "@mui/material";
+import { Grid, Stack, Typography, Avatar, Button } from "@mui/material";
+import Icon from "@src/components/Icon";
 import AnalyticsCard from "@src/components/AnalyticsCard";
 import { DashboardSkeleton } from "@src/components/SkeletonLoader";
 import SalesByGender from "./SalesByGender";
@@ -10,6 +11,7 @@ import Scrollbar from "react-browser-scrollbar";
 import SalesOverview from "./SalesOverview";
 import Balance from "./Balance";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import DashboardRangeButton from "./components/DashboardRangeButton";
 import EmployeeRanking from "./EmployeeRanking";
 
@@ -27,6 +29,7 @@ export const SellerProFile = ({ name, url, customId }: { name: string; url: stri
 
 const Dashboard = () => {
    const { formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [metrics, setMetrics] = useState<any>(null);
    const [loading, setLoading] = useState(true);
    const [loadError, setLoadError] = useState(false);
@@ -63,17 +66,26 @@ const Dashboard = () => {
             setMetrics(data);
             setLoadError(false);
          } else {
-            // Phase 1: a failed load must look like a failure — the
-            // previous silent catch rendered an all-zero dashboard that
-            // was indistinguishable from a zero-sales day.
             setLoadError(true);
+            showSnackbar(
+               metrics
+                  ? "Couldn't refresh dashboard data — figures may be out of date."
+                  : "Couldn't load dashboard data. Please check connection and try again.",
+               metrics ? "warning" : "error",
+            );
          }
       } catch {
          setLoadError(true);
+         showSnackbar(
+            metrics
+               ? "Couldn't refresh dashboard data — figures may be out of date."
+               : "Couldn't load dashboard data. Please check connection and try again.",
+            metrics ? "warning" : "error",
+         );
       } finally {
          setLoading(false);
       }
-   }, [rangeParams]);
+   }, [rangeParams, metrics, showSnackbar]);
 
    useEffect(() => {
       loadDashboard();
@@ -163,18 +175,23 @@ const Dashboard = () => {
 
    if (loadError && !metrics) {
       return (
-         <Stack spacing={3} py={1}>
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={() => loadDashboard()}>
-                     Retry
-                  </Button>
-               }
+         <Stack
+            alignItems="center"
+            justifyContent="center"
+            spacing={2}
+            sx={{ py: 10, textAlign: "center" }}
+         >
+            <Typography variant="body1" color="text.secondary">
+               Couldn&apos;t load dashboard data.
+            </Typography>
+            <Button
+               variant="outlined"
+               size="small"
+               startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+               onClick={() => loadDashboard()}
             >
-               Couldn&apos;t load dashboard data. No figures are shown rather than
-               incorrect ones — check the connection and try again.
-            </Alert>
+               Retry
+            </Button>
          </Stack>
       );
    }
@@ -192,29 +209,6 @@ const Dashboard = () => {
                </Typography>
             )}
          </Stack>
-         {/* P3-5: when a reload fails but earlier data is on screen,
-             keep the figures AND show the failure with a Retry —
-             previously the error only rendered when there was no
-             data at all, so stale figures looked fresh. */}
-         {loadError && metrics && (
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={() => loadDashboard()}>
-                     Retry
-                  </Button>
-               }
-            >
-               Couldn&apos;t refresh dashboard data — the figures below may be
-               out of date.
-            </Alert>
-         )}
-         {metrics && metrics.totalOrders === 0 && (
-            <Alert severity="info">
-               No orders were recorded in the selected range — the period
-               figures below are zero for that reason.
-            </Alert>
-         )}
          <Scrollbar autoHide thumbSize={6} darkMode>
             <Grid container spacing={3}>
                {/* 4 Metric Summary Cards */}

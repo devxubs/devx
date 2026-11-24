@@ -2,7 +2,6 @@
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-   Alert,
    Button,
    Stack,
    useTheme,
@@ -149,10 +148,11 @@ const Asset = () => {
          setAssets(mapped);
       } catch {
          setLoadError("Failed to load assets.");
+         showSnackbar("Failed to load assets. Please try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, [searchText]);
+   }, [searchText, showSnackbar]);
 
    useEffect(() => {
       loadAssets();
@@ -234,17 +234,26 @@ const Asset = () => {
    };
    return (
       <Stack spacing={2} py={2}>
-         {loadError && (
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={loadAssets}>
-                     Retry
-                  </Button>
-               }
+         {loadError && assets.length === 0 && !loading && (
+            <Stack
+               direction="row"
+               alignItems="center"
+               justifyContent="center"
+               spacing={1.5}
+               sx={{ py: 3 }}
             >
-               {loadError}
-            </Alert>
+               <Typography variant="body2" color="text.secondary">
+                  {loadError}
+               </Typography>
+               <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                  onClick={loadAssets}
+               >
+                  Retry
+               </Button>
+            </Stack>
          )}
 
          {/* Header */}

@@ -2,7 +2,6 @@
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-   Alert,
    Button,
    Stack,
    useTheme,
@@ -20,6 +19,7 @@ import CustomAutocomplete from "@src/components/Autocomplete";
 import { useSettings } from "@src/lib/settingsContext";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import React, { useEffect, useState } from "react";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -48,6 +48,7 @@ const expenseSchema = yup.object({
 
 const Expense = () => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const { filterQueryData } = useFilterQuery();
    const searchText = filterQueryData.searchText || "";
    const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
@@ -148,13 +149,15 @@ const Expense = () => {
             setLoadError(false);
          } else {
             setLoadError(true);
+            showSnackbar("Failed to load expenses. Please try again.", "error");
          }
       } catch {
          setLoadError(true);
+         showSnackbar("Failed to load expenses. Please try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, [paginationModel, searchText]);
+   }, [paginationModel, searchText, showSnackbar]);
 
    useEffect(() => {
       loadExpenses();
@@ -248,17 +251,26 @@ const Expense = () => {
                Add Expense
             </Button>
          </Stack>
-         {loadError && !loading && (
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={loadExpenses}>
-                     Retry
-                  </Button>
-               }
+         {loadError && !loading && expenses.length === 0 && (
+            <Stack
+               direction="row"
+               alignItems="center"
+               justifyContent="center"
+               spacing={1.5}
+               sx={{ py: 3 }}
             >
-               Failed to load expenses. Please try again.
-            </Alert>
+               <Typography variant="body2" color="text.secondary">
+                  Failed to load expenses.
+               </Typography>
+               <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                  onClick={loadExpenses}
+               >
+                  Retry
+               </Button>
+            </Stack>
          )}
          {loading && expenses.length === 0 ? (
             <TableSkeleton rows={5} cols={5} />

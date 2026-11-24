@@ -1,7 +1,6 @@
 "use client";
 
 import {
-   Alert,
    Button,
    Stack,
    useTheme,
@@ -18,6 +17,7 @@ import CustomTable, { ColumnConfig, MenuItem } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { PurchaseDetailModal, SupplierDetailModal } from "@src/components/EntityDetailModals/EntityModals";
@@ -102,6 +102,7 @@ const Purchase = () => {
    const { filterQueryData } = useFilterQuery();
    const searchText = filterQueryData.searchText || "";
    const [purchases, setPurchases] = useState<PurchaseTypes[]>([]);
+   const { showSnackbar } = useSnackbar();
    const [loading, setLoading] = useState(false);
    const [detailPurchaseId, setDetailPurchaseId] = useState<string | null>(null);
    const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
@@ -112,7 +113,6 @@ const Purchase = () => {
    // family, loaded like the Sidebar loads it.
    const [canReturn, setCanReturn] = useState(false);
    const [returnPurchase, setReturnPurchase] = useState<any | null>(null);
-   const [returnError, setReturnError] = useState<string | null>(null);
 
    React.useEffect(() => {
       let cancelled = false;
@@ -143,18 +143,18 @@ const Purchase = () => {
    }, []);
 
    const openReturnFlow = React.useCallback(async (row: PurchaseTypes) => {
-      setReturnError(null);
       try {
          const res = await fetch(`/api/purchases/${row.id}`);
          if (!res.ok) throw new Error("load failed");
          const data = await res.json();
          setReturnPurchase(data);
       } catch {
-         setReturnError(
+         showSnackbar(
             "Could not load that purchase for returning. Please try again.",
+            "error",
          );
       }
-   }, []);
+   }, [showSnackbar]);
    // Phase 2 (2.1): server-side pagination + toolbar search — the API
    // already accepts page/limit/search and returns the filtered total;
    // the list previously fetched a flat limit=100 with no search wiring.
@@ -211,13 +211,15 @@ const Purchase = () => {
             setLoadError(false);
          } else {
             setLoadError(true);
+            showSnackbar("Failed to load purchases. Please try again.", "error");
          }
       } catch {
          setLoadError(true);
+         showSnackbar("Failed to load purchases. Please try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, [paginationModel, searchText]);
+   }, [paginationModel, searchText, showSnackbar]);
 
    React.useEffect(() => {
       loadPurchases();
@@ -416,22 +418,26 @@ const Purchase = () => {
                Add purchase
             </Button>
          </Stack>
-         {loadError && !loading && (
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={loadPurchases}>
-                     Retry
-                  </Button>
-               }
+         {loadError && !loading && purchases.length === 0 && (
+            <Stack
+               direction="row"
+               alignItems="center"
+               justifyContent="center"
+               spacing={1.5}
+               sx={{ py: 3 }}
             >
-               Failed to load purchases. Please try again.
-            </Alert>
-         )}
-         {returnError && (
-            <Alert severity="error" onClose={() => setReturnError(null)}>
-               {returnError}
-            </Alert>
+               <Typography variant="body2" color="text.secondary">
+                  Failed to load purchases.
+               </Typography>
+               <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                  onClick={loadPurchases}
+               >
+                  Retry
+               </Button>
+            </Stack>
          )}
          {loading && purchases.length === 0 ? (
             <TableSkeleton rows={5} cols={6} />

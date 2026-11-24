@@ -20,6 +20,7 @@ interface ModalProps {
    editUserData?: UserProps;
    onAddUser?: (data: UserProps) => void;
    onEditUser?: (newData: UserProps) => void;
+   availableRoles?: string[];
 }
 
 const Modal = ({
@@ -28,7 +29,11 @@ const Modal = ({
    editUserData,
    onAddUser,
    onEditUser,
+   availableRoles,
 }: ModalProps) => {
+   const roleOptions =
+      availableRoles && availableRoles.length > 0 ? availableRoles : roles;
+
    const {
       control,
       handleSubmit,
@@ -45,11 +50,38 @@ const Modal = ({
             typeof (editUserData?.role as any) === "object"
                ? (editUserData?.role as any)?.name || ""
                : editUserData?.role || "",
+         status: (editUserData?.status?.toLowerCase() === "inactive"
+            ? "inactive"
+            : editUserData?.status?.toLowerCase() === "suspended"
+            ? "suspended"
+            : "active") as any,
          password: "",
          confirmPassword: "",
          profileUrl: editUserData?.profileUrl || "",
       },
    });
+
+   useEffect(() => {
+      reset({
+         name: editUserData?.name || "",
+         email: editUserData?.email || "",
+         phoneNumber: editUserData?.phoneNumber || "",
+         address: editUserData?.address || "",
+         role:
+            typeof (editUserData?.role as any) === "object"
+               ? (editUserData?.role as any)?.name || ""
+               : editUserData?.role || "",
+         status: (editUserData?.status?.toLowerCase() === "inactive"
+            ? "inactive"
+            : editUserData?.status?.toLowerCase() === "suspended"
+            ? "suspended"
+            : "active") as any,
+         password: "",
+         confirmPassword: "",
+         profileUrl: editUserData?.profileUrl || "",
+      });
+      setFile(editUserData?.file || null);
+   }, [editUserData, reset]);
    const passwordValue = watch("password");
    const [passwordShow, setPasswordShow] = useState(false);
    const [file, setFile] = useState<File | null>(editUserData?.file || null);
@@ -204,7 +236,7 @@ const Modal = ({
                               <>
                                  <CustomAutocomplete
                                     {...field}
-                                    options={roles.map((r: string) => ({
+                                    options={roleOptions.map((r: string) => ({
                                        label: r,
                                        value: r,
                                     }))}
@@ -224,6 +256,42 @@ const Modal = ({
                            )}
                         />
                      </Grid>
+
+                     {/* Status (Edit mode) */}
+                     {mode === "edit" && (
+                        <Grid size={{ xs: 12, md: 6 }}>
+                           <Controller
+                              name="status"
+                              control={control}
+                              render={({ field }) => (
+                                 <CustomAutocomplete
+                                    {...field}
+                                    options={[
+                                       { label: "Active", value: "active" },
+                                       { label: "Inactive", value: "inactive" },
+                                       ...(editUserData?.status?.toLowerCase() === "suspended"
+                                          ? [{ label: "Suspended", value: "suspended" }]
+                                          : []),
+                                    ]}
+                                    label="Status"
+                                    onChange={(v: OptionType | null) =>
+                                       field.onChange(v?.value || "active")
+                                    }
+                                    value={
+                                       field.value
+                                          ? {
+                                               label:
+                                                  field.value.charAt(0).toUpperCase() +
+                                                  field.value.slice(1),
+                                               value: field.value,
+                                            }
+                                          : { label: "Active", value: "active" }
+                                    }
+                                 />
+                              )}
+                           />
+                        </Grid>
+                     )}
 
                      {/* Password */}
                      <Grid size={{ xs: 12, md: 6 }}>
@@ -336,7 +404,7 @@ const Modal = ({
                      </Button>
 
                      <Button type="submit" variant="contained">
-                        {mode === "edit" ? "Update user" : "Add user"}
+                        {mode === "edit" ? "Update Employee" : "Add Employee"}
                      </Button>
                   </Stack>
                </Stack>

@@ -10,7 +10,6 @@
 // validate and recompute nothing client-side, and the parent reloads
 // the analytics list after a save so the stats stay accurate.
 import {
-   Alert,
    Button,
    CircularProgress,
    Grid,
@@ -19,6 +18,7 @@ import {
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import CustomModal from "@src/components/Modal";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { CustomerRow } from "./customerFilterUtils";
 
 interface CustomerFormModalProps {
@@ -36,6 +36,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
    onSaved,
 }) => {
    const isEdit = Boolean(customer);
+   const { showSnackbar } = useSnackbar();
    const [name, setName] = useState("");
    const [phone, setPhone] = useState("");
    const [email, setEmail] = useState("");
@@ -55,12 +56,22 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
    const handleSave = async () => {
       if (saving) return;
-      if (!name.trim()) return setError("Customer name is required");
-      if (!phone.trim()) return setError("Phone number is required");
-      if (!/^[0-9+\-\s()]+$/.test(phone.trim()))
+      if (!name.trim()) {
+         showSnackbar("Customer name is required", "error");
+         return setError("Customer name is required");
+      }
+      if (!phone.trim()) {
+         showSnackbar("Phone number is required", "error");
+         return setError("Phone number is required");
+      }
+      if (!/^[0-9+\-\s()]+$/.test(phone.trim())) {
+         showSnackbar("Invalid phone number", "error");
          return setError("Invalid phone number");
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+         showSnackbar("Invalid email address", "error");
          return setError("Invalid email address");
+      }
       setSaving(true);
       setError(null);
       try {
@@ -83,6 +94,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             // for create and edit); show it verbatim.
             throw new Error(data.error || "Failed to save customer");
          }
+         showSnackbar(isEdit ? "Customer updated successfully." : "Customer added successfully.", "success");
          onSaved(
             isEdit
                ? "Customer updated."
@@ -90,7 +102,9 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
          );
          onClose();
       } catch (err: any) {
-         setError(err?.message || "Failed to save customer");
+         const errMsg = err?.message || "Failed to save customer";
+         setError(errMsg);
+         showSnackbar(errMsg, "error");
       } finally {
          setSaving(false);
       }
@@ -110,7 +124,6 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
          }}
       >
          <Stack spacing={2}>
-            {error && <Alert severity="error">{error}</Alert>}
             <Grid container spacing={2}>
                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField

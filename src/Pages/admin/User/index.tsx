@@ -13,7 +13,6 @@ import {
    Grid,
    Chip,
    CircularProgress,
-   Alert,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
@@ -35,6 +34,7 @@ export interface UserProps {
    email: string;
    address: string;
    role: string;
+   roleId?: string;
    password?: string;
    confirmPassword?: string;
    profileUrl?: string;
@@ -56,7 +56,7 @@ const statusColor: Record<
    string,
    "default" | "warning" | "success" | "info" | "error"
 > = {
-   active: "default",
+   active: "success",
    inactive: "warning",
    suspended: "error",
 } as const;
@@ -164,7 +164,7 @@ const Users = () => {
    const theme = useTheme();
    const { showSnackbar } = useSnackbar();
    const [users, setUsers] = useState<UserProps[]>([]);
-   const [rolesList, setRolesList] = useState<string[]>(roles);
+   const [rolesList, setRolesList] = useState<{ id: string; name: string }[]>([]);
    const [loading, setLoading] = useState(false);
    const [modalOpen, setModalOpen] = useState(false);
    const [editableUser, setEditableUser] = useState({} as any);
@@ -290,6 +290,44 @@ const Users = () => {
    // suspended dialog
    const [suspendedUser, setSuspendedUser] = useState<UserProps | null>(null);
 
+   // unsuspend dialog
+   const [unsuspendUser, setUnsuspendUser] = useState<UserProps | null>(null);
+
+   const handleStatusChange = async (
+      targetUser: UserProps,
+      newStatus: "ACTIVE" | "INACTIVE",
+   ) => {
+      try {
+         const res = await fetch(`/api/users/${targetUser.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus }),
+         });
+         if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Failed to update status");
+         }
+         setUsers((prev) =>
+            prev.map((user) =>
+               user.id === targetUser.id
+                  ? { ...user, status: newStatus.toLowerCase() as any }
+                  : user,
+            ),
+         );
+         showSnackbar(
+            newStatus === "ACTIVE"
+               ? "Employee activated."
+               : "Employee deactivated.",
+            "success",
+         );
+      } catch (err: any) {
+         showSnackbar(
+            err.message || "Failed to update employee status.",
+            "error",
+         );
+      }
+   };
+
    // Phase 2 (2.6): standard list feedback states — load errors are
    // visible with a retry; saves/deletes confirm via Snackbar.
    const [loadError, setLoadError] = useState<string | null>(null);
@@ -308,28 +346,33 @@ const Users = () => {
             (d) => (Array.isArray(d) ? d : d.users || []),
             (d) => d.total,
          );
-         const mapped = data.map((u: any) => ({
-            id: u.id,
-            // ID-02: keep customId null when the record has none —
-            // substituting the raw database id here is what made
-            // un-numbered employees display a cuid as their ID.
-            customId: u.customId || "",
-            name: u.name || "User",
-            phoneNumber: u.phoneNumber || "-",
-            email: u.email,
-            address: u.address || "-",
-            role: u.role?.name || "Staff",
-            salary: u.salary || "0",
-            hireDate: u.hireDate ? new Date(u.hireDate) : new Date(),
-            status: (u.status ? u.status.toLowerCase() : "active") as any,
-         }));
+         const mapped = data.map((u: any) => {
+            const roleName =
+               typeof u.role === "string"
+                  ? u.role
+                  : u.role?.name || u.roleDetails?.name || "Staff";
+            return {
+               id: u.id,
+               customId: u.customId || "",
+               name: u.name || "Employee",
+               phoneNumber: u.phoneNumber || "-",
+               email: u.email,
+               address: u.address || "-",
+               role: roleName,
+               roleId: u.roleId || u.roleDetails?.id || "",
+               salary: u.salary || "0",
+               hireDate: u.hireDate ? new Date(u.hireDate) : new Date(),
+               status: (u.status ? u.status.toLowerCase() : "active") as any,
+            };
+         });
          setUsers(mapped);
       } catch {
-         setLoadError("Failed to load users.");
+         setLoadError("Failed to load employees.");
+         showSnackbar("Failed to load employees. Please check connection and try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [showSnackbar]);
 
    const loadRoles = React.useCallback(async () => {
       try {
@@ -337,7 +380,7 @@ const Users = () => {
          if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
-               setRolesList(data.map((r: any) => r.name));
+               setRolesList(data.map((r: any) => ({ id: r.id, name: r.name })));
             }
          }
       } catch {}
@@ -347,8 +390,8 @@ const Users = () => {
    const { filterQueryData } = useFilterQuery();
 
    const availableRoles = useMemo(() => {
-      const combined = Array.from(new Set([...roles, ...rolesList]));
-      return combined;
+      const fromApi = rolesList.map((r) => r.name);
+      return Array.from(new Set([...roles, ...fromApi]));
    }, [rolesList]);
 
    const filteredUsers = useMemo(() => {
@@ -381,17 +424,26 @@ const Users = () => {
    return (
       <Scrollbar autoHide thumbSize={6} darkMode>
          <Stack spacing={2} py={2}>
-            {loadError && (
-               <Alert
-                  severity="error"
-                  action={
-                     <Button color="inherit" size="small" onClick={loadUsers}>
-                        Retry
-                     </Button>
-                  }
+            {loadError && users.length === 0 && !loading && (
+               <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="center"
+                  spacing={1.5}
+                  sx={{ py: 3 }}
                >
-                  {loadError}
-               </Alert>
+                  <Typography variant="body2" color="text.secondary">
+                     {loadError}
+                  </Typography>
+                  <Button
+                     size="small"
+                     variant="outlined"
+                     startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                     onClick={loadUsers}
+                  >
+                     Retry
+                  </Button>
+               </Stack>
             )}
 
             {/* Header */}
@@ -413,7 +465,7 @@ const Users = () => {
                      setEditableUser({}); // store clicked user
                   }}
                >
-                  Add user
+                  Add Employee
                </Button>
             </Stack>
             <Stack>
@@ -425,30 +477,65 @@ const Users = () => {
                   canExport={false}
                   hideSelectionToolbar={true}
                   showSelectionIndicators={false}
-                  menuItems={[
-                     {
-                        label: "Edit",
-                        onClick: (p) => {
-                           setEditableUser(p.row);
-                           setMode("edit");
-                           setModalOpen(true);
+                  menuItems={(p) => {
+                     const isSuspended = p.row.status === "suspended";
+                     const isActive = p.row.status === "active";
+                     return [
+                        {
+                           label: "Edit",
+                           onClick: (p) => {
+                              setEditableUser(p.row);
+                              setMode("edit");
+                              setModalOpen(true);
+                           },
                         },
-                     },
-                     {
-                        label: "Suspended",
-                        color: "warning",
-                        onClick: (p) => {
-                           setSuspendedUser(p.row);
+                        ...(isActive
+                           ? [
+                                {
+                                   label: "Deactivate",
+                                   color: "warning" as const,
+                                   onClick: (p: any) =>
+                                      handleStatusChange(p.row, "INACTIVE"),
+                                },
+                             ]
+                           : !isSuspended
+                           ? [
+                                {
+                                   label: "Activate",
+                                   color: "success" as const,
+                                   onClick: (p: any) =>
+                                      handleStatusChange(p.row, "ACTIVE"),
+                                },
+                             ]
+                           : []),
+                        ...(isSuspended
+                           ? [
+                                {
+                                   label: "Unsuspend",
+                                   color: "info" as const,
+                                   onClick: (p: any) => {
+                                      setUnsuspendUser(p.row);
+                                   },
+                                },
+                             ]
+                           : [
+                                {
+                                   label: "Suspend",
+                                   color: "warning" as const,
+                                   onClick: (p: any) => {
+                                      setSuspendedUser(p.row);
+                                   },
+                                },
+                             ]),
+                        {
+                           label: "Delete",
+                           color: "error" as const,
+                           onClick: (p) => {
+                              setDeleteUser(p.row);
+                           },
                         },
-                     },
-                     {
-                        label: "Delete",
-                        color: "error",
-                        onClick: (p) => {
-                           setDeleteUser(p.row);
-                        },
-                     },
-                  ]}
+                     ];
+                  }}
                   filter={(data, onChange) => {
                      return (
                         <Stack
@@ -479,19 +566,23 @@ const Users = () => {
             </Stack>
          </Stack>
 
-         {/* Add or update user */}
+         {/* Add or update employee */}
          <CustomModal
             sx={{ width: { xs: "90%", md: 900 } }}
             open={modalOpen}
             onClose={() => setModalOpen(false)}
-            title={mode === "add" ? "Add User" : "Update User"}
+            title={mode === "add" ? "Add Employee" : "Update Employee"}
          >
             <Modal
                mode={mode}
                onClose={() => setModalOpen(false)}
                editUserData={editableUser || {}}
+               availableRoles={availableRoles}
                onAddUser={async (d) => {
                   try {
+                     const matchedRole = rolesList.find(
+                        (r) => r.name.toLowerCase() === (d.role || "").toLowerCase(),
+                     );
                      const res = await fetch("/api/users", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -502,40 +593,56 @@ const Users = () => {
                            phoneNumber: d.phoneNumber,
                            address: d.address,
                            salary: d.salary,
+                           role: d.role,
+                           roleId: matchedRole?.id || undefined,
                            status: "ACTIVE",
                         }),
                      });
-                     if (!res.ok) throw new Error("request failed");
-                     showSnackbar("User added successfully.", "success");
+                     if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error || "Failed to add employee");
+                     }
+                     showSnackbar("Employee added successfully.", "success");
                      loadUsers();
-                  } catch {
-                     showSnackbar("Failed to add the user.", "error");
+                  } catch (err: any) {
+                     showSnackbar(err.message || "Failed to add the employee.", "error");
                   }
                }}
                onEditUser={async (newData) => {
                   try {
+                     const matchedRole = rolesList.find(
+                        (r) => r.name.toLowerCase() === (newData.role || "").toLowerCase(),
+                     );
+                     const payload = {
+                        ...newData,
+                        roleId: matchedRole?.id || (newData as any).roleId || undefined,
+                        status: newData.status ? String(newData.status).toUpperCase() : undefined,
+                     };
                      const res = await fetch(`/api/users/${editableUser.id}`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(newData),
+                        body: JSON.stringify(payload),
                      });
-                     if (!res.ok) throw new Error("request failed");
-                     showSnackbar("User updated successfully.", "success");
+                     if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error || "Failed to update employee");
+                     }
+                     showSnackbar("Employee updated successfully.", "success");
                      loadUsers();
-                  } catch {
-                     showSnackbar("Failed to update the user.", "error");
+                  } catch (err: any) {
+                     showSnackbar(err.message || "Failed to update the employee.", "error");
                   }
                }}
             />
          </CustomModal>
 
-         {/* delete user */}
+         {/* delete employee */}
          <AlertDialog
             type="delete"
             open={Boolean(deleteUser)}
             onClose={() => setDeleteUser(null)}
             title={`Are you sure you want to delete <b>${
-               deleteUser?.email || "this user"
+               deleteUser?.name || deleteUser?.email || "this employee"
             }</b>`}
             onConfirm={async () => {
                if (!deleteUser) return;
@@ -543,25 +650,28 @@ const Users = () => {
                   const res = await fetch(`/api/users/${deleteUser.id}`, {
                      method: "DELETE",
                   });
-                  if (!res.ok) throw new Error("request failed");
+                  if (!res.ok) {
+                     const errData = await res.json().catch(() => ({}));
+                     throw new Error(errData.error || "Failed to delete employee");
+                  }
                   setUsers((prev) =>
                      prev.filter((user) => user.id !== deleteUser.id),
                   );
-                  showSnackbar("User deleted successfully.", "success");
-               } catch {
-                  showSnackbar("Failed to delete the user.", "error");
+                  showSnackbar("Employee deleted successfully.", "success");
+               } catch (err: any) {
+                  showSnackbar(err.message || "Failed to delete the employee.", "error");
                }
                setDeleteUser(null);
             }}
          />
 
-         {/* suspended user */}
+         {/* suspend employee */}
          <AlertDialog
             type="warning"
             open={Boolean(suspendedUser)}
             onClose={() => setSuspendedUser(null)}
             title={`Are you sure you want to suspend <b>${
-               suspendedUser?.email || "this user"
+               suspendedUser?.name || suspendedUser?.email || "this employee"
             }</b>`}
             onConfirm={async () => {
                if (!suspendedUser) return;
@@ -571,7 +681,10 @@ const Users = () => {
                      headers: { "Content-Type": "application/json" },
                      body: JSON.stringify({ status: "SUSPENDED" }),
                   });
-                  if (!res.ok) throw new Error("request failed");
+                  if (!res.ok) {
+                     const errData = await res.json().catch(() => ({}));
+                     throw new Error(errData.error || "Failed to suspend employee");
+                  }
                   setUsers((prev) =>
                      prev.map((user) =>
                         user.id === suspendedUser.id
@@ -579,19 +692,54 @@ const Users = () => {
                            : user,
                      ),
                   );
-                  showSnackbar("User suspended.", "success");
-               } catch {
-                  showSnackbar("Failed to suspend the user.", "error");
+                  showSnackbar("Employee suspended.", "success");
+               } catch (err: any) {
+                  showSnackbar(err.message || "Failed to suspend the employee.", "error");
                }
                setSuspendedUser(null);
             }}
          />
 
-         {/* User Details View Modal */}
+         {/* unsuspend employee */}
+         <AlertDialog
+            type="confirm"
+            open={Boolean(unsuspendUser)}
+            onClose={() => setUnsuspendUser(null)}
+            title={`Are you sure you want to unsuspend <b>${
+               unsuspendUser?.name || unsuspendUser?.email || "this employee"
+            }</b>`}
+            onConfirm={async () => {
+               if (!unsuspendUser) return;
+               try {
+                  const res = await fetch(`/api/users/${unsuspendUser.id}`, {
+                     method: "PUT",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({ status: "ACTIVE" }),
+                  });
+                  if (!res.ok) {
+                     const errData = await res.json().catch(() => ({}));
+                     throw new Error(errData.error || "Failed to unsuspend employee");
+                  }
+                  setUsers((prev) =>
+                     prev.map((user) =>
+                        user.id === unsuspendUser.id
+                           ? { ...user, status: "active" }
+                           : user,
+                     ),
+                  );
+                  showSnackbar("Employee unsuspended successfully.", "success");
+               } catch (err: any) {
+                  showSnackbar(err.message || "Failed to unsuspend the employee.", "error");
+               }
+               setUnsuspendUser(null);
+            }}
+         />
+
+         {/* Employee Details View Modal */}
          <CustomModal
             open={Boolean(detailUser)}
             onClose={() => setDetailUser(null)}
-            title="User Details"
+            title="Employee Details"
             closeIcon={true}
             sx={{
                width: { xs: "92%", sm: 540 },
@@ -621,7 +769,7 @@ const Users = () => {
                         />
                         <Box>
                            <Typography variant="h6">
-                              {viewUserData.name || "User"}
+                              {viewUserData.name || "Employee"}
                            </Typography>
                            <Typography variant="body2" color="text.secondary">
                               {viewUserData.email}
@@ -638,7 +786,7 @@ const Users = () => {
                         </Box>
                      </Stack>
                      <Chip
-                        label={viewUserData.customId || "USER"}
+                        label={viewUserData.customId || "EMP"}
                         color="primary"
                         size="small"
                         sx={{ fontWeight: 700 }}
@@ -696,7 +844,7 @@ const Users = () => {
                </Stack>
             ) : (
                <Typography variant="body2" color="text.secondary">
-                  User not found.
+                  Employee not found.
                </Typography>
             )}
          </CustomModal>

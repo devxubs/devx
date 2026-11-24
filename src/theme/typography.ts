@@ -1,5 +1,5 @@
 const typography: any = {
-   fontFamily: "Public Sans, sans-serif",
+   fontFamily: "var(--font-inter), 'Public Sans', sans-serif",
    h1: {
       fontWeight: 800,
       fontSize: "2.5rem",

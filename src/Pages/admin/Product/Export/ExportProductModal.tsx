@@ -87,18 +87,6 @@ export default function ExportProductModal({
                },
             }}
          >
-            {/* Feedback Alerts */}
-            {errorMsg && (
-               <Alert severity="error" variant="filled">
-                  {errorMsg}
-               </Alert>
-            )}
-            {successMsg && (
-               <Alert severity="success" variant="filled">
-                  {successMsg}
-               </Alert>
-            )}
-
             {/* A. Header */}
             <ExportHeader selectedCount={normalizedProducts.length} />
 

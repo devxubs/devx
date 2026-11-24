@@ -10,7 +10,6 @@
 // data (sale price when set, else regular price).
 
 import {
-   Alert,
    Box,
    Button,
    IconButton,
@@ -155,10 +154,18 @@ const BarcodeLabelsModal: React.FC<BarcodeLabelsModalProps> = ({
          sx={{ width: { xs: "95%", sm: "85%", md: 760 } }}
       >
          <Stack spacing={2} sx={{ p: 3 }}>
-            <Alert severity="info" sx={{ py: 0.5 }}>
-               Labels encode the product&apos;s barcode when one is set, otherwise
-               its SKU. Both scan correctly in the order form&apos;s product search.
-            </Alert>
+            <Stack
+               direction="row"
+               spacing={1}
+               alignItems="center"
+               sx={{ px: 1.5, py: 0.75, bgcolor: "action.hover", borderRadius: 1 }}
+            >
+               <Icon icon="solar:info-circle-bold" size="18px" />
+               <Typography variant="caption" color="text.secondary">
+                  Labels encode the product&apos;s barcode when one is set, otherwise
+                  its SKU. Both scan correctly in the order form&apos;s product search.
+               </Typography>
+            </Stack>
 
             <TextField
                size="small"

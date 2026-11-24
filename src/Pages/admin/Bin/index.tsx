@@ -1,7 +1,6 @@
 "use client";
 
 import {
-   Alert,
    Button,
    IconButton,
    Stack,
@@ -11,6 +10,7 @@ import {
    Typography,
    useTheme,
 } from "@mui/material";
+import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useSnackbar } from "@src/lib/snackbarContext";
@@ -18,7 +18,6 @@ import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState, useMemo } from "react";
-import Icon from "@src/components/Icon";
 import AlertDialog from "@src/components/AlertDialog";
 import {
    EmployeeDetailModal,
@@ -78,12 +77,14 @@ const Bin = () => {
             setBinItems(data);
          } else {
             setLoadError("Failed to load deleted items.");
+            showSnackbar("Failed to load deleted items. Please try again.", "error");
          }
       } catch {
          setLoadError("Failed to load deleted items.");
+         showSnackbar("Failed to load deleted items. Please try again.", "error");
       }
       setLoading(false);
-   }, []);
+   }, [showSnackbar]);
 
    useEffect(() => {
       loadBinItems();
@@ -320,17 +321,26 @@ const Bin = () => {
             </Tabs>
          </Stack>
 
-         {loadError && (
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={loadBinItems}>
-                     Retry
-                  </Button>
-               }
+         {loadError && binItems.length === 0 && !loading && (
+            <Stack
+               direction="row"
+               alignItems="center"
+               justifyContent="center"
+               spacing={1.5}
+               sx={{ py: 3 }}
             >
-               {loadError}
-            </Alert>
+               <Typography variant="body2" color="text.secondary">
+                  {loadError}
+               </Typography>
+               <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                  onClick={loadBinItems}
+               >
+                  Retry
+               </Button>
+            </Stack>
          )}
 
          {/* P3-4: sibling list pages show a TableSkeleton while

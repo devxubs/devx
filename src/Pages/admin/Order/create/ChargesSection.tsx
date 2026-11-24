@@ -51,10 +51,10 @@ const ChargesSection = ({
 }: ChargesSectionProps) => {
    return (
       <SectionCard title="Discount, Tax & Delivery" subtitle="Order-level charges — product discounts stay in the product table">
-         <Grid container spacing={2}>
+         <Grid container spacing={1.5}>
             <Grid size={{ xs: 12 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Overall Discount
                   </Typography>
                   <Stack direction="row" spacing={1}>
@@ -100,17 +100,18 @@ const ChargesSection = ({
                </Stack>
             </Grid>
             <Grid size={{ xs: 12 }}>
-               <Stack spacing={1}>
+               <Stack spacing={0.75}>
                   <FormControlLabel
                      control={
                         <Switch
                            checked={taxEnabled}
                            onChange={(e) => onChange({ taxEnabled: e.target.checked })}
                            color="primary"
+                           size="small"
                         />
                      }
                      label={
-                        <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+                        <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                            Tax / VAT
                         </Typography>
                      }
@@ -126,15 +127,15 @@ const ChargesSection = ({
                      InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
                      helperText={
                         taxEnabled
-                           ? `Tax amount: ${formatBDT(totals.taxAmount, currencySymbol)} (included in the grand total; breakdown saved with the order)`
-                           : "Off — no tax is applied"
+                           ? `Tax amount: ${formatBDT(totals.taxAmount, currencySymbol)}`
+                           : undefined
                      }
                   />
                </Stack>
             </Grid>
             <Grid size={{ xs: 12 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Delivery Charge <Typography component="span" variant="caption" color="textSecondary">(0 = free)</Typography>
                   </Typography>
                   <TextField

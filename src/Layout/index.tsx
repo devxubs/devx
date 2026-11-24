@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { usePathname } from "next/navigation";
 import { SnackbarProvider } from "@src/lib/snackbarContext";
+import SessionWatcher from "./SessionWatcher";
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
    const pathname = usePathname();
@@ -26,6 +27,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
    return (
       <SnackbarProvider>
+         <SessionWatcher />
          <Stack
             direction={isAuthPage ? "column" : "row"}
             height="100vh"

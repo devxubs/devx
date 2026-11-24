@@ -115,7 +115,10 @@ const OrderTable = () => {
       },
    );
    const [orderRows, setOrderRows] = useState<OrderType[]>([]);
-   const [statusCounts, setStatusCounts] = useState<Record<string, number> | null>(null);
+   const [statusCounts, setStatusCounts] = useState<Record<
+      string,
+      number
+   > | null>(null);
    const [loading, setLoading] = useState(false);
    // Phase 2 (2.1): server-side pagination — the API already accepts
    // page/limit and returns the filtered `total`; the list previously
@@ -132,7 +135,9 @@ const OrderTable = () => {
    );
    const [selectedOrders, setSelectedOrders] = useState<any[]>([]);
    // Phase 3B (3.5): bulk action state.
-   const [bulkStatusAnchor, setBulkStatusAnchor] = useState<HTMLElement | null>(null);
+   const [bulkStatusAnchor, setBulkStatusAnchor] = useState<HTMLElement | null>(
+      null,
+   );
    const [courierModalOpen, setCourierModalOpen] = useState(false);
    const [bulkCourier, setBulkCourier] = useState("");
    const [bulkCourierStatus, setBulkCourierStatus] = useState("");
@@ -198,7 +203,10 @@ const OrderTable = () => {
          // enum value.
          const currentStatus = orderStatus[orderTab]?.label;
          if (currentStatus && currentStatus !== "All") {
-            params.set("status", statusLabelToApi[currentStatus] || currentStatus);
+            params.set(
+               "status",
+               statusLabelToApi[currentStatus] || currentStatus,
+            );
          } else if (f.status && f.status !== "All") {
             params.set("status", statusLabelToApi[f.status] || f.status);
          }
@@ -342,7 +350,11 @@ const OrderTable = () => {
                   variantId: it.variantId || null,
                   variantName: it.variant?.variantName || null,
                   name: it.name,
-                  code: it.code || it.variant?.sku || it.product?.productCode || "",
+                  code:
+                     it.code ||
+                     it.variant?.sku ||
+                     it.product?.productCode ||
+                     "",
                   quantity: it.quantity,
                   price: Number(it.price),
                   subtotal: Number(it.subtotal),
@@ -433,7 +445,9 @@ const OrderTable = () => {
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-               throw new Error(data.message || data.error || "Bulk action failed");
+               throw new Error(
+                  data.message || data.error || "Bulk action failed",
+               );
             }
             setBulkResults(data);
             loadOrders();
@@ -484,9 +498,18 @@ const OrderTable = () => {
       {
          field: "orderId",
          headerName: "ID",
-         flex: 0.3,
-         renderCell: (params: any) => (
-            <Stack direction="column" spacing={0.5} alignItems="flex-start">
+         flex: 0.4,
+         renderCell: (params: any) => {
+            const isDuplicate =
+               Array.isArray(params.row.duplicateOf) &&
+               params.row.duplicateOf.length > 0;
+            const targetId =
+               params.row.orderCode ||
+               params.row.customId ||
+               params.row.orderId ||
+               params.row.id;
+
+            const idNode = (
                <Typography
                   variant="body2"
                   fontWeight={600}
@@ -496,33 +519,24 @@ const OrderTable = () => {
                      "&:hover": { textDecoration: "underline" },
                   }}
                   onClick={() => {
-                     const targetId =
-                        params.row.orderCode ||
-                        params.row.customId ||
-                        params.row.orderId ||
-                        params.row.id;
                      router.push(`/admin/order/${targetId}`);
                   }}
                >
-                  {params.row.orderCode || params.row.orderId || params.row.customId || params.row.id}
+                  {params.row.orderCode ||
+                     params.row.orderId ||
+                     params.row.customId ||
+                     params.row.id}
                </Typography>
-               {/* O8: non-blocking possible-duplicate marker. */}
-               {Array.isArray(params.row.duplicateOf) &&
-                  params.row.duplicateOf.length > 0 && (
-                     <Tooltip
-                        title={`Possible duplicate of ${params.row.duplicateOf.join(", ")}`}
-                        disableInteractive
-                     >
-                        <Chip
-                           label="Duplicate?"
-                           size="small"
-                           color="warning"
-                           sx={{ fontWeight: 700, fontSize: "0.65rem" }}
-                        />
-                     </Tooltip>
-                  )}
-            </Stack>
-         ),
+            );
+
+            return isDuplicate ? (
+               <Tooltip title="Duplicate" disableInteractive>
+                  {idNode}
+               </Tooltip>
+            ) : (
+               idNode
+            );
+         },
       },
       {
          field: "note",
@@ -543,54 +557,124 @@ const OrderTable = () => {
                </>
             );
          },
-         flex: 0.3,
+         flex: 0.5,
       },
       {
          field: "customer",
          headerName: "Customer",
          renderCell: (params) => {
             return (
-               <Stack
-                  sx={{ cursor: "pointer" }}
-                  onClick={() =>
+               <User
+                  {...params.row.customer}
+                  onNameClick={() =>
                      setDetailCustomerId(
                         params.row.customer?.id || params.row.customer?.name,
                      )
                   }
-               >
-                  <User {...params.row.customer} />
-               </Stack>
+               />
             );
          },
+         flex: 0.1,
+         minWidth: 190,
+      },
+      {
+         field: "address",
+         headerName: "Address",
          flex: 1,
+         minWidth: 140,
+         renderCell: (params: any) => {
+            const rawAddress =
+               params.row.customer?.address ||
+               params.row.address ||
+               params.row.customerAddress ||
+               "";
+            const displayAddress = rawAddress?.trim() || "—";
+
+            if (displayAddress === "—") {
+               return (
+                  <Typography variant="body2" color="text.secondary">
+                     —
+                  </Typography>
+               );
+            }
+
+            return (
+               <Tooltip title={displayAddress} disableInteractive>
+                  <Typography
+                     variant="body2"
+                     color="text.secondary"
+                     noWrap
+                     sx={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: "100%",
+                     }}
+                  >
+                     {displayAddress}
+                  </Typography>
+               </Tooltip>
+            );
+         },
       },
       {
          field: "date",
          headerName: "Date",
+         flex: 0.3,
+         minWidth: 155,
          renderCell: (params) => {
-            const d = new Date(params.row.createdAt);
-            const dateOnly = d.toLocaleDateString();
-            const timeOnly = d.toLocaleTimeString();
+            const formatDT = (dateVal?: string | Date | null) => {
+               if (!dateVal) return "—";
+               const d = new Date(dateVal);
+               if (Number.isNaN(d.getTime())) return "—";
+               const monthDate = d.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+               });
+               const time = d.toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+               });
+               return `${monthDate}, ${time}`;
+            };
 
-            return <CreateAt date={dateOnly} time={timeOnly} />;
-         },
-      },
-      {
-         // O9: Updated column — the order's updatedAt, formatted
-         // exactly like the Created ("Date") column above. No
-         // createdAt fallback: a missing updatedAt renders an em
-         // dash. (The list API already selects updatedAt, and the
-         // row mapping already carries it.)
-         field: "updatedAt",
-         headerName: "Updated",
-         renderCell: (params) => {
-            if (!params.row.updatedAt) return "—";
-            const d = new Date(params.row.updatedAt);
-            if (Number.isNaN(d.getTime())) return "—";
-            const dateOnly = d.toLocaleDateString();
-            const timeOnly = d.toLocaleTimeString();
-
-            return <CreateAt date={dateOnly} time={timeOnly} />;
+            return (
+               <Stack spacing={0.3} justifyContent="center" height="100%">
+                  <Typography variant="body2" fontSize={13} noWrap>
+                     <Tooltip title="Created Date" disableInteractive>
+                        <Typography
+                           component="span"
+                           variant="caption"
+                           fontWeight={700}
+                           color="text.secondary"
+                           sx={{ mr: 0.5, cursor: "help" }}
+                        >
+                           C:
+                        </Typography>
+                     </Tooltip>
+                     {formatDT(params.row.createdAt)}
+                  </Typography>
+                  <Typography
+                     variant="body2"
+                     fontSize={13}
+                     color="text.secondary"
+                     noWrap
+                  >
+                     <Tooltip title="Updated Date" disableInteractive>
+                        <Typography
+                           component="span"
+                           variant="caption"
+                           fontWeight={700}
+                           color="text.secondary"
+                           sx={{ mr: 0.5, cursor: "help" }}
+                        >
+                           U:
+                        </Typography>
+                     </Tooltip>
+                     {formatDT(params.row.updatedAt)}
+                  </Typography>
+               </Stack>
+            );
          },
       },
       {
@@ -613,34 +697,13 @@ const OrderTable = () => {
       {
          field: "status",
          headerName: "Status",
-         flex: 0.5,
+         flex: 1,
          chip: true,
          color: (params) => {
             return statusColor[params.row.status] || "default";
          },
          onClick: (params, e) => {
             setStatus({ orderRow: params.row, anchorEl: e.currentTarget });
-         },
-      },
-      {
-         field: "__quick_edit__",
-         headerName: "",
-         align: "right",
-         flex: 0.1,
-         sortable: false,
-         filterable: false,
-         disableColumnMenu: true,
-         renderCell: (params) => {
-            return (
-               <Tooltip title={"Quick Edit"} disableInteractive>
-                  <IconButton
-                     size="small"
-                     onClick={() => setEditModal(params.row)}
-                  >
-                     <Icon icon="solar:pen-bold" size="small" />
-                  </IconButton>
-               </Tooltip>
-            );
          },
       },
       { field: "@actions", headerName: "", flex: 0.1 },
@@ -681,22 +744,6 @@ const OrderTable = () => {
                }}
             />
          </Stack>
-         {/* O10: the filtered count — `totalOrders` is the list API's
-             filtered `total` for the ACTIVE filters (refreshed on
-             every filter apply/clear/change), not the page size and
-             not the unfiltered count. */}
-         <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="flex-end"
-            px={2}
-            pb={1}
-         >
-            <Typography variant="body2" color="text.secondary">
-               {totalOrders} order{totalOrders === 1 ? "" : "s"} matching
-               current filters
-            </Typography>
-         </Stack>
          <CustomTable
             key={`orders-table-${selectionResetKey}`}
             rows={orderRows as OrderType[]}
@@ -706,6 +753,12 @@ const OrderTable = () => {
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
             loading={loading}
+            getRowClassName={(params) =>
+               Array.isArray(params.row.duplicateOf) &&
+               params.row.duplicateOf.length > 0
+                  ? "duplicate-order-row"
+                  : ""
+            }
             filter={(data, onChange) =>
                OrderFilter(data, (d: any) => {
                   onChange(d);
@@ -754,13 +807,13 @@ const OrderTable = () => {
                            setBulkStatusAnchor(e.currentTarget);
                         }}
                      >
-                        <Icon
-                           icon="solar:refresh-circle-bold"
-                           size="small"
-                        />
+                        <Icon icon="solar:refresh-circle-bold" size="small" />
                      </IconButton>
                   </Tooltip>
-                  <Tooltip title="Assign courier to selected" disableInteractive>
+                  <Tooltip
+                     title="Assign courier to selected"
+                     disableInteractive
+                  >
                      <IconButton
                         aria-label="Assign courier to selected"
                         disabled={bulkWorking}
@@ -784,7 +837,10 @@ const OrderTable = () => {
                   {/* O7: bulk delete — soft-delete to the Bin via
                       POST /api/orders/bulk action "delete", behind
                       the existing AlertDialog confirmation. */}
-                  <Tooltip title="Delete selected orders (move to Bin)" disableInteractive>
+                  <Tooltip
+                     title="Delete selected orders (move to Bin)"
+                     disableInteractive
+                  >
                      <IconButton
                         aria-label="Delete selected orders"
                         disabled={bulkWorking}
@@ -828,7 +884,14 @@ const OrderTable = () => {
                   },
                },
                {
-                  label: "edit",
+                  label: "Quick Edit",
+                  icon: <Icon icon="solar:pen-new-square-bold" size="small" />,
+                  onClick: (params: GridRenderCellParams) => {
+                     setEditModal(params.row);
+                  },
+               },
+               {
+                  label: "Edit",
                   icon: <Icon icon="solar:pen-bold" size="small" />,
                   onClick: (params: GridRenderCellParams) => {
                      router.push(
@@ -837,7 +900,7 @@ const OrderTable = () => {
                   },
                },
                {
-                  label: "delete",
+                  label: "Delete",
                   color: "error",
                   icon: (
                      <Icon
@@ -907,7 +970,10 @@ const OrderTable = () => {
                   onClick: () => {
                      setBulkStatusAnchor(null);
                      runBulk(
-                        { action: "status", status: statusLabelToApi[s] || s.toUpperCase() },
+                        {
+                           action: "status",
+                           status: statusLabelToApi[s] || s.toUpperCase(),
+                        },
                         selectedOrders,
                      );
                   },
@@ -953,8 +1019,8 @@ const OrderTable = () => {
                </TextField>
                {bulkCourierStatus === "In Courier" && (
                   <Typography variant="caption" color="text.secondary">
-                     Orders without a submission time will be stamped as
-                     handed to the courier now.
+                     Orders without a submission time will be stamped as handed
+                     to the courier now.
                   </Typography>
                )}
                <Stack direction="row" spacing={2} justifyContent="flex-end">
@@ -1126,7 +1192,9 @@ const OrderTable = () => {
                         } catch {}
                      }}
                   >
-                     {noteModal?.employeeNote.length ? "Update note" : "Add note"}
+                     {noteModal?.employeeNote.length
+                        ? "Update note"
+                        : "Add note"}
                   </Button>
                </Stack>
             </Stack>
@@ -1168,7 +1236,10 @@ const OrderTable = () => {
                         extraFields?.pricing?.discount !== undefined
                            ? extraFields.pricing.discount
                            : Number(editModal.pricing?.discount || 0);
-                     const total = Math.max(0, newSubtotal + deliveryCharge - discount);
+                     const total = Math.max(
+                        0,
+                        newSubtotal + deliveryCharge - discount,
+                     );
                      const advancePayment =
                         extraFields?.pricing?.advancePayment !== undefined
                            ? extraFields.pricing.advancePayment
@@ -1222,7 +1293,10 @@ const OrderTable = () => {
                      setEditModal(null);
                      showSnackbar("Order updated successfully", "success");
                   } catch (err: any) {
-                     showSnackbar(err?.message || "Failed to update order", "error");
+                     showSnackbar(
+                        err?.message || "Failed to update order",
+                        "error",
+                     );
                      throw err;
                   } finally {
                      setIsUpdatingQuickEdit(false);
@@ -1262,10 +1336,7 @@ const OrderTable = () => {
             onClose={() => setBulkDeleteOpen(false)}
             onConfirm={async () => {
                setBulkDeleteOpen(false);
-               const data = await runBulk(
-                  { action: "delete" },
-                  selectedOrders,
-               );
+               const data = await runBulk({ action: "delete" }, selectedOrders);
                if (data && Number(data.succeeded || 0) > 0) {
                   clearSelection();
                }

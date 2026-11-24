@@ -11,7 +11,6 @@
 // auditable. Nothing here is fabricated: before the first payment is
 // recorded the section honestly says so.
 import {
-   Alert,
    Autocomplete,
    Button,
    Grid,
@@ -22,6 +21,7 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import AlertDialog from "@src/components/AlertDialog";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 const PAYMENT_METHODS = [
    "Cash",
@@ -58,6 +58,7 @@ const SupplierPaymentLedger = ({
    onSummaryChange,
 }: SupplierPaymentLedgerProps) => {
    const { formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [payments, setPayments] = useState<any[]>([]);
    const [summary, setSummary] = useState<any>(null);
    const [loading, setLoading] = useState(false);
@@ -77,7 +78,6 @@ const SupplierPaymentLedger = ({
    const [applyCredit, setApplyCredit] = useState("");
    const [formError, setFormError] = useState<string | null>(null);
    const [saving, setSaving] = useState(false);
-   const [notice, setNotice] = useState<string | null>(null);
    const [voidTarget, setVoidTarget] = useState<any>(null);
 
    const loadPayments = useCallback(async () => {
@@ -184,10 +184,11 @@ const SupplierPaymentLedger = ({
          });
          const data = await res.json().catch(() => ({}));
          if (!res.ok) throw new Error(data.message || data.error || "Failed to record payment");
-         setNotice(
+         showSnackbar(
             credit > 0
                ? `Payment recorded — ${formatCurrency(credit)} of return credit applied.`
                : `Payment ${data.payment?.customId || ""} recorded.`,
+            "success"
          );
          setAmount("");
          setApplyCredit("");
@@ -212,11 +213,11 @@ const SupplierPaymentLedger = ({
             { method: "DELETE" },
          );
          if (!res.ok) throw new Error("void failed");
-         setNotice(`Payment ${voidTarget.customId || ""} voided.`);
+         showSnackbar(`Payment ${voidTarget.customId || ""} voided.`, "success");
          await loadPayments();
          onDataChanged?.();
       } catch {
-         setNotice("Failed to void the payment. Please try again.");
+         showSnackbar("Failed to void the payment. Please try again.", "error");
       } finally {
          setVoidTarget(null);
       }
@@ -249,12 +250,6 @@ const SupplierPaymentLedger = ({
                )}{" "}
                = <b>net payable {formatCurrency(summary.netPayable)}</b>
             </Typography>
-         )}
-
-         {notice && (
-            <Alert severity="success" onClose={() => setNotice(null)}>
-               {notice}
-            </Alert>
          )}
 
          {formOpen && (

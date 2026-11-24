@@ -1,86 +1,194 @@
-import { Stack, Avatar, Typography, Tooltip, Button } from "@mui/material";
+import { Box, Typography, Tooltip, IconButton } from "@mui/material";
 import Icon from "@src/components/Icon";
-import { useState } from "react";
+import React, { useState } from "react";
+
+export interface CustomerInfoProps {
+   name: string;
+   email?: string;
+   phone: number | string;
+   url?: string;
+   onNameClick?: () => void;
+}
 
 const CustomerInfo = ({
    name,
    email,
    phone,
    url,
-}: {
-   name: string;
-   email?: string;
-   phone: number | string;
-   url?: string;
-}) => {
-   const [copyText, setCopyText] = useState("Copy phone number");
+   onNameClick,
+}: CustomerInfoProps) => {
+   const [phoneCopied, setPhoneCopied] = useState(false);
+
+   const handleCopyPhone = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!phone || phone === "-") return;
+      navigator.clipboard.writeText(String(phone));
+      setPhoneCopied(true);
+      setTimeout(() => {
+         setPhoneCopied(false);
+      }, 2000);
+   };
+
+   const handleWhatsApp = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!phone || phone === "-") return;
+      const rawDigits = String(phone).replace(/\D/g, "");
+      const formattedNumber =
+         rawDigits.length === 11 && rawDigits.startsWith("0")
+            ? `88${rawDigits}`
+            : rawDigits;
+      window.open(`https://wa.me/${formattedNumber}`, "_blank");
+   };
+
+   const handleCall = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!phone || phone === "-") return;
+      window.open(`tel:${phone}`);
+   };
+
+   const hasPhone = Boolean(phone && phone !== "-");
 
    return (
-      <Stack spacing={1} direction="row" alignItems="center" height={"100%"} sx={{ minWidth: 0, width: "100%" }}>
-         <Stack sx={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+      <Box
+         sx={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            width: "100%",
+            minWidth: 0,
+            py: 0.5,
+         }}
+      >
+         {/* Customer Details: Name & Phone */}
+         <Box
+            sx={{
+               minWidth: 0,
+               flex: 1,
+               mr: 1,
+               display: "flex",
+               flexDirection: "column",
+               justifyContent: "center",
+               overflow: "hidden",
+            }}
+         >
             <Typography
                variant="body2"
                color="textPrimary"
                noWrap
+               onClick={(e) => {
+                  if (onNameClick) {
+                     e.stopPropagation();
+                     onNameClick();
+                  }
+               }}
                sx={{
-                  "&:hover": { textDecoration: "underline", cursor: "pointer" },
+                  "&:hover": {
+                     textDecoration: onNameClick ? "underline" : "none",
+                  },
+                  cursor: onNameClick ? "pointer" : "default",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
+                  fontWeight: 500,
+                  lineHeight: 1.3,
                }}
             >
                {name}
             </Typography>
-            <Typography
-               variant="body2"
-               fontSize={14}
-               color="textSecondary"
-               noWrap
-               sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+            <Tooltip
+               title={
+                  hasPhone ? (phoneCopied ? "Copied!" : "Click to copy") : ""
+               }
+               disableInteractive
             >
-               {phone}
-            </Typography>
-         </Stack>
-         <Stack spacing={0.3}>
-            <Tooltip title={copyText} disableInteractive>
-               <Button
-                  color="inherit"
+               <Typography
+                  variant="body2"
+                  fontSize={13}
+                  color="textSecondary"
+                  noWrap
+                  onClick={handleCopyPhone}
                   sx={{
-                     borderRadius: "5px!important",
-                     minWidth: "30px!important",
-                     p: 0.3,
-                  }}
-                  onClick={() => {
-                     setCopyText("Copied!");
-                     navigator.clipboard.writeText(`${phone}`);
-                     setTimeout(() => {
-                        setCopyText("Copy phone number");
-                     }, 2000);
+                     overflow: "hidden",
+                     textOverflow: "ellipsis",
+                     lineHeight: 1.3,
+                     cursor: hasPhone ? "pointer" : "default",
+                     "&:hover": {
+                        textDecoration: hasPhone ? "underline" : "none",
+                        color: hasPhone ? "text.primary" : "textSecondary",
+                     },
                   }}
                >
-                  <Icon icon="solar:copy-bold-duotone" size="small" />
-               </Button>
+                  {phone || "—"}
+               </Typography>
             </Tooltip>
-            <Tooltip title="Call now" disableInteractive>
-               <Button
-                  color="primary"
-                  sx={{
-                     borderRadius: "5px!important",
-                     minWidth: "30px!important",
-                     p: 0.3,
-                  }}
-                  onClick={() => {
-                     window.open(`tel:${phone}`);
-                  }}
-               >
-                  <Icon
-                     icon="solar:outgoing-call-rounded-bold"
+         </Box>
+
+         {/* Dedicated flex column container for action buttons */}
+         <Box
+            sx={{
+               display: "flex",
+               flexDirection: "column",
+               alignItems: "center",
+               justifyContent: "center",
+               flexShrink: 0,
+               width: 24,
+               minWidth: 24,
+               gap: "2px",
+            }}
+         >
+            <Tooltip title="WhatsApp" placement="left" disableInteractive arrow>
+               <span style={{ display: "inline-flex" }}>
+                  <IconButton
+                     size="small"
+                     color="success"
+                     onClick={handleWhatsApp}
+                     disabled={!hasPhone}
+                     aria-label="WhatsApp"
+                     sx={{
+                        width: 30,
+                        height: 30,
+                        p: 0,
+                        borderRadius: "4px",
+                        "&:hover": {
+                           bgcolor: "action.hover",
+                        },
+                     }}
+                  >
+                     <Icon
+                        icon="ic:baseline-whatsapp"
+                        size="20px"
+                        color="success"
+                     />
+                  </IconButton>
+               </span>
+            </Tooltip>
+            <Tooltip title="Call" placement="left" disableInteractive arrow>
+               <span style={{ display: "inline-flex" }}>
+                  <IconButton
                      size="small"
                      color="primary"
-                  />
-               </Button>
+                     onClick={handleCall}
+                     disabled={!hasPhone}
+                     aria-label="Call"
+                     sx={{
+                        width: 30,
+                        height: 30,
+                        p: 0,
+                        borderRadius: "4px",
+                        "&:hover": {
+                           bgcolor: "action.hover",
+                        },
+                     }}
+                  >
+                     <Icon
+                        icon="solar:outgoing-call-rounded-bold"
+                        size="20px"
+                        // color="primary"
+                     />
+                  </IconButton>
+               </span>
             </Tooltip>
-         </Stack>
-      </Stack>
+         </Box>
+      </Box>
    );
 };
 

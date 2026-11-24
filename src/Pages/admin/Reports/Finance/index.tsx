@@ -12,7 +12,6 @@
 // figures (everything outstanding today), independent of the
 // selected period. All data comes from GET /api/reports?tab=finance.
 import {
-   Alert,
    Button,
    Grid,
    Stack,
@@ -24,6 +23,7 @@ import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { DEFAULT_FILTERS } from "@src/Pages/admin/Customers/components/customerFilterUtils";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
@@ -33,9 +33,9 @@ import { filterRowsBySearch } from "@src/lib/tableSearch";
 const Finance = () => {
    const router = useRouter();
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
    const loadReport = useCallback(async () => {
@@ -45,12 +45,11 @@ const Finance = () => {
          const res = await fetch(`/api/reports?${params.toString()}`);
          if (res.ok) {
             setReport(await res.json());
-            setError(null);
          } else {
-            setError("Failed to load the finance report. The figures below may be out of date.");
+            showSnackbar("Failed to load finance report", "error");
          }
       } catch {
-         setError("Failed to load the finance report. The figures below may be out of date.");
+         showSnackbar("Failed to load finance report", "error");
       }
       setLoading(false);
    }, [dateRange]);
@@ -260,7 +259,6 @@ const Finance = () => {
 
    return (
       <Stack spacing={2}>
-         {error && <Alert severity="error">{error}</Alert>}
          <Stack direction="row" justifyContent="flex-end">
             <DateRange
                title="Filter by period"

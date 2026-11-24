@@ -120,6 +120,31 @@ export async function POST(request: NextRequest) {
          return NextResponse.json({ error: "Email already in use" }, { status: 409 });
       }
 
+      let resolvedRoleId = roleId || undefined;
+      if (!resolvedRoleId && body.role) {
+         const roleStr = String(body.role).trim();
+         const matchedRole = await prisma.role.findFirst({
+            where: {
+               OR: [
+                  { id: roleStr },
+                  { name: roleStr },
+               ],
+            },
+         });
+         if (matchedRole) {
+            resolvedRoleId = matchedRole.id;
+         } else {
+            const allRoles = await prisma.role.findMany();
+            const fuzzy = allRoles.find(
+               (r) =>
+                  r.name.toLowerCase() === roleStr.toLowerCase() ||
+                  r.name.toLowerCase().includes(roleStr.toLowerCase()) ||
+                  roleStr.toLowerCase().includes(r.name.toLowerCase()),
+            );
+            if (fuzzy) resolvedRoleId = fuzzy.id;
+         }
+      }
+
       const passwordHash = password ? await hashPassword(password) : undefined;
       const { customId } = await generateNextEntityId("USER");
       const auditCtx = requestAuditContext(request);
@@ -137,7 +162,7 @@ export async function POST(request: NextRequest) {
                address: address || undefined,
                salary: salary || undefined,
                passwordHash,
-               roleId: roleId || undefined,
+               roleId: resolvedRoleId || undefined,
                status: status ? (status.toUpperCase() as any) : "ACTIVE",
                image: image || undefined,
             },

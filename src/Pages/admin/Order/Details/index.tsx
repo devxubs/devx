@@ -8,9 +8,8 @@ import {
    Grid,
    Stack,
    Typography,
-   Alert,
-   Snackbar,
 } from "@mui/material";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { useRouter } from "next/navigation";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
@@ -48,7 +47,15 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
    } = useOrderDetails(orderId);
 
    // Modal states
+   const { showSnackbar } = useSnackbar();
    const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
+
+   React.useEffect(() => {
+      if (feedback) {
+         showSnackbar(feedback.message, feedback.type);
+         setFeedback(null);
+      }
+   }, [feedback, setFeedback, showSnackbar]);
    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
    const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
 
@@ -92,24 +99,6 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
                onOpenQuickEdit={() => setIsQuickEditOpen(true)}
                onPrintInvoice={handlePrintInvoice}
             />
-
-            {/* Feedback alert */}
-            {feedback && (
-               <Snackbar
-                  open={Boolean(feedback)}
-                  autoHideDuration={3000}
-                  onClose={() => setFeedback(null)}
-                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
-               >
-                  <Alert
-                     severity={feedback.type}
-                     onClose={() => setFeedback(null)}
-                     sx={{ width: "100%", borderRadius: 1 }}
-                  >
-                     {feedback.message}
-                  </Alert>
-               </Snackbar>
-            )}
 
             {/* ============================================================ */}
             {/* 2. DUAL-COLUMN LAYOUT (Main Order Flow + Sidebar Context)    */}

@@ -1,5 +1,5 @@
 "use client";
-import { Alert, Grid, Stack, Typography } from "@mui/material";
+import { Grid, Stack, Typography } from "@mui/material";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
@@ -14,6 +14,7 @@ import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 const statusColor: Record<
    string,
@@ -40,9 +41,9 @@ const statusColor: Record<
 
 const Sales = () => {
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
    // Phase B4b (P1-5): consume the shared toolbar search. The reports
@@ -65,12 +66,11 @@ const Sales = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
-            setError(null);
          } else {
-            setError("Failed to load the sales report. The figures below may be out of date.");
+            showSnackbar("Failed to load sales report", "error");
          }
       } catch {
-         setError("Failed to load the sales report. The figures below may be out of date.");
+         showSnackbar("Failed to load sales report", "error");
       }
       setLoading(false);
    }, [dateRange]);
@@ -204,7 +204,6 @@ const Sales = () => {
 
    return (
       <Stack spacing={2}>
-         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             {analyticsCards.map((item, idx) => (
                <Grid size={{ xs: 12, sm: 6, md: 3 }} key={idx}>

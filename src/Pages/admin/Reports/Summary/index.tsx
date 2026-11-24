@@ -1,4 +1,4 @@
-import { Alert, Grid, Stack, Typography } from "@mui/material";
+import { Grid, Stack, Typography } from "@mui/material";
 import React from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import RadialBar from "@cmp/RadialBar";
@@ -6,11 +6,12 @@ import DateRangePickerCustom from "@src/components/DateRange";
 import { useSettings } from "@src/lib/settingsContext";
 import { formatCompactNumber } from "@src/lib/utils";
 import { reportParams } from "../reportExport";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 const Summary = () => {
    const { settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = React.useState<any>(null);
-   const [error, setError] = React.useState<string | null>(null);
    const [dateRange, setDateRange] = React.useState<[Date | null, Date | null]>([null, null]);
 
    React.useEffect(() => {
@@ -25,9 +26,7 @@ const Summary = () => {
          })
          // A failed load must not silently render as all-zero figures.
          .catch(() =>
-            setError(
-               "Failed to load the summary report. The figures below may be missing or out of date.",
-            ),
+            showSnackbar("Failed to load summary report", "error"),
          );
    }, [dateRange]);
 
@@ -84,7 +83,6 @@ const Summary = () => {
 
    return (
       <Stack spacing={2}>
-         {error && <Alert severity="error">{error}</Alert>}
          <Stack direction="row" justifyContent="flex-end">
             <DateRangePickerCustom
                title="Filter by Date"

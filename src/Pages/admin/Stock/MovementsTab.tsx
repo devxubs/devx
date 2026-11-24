@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-   Alert,
    Badge,
    Button,
    Chip,
@@ -15,6 +14,7 @@ import {
    Tooltip,
    Typography,
 } from "@mui/material";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import FilterModalShell from "@src/components/FilterModalShell";
@@ -72,6 +72,7 @@ interface MovementsTabProps {
 
 const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
    const { filterQueryData } = useFilterQuery();
+   const { showSnackbar } = useSnackbar();
    const search = filterQueryData.searchText || "";
    const [rows, setRows] = useState<any[]>([]);
    const [total, setTotal] = useState(0);
@@ -106,6 +107,7 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
          const res = await fetch(`/api/stock-movements?${params.toString()}`);
          if (!res.ok) {
             setLoadError("Failed to load stock movements.");
+            showSnackbar("Failed to load stock movements. Please try again.", "error");
             return;
          }
          if (res.ok) {
@@ -130,13 +132,12 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
             setTotal(Number(data.total ?? 0));
          }
       } catch {
-         // Rows stay as they are (possibly stale) — the banner above
-         // the table says the load failed and offers Retry.
          setLoadError("Failed to load stock movements.");
+         showSnackbar("Failed to load stock movements. Please try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, [paginationModel, search, filters]);
+   }, [paginationModel, search, filters, showSnackbar]);
 
    useEffect(() => {
       load();
@@ -227,17 +228,26 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
 
    return (
       <Stack spacing={2}>
-         {loadError && (
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={() => load()}>
-                     Retry
-                  </Button>
-               }
+         {loadError && rows.length === 0 && !loading && (
+            <Stack
+               direction="row"
+               alignItems="center"
+               justifyContent="center"
+               spacing={1.5}
+               sx={{ py: 3 }}
             >
-               {loadError}
-            </Alert>
+               <Typography variant="body2" color="text.secondary">
+                  {loadError}
+               </Typography>
+               <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                  onClick={() => load()}
+               >
+                  Retry
+               </Button>
+            </Stack>
          )}
 
          {countActive(filters) > 0 && (

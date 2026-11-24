@@ -11,6 +11,7 @@ import {
    GridRowsProp,
    GridRowSelectionModel,
    GridRowId,
+   GridRowParams,
 } from "@mui/x-data-grid";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Icon from "../Icon";
@@ -20,6 +21,7 @@ import NoRows from "./NoRows";
 
 export type MenuItem = Omit<MenuItemProps, "onClick"> & {
    onClick?: (params: GridRenderCellParams) => void;
+   hidden?: (params: GridRenderCellParams) => boolean;
 };
 
 export type ColumnConfig = GridColDef & {
@@ -41,7 +43,7 @@ interface DataTableProps {
    rows: GridRowsProp;
    columns: ColumnConfig[];
    checkBox?: boolean;
-   menuItems?: MenuItem[];
+   menuItems?: MenuItem[] | ((params: GridRenderCellParams) => MenuItem[]);
    filter?: (
       data: FilterData,
       onChange: (data: FilterData) => void,
@@ -81,6 +83,7 @@ interface DataTableProps {
       pageSize: number;
    }) => void;
    loading?: boolean;
+   getRowClassName?: (params: GridRowParams) => string;
 }
 
 export default function CustomTable({
@@ -105,6 +108,7 @@ export default function CustomTable({
    paginationModel: controlledPaginationModel,
    onPaginationModelChange,
    loading = false,
+   getRowClassName,
 }: DataTableProps) {
    const theme = useTheme();
 
@@ -409,6 +413,7 @@ export default function CustomTable({
                loading={loading}
                paginationModel={paginationModel}
                onPaginationModelChange={handlePaginationChange}
+               getRowClassName={getRowClassName}
                disableColumnSorting
                disableColumnMenu
                disableColumnResize
@@ -514,6 +519,28 @@ export default function CustomTable({
                            "!important",
                      }),
                   },
+                  "& .MuiDataGrid-row.duplicate-order-row": {
+                     backgroundColor:
+                        alpha(theme.palette.warning.main, 0.08) + "!important",
+                     ...theme.applyStyles("dark", {
+                        backgroundColor:
+                           alpha(theme.palette.warning.main, 0.16) +
+                           "!important",
+                     }),
+                  },
+                  "& .MuiDataGrid-row.duplicate-order-row:hover": {
+                     backgroundColor:
+                        alpha(theme.palette.warning.main, 0.14) + "!important",
+                     ...theme.applyStyles("dark", {
+                        backgroundColor:
+                           alpha(theme.palette.warning.main, 0.24) +
+                           "!important",
+                     }),
+                  },
+                  "& .MuiDataGrid-row.duplicate-order-row.Mui-selected": {
+                     backgroundColor:
+                        alpha(theme.palette.warning.main, 0.18) + "!important",
+                  },
 
                   "& .MuiDataGrid-cell": {
                      outline: "none !important",
@@ -545,13 +572,23 @@ export default function CustomTable({
          >
             <Menu
                item={
-                  menuItems?.map((menuItem) => ({
+                  (typeof menuItems === "function"
+                     ? selectedRowParams
+                        ? menuItems(selectedRowParams)
+                        : []
+                     : menuItems?.filter(
+                          (m) =>
+                             !m.hidden ||
+                             !selectedRowParams ||
+                             !m.hidden(selectedRowParams),
+                       ) ?? []
+                  ).map((menuItem) => ({
                      ...menuItem,
                      onClick: () => {
                         menuItem.onClick?.(selectedRowParams!);
                         setActionMenuOpen(null);
                      },
-                  })) ?? []
+                  }))
                }
                onClose={() => setActionMenuOpen(null)}
             />

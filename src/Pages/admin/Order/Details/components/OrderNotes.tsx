@@ -13,12 +13,12 @@ import {
    IconButton,
    Tooltip,
    CircularProgress,
-   Alert,
    alpha,
    useTheme,
    Divider,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 interface OrderNotesCardProps {
    orderId: string;
@@ -40,6 +40,7 @@ export default function OrderNotesCard({
    onNotesUpdated,
 }: OrderNotesCardProps) {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
 
    // Note values
    const [courierNote, setCourierNote] = useState(initialCourierNote || "");
@@ -51,14 +52,10 @@ export default function OrderNotesCard({
    const [editingNote, setEditingNote] = useState<NoteType | null>(null);
    const [draftText, setDraftText] = useState("");
    const [savingNote, setSavingNote] = useState<NoteType | null>(null);
-   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
    const handleStartEdit = (type: NoteType, currentVal: string) => {
       setEditingNote(type);
       setDraftText(currentVal);
-      setSuccessMsg(null);
-      setErrorMsg(null);
    };
 
    const handleCancelEdit = () => {
@@ -68,8 +65,6 @@ export default function OrderNotesCard({
 
    const handleSaveNote = async (type: NoteType) => {
       setSavingNote(type);
-      setErrorMsg(null);
-      setSuccessMsg(null);
 
       const payload: Record<string, string> = {};
       if (type === "courier") payload.courierNote = draftText.trim();
@@ -102,11 +97,10 @@ export default function OrderNotesCard({
             packing: "Packing Note",
             employee: "Employee Note",
          };
-         setSuccessMsg(`${titleMap[type]} saved successfully!`);
-         setTimeout(() => setSuccessMsg(null), 3000);
+         showSnackbar(`${titleMap[type]} saved successfully!`, "success");
          if (onNotesUpdated) onNotesUpdated(updatedOrder);
       } catch (err: any) {
-         setErrorMsg(err.message || "Failed to save note");
+         showSnackbar(err.message || "Failed to save note", "error");
       } finally {
          setSavingNote(null);
       }
@@ -205,18 +199,6 @@ export default function OrderNotesCard({
                </Box>
             </Stack>
          </Box>
-
-         {/* Feedback Alerts */}
-         {successMsg && (
-            <Alert severity="success" sx={{ m: 2.5, mb: 0, py: 0.5, borderRadius: 1 }}>
-               {successMsg}
-            </Alert>
-         )}
-         {errorMsg && (
-            <Alert severity="error" sx={{ m: 2.5, mb: 0, py: 0.5, borderRadius: 1 }}>
-               {errorMsg}
-            </Alert>
-         )}
 
          {/* Spacious 2-Column × 2-Row Note Panels */}
          <Box sx={{ p: 2.5 }}>

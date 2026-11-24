@@ -16,6 +16,7 @@ import {
    MenuItem,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import CustomSwitch from "@src/components/CustomSwitch";
 import AlertDialog from "@src/components/AlertDialog";
 import CourierProvidersCard from "./CourierProvidersCard";
@@ -40,7 +41,7 @@ export default function SystemTab({
    const [openResetDialog, setOpenResetDialog] = useState(false);
    const [isExporting, setIsExporting] = useState(false);
    const [isResetting, setIsResetting] = useState(false);
-   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+   const { showSnackbar } = useSnackbar();
 
    const handleExportData = async () => {
       setIsExporting(true);
@@ -56,9 +57,9 @@ export default function SystemTab({
          a.click();
          a.remove();
          window.URL.revokeObjectURL(url);
-         setStatusMessage({ type: "success", text: "Data export downloaded successfully!" });
+         showSnackbar("Data export downloaded successfully!", "success");
       } catch {
-         setStatusMessage({ type: "error", text: "Failed to generate data export." });
+         showSnackbar("Failed to generate data export.", "error");
       } finally {
          setIsExporting(false);
       }
@@ -69,12 +70,12 @@ export default function SystemTab({
       try {
          const ok = await onResetDefaults();
          if (ok) {
-            setStatusMessage({ type: "success", text: "Settings restored to factory defaults." });
+            showSnackbar("Settings restored to factory defaults.", "success");
          } else {
-            setStatusMessage({ type: "error", text: "Failed to reset settings." });
+            showSnackbar("Failed to reset settings.", "error");
          }
       } catch {
-         setStatusMessage({ type: "error", text: "An error occurred while resetting." });
+         showSnackbar("An error occurred while resetting.", "error");
       } finally {
          setIsResetting(false);
          setOpenResetDialog(false);
@@ -91,16 +92,6 @@ export default function SystemTab({
                Configure system alerts, automated notifications, data export, and store factory reset.
             </Typography>
          </Box>
-
-         {statusMessage && (
-            <Alert
-               severity={statusMessage.type}
-               onClose={() => setStatusMessage(null)}
-               sx={{ borderRadius: 1.5 }}
-            >
-               {statusMessage.text}
-            </Alert>
-         )}
 
          {/* Alert Recipients */}
          <Grid container spacing={2}>

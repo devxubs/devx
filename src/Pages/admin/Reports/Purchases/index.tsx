@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Stack, Grid, Typography } from "@mui/material";
+import { Stack, Grid, Typography } from "@mui/material";
 import React, { useState, useEffect, useCallback } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import CustomTable from "@src/components/Table";
@@ -11,12 +11,13 @@ import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 const Purchases = () => {
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    // Distinct-supplier count over the COMPLETE filtered dataset
    // (see loader) — counting only the displayed page undercounts.
    const [supplierCount, setSupplierCount] = useState<number | null>(null);
@@ -41,7 +42,6 @@ const Purchases = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
-            setError(null);
             try {
                const allRows = await fetchAllReportRows(
                   reportParams("purchases", dateRange),
@@ -56,10 +56,10 @@ const Purchases = () => {
                setSupplierCount(null);
             }
          } else {
-            setError("Failed to load the purchases report. The figures below may be out of date.");
+            showSnackbar("Failed to load purchases report", "error");
          }
       } catch {
-         setError("Failed to load the purchases report. The figures below may be out of date.");
+         showSnackbar("Failed to load purchases report", "error");
       }
       setLoading(false);
    }, [dateRange]);
@@ -113,7 +113,6 @@ const Purchases = () => {
 
    return (
       <Stack spacing={3}>
-         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <AnalyticsCard

@@ -29,10 +29,23 @@ export async function GET(request: NextRequest) {
    // Phase 1 (S-2): a suspended/inactive account's unexpired token must
    // not keep a working session — /me is the client's session probe.
    if (user.status !== "ACTIVE") {
-      return NextResponse.json(
-         { error: "Account is not active" },
+      const isSuspended = user.status === "SUSPENDED";
+      const response = NextResponse.json(
+         {
+            error: isSuspended
+               ? "Account suspended. Contact administrator."
+               : "Account is not active",
+            code: isSuspended ? "ACCOUNT_SUSPENDED" : "ACCOUNT_INACTIVE",
+            status: user.status,
+         },
          { status: 403 },
       );
+      response.cookies.set("devx_token", "", {
+         httpOnly: true,
+         expires: new Date(0),
+         path: "/",
+      });
+      return response;
    }
 
    return NextResponse.json({

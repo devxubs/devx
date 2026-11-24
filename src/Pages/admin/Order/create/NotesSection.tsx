@@ -31,15 +31,15 @@ const FIELDS: {
 const NotesSection = ({ notes, onChange }: NotesSectionProps) => {
    return (
       <SectionCard title="Order Notes" subtitle="Kept separate, exactly as in Order Details">
-         <Grid container spacing={2}>
+         <Grid container spacing={1.5}>
             {FIELDS.map((f) => (
-               <Grid size={{ xs: 12, md: 6 }} key={f.key}>
-                  <Stack spacing={1}>
+               <Grid size={{ xs: 12, sm: 6 }} key={f.key}>
+                  <Stack spacing={0.75}>
                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+                        <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                            {f.title}
                         </Typography>
-                        {f.badge && <Chip label={f.badge} size="small" sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700 }} />}
+                        {f.badge && <Chip label={f.badge} size="small" sx={{ height: 18, fontSize: "0.65rem", fontWeight: 700 }} />}
                      </Stack>
                      <TextField
                         fullWidth

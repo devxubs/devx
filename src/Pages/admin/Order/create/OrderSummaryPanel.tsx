@@ -26,27 +26,36 @@ const OrderSummaryPanel = ({ totals, currencySymbol = "৳" }: OrderSummaryPanel
    const statusColor =
       totals.paymentStatus === "Paid" ? "success" : totals.paymentStatus === "Partial" ? "warning" : "error";
    return (
-      <Paper sx={{ borderRadius: 1.5, boxShadow: 15, p: 2.5 }}>
-         <Stack spacing={1.25}>
+      <Paper
+         variant="outlined"
+         sx={{
+            borderRadius: 1.5,
+            borderColor: "divider",
+            p: 2,
+            bgcolor: "background.paper",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+         }}
+      >
+         <Stack spacing={1}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-               <Typography variant="body1" fontSize={17} color="textPrimary">
+               <Typography variant="subtitle1" fontWeight={700} fontSize="0.95rem" color="textPrimary">
                   Order Summary
                </Typography>
-               <Chip label={totals.paymentStatus} color={statusColor as any} size="small" sx={{ fontWeight: 700 }} />
+               <Chip label={totals.paymentStatus} color={statusColor as any} size="small" sx={{ fontWeight: 700, height: 22, fontSize: "0.75rem" }} />
             </Stack>
-            <Divider />
+            <Divider sx={{ my: 0.5 }} />
             <Row label="Subtotal" value={formatBDT(totals.subtotal, currencySymbol)} />
             <Row label="Product Discount" value={`− ${formatBDT(totals.productDiscount, currencySymbol)}`} />
             <Row label="Net Product Amount" value={formatBDT(totals.netProductAmount, currencySymbol)} />
             <Row label="Overall Discount" value={`− ${formatBDT(totals.overallDiscount, currencySymbol)}`} />
             <Row label="Tax / VAT" value={formatBDT(totals.taxAmount, currencySymbol)} />
             <Row label="Delivery Charge" value={formatBDT(totals.deliveryCharge, currencySymbol)} />
-            <Divider />
+            <Divider sx={{ my: 0.5 }} />
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-               <Typography variant="subtitle1" fontWeight={800}>
+               <Typography variant="subtitle1" fontWeight={800} fontSize="1rem">
                   Grand Total
                </Typography>
-               <Typography variant="subtitle1" fontWeight={800} color="primary.main" noWrap>
+               <Typography variant="subtitle1" fontWeight={800} fontSize="1.1rem" color="primary.main" noWrap>
                   {formatBDT(totals.grandTotal, currencySymbol)}
                </Typography>
             </Stack>
@@ -55,7 +64,7 @@ const OrderSummaryPanel = ({ totals, currencySymbol = "৳" }: OrderSummaryPanel
                direction="row"
                justifyContent="space-between"
                alignItems="center"
-               sx={{ bgcolor: "action.hover", borderRadius: 1, px: 1.25, py: 0.75 }}
+               sx={{ bgcolor: "action.hover", borderRadius: 1, px: 1.25, py: 0.75, mt: 0.5 }}
             >
                <Typography variant="body2" fontWeight={700}>
                   Due Amount

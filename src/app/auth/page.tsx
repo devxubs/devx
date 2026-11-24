@@ -51,6 +51,28 @@ const LoginPage = () => {
    const theme = useTheme();
    const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
+   React.useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const isSuspended = params.get("error") === "suspended";
+      const isInactive = params.get("error") === "inactive";
+      const storedMsg =
+         typeof window !== "undefined"
+            ? sessionStorage.getItem("auth_suspended_toast")
+            : null;
+      if (isSuspended || isInactive || storedMsg) {
+         setSnackbarMessage(
+            storedMsg ||
+               (isInactive
+                  ? "Your account is inactive. Please contact administrator."
+                  : "Your account has been suspended. Please contact administrator."),
+         );
+         setSnackbarOpen(true);
+         try {
+            sessionStorage.removeItem("auth_suspended_toast");
+         } catch {}
+      }
+   }, []);
+
    // Login form. Public registration is closed (accounts are
    // created by an administrator), so this page is sign-in only —
    // the previous sign-up mode and dummy social buttons were

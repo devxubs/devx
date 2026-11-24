@@ -53,7 +53,7 @@ const items: NavItem[] = [
    {
       headingId: "management",
       icon: "solar:users-group-rounded-bold-duotone",
-      label: "User",
+      label: "Employee",
       url: "/admin/user",
       module: { plural: "users", singular: "user" },
    },

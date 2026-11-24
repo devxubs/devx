@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Alert, Stack, Button, Typography, useTheme } from "@mui/material";
+import { Stack, Button, Typography, useTheme } from "@mui/material";
 import Scrollbar from "react-browser-scrollbar";
 import Icon from "@src/components/Icon";
 import { useSnackbar } from "@src/lib/snackbarContext";
@@ -58,6 +58,7 @@ const Unit = () => {
          const res = await fetch("/api/units");
          if (!res.ok) {
             setLoadError("Failed to load units.");
+            showSnackbar("Failed to load units. Please try again.", "error");
             return;
          }
          if (res.ok) {
@@ -75,10 +76,11 @@ const Unit = () => {
          }
       } catch {
          setLoadError("Failed to load units.");
+         showSnackbar("Failed to load units. Please try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [showSnackbar]);
 
    useEffect(() => {
       loadUnits();
@@ -185,17 +187,26 @@ const Unit = () => {
                </Button>
             </Stack>
 
-            {loadError && (
-               <Alert
-                  severity="error"
-                  action={
-                     <Button color="inherit" size="small" onClick={loadUnits}>
-                        Retry
-                     </Button>
-                  }
+            {loadError && units.length === 0 && !loading && (
+               <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="center"
+                  spacing={1.5}
+                  sx={{ py: 3 }}
                >
-                  {loadError}
-               </Alert>
+                  <Typography variant="body2" color="text.secondary">
+                     {loadError}
+                  </Typography>
+                  <Button
+                     size="small"
+                     variant="outlined"
+                     startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                     onClick={loadUnits}
+                  >
+                     Retry
+                  </Button>
+               </Stack>
             )}
 
             {/* Units Data Table */}

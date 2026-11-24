@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 // P4-3: types are static (erased); the runtime engine is loaded
 // lazily inside the export handler via dynamic import().
 import type {
@@ -31,6 +32,7 @@ export function useProductExport({
    selectedProducts = [],
 }: UseProductExportParams) {
    const { settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
    // 1. Export Target & Format State
@@ -236,13 +238,15 @@ export function useProductExport({
             });
          }
 
-         setSuccessMsg(
-            `Successfully exported ${normalizedProducts.length} product${
-               normalizedProducts.length > 1 ? "s" : ""
-            } to "${finalFileName}"!`,
-         );
+         const msg = `Successfully exported ${normalizedProducts.length} product${
+            normalizedProducts.length > 1 ? "s" : ""
+         } to "${finalFileName}"!`;
+         setSuccessMsg(msg);
+         showSnackbar(msg, "success");
       } catch (err: any) {
-         setErrorMsg(err.message || "Failed to generate export file.");
+         const errText = err.message || "Failed to generate export file.";
+         setErrorMsg(errText);
+         showSnackbar(errText, "error");
       } finally {
          setIsExporting(false);
       }

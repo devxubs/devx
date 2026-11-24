@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Button, Chip, Stack, Typography, useTheme } from "@mui/material";
+import { Button, Chip, Stack, Typography, useTheme } from "@mui/material";
 import AlertDialog from "@src/components/AlertDialog";
 import { TableSkeleton } from "@src/components/SkeletonLoader";
 import { useSnackbar } from "@src/lib/snackbarContext";
@@ -139,13 +139,15 @@ const Roles = () => {
             setRolesData(data);
          } else {
             setLoadError("Failed to load roles.");
+            showSnackbar("Failed to load roles. Please try again.", "error");
          }
       } catch {
          setLoadError("Failed to load roles.");
+         showSnackbar("Failed to load roles. Please try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [showSnackbar]);
 
    React.useEffect(() => {
       loadRoles();
@@ -224,17 +226,26 @@ const Roles = () => {
                   Add Roles
                </Button>
             </Stack>
-            {loadError && (
-               <Alert
-                  severity="error"
-                  action={
-                     <Button color="inherit" size="small" onClick={loadRoles}>
-                        Retry
-                     </Button>
-                  }
+            {loadError && rolesData.length === 0 && !loading && (
+               <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="center"
+                  spacing={1.5}
+                  sx={{ py: 3 }}
                >
-                  {loadError}
-               </Alert>
+                  <Typography variant="body2" color="text.secondary">
+                     {loadError}
+                  </Typography>
+                  <Button
+                     size="small"
+                     variant="outlined"
+                     startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                     onClick={loadRoles}
+                  >
+                     Retry
+                  </Button>
+               </Stack>
             )}
             <Stack>
                {/* P3-4: sibling list pages show a TableSkeleton while

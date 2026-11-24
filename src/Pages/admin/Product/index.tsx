@@ -15,7 +15,6 @@ import {
    CircularProgress,
    IconButton,
    Tooltip,
-   Alert,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
@@ -427,14 +426,16 @@ const Product = () => {
             setLoadError(false);
          } else {
             setLoadError(true);
+            showSnackbar("Failed to load products. Please try again.", "error");
          }
       } catch {
          setLoadError(true);
+         showSnackbar("Failed to load products. Please try again.", "error");
       } finally {
          setIsFetching(false);
          setInitialLoading(false);
       }
-   }, [filterQueryData, paginationModel]);
+   }, [filterQueryData, paginationModel, showSnackbar]);
 
    // Filter / search changes return to the first page.
    useEffect(() => {
@@ -511,23 +512,26 @@ const Product = () => {
                   Add product
                </Button>
             </Stack>
-            {/* Phase 2 (2.6): standard load-error banner with retry
-                (Customers dialect) instead of a silently empty table. */}
-            {loadError && !initialLoading && (
-               <Alert
-                  severity="error"
-                  action={
-                     <Button
-                        color="inherit"
-                        size="small"
-                        onClick={loadProducts}
-                     >
-                        Retry
-                     </Button>
-                  }
+            {loadError && !initialLoading && products.length === 0 && (
+               <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="center"
+                  spacing={1.5}
+                  sx={{ py: 3 }}
                >
-                  Failed to load products. Please try again.
-               </Alert>
+                  <Typography variant="body2" color="text.secondary">
+                     Failed to load products.
+                  </Typography>
+                  <Button
+                     size="small"
+                     variant="outlined"
+                     startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                     onClick={loadProducts}
+                  >
+                     Retry
+                  </Button>
+               </Stack>
             )}
             <Stack>
                {initialLoading ? (
@@ -563,10 +567,7 @@ const Product = () => {
                                  />
                               </IconButton>
                            </Tooltip>
-                           <Tooltip
-                              title="Barcode Print"
-                              disableInteractive
-                           >
+                           <Tooltip title="Barcode Print" disableInteractive>
                               <IconButton
                                  aria-label="Barcode Print"
                                  onClick={() =>
@@ -574,7 +575,7 @@ const Product = () => {
                                  }
                               >
                                  <Icon
-                                    icon="solar:barcode-bold-duotone"
+                                    icon="clarity:bar-code-line"
                                     size="small"
                                  />
                               </IconButton>

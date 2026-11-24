@@ -6,7 +6,6 @@ import {
    Button,
    TextField,
    Typography,
-   Alert,
    CircularProgress,
    Collapse,
    Box,
@@ -113,7 +112,7 @@ export const UnitFormModal: React.FC<UnitFormModalProps> = ({
             const errorMsg =
                responseData.error ||
                `Failed to ${selectedUnit ? "update" : "create"} unit (${res.status})`;
-            setApiError(errorMsg);
+            showSnackbar(errorMsg, "error");
             return;
          }
 
@@ -126,7 +125,7 @@ export const UnitFormModal: React.FC<UnitFormModalProps> = ({
          onSuccess();
          handleClose();
       } catch (err: any) {
-         setApiError(err?.message || "An unexpected network error occurred.");
+         showSnackbar(err?.message || "An unexpected network error occurred.", "error");
       } finally {
          setIsSubmitting(false);
       }
@@ -158,18 +157,6 @@ export const UnitFormModal: React.FC<UnitFormModalProps> = ({
             sx={{ mt: 1 }}
          >
             <Stack spacing={2.5}>
-               <Collapse in={Boolean(apiError)}>
-                  {apiError && (
-                     <Alert
-                        severity="error"
-                        onClose={() => setApiError(null)}
-                        sx={{ fontSize: "0.85rem" }}
-                     >
-                        {apiError}
-                     </Alert>
-                  )}
-               </Collapse>
-
                {/* Unit Name Field */}
                <Stack spacing={1}>
                   <Typography

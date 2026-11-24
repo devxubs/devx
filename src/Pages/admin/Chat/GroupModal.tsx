@@ -8,7 +8,6 @@ import {
    useMediaQuery,
    useTheme,
    CircularProgress,
-   Alert,
 } from "@mui/material";
 import AnimatedAvatar from "@src/components/AnimateAvatar";
 import CustomModal from "@src/components/Modal";
@@ -18,6 +17,7 @@ import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import { User } from "./handler/chatData";
 import Switch from "./Switch";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 interface ModalProps {
    open: boolean;
@@ -28,20 +28,19 @@ interface ModalProps {
 
 const Modal = ({ users, open, onClose, onGroupCreated }: ModalProps) => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const [groupName, setGroupName] = useState("");
    const [selected, setSelected] = useState<User[]>([]);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    const isSmDown = useMediaQuery(theme.breakpoints.down("sm"));
 
    const handleCreateGroup = async () => {
       if (!groupName.trim()) {
-         setError("Group name is required");
+         showSnackbar("Group name is required", "error");
          return;
       }
 
       setLoading(true);
-      setError(null);
       try {
          const res = await fetch("/api/chat/conversations", {
             method: "POST",
@@ -57,14 +56,15 @@ const Modal = ({ users, open, onClose, onGroupCreated }: ModalProps) => {
             const data = await res.json();
             setGroupName("");
             setSelected([]);
+            showSnackbar("Group created successfully", "success");
             if (onGroupCreated) onGroupCreated(data);
             onClose();
          } else {
             const errData = await res.json();
-            setError(errData.error || "Failed to create group");
+            showSnackbar(errData.error || "Failed to create group", "error");
          }
       } catch {
-         setError("Error creating group conversation");
+         showSnackbar("Error creating group conversation", "error");
       } finally {
          setLoading(false);
       }
@@ -83,11 +83,6 @@ const Modal = ({ users, open, onClose, onGroupCreated }: ModalProps) => {
             },
          }}
       >
-         {error && (
-            <Alert severity="error" sx={{ mb: 1.5 }}>
-               {error}
-            </Alert>
-         )}
          <Stack
             spacing={2}
             direction={{

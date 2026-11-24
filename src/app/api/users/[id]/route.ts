@@ -71,13 +71,49 @@ export async function PUT(
    try {
       const body = await request.json();
 
+      // Resolve role / roleId if provided
+      let resolvedRoleId: string | null | undefined = undefined;
+      if (body.roleId !== undefined) {
+         resolvedRoleId = body.roleId || null;
+      } else if (body.role !== undefined) {
+         if (!body.role) {
+            resolvedRoleId = null;
+         } else {
+            const roleStr = String(body.role).trim();
+            const matchedRole = await prisma.role.findFirst({
+               where: {
+                  OR: [
+                     { id: roleStr },
+                     { name: roleStr },
+                  ],
+               },
+            });
+            if (matchedRole) {
+               resolvedRoleId = matchedRole.id;
+            } else {
+               const allRoles = await prisma.role.findMany();
+               const fuzzy = allRoles.find(
+                  (r) =>
+                     r.name.toLowerCase() === roleStr.toLowerCase() ||
+                     r.name.toLowerCase().includes(roleStr.toLowerCase()) ||
+                     roleStr.toLowerCase().includes(r.name.toLowerCase()),
+               );
+               if (fuzzy) {
+                  resolvedRoleId = fuzzy.id;
+               }
+            }
+         }
+      }
+
       // SEC-01 fix: updating ANOTHER account, or changing privileged
       // fields (role, status, salary) on any account, requires the
       // user-management permission. A user may still update their own
       // basic profile fields and password — this prevents privilege
       // self-escalation through the API.
       const touchesPrivilegedFields =
+         resolvedRoleId !== undefined ||
          body.roleId !== undefined ||
+         body.role !== undefined ||
          body.status !== undefined ||
          body.salary !== undefined;
       const isSelf = session.id === id;
@@ -93,7 +129,7 @@ export async function PUT(
       if (body.phoneNumber !== undefined) dataToUpdate.phoneNumber = body.phoneNumber;
       if (body.address !== undefined) dataToUpdate.address = body.address;
       if (body.salary !== undefined) dataToUpdate.salary = body.salary;
-      if (body.roleId !== undefined) dataToUpdate.roleId = body.roleId;
+      if (resolvedRoleId !== undefined) dataToUpdate.roleId = resolvedRoleId;
       if (body.status !== undefined) dataToUpdate.status = body.status.toUpperCase();
       if (body.image !== undefined) dataToUpdate.image = body.image;
       // P4-13: email changes normalise (trim + lowercase) before
@@ -158,8 +194,12 @@ export async function PUT(
             return result;
          });
 
-         const { passwordHash: _, ...safeUser } = updated;
-         return NextResponse.json(safeUser);
+         const { passwordHash: _, role: updatedRole, ...safeUser } = updated;
+         return NextResponse.json({
+            ...safeUser,
+            role: updatedRole?.name || "Staff",
+            roleDetails: updatedRole,
+         });
       }
 
       const updated = await prisma.user.update({
@@ -168,8 +208,12 @@ export async function PUT(
          include: { role: true },
       });
 
-      const { passwordHash: _, ...safeUser } = updated;
-      return NextResponse.json(safeUser);
+      const { passwordHash: _, role: updatedRole, ...safeUser } = updated;
+      return NextResponse.json({
+         ...safeUser,
+         role: updatedRole?.name || "Staff",
+         roleDetails: updatedRole,
+      });
    } catch (error: any) {
       // P4-13: a race past the email duplicate check hits the
       // unique index — that is a 409, not a 500.
@@ -184,36 +228,68 @@ export async function DELETE(
    request: NextRequest,
    { params }: { params: Promise<{ id: string }> },
 ) {
-   // SEC-01 fix: deactivating an account requires user-management rights.
+   // SEC-01 fix: deleting an account requires user-management rights.
    const gate = await requirePermission(request, USER_DELETE_KEYS);
    if (gate instanceof NextResponse) return gate;
 
    const { id } = await params;
 
    try {
+      const targetUser = await prisma.user.findFirst({
+         where: { OR: [{ id }, { customId: id }] },
+      });
+      if (!targetUser) {
+         return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+      }
+
+      // Prevent self-deletion
+      if (gate.userId === targetUser.id) {
+         return NextResponse.json(
+            { error: "You cannot delete your own account" },
+            { status: 400 },
+         );
+      }
+
       await prisma.$transaction(async (tx) => {
-         const before = await tx.user.findUnique({ where: { id } });
-         await tx.user.update({
-            where: { id },
-            data: { status: "INACTIVE" },
+         // Unlink nullable foreign keys so foreign key constraints are satisfied
+         await tx.order.updateMany({
+            where: { employeeId: targetUser.id },
+            data: { employeeId: null },
+         });
+         await tx.purchase.updateMany({
+            where: { createdById: targetUser.id },
+            data: { createdById: null },
+         });
+         await tx.expense.updateMany({
+            where: { createdById: targetUser.id },
+            data: { createdById: null },
+         });
+         await tx.purchaseReturn.updateMany({
+            where: { createdById: targetUser.id },
+            data: { createdById: null },
+         });
+         await tx.supplierPayment.updateMany({
+            where: { createdById: targetUser.id },
+            data: { createdById: null },
          });
 
-         // Phase 4 (D1): audit in the same transaction.
-         if (before && before.status !== "INACTIVE") {
-            await logAudit(tx, {
-               actor: auditActorFromContext(gate),
-               action: "STATUS_CHANGE",
-               entityType: "USER",
-               entityId: before.id,
-               entityCustomId: before.customId,
-               summary: `User ${before.name || before.email} deactivated (moved to Recycle Bin)`,
-               changes: { status: { from: before.status, to: "INACTIVE" } },
-               ...requestAuditContext(request),
-            });
-         }
+         await tx.user.delete({
+            where: { id: targetUser.id },
+         });
+
+         await logAudit(tx, {
+            actor: auditActorFromContext(gate),
+            action: "DELETE",
+            entityType: "USER",
+            entityId: targetUser.id,
+            entityCustomId: targetUser.customId,
+            summary: `Employee ${targetUser.name || targetUser.email} deleted`,
+            ...requestAuditContext(request),
+         });
       });
-      return NextResponse.json({ message: "User moved to Recycle Bin" });
+
+      return NextResponse.json({ message: "Employee deleted successfully" });
    } catch {
-      return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to delete employee" }, { status: 500 });
    }
 }

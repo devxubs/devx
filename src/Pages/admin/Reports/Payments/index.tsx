@@ -10,7 +10,6 @@
 // from GET /api/reports?tab=payments; an empty day shows an honest
 // empty state.
 import {
-   Alert,
    Button,
    Chip,
    Grid,
@@ -23,6 +22,7 @@ import { useRouter } from "next/navigation";
 import CustomTable from "@src/components/Table";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
 
@@ -41,14 +41,13 @@ const STATUS_META: Record<string, { label: string; color: "success" | "warning" 
 const Payments = () => {
    const router = useRouter();
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [date, setDate] = useState(todayInputValue());
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    const [txid, setTxid] = useState("");
    const [txidResults, setTxidResults] = useState<any[] | null>(null);
    const [searching, setSearching] = useState(false);
-   const [feedback, setFeedback] = useState<string | null>(null);
 
    const dayRange = useCallback((): [Date | null, Date | null] => {
       if (!date) return [null, null];
@@ -68,12 +67,11 @@ const Payments = () => {
          const res = await fetch(`/api/reports?${params.toString()}`);
          if (res.ok) {
             setReport(await res.json());
-            setError(null);
          } else {
-            setError("Failed to load the reconciliation report. The figures below may be out of date.");
+            showSnackbar("Failed to load reconciliation report", "error");
          }
       } catch {
-         setError("Failed to load the reconciliation report. The figures below may be out of date.");
+         showSnackbar("Failed to load reconciliation report", "error");
       }
       setLoading(false);
    }, [dayRange]);
@@ -95,10 +93,10 @@ const Payments = () => {
             const data = await res.json();
             setTxidResults(data.txidMatches || []);
          } else {
-            setFeedback("Transaction search failed. Please try again.");
+            showSnackbar("Transaction search failed. Please try again.", "error");
          }
       } catch {
-         setFeedback("Transaction search failed. Please try again.");
+         showSnackbar("Transaction search failed. Please try again.", "error");
       }
       setSearching(false);
    };
@@ -112,11 +110,11 @@ const Payments = () => {
          });
          const data = await res.json().catch(() => ({}));
          if (!res.ok) throw new Error(data.message || data.error || "Update failed");
-         setFeedback(`Order ${row.orderId} marked ${next === "VERIFIED" ? "verified" : "mismatched"}.`);
+         showSnackbar(`Order ${row.orderId} marked ${next === "VERIFIED" ? "verified" : "mismatched"}.`, "success");
          loadReport();
          if (txidResults) handleTxidSearch();
       } catch (err: any) {
-         setFeedback(err?.message || "Failed to update the payment status.");
+         showSnackbar(err?.message || "Failed to update the payment status.", "error");
       }
    };
 
@@ -271,14 +269,6 @@ const Payments = () => {
                </Button>
             </Stack>
          </Stack>
-
-         {error && <Alert severity="error">{error}</Alert>}
-
-         {feedback && (
-            <Alert severity="info" onClose={() => setFeedback(null)}>
-               {feedback}
-            </Alert>
-         )}
 
          {txidResults !== null && (
             <Stack spacing={1} bgcolor="background.paper" sx={{ borderRadius: 1.5, p: 2 }}>

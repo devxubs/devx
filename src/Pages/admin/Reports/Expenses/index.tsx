@@ -1,10 +1,11 @@
 "use client";
 
-import { Alert, Stack, Typography } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
 import CustomTable from "@src/components/Table";
 import DateRangePicker from "@src/components/DateRange";
 import React, { useEffect, useState, useCallback } from "react";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { ExpenseDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
@@ -18,9 +19,9 @@ import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const Expenses = () => {
    const { formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
    // Phase B4b (P1-5): consume the shared toolbar search — the
@@ -41,12 +42,11 @@ const Expenses = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
-            setError(null);
          } else {
-            setError("Failed to load the expenses report. The figures below may be out of date.");
+            showSnackbar("Failed to load expenses report", "error");
          }
       } catch {
-         setError("Failed to load the expenses report. The figures below may be out of date.");
+         showSnackbar("Failed to load expenses report", "error");
       }
       setLoading(false);
    }, [dateRange]);
@@ -98,7 +98,6 @@ const Expenses = () => {
 
    return (
       <Stack spacing={3}>
-         {error && <Alert severity="error">{error}</Alert>}
          <Stack
             spacing={2}
             bgcolor={"background.paper"}

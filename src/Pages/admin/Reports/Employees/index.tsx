@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Stack, Grid, Typography, Chip } from "@mui/material";
+import { Stack, Grid, Typography, Chip } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
@@ -9,6 +9,7 @@ import DateRange from "@src/components/DateRange";
 import { SellerProFile } from "../../Dashboard";
 import { GridCellParams } from "@mui/x-data-grid";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { EmployeeDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
@@ -17,9 +18,9 @@ import { filterRowsBySearch } from "@src/lib/tableSearch";
 
 const Employees = () => {
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    // Phase B4b (P1-5): consume the shared toolbar search — the
@@ -52,7 +53,7 @@ const Employees = () => {
          })
          .catch(() => {
             if (!cancelled) {
-               setError("Failed to load the employees report. The figures below may be out of date.");
+               showSnackbar("Failed to load employees report", "error");
             }
          })
          .finally(() => {
@@ -149,7 +150,6 @@ const Employees = () => {
 
    return (
       <Stack spacing={3}>
-         {error && <Alert severity="error">{error}</Alert>}
          {/* Honest scope caption: sales/revenue figures follow the
              selected period; the employee list itself is current. */}
          <Typography variant="caption" color="text.secondary">

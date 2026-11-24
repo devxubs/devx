@@ -17,30 +17,58 @@ interface SectionCardProps {
 const SectionCard = ({ title, subtitle, children, defaultExpanded = true, action }: SectionCardProps) => {
    const [expanded, setExpanded] = useState(defaultExpanded);
    return (
-      <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
-         <Stack direction="row" justifyContent="space-between" alignItems="center" px={2.5} py={2} spacing={1.5}>
+      <Paper
+         variant="outlined"
+         sx={{
+            borderRadius: 1.5,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            overflow: "hidden",
+            transition: "box-shadow 0.2s ease-in-out",
+            "&:hover": {
+               boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            },
+         }}
+      >
+         <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            px={2}
+            py={1.5}
+            spacing={1.5}
+         >
             <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-               <Typography variant="body1" fontSize={17} color="textPrimary">
+               <Typography variant="subtitle1" fontWeight={700} fontSize="0.95rem" color="textPrimary">
                   {title}
                </Typography>
                {subtitle && (
-                  <Typography variant="body2" color="textSecondary" fontSize={13}>
+                  <Typography variant="caption" color="textSecondary" fontSize={12}>
                      {subtitle}
                   </Typography>
                )}
             </Stack>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
                {action}
-               <IconButton size="small" onClick={() => setExpanded(!expanded)} aria-label={expanded ? "Collapse section" : "Expand section"}>
+               <IconButton
+                  size="small"
+                  onClick={() => setExpanded(!expanded)}
+                  aria-label={expanded ? "Collapse section" : "Expand section"}
+                  sx={{ p: 0.5 }}
+               >
                   <Icon
-                     style={{ transform: `rotate(${expanded ? 90 : 0}deg)`, transition: "all 0.2s" }}
-                     icon={"solar:alt-arrow-right-broken"}
+                     style={{
+                        transform: `rotate(${expanded ? 90 : 0}deg)`,
+                        transition: "transform 0.2s ease-in-out",
+                     }}
+                     icon="solar:alt-arrow-right-broken"
+                     size="small"
                   />
                </IconButton>
             </Stack>
          </Stack>
          <Collapse in={expanded}>
-            <Stack spacing={2} p={2} pt={0}>
+            <Stack spacing={2} p={2} pt={0.5}>
                {children}
             </Stack>
          </Collapse>

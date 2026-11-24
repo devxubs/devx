@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Stack, Grid, Typography } from "@mui/material";
+import { Stack, Grid, Typography } from "@mui/material";
 import React, { useState, useEffect, useCallback } from "react";
 import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
@@ -8,6 +8,7 @@ import { useTheme } from "@mui/material/styles";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import RadialBar from "@cmp/RadialBar";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import { OrderDetailModal } from "@src/components/EntityDetailModals/EntityModals";
 import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
@@ -17,9 +18,9 @@ import { filterRowsBySearch } from "@src/lib/tableSearch";
 const Courier = () => {
    const theme = useTheme();
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    // KPI totals over the COMPLETE filtered dataset (P2-7: served
    // as `cardTotals` aggregates by the reports API).
    const [cardTotals, setCardTotals] = useState<{
@@ -51,7 +52,6 @@ const Courier = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
-            setError(null);
             // P2-7: card totals over the complete filtered dataset
             // now arrive as server aggregates (`cardTotals`) on the
             // main response — the tab no longer pages through every
@@ -60,10 +60,10 @@ const Courier = () => {
             // the displayed page sums (previous fallback behaviour).
             setCardTotals(data.cardTotals || null);
          } else {
-            setError("Failed to load the courier report. The figures below may be out of date.");
+            showSnackbar("Failed to load courier report", "error");
          }
       } catch {
-         setError("Failed to load the courier report. The figures below may be out of date.");
+         showSnackbar("Failed to load courier report", "error");
       }
       setLoading(false);
    }, [dateRange]);
@@ -240,7 +240,6 @@ const Courier = () => {
 
    return (
       <Stack spacing={2}>
-         {error && <Alert severity="error">{error}</Alert>}
          <Grid container spacing={2}>
             {courierData.map((item, index) => (
                <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>

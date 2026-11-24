@@ -2,7 +2,6 @@
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
-   Alert,
    Button,
    Stack,
    useTheme,
@@ -227,10 +226,11 @@ const Suppliers = () => {
          setLoadError(false);
       } catch {
          setLoadError(true);
+         showSnackbar("Failed to load suppliers. Please try again.", "error");
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [showSnackbar]);
 
    React.useEffect(() => {
       loadSuppliers();
@@ -314,17 +314,26 @@ const Suppliers = () => {
                Add Supplier
             </Button>
          </Stack>
-         {loadError && !loading && (
-            <Alert
-               severity="error"
-               action={
-                  <Button color="inherit" size="small" onClick={loadSuppliers}>
-                     Retry
-                  </Button>
-               }
+         {loadError && !loading && suppliers.length === 0 && (
+            <Stack
+               direction="row"
+               alignItems="center"
+               justifyContent="center"
+               spacing={1.5}
+               sx={{ py: 3 }}
             >
-               Failed to load suppliers. Please try again.
-            </Alert>
+               <Typography variant="body2" color="text.secondary">
+                  Failed to load suppliers.
+               </Typography>
+               <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<Icon icon="solar:restart-bold" size="16px" />}
+                  onClick={loadSuppliers}
+               >
+                  Retry
+               </Button>
+            </Stack>
          )}
          {loading && suppliers.length === 0 ? (
             <TableSkeleton rows={5} cols={6} />

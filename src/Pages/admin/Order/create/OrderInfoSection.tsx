@@ -6,13 +6,13 @@
 // burned by rendering this page). The preview is derived from the latest
 // order (GET /api/orders?limit=1) and clearly labelled as an estimate.
 import {
-   Autocomplete,
    Grid,
    Stack,
    TextField,
    Typography,
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
+import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionCard from "./SectionCard";
 import { orderSources, orderStatuses } from "../data";
 
@@ -64,10 +64,10 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
 
    return (
       <SectionCard title="Order Information" subtitle="IDs are assigned by the server when the order is saved">
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+         <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Order ID <Typography component="span" variant="caption" color="textSecondary">(auto)</Typography>
                   </Typography>
                   <TextField
@@ -79,9 +79,9 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                   />
                </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Invoice No. <Typography component="span" variant="caption" color="textSecondary">(auto)</Typography>
                   </Typography>
                   <TextField
@@ -93,51 +93,57 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                   />
                </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Order Date
                   </Typography>
                   <TextField fullWidth size="small" value={todayDhaka} disabled helperText="Asia/Dhaka — set by the server at creation" />
                </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Delivery Method
                   </Typography>
-                  <Autocomplete
+                  <CustomAutocomplete
+                     arrow
                      options={COURIER_OPTIONS}
                      value={courier}
-                     onChange={(_, v) => onChange({ courier: v ?? "" })}
-                     getOptionLabel={(o) => (o === "" ? "Not assigned" : o)}
-                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select courier" />}
+                     onChange={(v) => onChange({ courier: v ?? "" })}
+                     getOptionLabel={(o) => (o === "" ? "Not assigned" : String(o))}
+                     placeholder="Select courier"
+                     size="small"
                   />
                </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Order Source
                   </Typography>
-                  <Autocomplete
+                  <CustomAutocomplete
+                     arrow
                      options={orderSources}
                      value={orderSource || null}
-                     onChange={(_, v) => onChange({ orderSource: v ?? "" })}
-                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select source" />}
+                     onChange={(v) => onChange({ orderSource: v ?? "" })}
+                     placeholder="Select source"
+                     size="small"
                   />
                </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Order Status
                   </Typography>
-                  <Autocomplete
+                  <CustomAutocomplete
+                     arrow
                      options={orderStatuses}
                      value={status || null}
-                     onChange={(_, v) => onChange({ status: v ?? "Pending" })}
-                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select status" />}
+                     onChange={(v) => onChange({ status: v ?? "Pending" })}
+                     placeholder="Select status"
+                     size="small"
                   />
                </Stack>
             </Grid>

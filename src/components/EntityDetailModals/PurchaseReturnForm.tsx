@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-   Alert,
    Box,
    Button,
    CircularProgress,
@@ -21,6 +20,7 @@ import {
 } from "@mui/material";
 import CustomModal from "@src/components/Modal";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import {
    computeReturnableQuantity,
    soldOrConsumedQuantity,
@@ -67,6 +67,7 @@ const PurchaseReturnForm = ({
    onSaved,
 }: PurchaseReturnFormProps) => {
    const { formatCurrency } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [returnedByItem, setReturnedByItem] = useState<
       Record<string, number>
    >({});
@@ -166,7 +167,7 @@ const PurchaseReturnForm = ({
    const handleSubmit = async () => {
       const selected = lines.filter((l) => l.qty > 0);
       if (selected.length === 0) {
-         setError("Enter a quantity for at least one item.");
+         showSnackbar("Enter a quantity for at least one item.", "error");
          return;
       }
       setSubmitting(true);
@@ -186,15 +187,15 @@ const PurchaseReturnForm = ({
          });
          const data = await res.json().catch(() => ({}));
          if (!res.ok) {
-            setError(
-               data.message || data.error || "Failed to create the return.",
-            );
+            const msg = data.message || data.error || "Failed to create the return.";
+            showSnackbar(msg, "error");
             return;
          }
+         showSnackbar("Purchase return created successfully.", "success");
          onSaved();
          onClose();
       } catch {
-         setError("Failed to create the return.");
+         showSnackbar("Failed to create the return.", "error");
       } finally {
          setSubmitting(false);
       }
@@ -218,7 +219,6 @@ const PurchaseReturnForm = ({
                </Stack>
             ) : (
                <Stack spacing={2}>
-                  {error && <Alert severity="error">{error}</Alert>}
                   <Paper variant="outlined">
                      <Table size="small">
                         <TableHead>

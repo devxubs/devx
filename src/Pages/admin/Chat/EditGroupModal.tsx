@@ -4,7 +4,6 @@ import {
    Stack,
    TextField,
    Button,
-   Alert,
    CircularProgress,
    Avatar,
    Typography,
@@ -15,6 +14,7 @@ import CustomModal from "@src/components/Modal";
 import React, { useState, useEffect } from "react";
 import Icon from "@src/components/Icon";
 import { User } from "./handler/chatData";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 interface EditGroupModalProps {
    open: boolean;
@@ -36,17 +36,16 @@ const EditGroupModal = ({
    currentUserId,
    onMembersChanged,
 }: EditGroupModalProps) => {
+   const { showSnackbar } = useSnackbar();
    const [groupName, setGroupName] = useState("");
    const [description, setDescription] = useState("");
    const [avatarUrl, setAvatarUrl] = useState("");
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    // P2-9: member management state, synced from the conversation.
    const [memberIds, setMemberIds] = useState<string[]>([]);
    const [adminIds, setAdminIds] = useState<string[]>([]);
    const [addUserId, setAddUserId] = useState("");
    const [memberBusy, setMemberBusy] = useState(false);
-   const [memberError, setMemberError] = useState<string | null>(null);
 
    useEffect(() => {
       if (conversation) {
@@ -76,7 +75,6 @@ const EditGroupModal = ({
       userId: string,
    ) => {
       setMemberBusy(true);
-      setMemberError(null);
       try {
          const res = await fetch("/api/chat/conversations", {
             method: "PUT",
@@ -89,13 +87,14 @@ const EditGroupModal = ({
          });
          const data = await res.json().catch(() => ({}));
          if (!res.ok) {
-            setMemberError(data.error || "Failed to update members");
+            showSnackbar(data.error || "Failed to update members", "error");
             return;
          }
          const updated = data.conversation || data;
          setMemberIds(Array.isArray(updated.members) ? updated.members : []);
          setAdminIds(Array.isArray(updated.adminIds) ? updated.adminIds : []);
          setAddUserId("");
+         showSnackbar(action === "add_member" ? "Member added" : "Member removed", "success");
          onMembersChanged?.(updated);
          // Leaving the group closes the modal — the conversation
          // is no longer the caller's.
@@ -103,7 +102,7 @@ const EditGroupModal = ({
             onClose();
          }
       } catch {
-         setMemberError("Network error updating members");
+         showSnackbar("Network error updating members", "error");
       } finally {
          setMemberBusy(false);
       }
@@ -111,12 +110,11 @@ const EditGroupModal = ({
 
    const handleSave = async () => {
       if (!groupName.trim()) {
-         setError("Group name is required");
+         showSnackbar("Group name is required", "error");
          return;
       }
 
       setLoading(true);
-      setError(null);
       try {
          const res = await fetch("/api/chat/conversations", {
             method: "PUT",
@@ -132,14 +130,15 @@ const EditGroupModal = ({
 
          if (res.ok) {
             const data = await res.json();
+            showSnackbar("Group profile updated", "success");
             if (onUpdated) onUpdated(data.conversation || { ...conversation, name: groupName.trim(), description: description.trim(), avatar: avatarUrl });
             onClose();
          } else {
             const errData = await res.json();
-            setError(errData.error || "Failed to update group profile");
+            showSnackbar(errData.error || "Failed to update group profile", "error");
          }
       } catch {
-         setError("Network error updating group profile");
+         showSnackbar("Network error updating group profile", "error");
       } finally {
          setLoading(false);
       }
@@ -158,12 +157,6 @@ const EditGroupModal = ({
             },
          }}
       >
-         {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-               {error}
-            </Alert>
-         )}
-
          <Stack spacing={2.5} py={1}>
             <Stack direction="row" spacing={2} alignItems="center" justifyContent="center">
                <Avatar
@@ -205,7 +198,6 @@ const EditGroupModal = ({
                <Typography variant="subtitle2" fontWeight={700}>
                   Members ({memberIds.length})
                </Typography>
-               {memberError && <Alert severity="error">{memberError}</Alert>}
                {memberIds.map((id) => {
                   const u = userById(id);
                   const isAdmin = adminIds.includes(id);

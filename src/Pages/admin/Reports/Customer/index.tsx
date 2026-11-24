@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Grid, Stack, Typography } from "@mui/material";
+import { Grid, Stack, Typography } from "@mui/material";
 import CustomerInfo from "@src/Pages/admin/Customers/CustomerInfo";
 import CustomTable from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
@@ -11,13 +11,14 @@ import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 export const customerOrderData: any[] = [];
 
 const Customer = () => {
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
    const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
    // Phase B4b (P1-5): consume the shared toolbar search — the
@@ -36,12 +37,11 @@ const Customer = () => {
          if (res.ok) {
             const data = await res.json();
             setReport(data);
-            setError(null);
          } else {
-            setError("Failed to load the customer report. The figures below may be out of date.");
+            showSnackbar("Failed to load customer report", "error");
          }
       } catch {
-         setError("Failed to load the customer report. The figures below may be out of date.");
+         showSnackbar("Failed to load customer report", "error");
       }
       setLoading(false);
    }, [dateRange]);
@@ -138,7 +138,6 @@ const Customer = () => {
 
    return (
       <Stack spacing={2}>
-         {error && <Alert severity="error">{error}</Alert>}
          {/* Honest scope caption: order counts follow the selected
              period; the customer list and Total Customers are current
              records and are not date-filtered. */}

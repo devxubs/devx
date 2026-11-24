@@ -1,12 +1,12 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
-   Alert,
    Chip,
    CircularProgress,
    Stack,
    Typography,
    useTheme,
 } from "@mui/material";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 interface QuickEditHeaderProps {
    effectiveOrderId?: string;
@@ -26,6 +26,14 @@ export const QuickEditHeader: React.FC<QuickEditHeaderProps> = ({
    onClearError,
 }) => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
+
+   useEffect(() => {
+      if (errorMessage) {
+         showSnackbar(errorMessage, "error");
+         onClearError?.();
+      }
+   }, [errorMessage, onClearError, showSnackbar]);
 
    const getStatusColor = (
       st: string,
@@ -89,17 +97,6 @@ export const QuickEditHeader: React.FC<QuickEditHeaderProps> = ({
                   />
                )}
             </Stack>
-         )}
-
-         {/* Validation / Error Banner */}
-         {errorMessage && (
-            <Alert
-               severity="error"
-               onClose={onClearError}
-               sx={{ borderRadius: 1 }}
-            >
-               {errorMessage}
-            </Alert>
          )}
       </Stack>
    );

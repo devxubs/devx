@@ -5,7 +5,6 @@
 // total by the calculation engine and shown as a chip; it is not stored
 // separately (the orders API derives it the same way from advance/due).
 import {
-   Autocomplete,
    Chip,
    Grid,
    Stack,
@@ -13,6 +12,7 @@ import {
    Typography,
 } from "@mui/material";
 import React from "react";
+import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionCard from "./SectionCard";
 import { formatBDT } from "./orderCalculations";
 import { isMobilePaymentMethod } from "../paymentMethods";
@@ -52,21 +52,23 @@ const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", payme
       <SectionCard title="Payment Information" subtitle="Advance, due and payment status update automatically">
          <Grid container spacing={2}>
             <Grid size={{ xs: 12 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Payment Method
                   </Typography>
-                  <Autocomplete
+                  <CustomAutocomplete
+                     arrow
                      options={PAYMENT_METHODS}
                      value={paymentMethod || null}
-                     onChange={(_, v) => onChange({ paymentMethod: v ?? "" })}
-                     renderInput={(params) => <TextField {...params} size="small" placeholder="Select method" />}
+                     onChange={(v) => onChange({ paymentMethod: v ?? "" })}
+                     placeholder="Select method"
+                     size="small"
                   />
                </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Advance Payment
                   </Typography>
                   <TextField
@@ -81,9 +83,9 @@ const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", payme
                   />
                </Stack>
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
-                  <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+               <Stack spacing={0.75}>
+                  <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Due Amount
                   </Typography>
                   <TextField
@@ -96,9 +98,9 @@ const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", payme
             </Grid>
             {showTxFields && (
                <>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <Stack spacing={1}>
-                        <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                     <Stack spacing={0.75}>
+                        <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                            Transaction ID (optional)
                         </Typography>
                         <TextField
@@ -110,9 +112,9 @@ const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", payme
                         />
                      </Stack>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                     <Stack spacing={1}>
-                        <Typography variant="h6" fontSize="13px!important" fontWeight={500}>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                     <Stack spacing={0.75}>
+                        <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                            Sender Number (optional)
                         </Typography>
                         <TextField

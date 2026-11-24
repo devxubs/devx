@@ -3,7 +3,7 @@ import * as React from "react";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import ThemeProviderClient from "@src/theme/ThemeProviderClient";
-import { Public_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 export const metadata = {
@@ -11,9 +11,31 @@ export const metadata = {
    description: "Point of Sale & Business Management System",
 };
 
-const Public_Sans_font = Public_Sans({
-   subsets: ["latin"],
+const fontInter = localFont({
+   src: [
+      {
+         path: "./fonts/Inter-Regular.ttf",
+         weight: "400",
+         style: "normal",
+      },
+      {
+         path: "./fonts/Inter-Medium.ttf",
+         weight: "500",
+         style: "normal",
+      },
+      {
+         path: "./fonts/Inter-SemiBold.ttf",
+         weight: "600",
+         style: "normal",
+      },
+      {
+         path: "./fonts/Inter-Bold.ttf",
+         weight: "700",
+         style: "normal",
+      },
+   ],
    variable: "--font-inter",
+   display: "swap",
 });
 
 export default function RootLayout({
@@ -25,9 +47,9 @@ export default function RootLayout({
       <html
          lang="en"
          suppressHydrationWarning
-         className={Public_Sans_font.className}
+         className={`${fontInter.variable} ${fontInter.className}`}
       >
-         <body suppressHydrationWarning className={Public_Sans_font.className}>
+         <body suppressHydrationWarning className={fontInter.className}>
             <InitColorSchemeScript attribute="class" />
             <AppRouterCacheProvider options={{ enableCssLayer: true }}>
                <ThemeProviderClient>{children}</ThemeProviderClient>

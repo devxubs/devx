@@ -6,19 +6,18 @@
 // Manual entry stays available (walk-in / new customer — the order API reuses
 // an existing customer by phone or creates one, as before).
 import {
-   Autocomplete,
    Button,
-   CircularProgress,
    Grid,
    Stack,
    TextField,
    Typography,
+   Box,
    useTheme,
 } from "@mui/material";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@src/components/Icon";
+import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionCard from "./SectionCard";
-import AddCustomerModal from "./AddCustomerModal";
 import type { ApiCustomer, CustomerFormState } from "./types";
 
 interface CustomerSectionProps {
@@ -36,7 +35,6 @@ const CustomerSection = ({
    const [options, setOptions] = useState<ApiCustomer[]>([]);
    const [loading, setLoading] = useState(false);
    const [inputValue, setInputValue] = useState("");
-   const [modalOpen, setModalOpen] = useState(false);
    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
    const requestRef = useRef(0);
 
@@ -86,130 +84,85 @@ const CustomerSection = ({
    return (
       <SectionCard
          title="Customer Details"
-         subtitle="Search an existing customer, or type details for a walk-in / new customer"
-         action={
-            <Button
-               size="small"
-               variant="outlined"
-               color="primary"
-               startIcon={
-                  <Icon
-                     icon="solar:user-plus-bold"
-                     size="16px"
-                     color="primary"
-                  />
-               }
-               onClick={() => setModalOpen(true)}
-               sx={{
-                  textTransform: "none",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  px: 1.75,
-                  py: 0.75,
-                  fontWeight: 600,
-                  "& .MuiButton-startIcon": { mr: 0.75, color: "primary.main" },
-               }}
-            >
-               Add Customer
-            </Button>
-         }
+         subtitle="Search an existing customer, or enter details for a walk-in / new customer"
       >
-         <Autocomplete<ApiCustomer>
-            options={options}
-            loading={loading}
-            value={null}
-            inputValue={inputValue}
-            onInputChange={(_, value, reason) => {
-               setInputValue(value);
-               if (reason === "input") runSearch(value);
-            }}
-            onChange={(_, value) => {
-               if (value) {
-                  applyCustomer(value);
-                  setInputValue("");
-               }
-            }}
-            getOptionLabel={(o) => o.name || ""}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-            noOptionsText={
-               loading
-                  ? "Searching…"
-                  : "No customer found — type details below or use Add Customer"
-            }
-            renderOption={(props, option) => (
-               <li {...props} key={option.id}>
-                  <Stack spacing={0} sx={{ py: 0.25 }}>
-                     <Typography variant="body2" fontWeight={600}>
-                        {option.name}
-                        {option.customId ? (
-                           <Typography
-                              component="span"
-                              variant="caption"
-                              color="textSecondary"
-                           >
-                              {"  "}({option.customId})
-                           </Typography>
-                        ) : null}
-                     </Typography>
-                     <Typography variant="caption" color="textSecondary">
-                        {[option.phone, option.email]
-                           .filter(Boolean)
-                           .join(" · ") || "No phone / email on record"}
-                     </Typography>
-                  </Stack>
-               </li>
-            )}
-            renderInput={(params) => (
-               <TextField
-                  {...params}
-                  label="Search customer (name, phone or email)"
-                  placeholder="Start typing to search…"
-                  size="small"
-                  InputProps={{
-                     ...params.InputProps,
-                     endAdornment: (
-                        <>
-                           {loading ? <CircularProgress size={16} /> : null}
-                           {params.InputProps.endAdornment}
-                        </>
-                     ),
-                  }}
-               />
-            )}
-         />
-         {customer.id && (
-            <Stack direction="row" alignItems="center" spacing={1}>
-               <Icon
-                  icon="solar:check-circle-bold"
-                  size="15px"
-                  // P3-8: theme accent (follows the user's accent-colour
-                  // setting) instead of the hard-coded default #00A76F.
-                  style={{ color: theme.palette.primary.main }}
-               />
-               <Typography variant="caption" color="textSecondary">
-                  Linked to an existing customer record. Clearing
-                  name/phone/email switches back to manual entry.
-               </Typography>
-               <Button
-                  size="small"
-                  variant="text"
-                  sx={{ textTransform: "none", minWidth: 0, p: 0.25 }}
-                  onClick={() =>
-                     onChange({
-                        id: null,
-                        name: "",
-                        email: "",
-                        phone: "",
-                        address: "",
-                     })
+         <Stack direction="column" spacing={1.5}>
+            <CustomAutocomplete
+               options={options}
+               loading={loading}
+               value={null}
+               inputValue={inputValue}
+               onInputChange={(_, value, reason) => {
+                  setInputValue(value);
+                  if (reason === "input") runSearch(value);
+               }}
+               onChange={(value) => {
+                  if (value) {
+                     applyCustomer(value);
+                     setInputValue("");
                   }
-               >
-                  Clear selection
-               </Button>
-            </Stack>
-         )}
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
+               }}
+               getOptionLabel={(o) => o.name || ""}
+               isOptionEqualToValue={(o, v) => o.id === v.id}
+               noOptionsText={
+                  loading
+                     ? "Searching…"
+                     : "No customer found — enter details below"
+               }
+               placeholder="Search customer by name, phone or email…"
+               size="small"
+               freeSolo={false}
+               renderOption={(props, option) => (
+                  <li {...props} key={option.id}>
+                     <Stack spacing={0} sx={{ py: 0.25, width: "100%" }}>
+                        <Typography variant="body2" fontWeight={600}>
+                           {option.name}
+                           {option.customId ? (
+                              <Typography
+                                 component="span"
+                                 variant="caption"
+                                 color="textSecondary"
+                              >
+                                 {"  "}({option.customId})
+                              </Typography>
+                           ) : null}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                           {[option.phone, option.email]
+                              .filter(Boolean)
+                              .join(" · ") || "No phone / email on record"}
+                        </Typography>
+                     </Stack>
+                  </li>
+               )}
+            />
+            {customer.id && (
+               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ bgcolor: "action.hover", px: 1.5, py: 0.75, borderRadius: 1 }}>
+                  <Typography variant="caption" color="textPrimary" fontWeight={600}>
+                     Linked customer: {customer.name} {customer.phone ? `(${customer.phone})` : ""}
+                  </Typography>
+                  <Button
+                     size="small"
+                     color="error"
+                     variant="text"
+                     sx={{ textTransform: "none", minWidth: 0, p: 0, fontSize: "0.75rem" }}
+                     onClick={() =>
+                        onChange({
+                           id: null,
+                           name: "",
+                           email: "",
+                           phone: "",
+                           address: "",
+                        })
+                     }
+                  >
+                     Clear selection
+                  </Button>
+               </Stack>
+            )}
+         </Stack>
+         <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
                <TextField
                   label="Full Name *"
                   fullWidth
@@ -219,7 +172,7 @@ const CustomerSection = ({
                   placeholder="Customer name"
                />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
                <TextField
                   label="Phone Number *"
                   fullWidth
@@ -230,7 +183,7 @@ const CustomerSection = ({
                   placeholder="01XXXXXXXXX"
                />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
                <TextField
                   label="E-mail"
                   fullWidth
@@ -240,7 +193,7 @@ const CustomerSection = ({
                   placeholder="customer@mail.com"
                />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
                <TextField
                   label="Billing Address"
                   fullWidth
@@ -251,16 +204,6 @@ const CustomerSection = ({
                />
             </Grid>
          </Grid>
-         <AddCustomerModal
-            open={modalOpen}
-            onClose={() => setModalOpen(false)}
-            onCreated={(created) => {
-               // Select the new customer immediately and refresh the
-               // autocomplete options so it appears in future searches.
-               applyCustomer(created);
-               runSearch("");
-            }}
-         />
       </SectionCard>
    );
 };

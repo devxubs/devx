@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Grid from "@mui/material/Grid";
-import { Alert, Stack, Typography } from "@mui/material";
+import { Stack, Typography } from "@mui/material";
 import AnalyticsCard from "@cmp/AnalyticsCard";
 import AnalyticsGraph from "@cmp/AnalyticsGraph";
 import RadialBar from "@cmp/RadialBar";
@@ -16,12 +16,13 @@ import { fetchAllReportRows, reportParams } from "../reportExport";
 import { formatCompactNumber } from "@src/lib/utils";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { filterRowsBySearch } from "@src/lib/tableSearch";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 const Products = () => {
    const { formatCurrency, settings } = useSettings();
+   const { showSnackbar } = useSnackbar();
    const [report, setReport] = useState<any>(null);
    const [loading, setLoading] = useState(false);
-   const [error, setError] = useState<string | null>(null);
    // Product counts by availability status over the COMPLETE
    // catalogue (see the effect below) for the distribution chart.
    const [stockCounts, setStockCounts] = useState<{
@@ -62,7 +63,7 @@ const Products = () => {
             }
          })
          .catch(() =>
-            setError("Failed to load the products report. The figures below may be out of date."),
+            showSnackbar("Failed to load products report", "error"),
          )
          .finally(() => setLoading(false));
    }, [dateRange]);
@@ -157,7 +158,6 @@ const Products = () => {
 
    return (
       <Stack spacing={3}>
-         {error && <Alert severity="error">{error}</Alert>}
          <Stack direction="row" justifyContent="flex-end">
             <DateRangePickerCustom
                title="Top Sellers Period"

@@ -16,7 +16,6 @@ import {
    DialogContentText,
    DialogTitle,
    Grid,
-   Snackbar,
    Stack,
    Typography,
 } from "@mui/material";
@@ -24,6 +23,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@src/components/Icon";
 import { useSettings } from "@src/lib/settingsContext";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 import { mergeLineVariants } from "@src/lib/orderLineVariants";
 import { parseOrderTags, rehydratedDiscountValue } from "@src/lib/orderMoney";
@@ -53,12 +53,9 @@ const Publish = () => {
 
    const oc = useOrderCreate();
    const { form, patch, totals } = oc;
+   const { showSnackbar } = useSnackbar();
 
    const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
-   const [snackbar, setSnackbar] = useState<{
-      type: "success" | "error" | "info";
-      message: string;
-   } | null>(null);
    const settingsApplied = useRef(false);
 
    // Apply store defaults once (create mode only, pristine form only).
@@ -190,18 +187,17 @@ const Publish = () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [editId]);
 
-   // Surface hook notices (draft saved/restored, extras warning) as snackbars.
+   // Surface hook notices (draft saved/restored, extras warning) as toasts.
    useEffect(() => {
       if (oc.notice) {
-         setSnackbar(oc.notice);
+         showSnackbar(oc.notice.message, oc.notice.type);
          oc.setNotice(null);
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [oc.notice]);
+   }, [oc.notice, showSnackbar, oc]);
 
    const handleAddProduct = (product: any) => {
       const message = oc.addProduct(product);
-      if (message) setSnackbar({ type: "error", message });
+      if (message) showSnackbar(message, "error");
       return message;
    };
 
@@ -210,20 +206,22 @@ const Publish = () => {
    // surfaces here as an error and the typed code stays in the field.
    const handleScanBarcode = async (code: string) => {
       const message = await oc.scanBarcode(code);
-      if (message) setSnackbar({ type: "error", message });
+      if (message) showSnackbar(message, "error");
       return message;
    };
 
    const handleSubmit = async () => {
       const created = await oc.submit(editId || undefined);
       if (created) {
-         setSnackbar({
-            type: "success",
-            message: editId
-               ? "Order updated successfully"
-               : `Order ${created.orderId || ""} created successfully`,
-         });
-         setTimeout(() => router.push("/admin/order"), 900);
+         showSnackbar(
+            editId
+               ? "Order updated successfully."
+               : `Order ${created.orderId || ""} created successfully.`,
+            "success",
+         );
+         setTimeout(() => router.push("/admin/order"), 800);
+      } else if (oc.submitError) {
+         showSnackbar(oc.submitError, "error");
       }
    };
 
@@ -290,16 +288,10 @@ const Publish = () => {
                </Alert>
             )}
 
-            {oc.submitError && (
-               <Alert severity="error" onClose={() => oc.setSubmitError(null)}>
-                  {oc.submitError}
-               </Alert>
-            )}
-
-            <Grid container spacing={2.5} alignItems="flex-start">
+            <Grid container spacing={2} alignItems="flex-start">
                {/* Left column */}
                <Grid size={{ xs: 12, lg: 7 }}>
-                  <Stack spacing={2.5}>
+                  <Stack spacing={2}>
                      <CustomerSection
                         customer={form.customer}
                         onChange={(customer) => patch({ customer })}
@@ -331,7 +323,7 @@ const Publish = () => {
 
                {/* Right column */}
                <Grid size={{ xs: 12, lg: 5 }}>
-                  <Stack spacing={2.5}>
+                  <Stack spacing={2}>
                      <OrderInfoSection
                         orderSource={form.orderSource}
                         status={form.status}
@@ -469,23 +461,6 @@ const Publish = () => {
                </Button>
             </DialogActions>
          </Dialog>
-
-         <Snackbar
-            open={!!snackbar}
-            autoHideDuration={4000}
-            onClose={() => setSnackbar(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-         >
-            {snackbar ? (
-               <Alert
-                  severity={snackbar.type}
-                  onClose={() => setSnackbar(null)}
-                  sx={{ width: "100%" }}
-               >
-                  {snackbar.message}
-               </Alert>
-            ) : undefined}
-         </Snackbar>
       </Container>
    );
 };

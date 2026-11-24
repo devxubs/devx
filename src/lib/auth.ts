@@ -234,10 +234,26 @@ export async function requireActiveSession(
    }
    const ctx = await getAuthContext(request);
    if (!ctx) {
-      return NextResponse.json(
-         { error: "Forbidden: account is not active" },
+      const user = await prisma.user.findUnique({
+         where: { id: session.id },
+         select: { status: true },
+      });
+      const isSuspended = user?.status === "SUSPENDED";
+      const response = NextResponse.json(
+         {
+            error: isSuspended
+               ? "Account suspended. Contact administrator."
+               : "Forbidden: account is not active",
+            code: isSuspended ? "ACCOUNT_SUSPENDED" : "ACCOUNT_INACTIVE",
+         },
          { status: 403 },
       );
+      response.cookies.set("devx_token", "", {
+         httpOnly: true,
+         expires: new Date(0),
+         path: "/",
+      });
+      return response;
    }
    return ctx;
 }
@@ -256,7 +272,29 @@ export async function requireAdmin(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
    }
    const ctx = await getAuthContext(request);
-   if (!ctx || !ctx.isAdmin) {
+   if (!ctx) {
+      const user = await prisma.user.findUnique({
+         where: { id: session.id },
+         select: { status: true },
+      });
+      const isSuspended = user?.status === "SUSPENDED";
+      const response = NextResponse.json(
+         {
+            error: isSuspended
+               ? "Account suspended. Contact administrator."
+               : "Forbidden: account is not active",
+            code: isSuspended ? "ACCOUNT_SUSPENDED" : "ACCOUNT_INACTIVE",
+         },
+         { status: 403 },
+      );
+      response.cookies.set("devx_token", "", {
+         httpOnly: true,
+         expires: new Date(0),
+         path: "/",
+      });
+      return response;
+   }
+   if (!ctx.isAdmin) {
       return NextResponse.json(
          { error: "Forbidden: administrator access required" },
          { status: 403 },
@@ -278,7 +316,29 @@ export async function requirePermission(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
    }
    const ctx = await getAuthContext(request);
-   if (!ctx || !ctx.hasPermission(candidates)) {
+   if (!ctx) {
+      const user = await prisma.user.findUnique({
+         where: { id: session.id },
+         select: { status: true },
+      });
+      const isSuspended = user?.status === "SUSPENDED";
+      const response = NextResponse.json(
+         {
+            error: isSuspended
+               ? "Account suspended. Contact administrator."
+               : "Forbidden: account is not active",
+            code: isSuspended ? "ACCOUNT_SUSPENDED" : "ACCOUNT_INACTIVE",
+         },
+         { status: 403 },
+      );
+      response.cookies.set("devx_token", "", {
+         httpOnly: true,
+         expires: new Date(0),
+         path: "/",
+      });
+      return response;
+   }
+   if (!ctx.hasPermission(candidates)) {
       return NextResponse.json(
          { error: "Forbidden: insufficient permissions" },
          { status: 403 },

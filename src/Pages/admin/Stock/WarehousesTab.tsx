@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-   Alert,
    Box,
    Button,
    Chip,
@@ -15,6 +14,7 @@ import {
    alpha,
    useTheme,
 } from "@mui/material";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import CustomModal from "@src/components/Modal";
 import Icon from "@src/components/Icon";
@@ -41,6 +41,7 @@ const emptyForm = { name: "", code: "", address: "", phone: "", isDefault: false
 
 const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
    const theme = useTheme();
+   const { showSnackbar } = useSnackbar();
    const [rows, setRows] = useState<WarehouseRow[]>([]);
    const [loading, setLoading] = useState(false);
    const [modalOpen, setModalOpen] = useState(false);
@@ -112,7 +113,7 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
    const handleSave = async () => {
       setError(null);
       if (!form.name.trim()) {
-         setError("Warehouse name is required.");
+         showSnackbar("Warehouse name is required.", "error");
          return;
       }
       setSaving(true);
@@ -139,16 +140,23 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
                      ? "Failed to update warehouse"
                      : "Failed to create warehouse"),
             );
+         showSnackbar(
+            editing
+               ? "Warehouse updated successfully."
+               : "Warehouse created successfully.",
+            "success",
+         );
          setModalOpen(false);
          setEditing(null);
          setForm(emptyForm);
          load();
       } catch (err: any) {
-         setError(
+         showSnackbar(
             err.message ||
                (editing
                   ? "Failed to update warehouse"
                   : "Failed to create warehouse"),
+            "error",
          );
       } finally {
          setSaving(false);
@@ -165,10 +173,11 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
          });
          const data = await res.json().catch(() => ({}));
          if (!res.ok) throw new Error(data.error || "Failed to delete warehouse");
+         showSnackbar("Warehouse deleted successfully.", "success");
          setDeleteTarget(null);
          load();
       } catch (err: any) {
-         setDeleteError(err.message || "Failed to delete warehouse");
+         showSnackbar(err.message || "Failed to delete warehouse", "error");
       } finally {
          setDeleting(false);
       }
@@ -354,7 +363,6 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
                      </Box>
                   }
                />
-               {error && <Alert severity="error">{error}</Alert>}
                <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
                   <Button
                      variant="text"
@@ -431,14 +439,6 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
                   ? It will be removed from the warehouses list. Its stock
                   history is preserved in the movement ledger.
                </Typography>
-
-               {deleteTarget?.isDefault && (
-                  <Alert severity="warning" sx={{ fontSize: "0.85rem" }}>
-                     This is the default warehouse — the server will refuse
-                     the deletion until another warehouse is set as default.
-                  </Alert>
-               )}
-               {deleteError && <Alert severity="error">{deleteError}</Alert>}
 
                <Stack direction="row" spacing={1.5} justifyContent="flex-end" pt={1}>
                   <Button

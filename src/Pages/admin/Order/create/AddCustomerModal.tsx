@@ -12,9 +12,10 @@
 // in that case the user can select that existing customer instead.
 // On success the created customer is handed back via onCreated and the
 // Order Create page selects it automatically.
-import { Alert, Button, CircularProgress, Grid, Stack, TextField, Typography } from "@mui/material";
+import { Button, CircularProgress, Grid, Stack, TextField, Typography } from "@mui/material";
 import React, { useState } from "react";
 import CustomModal from "@src/components/Modal";
+import { useSnackbar } from "@src/lib/snackbarContext";
 import type { ApiCustomer } from "./types";
 
 interface AddCustomerModalProps {
@@ -25,6 +26,7 @@ interface AddCustomerModalProps {
 }
 
 const AddCustomerModal = ({ open, onClose, onCreated }: AddCustomerModalProps) => {
+   const { showSnackbar } = useSnackbar();
    const [name, setName] = useState("");
    const [phone, setPhone] = useState("");
    const [email, setEmail] = useState("");
@@ -69,10 +71,22 @@ const AddCustomerModal = ({ open, onClose, onCreated }: AddCustomerModalProps) =
 
    const handleSave = async () => {
       if (saving) return;
-      if (!name.trim()) return setError("Customer name is required");
-      if (!phone.trim()) return setError("Phone number is required");
-      if (!/^[0-9+\-\s()]+$/.test(phone.trim())) return setError("Invalid phone number");
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError("Invalid email address");
+      if (!name.trim()) {
+         showSnackbar("Customer name is required", "error");
+         return setError("Customer name is required");
+      }
+      if (!phone.trim()) {
+         showSnackbar("Phone number is required", "error");
+         return setError("Phone number is required");
+      }
+      if (!/^[0-9+\-\s()]+$/.test(phone.trim())) {
+         showSnackbar("Invalid phone number", "error");
+         return setError("Invalid phone number");
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+         showSnackbar("Invalid email address", "error");
+         return setError("Invalid email address");
+      }
       setSaving(true);
       setError(null);
       setDuplicate(null);
@@ -90,14 +104,19 @@ const AddCustomerModal = ({ open, onClose, onCreated }: AddCustomerModalProps) =
          const data = await res.json().catch(() => ({}));
          if (res.status === 409 && data.existingCustomer) {
             setDuplicate({ id: data.existingCustomer.id, name: data.existingCustomer.name });
-            setError(data.error || "A customer with this phone number already exists");
+            const msg = data.error || "A customer with this phone number already exists";
+            setError(msg);
+            showSnackbar(msg, "warning");
             return;
          }
          if (!res.ok) throw new Error(data.error || "Failed to create customer");
+         showSnackbar("Customer created successfully.", "success");
          onCreated(data as ApiCustomer);
          handleClose();
       } catch (err: any) {
-         setError(err?.message || "Failed to create customer");
+         const msg = err?.message || "Failed to create customer";
+         setError(msg);
+         showSnackbar(msg, "error");
       } finally {
          setSaving(false);
       }
@@ -112,7 +131,6 @@ const AddCustomerModal = ({ open, onClose, onCreated }: AddCustomerModalProps) =
          sx={{ width: { xs: "92vw", sm: 560 }, maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}
       >
          <Stack spacing={2}>
-            {error && <Alert severity={duplicate ? "warning" : "error"}>{error}</Alert>}
             <Grid container spacing={2}>
                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField label="Full Name *" fullWidth value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" />
