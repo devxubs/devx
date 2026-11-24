@@ -23,6 +23,10 @@ interface OrderHeaderProps {
    orderDate: Date;
    onOpenQuickEdit: () => void;
    onPrintInvoice?: () => void;
+   // OBS-C4: a direct cancel control on the details page (the
+   // parent passes this only for statuses the transition policy
+   // allows cancelling from).
+   onCancelOrder?: () => void;
    orderId: string;
 }
 
@@ -67,6 +71,7 @@ export default function OrderHeader({
    orderDate,
    onOpenQuickEdit,
    onPrintInvoice,
+   onCancelOrder,
    orderId,
 }: OrderHeaderProps) {
    const theme = useTheme();
@@ -246,6 +251,20 @@ export default function OrderHeader({
                      <Icon icon="solar:printer-bold" size="18px" />
                   </IconButton>
                </Tooltip>
+
+               {/* Cancel Order (OBS-C4) — rendered only when the
+                   parent offers it for the order's status. */}
+               {onCancelOrder && (
+                  <Tooltip disableInteractive title="Cancel Order" arrow>
+                     <IconButton
+                        color="error"
+                        onClick={onCancelOrder}
+                        aria-label="Cancel Order"
+                     >
+                        <Icon icon="solar:close-circle-bold" size="18px" />
+                     </IconButton>
+                  </Tooltip>
+               )}
             </Paper>
          </Stack>
       </Box>

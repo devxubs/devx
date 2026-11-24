@@ -119,18 +119,63 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
       rawStatus === "PROCESSING" ||
       rawStatus === "CONFIRMED";
 
+   // OBS-I3 (Full Live QA Audit 2026-11-25): stage times came from
+   // createdAt/updatedAt only, so every reached stage showed the
+   // creation (or last-edit) time rather than when the stage
+   // actually happened. The persistent audit history carries the
+   // real transition timestamps — prefer the earliest status event
+   // for each stage, falling back to the previous derivation for
+   // legacy orders without history.
+   const tagsForStages =
+      typeof order.orderTags === "object" && order.orderTags !== null
+         ? (order.orderTags as Record<string, any>)
+         : typeof order.orderTags === "string"
+           ? (() => {
+                try {
+                   return JSON.parse(order.orderTags);
+                } catch {
+                   return {};
+                }
+             })()
+           : {};
+   const statusEventTimes = new Map<string, string>();
+   if (Array.isArray(tagsForStages.auditHistory)) {
+      // auditHistory is stored newest-first; walk it oldest-first
+      // so each status keeps its EARLIEST transition time.
+      for (const ev of [...tagsForStages.auditHistory].reverse()) {
+         const next = ev?.diff?.field === "status" ? ev?.diff?.new : null;
+         const ts = ev?.timestamp || ev?.createdAt;
+         if (next && ts && !statusEventTimes.has(String(next))) {
+            statusEventTimes.set(String(next), ts);
+         }
+      }
+   }
+   const stageTime = (...statuses: string[]) => {
+      for (const s of statuses) {
+         const t = statusEventTimes.get(s);
+         if (t) return t;
+      }
+      return null;
+   };
+
    const placedTimes = formatDateTimeParts(order.createdAt);
    const processingTimes = formatDateTimeParts(
-      isConfirmedOrAbove ? order.updatedAt || order.createdAt : null,
+      stageTime("CONFIRMED", "PROCESSING") ||
+         (isConfirmedOrAbove ? order.updatedAt || order.createdAt : null),
    );
    const courierTimes = formatDateTimeParts(
-      order.courierSubmittedAt || (isShipped ? order.updatedAt : null),
+      order.courierSubmittedAt ||
+         stageTime("SHIPPED", "OUT_FOR_DELIVERY") ||
+         (isShipped ? order.updatedAt : null),
    );
    const deliveryTimes = formatDateTimeParts(
-      order.deliveredAt || (isDelivered ? order.updatedAt : null),
+      order.deliveredAt ||
+         stageTime("COMPLETED", "DELIVERED") ||
+         (isDelivered ? order.updatedAt : null),
    );
    const cancelledTimes = formatDateTimeParts(
-      isCancelled || isReturned ? order.updatedAt || order.createdAt : null,
+      stageTime("CANCELLED", "FAILED", "RETURNED") ||
+         (isCancelled || isReturned ? order.updatedAt || order.createdAt : null),
    );
 
    const trackingId = order.courierTrackingCode || order.courierTrackingId || order.referenceId;
@@ -706,7 +751,19 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
       for (const item of tagsObj.auditHistory) {
          const noteTitle = noteTitleOfAuditEvent(item);
          if (noteTitle) coveredNoteTitles.add(noteTitle);
-         if (item.category === "workflow" || item.action?.includes("Status")) hasPersistentStatusAudit = true;
+         // OBS-C3 (Full Live QA Audit 2026-11-25): coverage also
+         // counts any persistent event carrying a status diff. The
+         // "Order Cancelled" event has category "order" (not
+         // "workflow") and no "Status" in its action, so cancelling
+         // left hasPersistentStatusAudit false and the fallback
+         // below added a SECOND, contradictory status entry
+         // ("Status: CANCELLED", previous fabricated as PENDING).
+         if (
+            item.category === "workflow" ||
+            item.action?.includes("Status") ||
+            item.diff?.field === "status"
+         )
+            hasPersistentStatusAudit = true;
          if (item.category === "payment") hasPersistentPaymentAudit = true;
          if (item.category === "courier") hasPersistentCourierAudit = true;
 
@@ -790,7 +847,10 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
             role: "Order Fulfillment",
          },
          details: `Order workflow status registered as "${order.status}"`,
-         diff: { field: "status", previous: "PENDING", new: order.status },
+         // OBS-C3: no fabricated "previous" — for a legacy order
+         // without persistent history the prior status is unknown,
+         // not necessarily PENDING.
+         diff: { field: "status", previous: null, new: order.status },
          date: updateTimes.date,
          time: updateTimes.time,
          timestamp: updateTimes.full,

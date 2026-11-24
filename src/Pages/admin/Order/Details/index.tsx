@@ -13,6 +13,7 @@ import { useSnackbar } from "@src/lib/snackbarContext";
 import { useRouter } from "next/navigation";
 import Icon from "@src/components/Icon";
 import CustomModal from "@src/components/Modal";
+import AlertDialog from "@src/components/AlertDialog";
 import CustomerDetailModal from "@src/Pages/admin/Customers/CustomerDetailModal";
 import QuickEditModal from "../QuickEditModal";
 import { displayOrderDiscount, displayOrderTax } from "@src/lib/orderMoney";
@@ -58,6 +59,40 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
    }, [feedback, setFeedback, showSnackbar]);
    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
    const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
+   // OBS-C4: direct cancel from the details page.
+   const [cancelOpen, setCancelOpen] = useState(false);
+   const [cancelling, setCancelling] = useState(false);
+
+   const statusUpper = String(order?.status || "").toUpperCase();
+   const canCancelOrder =
+      Boolean(order) &&
+      !["CANCELLED", "FAILED", "COMPLETED", "DELIVERED", "RETURNED"].includes(statusUpper);
+
+   const handleCancelOrder = async () => {
+      if (!order) return;
+      setCancelling(true);
+      try {
+         const res = await fetch(`/api/orders/${order.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "Cancelled" }),
+         });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) {
+            throw new Error(data.message || data.error || "Failed to cancel order");
+         }
+         setCancelOpen(false);
+         setFeedback({ type: "success", message: "Order cancelled." });
+         await fetchOrder();
+      } catch (err: any) {
+         setFeedback({
+            type: "error",
+            message: err?.message || "Failed to cancel order",
+         });
+      } finally {
+         setCancelling(false);
+      }
+   };
 
    if (loading) {
       return (
@@ -98,6 +133,7 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
                orderId={order.id}
                onOpenQuickEdit={() => setIsQuickEditOpen(true)}
                onPrintInvoice={handlePrintInvoice}
+               onCancelOrder={canCancelOrder ? () => setCancelOpen(true) : undefined}
             />
 
             {/* ============================================================ */}
@@ -232,6 +268,17 @@ export default function OrderDetailsPage({ orderId }: OrderDetailsPageProps = {}
             open={Boolean(selectedCustomerId)}
             onClose={() => setSelectedCustomerId(null)}
             customerId={selectedCustomerId}
+         />
+
+         {/* OBS-C4: cancel confirmation — the API restores the
+             order's stock and writes the cancellation audit event. */}
+         <AlertDialog
+            open={cancelOpen}
+            onClose={() => !cancelling && setCancelOpen(false)}
+            onConfirm={handleCancelOrder}
+            type={"confirm"}
+            confirmText={cancelling ? "Cancelling..." : "Cancel Order"}
+            title={`Cancel order <b>${displayOrderId}</b>? Its reserved stock will be restored.`}
          />
       </Box>
    );

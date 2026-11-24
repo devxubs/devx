@@ -683,7 +683,10 @@ const OrderTable = () => {
       },
       {
          field: "subtotal",
-         headerName: "Price",
+         // OBS-B2: the column sums the line items only (no delivery,
+         // no discount) — calling it "Price" made it look like the
+         // order total and disagree with the details view.
+         headerName: "Subtotal",
          renderCell: (params) => {
             let productSubtotal = 0;
             params.row.products.map((p: any) => {
