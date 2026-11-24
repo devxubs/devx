@@ -20,7 +20,7 @@ import { hideDeletedCategory } from "@src/lib/categoryVisibility";
 import { validateProductImages } from "@src/lib/productImages";
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["products", "product", "products_read", "product_view_product", "product_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);

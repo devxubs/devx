@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveSession } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { resolveBarcodeLookup } from "@src/lib/barcodeLookup";
 import { hideDeletedCategory } from "@src/lib/categoryVisibility";
@@ -54,7 +54,7 @@ const productInclude = {
 } as const;
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["products", "product", "products_read", "product_view_product", "orders", "order"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const code = new URL(request.url).searchParams.get("code")?.trim() || "";

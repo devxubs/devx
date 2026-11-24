@@ -13,7 +13,7 @@ export async function GET(
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["assets", "asset", "asset_view_asset", "asset_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveSession } from "@src/lib/auth";
+import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { parsePagination } from "@src/lib/pagination";
 
@@ -10,7 +10,7 @@ import { parsePagination } from "@src/lib/pagination";
 // returns what exists; variant names and order/purchase references
 // (customId) are resolved with lookups.
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["products", "product", "products_read", "product_view_product", "stock", "inventory"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);

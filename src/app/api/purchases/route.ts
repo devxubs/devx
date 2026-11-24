@@ -16,7 +16,7 @@ import { normalizePurchaseAttachments } from "@src/lib/purchaseAttachments";
 import { splitCreationPayment } from "@src/lib/utils";
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["purchases", "purchase", "purchase_view_purchase", "purchase_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);

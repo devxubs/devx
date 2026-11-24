@@ -11,7 +11,7 @@ import {
 import { validateUserExpenseAmount } from "@src/lib/expenses";
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["expenses", "expense", "expense_view_expense", "expense_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
    }
 
    try {
-      const [expenses, total] = await Promise.all([
+      const [expenses, total, amountAgg] = await Promise.all([
          prisma.expense.findMany({
             where,
             skip,
@@ -47,9 +47,18 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: "desc" },
          }),
          prisma.expense.count({ where }),
+         // OBS-H1: the Expenses page showed no money total at all.
+         // Sum over the same filtered set the list/count use.
+         prisma.expense.aggregate({ where, _sum: { amount: true } }),
       ]);
 
-      return NextResponse.json({ expenses, total, page, limit });
+      return NextResponse.json({
+         expenses,
+         total,
+         page,
+         limit,
+         totalAmount: Number(amountAgg._sum.amount || 0),
+      });
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch expenses" },

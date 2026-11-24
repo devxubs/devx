@@ -260,32 +260,50 @@ export async function GET(request: NextRequest) {
          (s) => s.name.toLowerCase().includes(qLower) || s.keywords.includes(qLower) || s.tab.includes(qLower),
       );
 
+      // BUG-G2 (Full Live QA Audit 2026-11-25): global search
+      // returned every entity type to any signed-in account —
+      // including employees, suppliers, purchases, expenses and
+      // assets the caller cannot see anywhere else in the app.
+      // Sections are now filtered by the same permissions that gate
+      // their own list endpoints. (Categories/units are reference
+      // data shared by all staff forms and stay visible.)
+      const can = (keys: string[]) => sessionGate.hasPermission(keys);
+      const vProducts = can(["products", "product", "products_read", "product_view_product"]) ? products : [];
+      const vOrders = can(["orders", "order", "order_view_order"]) ? orders : [];
+      const vCustomers = can(["customers", "customer", "customer_view_customer"]) ? customers : [];
+      const vEmployees = can(["users", "user", "user_view_user"]) ? employees : [];
+      const vSuppliers = can(["suppliers", "supplier", "supplier_view_supplier"]) ? suppliers : [];
+      const vPurchases = can(["purchases", "purchase", "purchase_view_purchase"]) ? purchases : [];
+      const vExpenses = can(["expenses", "expense", "expense_view_expense"]) ? expenses : [];
+      const vAssets = can(["assets", "asset", "asset_view_asset"]) ? assets : [];
+      const vSettings = can(["settings", "setting", "setting_view_setting"]) ? matchedSettings : [];
+
       const totalMatches =
-         products.length +
+         vProducts.length +
          categories.length +
          units.length +
-         orders.length +
-         customers.length +
-         employees.length +
-         suppliers.length +
-         purchases.length +
-         expenses.length +
-         assets.length +
-         matchedSettings.length;
+         vOrders.length +
+         vCustomers.length +
+         vEmployees.length +
+         vSuppliers.length +
+         vPurchases.length +
+         vExpenses.length +
+         vAssets.length +
+         vSettings.length;
 
       return NextResponse.json({
          results: {
-            products,
+            products: vProducts,
             categories,
             units,
-            orders,
-            customers,
-            employees,
-            suppliers,
-            purchases,
-            expenses,
-            assets,
-            settings: matchedSettings,
+            orders: vOrders,
+            customers: vCustomers,
+            employees: vEmployees,
+            suppliers: vSuppliers,
+            purchases: vPurchases,
+            expenses: vExpenses,
+            assets: vAssets,
+            settings: vSettings,
          },
          totalMatches,
       });

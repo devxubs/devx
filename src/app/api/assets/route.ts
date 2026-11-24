@@ -10,7 +10,7 @@ import {
 } from "@src/lib/audit";
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["assets", "asset", "asset_view_asset", "asset_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);

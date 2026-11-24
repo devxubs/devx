@@ -25,7 +25,7 @@ export async function GET(
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["products", "product", "products_read", "product_view_product", "product_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const product = await prisma.product.findFirst({

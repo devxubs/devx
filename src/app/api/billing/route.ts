@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveSession, requireAdmin } from "@src/lib/auth";
+import { requireActiveSession, requireAdmin, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
 import { parsePagination } from "@src/lib/pagination";
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["billing", "billings", "billing_view_billing", "settings", "setting", "setting_view_setting"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);

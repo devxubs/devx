@@ -14,7 +14,7 @@ export async function GET(
    { params }: { params: Promise<{ id: string }> },
 ) {
    const { id } = await params;
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["expenses", "expense", "expense_view_expense", "expense_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    try {

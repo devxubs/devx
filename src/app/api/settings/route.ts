@@ -77,7 +77,39 @@ export async function GET(request: NextRequest) {
          where: { id: "default" },
       });
 
-      return NextResponse.json(settings ?? DEFAULT_SETTINGS);
+      const payload: any = settings ?? DEFAULT_SETTINGS;
+
+      // BUG-G2 (Full Live QA Audit 2026-11-25): every signed-in
+      // account receives the store settings because the app shell
+      // needs the flat identity fields (name, logo, currency) for
+      // all roles — but the full customConfig is business
+      // configuration (and the future home of courier credentials).
+      // Callers without a settings permission now receive only the
+      // two benign operational keys other staff screens consume
+      // (the Order table's default courier status and the Expense
+      // form's default category); everything else is withheld.
+      const canSeeSettings = sessionGate.hasPermission([
+         "settings",
+         "setting",
+         "setting_view_setting",
+         "setting_update_setting",
+         "setting_update",
+      ]);
+      if (
+         !canSeeSettings &&
+         payload &&
+         payload.customConfig &&
+         typeof payload.customConfig === "object"
+      ) {
+         const cfg = payload.customConfig as Record<string, unknown>;
+         const scrubbed: Record<string, unknown> = {};
+         for (const key of ["defaultCourierStatus", "defaultExpenseCategory"]) {
+            if (key in cfg) scrubbed[key] = cfg[key];
+         }
+         return NextResponse.json({ ...payload, customConfig: scrubbed });
+      }
+
+      return NextResponse.json(payload);
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch settings" },

@@ -42,7 +42,7 @@ import {
 } from "@src/lib/duplicateOrders";
 
 export async function GET(request: NextRequest) {
-   const sessionGate = await requireActiveSession(request);
+   const sessionGate = await requirePermission(request, ["orders", "order", "order_view_order", "order_create"]);
    if (sessionGate instanceof NextResponse) return sessionGate;
 
    const { searchParams } = new URL(request.url);
