@@ -259,9 +259,12 @@ const Sidebar = () => {
    const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
 
    // Phase 2 (2.2): load the signed-in user's permissions once and
-   // filter the navigation. Until the request resolves, the full menu
-   // renders (the layout only mounts for signed-in users); afterwards
-   // only accessible items remain.
+   // filter the navigation.
+   // OBS-G3 (Full Live QA Audit 2026-11-25): until the request
+   // resolved, the FULL admin menu rendered — a cashier landing
+   // directly on a page briefly saw every admin entry flash before
+   // the filter landed. Fail closed instead: no items render until
+   // the permissions are known.
    const [permissions, setPermissions] = useState<Record<
       string,
       boolean
@@ -291,7 +294,7 @@ const Sidebar = () => {
    const visibleItems = useMemo(() => {
       const visible =
          permissions === null
-            ? items
+            ? []
             : items.filter((item) => canSeeItem(item, permissions, isAdmin));
       // Re-attach each group's heading to its first visible item (the
       // heading normally rides on the group's first entry, which may

@@ -7,6 +7,9 @@ import {
    TextField,
    InputAdornment,
    useMediaQuery,
+   Alert,
+   Chip,
+   Typography,
 } from "@mui/material";
 import Masonry from "@mui/lab/Masonry";
 
@@ -616,6 +619,34 @@ const Publish = () => {
                   />
                ))}
             </Masonry>
+
+            {/* OBS-G1 (Full Live QA Audit 2026-11-25): grants the
+                checkbox catalogue cannot represent (seed broad
+                grants like "orders", legacy keys like
+                "products_read") were carried through invisibly —
+                editing the seeded Cashier role showed 83 unchecked
+                boxes and no sign the role held any permissions at
+                all. They are now listed, read-only, so what will be
+                preserved on save is visible before saving. */}
+            {Object.keys(extraPermissions).length > 0 && (
+               <Alert severity="info" sx={{ alignItems: "flex-start" }}>
+                  <Typography variant="body2" fontWeight={600} gutterBottom>
+                     Additional permissions kept on save
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                     This role also holds the grants below. They have no
+                     checkbox here (broad or legacy keys) and are
+                     preserved unchanged when you save.
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                     {Object.keys(extraPermissions)
+                        .sort()
+                        .map((key) => (
+                           <Chip key={key} label={key} size="small" variant="outlined" />
+                        ))}
+                  </Stack>
+               </Alert>
+            )}
 
             <Stack
                spacing={2}

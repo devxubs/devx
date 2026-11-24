@@ -81,6 +81,13 @@ export const Stock = ({
          <LinearProgress
             variant="determinate"
             value={Math.min(quantity, 80)}
+            // OBS-D1: the bar is a rough visual gauge (full at 80+),
+            // but its aria-valuenow exposed the capped "80" next to
+            // the real figure in the label below — assistive tech
+            // read the cell as two disagreeing numbers ("80" and
+            // "107 in stock"). The label is the single source of
+            // truth; the bar is decorative.
+            aria-hidden
             color={color}
             sx={{
                height: 6,
@@ -327,6 +334,20 @@ const Product = () => {
                      quantity={parseInt(params.row.quantity)}
                   />
                );
+            },
+         },
+         {
+            // OBS-D2: the list had no Status column — a draft or
+            // inactive product was indistinguishable from a live one.
+            field: "status",
+            headerName: "Status",
+            flex: 1,
+            chip: true,
+            color: (params: any) => {
+               const s = String(params.row.status || "").toUpperCase();
+               if (s === "ACTIVE") return "success";
+               if (s === "DRAFT") return "warning";
+               return "default";
             },
          },
          {

@@ -106,7 +106,7 @@ const Profile = ({ open, onClose, onOpen }: ProfileProps) => {
                      borderColor="divider"
                      sx={{ borderStyle: "dashed" }}
                   >
-                     <AnimatedAvatar size="large" />
+                     <AnimatedAvatar size="large" alt={user?.name || "User avatar"} />
                      <Stack spacing={0.1}>
                         <Typography
                            variant="h6"

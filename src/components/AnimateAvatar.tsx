@@ -10,9 +10,10 @@ const rotate = keyframes`
 interface AnimatedAvatarProps {
    size?: "small" | "medium" | "large";
    src?: string;
+   alt?: string;
 }
 
-const AnimatedAvatar = ({ size, src }: AnimatedAvatarProps) => {
+const AnimatedAvatar = ({ size, src, alt }: AnimatedAvatarProps) => {
    const theme = useTheme();
 
    return (
@@ -76,7 +77,9 @@ const AnimatedAvatar = ({ size, src }: AnimatedAvatarProps) => {
 
          {/* Avatar (inside background circle) */}
          <Avatar
-            alt="Jaydon Frankie"
+            // OBS-G4: was the template placeholder "Jaydon Frankie" —
+            // every avatar in the app announced a stranger's name.
+            alt={alt || "User avatar"}
             src={src}
             sx={{
                position: "absolute",
