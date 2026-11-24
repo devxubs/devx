@@ -2,6 +2,7 @@
 
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
+   Box,
    Button,
    Stack,
    useTheme,
@@ -60,6 +61,9 @@ const Expense = () => {
       pageSize: 25,
    });
    const [totalExpenses, setTotalExpenses] = useState(0);
+   const [denied, setDenied] = useState(false);
+   // OBS-H1: money total of the filtered expense set (from the API).
+   const [totalAmount, setTotalAmount] = useState(0);
    const [loadError, setLoadError] = useState(false);
 
    // Phase 2 (2.3): global-search deep link — /admin/expense?expense=<id>
@@ -134,7 +138,17 @@ const Expense = () => {
          params.set("limit", String(paginationModel.pageSize));
          if (searchText.trim()) params.set("search", searchText.trim());
          const res = await fetch(`/api/expenses?${params.toString()}`);
+         if (res.status === 403) {
+            // OBS-G2 companion: a permission denial is not a
+            // connection failure — say so, and don't offer a Retry
+            // that can never succeed.
+            setDenied(true);
+            setLoadError(false);
+            setExpenses([]);
+            return;
+         }
          if (res.ok) {
+            setDenied(false);
             const data = await res.json();
             const mapped = (data.expenses || []).map((e: any) => ({
                id: e.id,
@@ -146,6 +160,7 @@ const Expense = () => {
             }));
             setExpenses(mapped);
             setTotalExpenses(Number(data.total ?? mapped.length));
+            setTotalAmount(Number(data.totalAmount ?? 0));
             setLoadError(false);
          } else {
             setLoadError(true);
@@ -209,32 +224,62 @@ const Expense = () => {
    }, [editItem, reset]);
 
    const onSubmit: SubmitHandler<ExpenseForm> = async (formData) => {
+      // OBS-H3 (Full Live QA Audit 2026-11-25): a successful save
+      // gave no confirmation, and a FAILED save was
+      // indistinguishable — the response status was never checked
+      // and the catch swallowed errors, yet the modal still closed
+      // and the form reset. Now: success shows the standard
+      // snackbar; failure keeps the modal open with the server's
+      // message, so no entry is silently lost.
       try {
-         if (!editItem) {
-            await fetch("/api/expenses", {
-               method: "POST",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify(formData),
-            });
-         } else {
-            await fetch(`/api/expenses/${editItem.id}`, {
-               method: "PUT",
-               headers: { "Content-Type": "application/json" },
-               body: JSON.stringify(formData),
-            });
+         const res = !editItem
+            ? await fetch("/api/expenses", {
+                 method: "POST",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify(formData),
+              })
+            : await fetch(`/api/expenses/${editItem.id}`, {
+                 method: "PUT",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify(formData),
+              });
+         if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(
+               err.message || err.error || "Failed to save expense",
+            );
          }
          loadExpenses();
-      } catch {}
-
-      reset();
-      setEditItem(null);
-      setOpenModal(false);
+         showSnackbar(
+            editItem ? "Expense updated." : "Expense added.",
+            "success",
+         );
+         reset();
+         setEditItem(null);
+         setOpenModal(false);
+      } catch (err: any) {
+         showSnackbar(
+            err?.message || "Failed to save expense. Please try again.",
+            "error",
+         );
+      }
    };
 
    return (
       <Stack spacing={2} py={2}>
          {/* Header */}
-         <Stack direction="row" justifyContent="flex-end" spacing={2}>
+         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+            {!loadError && !denied ? (
+               <Typography variant="body2" color="text.secondary">
+                  Total expenses:{" "}
+                  <Box component="span" fontWeight={700} color="text.primary">
+                     ৳ {totalAmount.toFixed(2)}
+                  </Box>{" "}
+                  ({totalExpenses} {totalExpenses === 1 ? "record" : "records"})
+               </Typography>
+            ) : (
+               <span />
+            )}
             <Button
                variant="contained"
                color="primary"
@@ -251,6 +296,19 @@ const Expense = () => {
                Add Expense
             </Button>
          </Stack>
+         {denied && !loading && (
+            <Stack
+               direction="row"
+               alignItems="center"
+               justifyContent="center"
+               spacing={1.5}
+               sx={{ py: 3 }}
+            >
+               <Typography variant="body2" color="text.secondary">
+                  You don&apos;t have permission to view expenses.
+               </Typography>
+            </Stack>
+         )}
          {loadError && !loading && expenses.length === 0 && (
             <Stack
                direction="row"
@@ -513,17 +571,33 @@ const Expense = () => {
             }}
             onConfirm={async () => {
                if (deleteItem) {
+                  // OBS-H5: the old handler filtered the row out
+                  // locally and never refreshed, so the record count
+                  // (and now the money total) stayed stale — and a
+                  // failed DELETE looked identical to a successful
+                  // one. Refresh from the server on success; report
+                  // failure honestly.
                   try {
-                     await fetch(`/api/expenses/${deleteItem.id}`, { method: "DELETE" });
-                  } catch {}
-                  setExpenses((prev) =>
-                     prev.filter((item) => item.id !== deleteItem.id),
-                  );
-                  setDeleteItem(null);
+                     const res = await fetch(`/api/expenses/${deleteItem.id}`, { method: "DELETE" });
+                     if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || err.error || "Failed to delete expense");
+                     }
+                     setDeleteItem(null);
+                     loadExpenses();
+                  } catch (err: any) {
+                     showSnackbar(
+                        err?.message || "Failed to delete expense. Please try again.",
+                        "error",
+                     );
+                  }
                }
             }}
-            type={"error"}
-            title={`Are you sure want to delete <b>${deleteItem?.type}</b>?`}
+            type={"delete"}
+            // OBS-H4: the dialog named only the expense's category —
+            // with several expenses in one category it didn't identify
+            // WHICH record was being deleted. Amount + date pin it down.
+            title={`Are you sure you want to delete <b>${deleteItem?.type}</b> (৳ ${Number(deleteItem?.amount || 0).toFixed(2)}${deleteItem?.date ? `, ${deleteItem.date}` : ""})?`}
          />
       </Stack>
    );
