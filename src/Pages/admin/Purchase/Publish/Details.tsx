@@ -178,8 +178,8 @@ const Details = ({
                                           newProducts.filter(Boolean),
                                        ); // remove nulls
                                     }}
-                                    error={!!errors.products}
-                                    helperText={errors.products?.message}
+                                    error={!!errors.product}
+                                    helperText={errors.product?.message}
                                     arrow
                                     option={productName}
                                     placeholder="Search product..."
@@ -191,15 +191,10 @@ const Details = ({
                                     limitTags={1}
                                  />
 
-                                 {errors.products && (
-                                    <Typography
-                                       color="error"
-                                       variant="caption"
-                                       sx={{ mt: 0.5 }}
-                                    >
-                                       {errors.products.message}
-                                    </Typography>
-                                 )}
+                                 {/* The product error renders once,
+                                     via the search field's helperText
+                                     above (it previously rendered
+                                     twice — here and as helperText). */}
                               </>
                            );
                         }}

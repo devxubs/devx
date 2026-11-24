@@ -17,6 +17,7 @@ import { Controller } from "react-hook-form";
 import { PurchaseTypes } from "..";
 import AttachmentUploader from "./AttachmentUploader";
 import DatePicker from "@src/components/DateRange";
+import { format } from "date-fns";
 
 interface DetailsProps {
    control: any;
@@ -72,14 +73,46 @@ const Information = ({ control, errors, data }: DetailsProps) => {
                         <Controller
                            name="date"
                            control={control}
-                           defaultValue={data.date || []}
-                           render={({ field }) => (
-                              <DatePicker
-                                 {...field}
-                                 value={field.value} // ✅ always controlled
-                                 onChange={(val: any) => field.onChange(val)}
-                              />
-                           )}
+                           defaultValue={data.date || ""}
+                           render={({ field }) => {
+                              // BUG-E1 fix: the shared DateRange picker
+                              // speaks in [Date, Date] tuples, while the
+                              // purchase schema stores `date` as a
+                              // "yyyy-MM-dd" string. Adapt at this
+                              // boundary — previously the raw tuple was
+                              // stored in the field, yup validation
+                              // failed on every submit, and the submit
+                              // died silently (no request, no error).
+                              const parsed = field.value
+                                 ? new Date(field.value as any)
+                                 : null;
+                              const pickerValue: [Date | null, Date | null] =
+                                 parsed && !Number.isNaN(parsed.getTime())
+                                    ? [parsed, parsed]
+                                    : [null, null];
+                              return (
+                                 <Stack spacing={0.5}>
+                                    <DatePicker
+                                       type="single"
+                                       value={pickerValue}
+                                       onChange={(val) => {
+                                          const d = val?.[0];
+                                          field.onChange(
+                                             d ? format(d, "yyyy-MM-dd") : "",
+                                          );
+                                       }}
+                                    />
+                                    {errors.date && (
+                                       <Typography
+                                          variant="caption"
+                                          color="error"
+                                       >
+                                          {errors.date.message}
+                                       </Typography>
+                                    )}
+                                 </Stack>
+                              );
+                           }}
                         />
                      </Stack>
                   </Grid>
@@ -112,6 +145,12 @@ const Information = ({ control, errors, data }: DetailsProps) => {
                                  fullWidth
                                  label="Invoice No."
                                  placeholder="Invoice No."
+                                 // BUG-E1 follow-through: the invoice
+                                 // error was never wired to the field,
+                                 // so a blank invoice blocked submit
+                                 // with no visible message.
+                                 error={!!errors.invoice}
+                                 helperText={errors.invoice?.message}
                               />
                            )}
                         />

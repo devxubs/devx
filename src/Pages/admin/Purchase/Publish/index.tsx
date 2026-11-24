@@ -19,6 +19,7 @@ import Details from "./Details";
 import Pricing from "./Pricing";
 import Information from "./Information";
 import { uploadImageFile } from "@src/lib/uploadImage";
+import { useSnackbar } from "@src/lib/snackbarContext";
 
 export interface SupplierOption {
    id: string;
@@ -138,9 +139,23 @@ export const purchaseSchema = yup.object({
 
 export type PurchaseFormValues = yup.InferType<typeof purchaseSchema>;
 
+// BUG-E1 follow-through: "today" for the purchase date must be the
+// store's calendar day (Asia/Dhaka — the same zone the order-create
+// page hardcodes for its date display). `new Date().toISOString()`
+// is UTC and showed *yesterday* every Dhaka morning. en-CA formats
+// as yyyy-MM-dd.
+const todayDhaka = (): string =>
+   new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+   }).format(new Date());
+
 const Publish = () => {
    const [data, setData] = useState<PurchaseTypes>({} as PurchaseTypes);
    const router = useRouter();
+   const { showSnackbar } = useSnackbar();
 
    const {
       control,
@@ -153,7 +168,10 @@ const Publish = () => {
       resolver: yupResolver<PurchaseFormValues, any, any>(purchaseSchema),
       defaultValues: {
          id: 0,
-         date: "", // e.g., "2025-10-25"
+         // BUG-E1: default to today (Asia/Dhaka) in the schema's
+         // "yyyy-MM-dd" format so a fresh form is valid without
+         // touching the date picker.
+         date: todayDhaka(),
          invoice: "",
          supplier: "",
          product: [],
@@ -297,7 +315,7 @@ const Publish = () => {
          );
          reset({
             id: 0,
-            date: new Date().toISOString().split("T")[0],
+            date: todayDhaka(),
             invoice: "",
             supplier: draft.supplierName || "",
             product: items.map((it: any) => ({
@@ -401,6 +419,11 @@ const Publish = () => {
          // server for both POST and PUT — client totals are advisory.
          const payload = {
             supplierId: supplierId || null,
+            // BUG-E1 follow-through: the form's date is now actually
+            // sent — the API stores it as the purchase's date
+            // (createdAt). It was previously dropped here, so the
+            // field silently did nothing.
+            date: formData.date || undefined,
             invoice: formData.invoice?.trim() || undefined,
             items: (formData.product || []).map((p: any) => ({
                productId: p.productId || p.id || null,
@@ -437,6 +460,14 @@ const Publish = () => {
             );
          }
 
+         // BUG-E1 follow-through: a successful save previously gave
+         // no confirmation at all. Same pattern as Product Publish —
+         // the snackbar provider lives in the admin Layout, so the
+         // message survives the navigation back to the list.
+         showSnackbar(
+            editId ? "Purchase updated." : "Purchase added.",
+            "success",
+         );
          router.push("/admin/purchase");
       } catch (err: any) {
          setErrorMsg(err.message || "Failed to save purchase");

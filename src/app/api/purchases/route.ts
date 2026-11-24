@@ -82,7 +82,27 @@ export async function POST(request: NextRequest) {
          discount = 0,
          paid = 0,
          note,
+         date,
       } = body;
+
+      // BUG-E1 follow-through: the purchase form's date field was
+      // previously never sent and never read — the chosen date was
+      // silently discarded and the purchase was stamped with the
+      // server's clock. The model has no separate date column; the
+      // form's date IS the purchase's createdAt (edit mode derives
+      // the field from createdAt, symmetrically). A valid
+      // "yyyy-MM-dd" is stored at midday UTC so the calendar day
+      // renders identically in UTC and Asia/Dhaka displays.
+      const purchaseDate =
+         typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+            ? new Date(`${date}T12:00:00.000Z`)
+            : null;
+      if (purchaseDate && Number.isNaN(purchaseDate.getTime())) {
+         return NextResponse.json(
+            { error: "Invalid purchase date" },
+            { status: 400 },
+         );
+      }
 
       if (!Array.isArray(items)) {
          return NextResponse.json(
@@ -265,6 +285,7 @@ export async function POST(request: NextRequest) {
                due,
                note: note || undefined,
                createdById: session.id || undefined,
+               ...(purchaseDate ? { createdAt: purchaseDate } : {}),
                items: {
                   create: normalizedItems,
                },
