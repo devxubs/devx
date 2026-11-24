@@ -6,6 +6,7 @@ import {
    VALID_ORDER_WHERE,
    isValidOrder,
    isDeliveredValidOrder,
+   isOrderStatusTransitionAllowed,
 } from "@src/lib/orderStatus";
 
 // Phase B1 (P1-4): the API-boundary status normaliser. The Publish
@@ -123,5 +124,52 @@ describe("isDeliveredValidOrder", () => {
       expect(isDeliveredValidOrder({ status: "CANCELLED", isDeleted: false })).toBe(false);
       expect(isDeliveredValidOrder({ status: "FAILED", isDeleted: false })).toBe(false);
       expect(isDeliveredValidOrder({ status: "DELIVERED", isDeleted: true })).toBe(false);
+   });
+});
+
+// BUG-C1 (Full Live QA Audit 2026-11-25): the transition policy the
+// single-order PUT and the bulk status action now enforce. Before
+// this, CANCELLED → PENDING was accepted, resurrecting the order and
+// re-deducting its stock.
+describe("isOrderStatusTransitionAllowed (BUG-C1)", () => {
+   it("never allows leaving CANCELLED or FAILED", () => {
+      for (const from of ["CANCELLED", "FAILED"]) {
+         for (const to of ORDER_STATUSES) {
+            if (to === from) continue;
+            expect(isOrderStatusTransitionAllowed(from, to)).toBe(false);
+         }
+      }
+   });
+
+   it("treats COMPLETED as terminal and DELIVERED as completable-only", () => {
+      expect(isOrderStatusTransitionAllowed("COMPLETED", "PENDING")).toBe(false);
+      expect(isOrderStatusTransitionAllowed("COMPLETED", "DELIVERED")).toBe(false);
+      expect(isOrderStatusTransitionAllowed("DELIVERED", "COMPLETED")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("DELIVERED", "PENDING")).toBe(false);
+      expect(isOrderStatusTransitionAllowed("DELIVERED", "CANCELLED")).toBe(false);
+   });
+
+   it("preserves the normal fulfilment flows", () => {
+      expect(isOrderStatusTransitionAllowed("PENDING", "CONFIRMED")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("CONFIRMED", "PROCESSING")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("PROCESSING", "SHIPPED")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("SHIPPED", "OUT_FOR_DELIVERY")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("OUT_FOR_DELIVERY", "DELIVERED")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("CONFIRMED", "COMPLETED")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("PENDING", "HOLD")).toBe(true);
+      expect(isOrderStatusTransitionAllowed("HOLD", "PENDING")).toBe(true);
+   });
+
+   it("allows cancelling / failing from any active status", () => {
+      for (const from of ["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "OUT_FOR_DELIVERY", "HOLD"]) {
+         expect(isOrderStatusTransitionAllowed(from, "CANCELLED")).toBe(true);
+         expect(isOrderStatusTransitionAllowed(from, "FAILED")).toBe(true);
+      }
+   });
+
+   it("always allows a same-status save (not a transition)", () => {
+      for (const s of ORDER_STATUSES) {
+         expect(isOrderStatusTransitionAllowed(s, s)).toBe(true);
+      }
    });
 });

@@ -72,6 +72,43 @@ export function normalizeOrderStatus(input: unknown): OrderStatusValue | null {
 export const INVALID_ORDER_STATUSES = ["CANCELLED", "FAILED"] as const;
 
 /**
+ * Status-transition policy (BUG-C1, Full Live QA Audit 2026-11-25).
+ *
+ * Before this policy existed, the order PUT accepted ANY status
+ * change — including CANCELLED → PENDING from Quick Edit, which
+ * silently resurrected a cancelled order, re-deducted its stock, and
+ * dropped the cancellation from the visible timeline. Transitions are
+ * now guarded server-side (the UI staying enabled is harmless once
+ * the API refuses):
+ *
+ *  - CANCELLED and FAILED are terminal: no outgoing transitions.
+ *  - COMPLETED is terminal.
+ *  - DELIVERED may only move to COMPLETED (marking a delivered order
+ *    as fully completed); it can never move back to an active state.
+ *  - Every other (active) status may move to any other status, which
+ *    preserves all existing fulfilment flows, including cancelling
+ *    from any active state and HOLD/resume.
+ *  - A "transition" to the SAME status is not a transition (Quick
+ *    Edit saves routinely include the unchanged status) and is
+ *    always allowed.
+ */
+export const TERMINAL_ORDER_STATUSES = ["CANCELLED", "FAILED"] as const;
+
+export function isOrderStatusTransitionAllowed(
+   from: string,
+   to: string,
+): boolean {
+   const f = String(from || "").toUpperCase();
+   const t = String(to || "").toUpperCase();
+   if (f === t) return true;
+   if ((TERMINAL_ORDER_STATUSES as readonly string[]).includes(f))
+      return false;
+   if (f === "COMPLETED") return false;
+   if (f === "DELIVERED") return t === "COMPLETED";
+   return true;
+}
+
+/**
  * Prisma where-fragment expressing the canonical valid-order rule on
  * its own: spread it into an order `where` (it composes with the
  * caller's other keys; a caller that also filters `status` or

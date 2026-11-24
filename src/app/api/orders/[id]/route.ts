@@ -19,6 +19,7 @@ import {
 } from "@src/lib/payments";
 import {
    normalizeOrderStatus,
+   isOrderStatusTransitionAllowed,
    type OrderStatusValue,
 } from "@src/lib/orderStatus";
 import {
@@ -161,6 +162,27 @@ export async function PUT(
             );
          }
          normalizedStatus = normalized;
+      }
+
+      // BUG-C1 (Full Live QA Audit 2026-11-25): enforce the status
+      // transition policy server-side, BEFORE any stock, payment or
+      // audit mutation below. A CANCELLED (or FAILED / COMPLETED)
+      // order must never be moved back into the fulfilment flow —
+      // previously Quick Edit could resurrect a cancelled order,
+      // re-deducting its stock and dropping the cancellation from
+      // the visible history. Same-status saves are not transitions
+      // and pass through.
+      if (
+         normalizedStatus !== undefined &&
+         !isOrderStatusTransitionAllowed(existingOrder.status, normalizedStatus)
+      ) {
+         return NextResponse.json(
+            {
+               error: "Invalid status transition",
+               message: `An order in status ${existingOrder.status} cannot be changed to ${normalizedStatus}.`,
+            },
+            { status: 400 },
+         );
       }
 
       const existingTags =

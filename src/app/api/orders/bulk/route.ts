@@ -12,6 +12,7 @@ import {
 import { logAudit, requestAuditContext } from "@src/lib/audit";
 import {
    normalizeOrderStatus,
+   isOrderStatusTransitionAllowed,
    ORDER_STATUSES,
 } from "@src/lib/orderStatus";
 import { resolveSubmittedCourierStatus } from "@src/lib/courierSubmission";
@@ -204,6 +205,17 @@ export async function POST(request: NextRequest) {
                   const target = nextStatus as string;
                   if (order.status === target) {
                      return { ok: true, displayId, note: "Already in this status" };
+                  }
+                  // BUG-C1: the same terminal-status policy as the
+                  // single-order PUT — a bulk action must not
+                  // resurrect CANCELLED / FAILED / COMPLETED orders
+                  // either (this path previously even re-deducted
+                  // stock for "reactivated" orders).
+                  if (!isOrderStatusTransitionAllowed(order.status, target)) {
+                     return {
+                        ok: false,
+                        error: `An order in status ${order.status} cannot be changed to ${target}`,
+                     };
                   }
                   const wasHoldingStock = orderHoldsStock(order);
                   const willHoldStock = orderHoldsStock({
