@@ -3,8 +3,12 @@
 // Order Create (upgrade) — Order Information.
 // Order ID / Invoice No. are previews only: the server assigns the real
 // sequential IDs inside the creation transaction (no sequence number is
-// burned by rendering this page). The preview is derived from the latest
-// order (GET /api/orders?limit=1) and clearly labelled as an estimate.
+// burned by rendering this page). OBS-B1: the preview is read from the
+// server's EntitySequence (GET /api/entity-sequence?type=ORDER) — the
+// same counter creation consumes. It previously guessed "latest
+// order's ID + 1", which disagreed with the assigned ID whenever rows
+// were seeded or deleted (the form showed ORD_6004; the server
+// assigned ORD_1).
 import {
    Grid,
    Stack,
@@ -25,12 +29,7 @@ interface OrderInfoSectionProps {
    onChange: (partial: { orderSource?: string; status?: string; courier?: string }) => void;
 }
 
-function nextPreviewId(latest: string | null | undefined, prefix: string): string {
-   if (!latest) return "Assigned on save";
-   const match = String(latest).match(/(\d+)\s*$/);
-   if (!match) return "Assigned on save";
-   return `${prefix}${parseInt(match[1], 10) + 1}`;
-}
+
 
 const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoSectionProps) => {
    const [orderPreview, setOrderPreview] = useState("Assigned on save");
@@ -48,13 +47,16 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
       let cancelled = false;
       (async () => {
          try {
-            const res = await fetch("/api/orders?limit=1");
+            const res = await fetch("/api/entity-sequence?type=ORDER");
             if (!res.ok) return;
             const data = await res.json();
-            const latest = Array.isArray(data.orders) ? data.orders[0] : null;
-            if (!latest || cancelled) return;
-            setOrderPreview(nextPreviewId(latest.orderId || latest.customId, "ORD_"));
-            setInvoicePreview(nextPreviewId(latest.invoiceNo, "INV_"));
+            if (!data?.nextId || cancelled) return;
+            setOrderPreview(data.nextId);
+            // The orders POST derives the invoice number from the
+            // same sequence value (INV_<seq>).
+            if (typeof data.seq === "number") {
+               setInvoicePreview(`INV_${data.seq}`);
+            }
          } catch { /* preview is best-effort */ }
       })();
       return () => {

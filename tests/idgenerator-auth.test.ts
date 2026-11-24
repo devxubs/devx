@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateNextEntityId } from "@src/lib/idGenerator";
+import { generateNextEntityId, peekNextEntityId } from "@src/lib/idGenerator";
 import {
    normalizePermissions,
    permissionMatches,
@@ -145,5 +145,76 @@ describe("token + password handling", () => {
       expect(hash).not.toContain("correct horse");
       expect(await verifyPassword("correct horse", hash)).toBe(true);
       expect(await verifyPassword("wrong", hash)).toBe(false);
+   });
+});
+
+// OBS-B1 (Full Live QA Audit 2026-11-25): the create-form ID preview
+// must come from the same sequence the server consumes. peekNextEntityId
+// mirrors generateNextEntityId's prefix + collision rules read-only.
+describe("peekNextEntityId (OBS-B1)", () => {
+   function makePeekDb(currentSeq: number | null, existingIds: string[] = []) {
+      const existing = new Set(existingIds);
+      const model = {
+         findFirst: async ({ where }: any) => {
+            const wanted: string[] = (where.OR || []).map(
+               (c: any) => c.customId || c.orderId || c.orderCode,
+            );
+            return wanted.some((id) => existing.has(id))
+               ? { customId: wanted[0] }
+               : null;
+         },
+      };
+      const db: any = {
+         storeSetting: { findUnique: async () => null },
+         entitySequence: {
+            findUnique: async () =>
+               currentSeq === null
+                  ? null
+                  : { entityType: "ORDER", currentSeq },
+         },
+         user: model,
+         customer: model,
+         supplier: model,
+         order: model,
+         purchase: model,
+         product: model,
+         category: model,
+         unit: model,
+         expense: model,
+         asset: model,
+         role: model,
+         billingTransaction: model,
+         warehouse: model,
+         supplierPayment: model,
+         purchaseReturn: model,
+      };
+      return db;
+   }
+
+   it("previews current sequence + 1", async () => {
+      const db = makePeekDb(3);
+      const peek = await peekNextEntityId("ORDER", db);
+      expect(peek.customId).toBe("ORD_4");
+      expect(peek.seq).toBe(4);
+   });
+
+   it("starts at 1 when no sequence row exists yet", async () => {
+      const db = makePeekDb(null);
+      const peek = await peekNextEntityId("ORDER", db);
+      expect(peek.customId).toBe("ORD_1");
+   });
+
+   it("skips IDs that already exist (seeded / out-of-band rows)", async () => {
+      const db = makePeekDb(null, ["ORD_1", "ORD_2"]);
+      const peek = await peekNextEntityId("ORDER", db);
+      expect(peek.customId).toBe("ORD_3");
+   });
+
+   it("never consumes the sequence — repeated peeks agree", async () => {
+      const db = makePeekDb(7);
+      const a = await peekNextEntityId("SUPPLIER", db);
+      const b = await peekNextEntityId("SUPPLIER", db);
+      expect(a.customId).toBe("SUP_8");
+      expect(b.customId).toBe("SUP_8");
    });
 });

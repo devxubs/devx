@@ -154,3 +154,74 @@ export async function generateNextEntityId(
       prefix,
    };
 }
+
+/**
+ * OBS-B1 (Full Live QA Audit 2026-11-25): read-only preview of the ID
+ * the NEXT created record of this type will receive.
+ *
+ * The order-create form previously guessed the next ID from the
+ * latest existing row (max customId + 1), which disagrees with this
+ * sequence whenever rows were seeded, deleted, or the counter was
+ * ever out of sync — staff quoted the previewed number to customers
+ * and the saved order carried a different one. This peek mirrors
+ * generateNextEntityId exactly (same prefix source, same collision
+ * rule) WITHOUT consuming the sequence: it reads the current counter
+ * and walks forward past IDs that already exist. It is a preview,
+ * not a reservation — a concurrent create can still claim the
+ * number first, which is why the UI keeps its "assigned on save"
+ * framing.
+ */
+export async function peekNextEntityId(
+   entityType: EntityType,
+   client?: any,
+): Promise<{ customId: string; seq: number; prefix: string }> {
+   const db = client || prisma;
+   const prefix = await getEntityPrefix(entityType, db);
+
+   const modelMap: Record<EntityType, any> = {
+      USER: db.user,
+      CUSTOMER: db.customer,
+      SUPPLIER: db.supplier,
+      ORDER: db.order,
+      PURCHASE: db.purchase,
+      PRODUCT: db.product,
+      CATEGORY: db.category,
+      UNIT: db.unit,
+      EXPENSE: db.expense,
+      ASSET: db.asset,
+      ROLE: db.role,
+      BILLING: db.billingTransaction,
+      WAREHOUSE: db.warehouse,
+      SUPPLIER_PAYMENT: db.supplierPayment,
+      PURCHASE_RETURN: db.purchaseReturn,
+   };
+
+   const seqRow = await db.entitySequence.findUnique({
+      where: { entityType },
+   });
+   let candidateSeq = (seqRow?.currentSeq ?? 0) + 1;
+   let candidateId = `${prefix}${candidateSeq}`;
+
+   const model = modelMap[entityType];
+   if (model && typeof model.findFirst === "function") {
+      const findCollision = () =>
+         model.findFirst({
+            where: {
+               OR: [
+                  { customId: candidateId },
+                  ...(entityType === "ORDER"
+                     ? [{ orderId: candidateId }, { orderCode: candidateId }]
+                     : []),
+               ],
+            },
+         });
+      let exists = await findCollision();
+      while (exists) {
+         candidateSeq += 1;
+         candidateId = `${prefix}${candidateSeq}`;
+         exists = await findCollision();
+      }
+   }
+
+   return { customId: candidateId, seq: candidateSeq, prefix };
+}
