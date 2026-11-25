@@ -85,6 +85,17 @@ export const purchaseSchema = yup.object({
 
    invoice: yup
       .string()
+      // The field is optional (the API stores purchases without an
+      // invoice number, and the submit path already sends undefined
+      // for a blank value) — but the form's default is "", and a
+      // present empty string still runs the min/max checks, so a
+      // blank invoice failed with "Invoice number is too short" and
+      // blocked creation (found in the field-consistency live
+      // check). Normalise blank to undefined so .optional() means
+      // what it says; a typed value still must be 2–20 chars.
+      .transform((v) =>
+         typeof v === "string" && v.trim() === "" ? undefined : v,
+      )
       .min(2, "Invoice number is too short")
       .max(20, "Invoice number is too long")
       .optional(),

@@ -6,12 +6,16 @@
 // Attachment handling is unchanged: files go through the existing
 // uploads flow on save (see Publish/index.tsx), and attachments
 // already saved on the purchase stay listed in edit mode.
+//
+// Labels and helpers follow the Order Create / Product Create form
+// system (FieldLabel + helper text under the field); both fields
+// here are optional in the schema, and say so in their labels.
 
 import { Stack, TextField, Typography } from "@mui/material";
 import React from "react";
 import { Controller } from "react-hook-form";
 import AttachmentUploader from "./AttachmentUploader";
-import { roomyTextareaSx } from "./fieldStyles";
+import FieldLabel from "./FieldLabel";
 
 interface NotesSectionProps {
    control: any;
@@ -21,10 +25,8 @@ interface NotesSectionProps {
 const NotesSection = ({ control, data }: NotesSectionProps) => {
    return (
       <Stack spacing={3}>
-         <Stack spacing={1.25}>
-            <Typography fontSize={13} fontWeight={500}>
-               Purchase Notes
-            </Typography>
+         <Stack spacing={0.75}>
+            <FieldLabel optional>Purchase Notes</FieldLabel>
             <Controller
                name="note"
                control={control}
@@ -34,19 +36,17 @@ const NotesSection = ({ control, data }: NotesSectionProps) => {
                      {...field}
                      fullWidth
                      multiline
-                     rows={5}
-                     placeholder="Optional note for this purchase…"
-                     label="Note"
-                     sx={roomyTextareaSx}
+                     rows={3}
+                     size="small"
+                     placeholder="Note for this purchase…"
+                     helperText="Add any additional information about this purchase."
                   />
                )}
             />
          </Stack>
 
-         <Stack spacing={1.25}>
-            <Typography fontSize={13} fontWeight={500}>
-               Attachments
-            </Typography>
+         <Stack spacing={0.75}>
+            <FieldLabel optional>Attachments</FieldLabel>
             <Controller
                name="attachments"
                control={control}

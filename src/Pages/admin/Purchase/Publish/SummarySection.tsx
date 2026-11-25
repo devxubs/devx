@@ -24,7 +24,22 @@ import {
    paymentStatusLabel,
    type PurchaseTotals,
 } from "./calculations";
-import { roomyMoneyInputSx } from "./fieldStyles";
+
+// Row label for the summary's input rows. Others cost, discount
+// and paid amount are all optional in the form schema; the
+// "(Optional)" qualifier sits on its own caption line under the
+// name — the summary card is narrow, and the inline caption span
+// used by FieldLabel wrapped mid-label here (live-check finding).
+const RowLabel = ({ children }: { children: React.ReactNode }) => (
+   <Stack sx={{ pt: "2px" }}>
+      <Typography variant="body2" color="textSecondary">
+         {children}
+      </Typography>
+      <Typography variant="caption" color="textSecondary">
+         (Optional)
+      </Typography>
+   </Stack>
+);
 
 interface SummarySectionProps {
    control: any;
@@ -86,12 +101,10 @@ const SummarySection = ({
          <Stack
             direction="row"
             justifyContent="space-between"
-            alignItems="center"
+            alignItems="flex-start"
             spacing={2}
          >
-            <Typography variant="body2" color="textSecondary">
-               Others Cost
-            </Typography>
+            <RowLabel>Others Cost</RowLabel>
             <Controller
                name="others_cost"
                control={control}
@@ -103,8 +116,11 @@ const SummarySection = ({
                      size="small"
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.others_cost}
-                     helperText={errors?.others_cost?.message}
-                     sx={[{ width: 150 }, roomyMoneyInputSx]}
+                     helperText={
+                        errors?.others_cost?.message ||
+                        "Additional costs for this purchase."
+                     }
+                     sx={{ width: 150 }}
                   />
                )}
             />
@@ -114,12 +130,10 @@ const SummarySection = ({
          <Stack
             direction="row"
             justifyContent="space-between"
-            alignItems="center"
+            alignItems="flex-start"
             spacing={2}
          >
-            <Typography variant="body2" color="textSecondary">
-               Discount
-            </Typography>
+            <RowLabel>Discount</RowLabel>
             <Controller
                name="discount"
                control={control}
@@ -131,8 +145,11 @@ const SummarySection = ({
                      size="small"
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.discount}
-                     helperText={errors?.discount?.message}
-                     sx={[{ width: 150 }, roomyMoneyInputSx]}
+                     helperText={
+                        errors?.discount?.message ||
+                        "Discount applied to this purchase."
+                     }
+                     sx={{ width: 150 }}
                   />
                )}
             />
@@ -150,12 +167,10 @@ const SummarySection = ({
          <Stack
             direction="row"
             justifyContent="space-between"
-            alignItems="center"
+            alignItems="flex-start"
             spacing={2}
          >
-            <Typography variant="body2" color="textSecondary">
-               Paid Amount
-            </Typography>
+            <RowLabel>Paid Amount</RowLabel>
             <Controller
                name="pay"
                control={control}
@@ -167,8 +182,11 @@ const SummarySection = ({
                      size="small"
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.pay}
-                     helperText={errors?.pay?.message}
-                     sx={[{ width: 150 }, roomyMoneyInputSx]}
+                     helperText={
+                        errors?.pay?.message ||
+                        "Amount paid to the supplier."
+                     }
+                     sx={{ width: 150 }}
                   />
                )}
             />
