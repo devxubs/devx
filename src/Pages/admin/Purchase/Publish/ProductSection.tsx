@@ -14,8 +14,11 @@
 // selection exactly as before.
 
 import {
+   Avatar,
+   Box,
    FormControl,
    IconButton,
+   InputAdornment,
    MenuItem,
    Paper,
    Select,
@@ -27,6 +30,7 @@ import {
    TableHead,
    TableRow as TableRowMUI,
    TextField,
+   Tooltip,
    Typography,
    alpha,
    useTheme,
@@ -47,6 +51,38 @@ interface ProductSectionProps {
    productOptions: ProductOption[];
 }
 
+/** Compact in-table field styling — the Order Create product
+ * table's pattern (30px fields, 13px text, number spinners
+ * removed), copied page-scoped; the Order page is not modified. */
+const compactFieldSx = {
+   "& .MuiInputBase-root": {
+      minHeight: 30,
+      height: 30,
+   },
+   "& .MuiInputBase-input": {
+      py: "3px",
+      px: "6px",
+      fontSize: 13,
+      lineHeight: 1.2,
+   },
+   "& .MuiInputAdornment-root": {
+      ml: 0,
+      mr: 0,
+      maxHeight: "100%",
+   },
+   "& input[type=number]": {
+      MozAppearance: "textfield",
+   },
+   "& input[type=number]::-webkit-inner-spin-button": {
+      WebkitAppearance: "none",
+      margin: 0,
+   },
+   "& input[type=number]::-webkit-outer-spin-button": {
+      WebkitAppearance: "none",
+      margin: 0,
+   },
+} as const;
+
 const productStock = (option?: ProductOption | null): number | null => {
    if (!option) return null;
    if (option.variants && option.variants.length > 0) {
@@ -64,7 +100,8 @@ const ProductSection = ({
    productOptions,
 }: ProductSectionProps) => {
    const theme = useTheme();
-   const { formatCurrency } = useSettings();
+   const { formatCurrency, settings } = useSettings();
+   const currencySymbol = settings?.currencySymbol || "৳";
 
    return (
       <Controller
@@ -116,10 +153,7 @@ const ProductSection = ({
                         )
                      }
                      error={!!errors.product?.message}
-                     helperText={
-                        errors.product?.message ||
-                        "Search by product name, SKU, or barcode."
-                     }
+                     helperText={errors.product?.message}
                      arrow
                      option={productOptions}
                      placeholder="Search product..."
@@ -210,63 +244,78 @@ const ProductSection = ({
                   />
 
                   {!lines.length ? (
+                     // Empty state — the Order Create product table's
+                     // dashed-box pattern.
                      <Stack
                         alignItems="center"
                         justifyContent="center"
-                        px={3}
-                        py={5}
+                        spacing={1}
                         sx={{
-                           color: theme.palette.text.secondary,
-                           border: `1px dashed ${theme.palette.divider}`,
+                           py: 4,
+                           border: `1px dashed ${alpha(theme.palette.text.primary, 0.25)}`,
                            borderRadius: 1.5,
+                           color: "text.secondary",
                         }}
                      >
+                        <Icon icon="solar:cart-large-linear" size="26px" />
                         <Typography variant="body2">
                            No products added yet — search above to add items.
                         </Typography>
                      </Stack>
                   ) : (
+                     // Container, header and cell rhythm follow the
+                     // Order Create product table exactly; the
+                     // columns and cell contents stay Purchase's.
                      <TableContainer
                         component={Paper}
-                        variant="outlined"
+                        elevation={0}
                         sx={{
-                           maxHeight: 380,
-                           overflowY: "auto",
-                           scrollbarWidth: "none!important",
+                           maxHeight: 460,
+                           overflow: "auto",
                            backgroundColor: alpha(
                               theme.palette.grey[400],
-                              0.06,
+                              0.08,
                            ),
-                           "&::-webkit-scrollbar": { display: "none" },
+                           border: `1px solid ${theme.palette.divider}`,
+                           borderRadius: 1.5,
                         }}
                      >
                         <Table
                            stickyHeader
+                           size="small"
                            sx={{
+                              // Order's table uses 720, but it has a
+                              // seventh (discount) column and a wider
+                              // card; at 720 this six-column table
+                              // overflowed its card at desktop width
+                              // and pushed Line Total and the remove
+                              // button off-screen (live-check finding).
                               minWidth: 640,
-                              "& .MuiTableCell-root": { py: 1.75 },
+                              "& .MuiTableCell-root": {
+                                 verticalAlign: "middle",
+                                 px: 1,
+                                 py: 0.875,
+                              },
+                              "& .MuiTableCell-head": {
+                                 backgroundColor: alpha(
+                                    theme.palette.grey[400],
+                                    0.12,
+                                 ),
+                                 fontWeight: 700,
+                                 whiteSpace: "nowrap",
+                              },
                            }}
                         >
-                           <TableHead
-                              sx={{
-                                 "& th": {
-                                    backgroundColor: theme.palette.grey[200],
-                                    fontWeight: 600,
-                                    ...theme.applyStyles("dark", {
-                                       backgroundColor: theme.palette.grey[800],
-                                    }),
-                                 },
-                              }}
-                           >
+                           <TableHead>
                               <TableRowMUI>
                                  <TableCell>Product</TableCell>
-                                 <TableCell align="left">Stock</TableCell>
-                                 <TableCell align="left">Qty</TableCell>
-                                 <TableCell align="left">
+                                 <TableCell align="center">Stock</TableCell>
+                                 <TableCell align="center">Qty</TableCell>
+                                 <TableCell align="right">
                                     Purchase Price
                                  </TableCell>
                                  <TableCell align="right">Line Total</TableCell>
-                                 <TableCell align="left"></TableCell>
+                                 <TableCell align="center"></TableCell>
                               </TableRowMUI>
                            </TableHead>
                            <TableBody>
@@ -292,22 +341,55 @@ const ProductSection = ({
                                  return (
                                     <TableRowMUI key={row.productId || row.id || idx}>
                                        <TableCell>
-                                          <Stack spacing={0.5}>
-                                             <Typography variant="body2" fontWeight={500}>
-                                                {row.name}
-                                             </Typography>
-                                             {row.code && (
-                                                <Typography
-                                                   variant="caption"
-                                                   color="text.secondary"
+                                          <Stack
+                                             direction="row"
+                                             spacing={1}
+                                             alignItems="flex-start"
+                                          >
+                                             <Avatar
+                                                variant="rounded"
+                                                sx={{
+                                                   width: 30,
+                                                   height: 30,
+                                                   flexShrink: 0,
+                                                }}
+                                             >
+                                                <Icon
+                                                   icon="solar:box-linear"
+                                                   size="15px"
+                                                />
+                                             </Avatar>
+                                             <Box sx={{ minWidth: 0 }}>
+                                                <Tooltip
+                                                   title={row.name}
+                                                   disableInteractive
                                                 >
-                                                   SKU: {row.code}
-                                                </Typography>
-                                             )}
-                                             {lineVariants.length > 0 ? (
+                                                   <Typography
+                                                      variant="body2"
+                                                      fontWeight={600}
+                                                      noWrap
+                                                      sx={{ maxWidth: 138 }}
+                                                   >
+                                                      {row.name}
+                                                   </Typography>
+                                                </Tooltip>
+                                                {row.code && (
+                                                   <Typography
+                                                      variant="caption"
+                                                      color="textSecondary"
+                                                      component="div"
+                                                   >
+                                                      SKU: {row.code}
+                                                   </Typography>
+                                                )}
+                                                {lineVariants.length > 0 ? (
                                                 <FormControl
                                                    size="small"
-                                                   sx={{ minWidth: 170, maxWidth: 230 }}
+                                                   sx={{
+                                                      mt: 0.5,
+                                                      minWidth: 180,
+                                                      maxWidth: 220,
+                                                   }}
                                                 >
                                                    <Select
                                                       value={row.variantId || ""}
@@ -335,10 +417,10 @@ const ProductSection = ({
                                                          });
                                                       }}
                                                       sx={{
-                                                         height: 28,
-                                                         fontSize: "0.78rem",
+                                                         height: 30,
+                                                         fontSize: 13,
                                                          "& .MuiSelect-select": {
-                                                            py: "3px",
+                                                            py: "4px",
                                                          },
                                                       }}
                                                       renderValue={(selected) => {
@@ -347,7 +429,7 @@ const ProductSection = ({
                                                                <Typography
                                                                   variant="body2"
                                                                   color="warning.main"
-                                                                  fontSize="0.78rem"
+                                                                  fontSize={13}
                                                                >
                                                                   Select variant
                                                                </Typography>
@@ -396,31 +478,32 @@ const ProductSection = ({
                                                    Variant: {row.variantName}
                                                 </Typography>
                                              ) : null}
-                                             {row.barcode && (
-                                                <Stack spacing={0.25} sx={{ pt: 0.5 }}>
-                                                   <Barcode
-                                                      value={row.barcode}
-                                                      height={18}
-                                                      moduleWidth={0.7}
-                                                      showText={false}
-                                                   />
-                                                   <Typography
-                                                      variant="caption"
-                                                      color="text.secondary"
-                                                      sx={{ fontFamily: "monospace" }}
-                                                   >
-                                                      {row.barcode}
-                                                   </Typography>
-                                                </Stack>
-                                             )}
+                                                {row.barcode && (
+                                                   <Stack spacing={0.25} sx={{ pt: 0.5 }}>
+                                                      <Barcode
+                                                         value={row.barcode}
+                                                         height={18}
+                                                         moduleWidth={0.7}
+                                                         showText={false}
+                                                      />
+                                                      <Typography
+                                                         variant="caption"
+                                                         color="text.secondary"
+                                                         sx={{ fontFamily: "monospace" }}
+                                                      >
+                                                         {row.barcode}
+                                                      </Typography>
+                                                   </Stack>
+                                                )}
+                                             </Box>
                                           </Stack>
                                        </TableCell>
-                                       <TableCell align="left">
+                                       <TableCell align="center">
                                           <Typography variant="body2">
                                              {stock ?? "—"}
                                           </Typography>
                                        </TableCell>
-                                       <TableCell align="left">
+                                       <TableCell align="center">
                                           <TextField
                                              type="number"
                                              size="small"
@@ -436,11 +519,14 @@ const ProductSection = ({
                                                          : parseInt(raw, 10) || 0,
                                                 });
                                              }}
-                                             sx={{ width: 84 }}
-                                             inputProps={{ min: 1 }}
+                                             sx={{ width: 64, ...compactFieldSx }}
+                                             inputProps={{
+                                                min: 1,
+                                                style: { textAlign: "center" },
+                                             }}
                                           />
                                        </TableCell>
-                                       <TableCell align="left">
+                                       <TableCell align="right">
                                           <TextField
                                              type="number"
                                              size="small"
@@ -456,8 +542,27 @@ const ProductSection = ({
                                                          : parseFloat(raw) || 0,
                                                 });
                                              }}
-                                             sx={{ width: 104 }}
-                                             inputProps={{ min: 0, step: "0.01" }}
+                                             InputProps={{
+                                                startAdornment: (
+                                                   <InputAdornment
+                                                      position="start"
+                                                      sx={{ mr: 0 }}
+                                                   >
+                                                      <Typography
+                                                         variant="caption"
+                                                         color="textSecondary"
+                                                      >
+                                                         {currencySymbol}
+                                                      </Typography>
+                                                   </InputAdornment>
+                                                ),
+                                             }}
+                                             sx={{ width: 92, ...compactFieldSx }}
+                                             inputProps={{
+                                                min: 0,
+                                                step: "0.01",
+                                                style: { textAlign: "right" },
+                                             }}
                                           />
                                        </TableCell>
                                        <TableCell align="right">
@@ -470,20 +575,30 @@ const ProductSection = ({
                                              )}
                                           </Typography>
                                        </TableCell>
-                                       <TableCell align="left">
-                                          <IconButton
-                                             aria-label={`Remove ${row.name}`}
-                                             onClick={() =>
-                                                field.onChange(
-                                                   lines.filter(
-                                                      (_: any, i: number) =>
-                                                         i !== idx,
-                                                   ),
-                                                )
-                                             }
+                                       <TableCell align="center">
+                                          <Tooltip
+                                             title="Remove product"
+                                             disableInteractive
                                           >
-                                             <Icon icon="carbon:close" />
-                                          </IconButton>
+                                             <IconButton
+                                                size="small"
+                                                color="error"
+                                                aria-label={`Remove ${row.name}`}
+                                                onClick={() =>
+                                                   field.onChange(
+                                                      lines.filter(
+                                                         (_: any, i: number) =>
+                                                            i !== idx,
+                                                      ),
+                                                   )
+                                                }
+                                             >
+                                                <Icon
+                                                   icon="solar:trash-bin-trash-bold"
+                                                   size="17px"
+                                                />
+                                             </IconButton>
+                                          </Tooltip>
                                        </TableCell>
                                     </TableRowMUI>
                                  );

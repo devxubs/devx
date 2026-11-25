@@ -17,6 +17,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import {
    Alert,
    Button,
+   CircularProgress,
    Grid,
    Paper,
    Stack,
@@ -27,6 +28,7 @@ import { SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { PurchaseTypes } from "..";
 import { useRouter } from "next/navigation";
+import Breadcrumbs from "@src/components/Breadcrumbs";
 import SectionCard from "./SectionCard";
 import PurchaseInfoSection from "./PurchaseInfoSection";
 import ProductSection from "./ProductSection";
@@ -660,6 +662,21 @@ const Publish = () => {
 
    return (
       <Stack width="100%" maxWidth={1180} mx="auto" component="form" spacing={4}>
+         {/* Breadcrumbs — the shared component, used exactly as on
+             the Order Create page (back-link + current-page label). */}
+         <Stack direction="row" alignItems="center" spacing={1}>
+            <Breadcrumbs
+               href="/admin/purchase"
+               label={
+                  editId
+                     ? `Edit Purchase ${(data as any)?.customId || ""}`
+                     : "Create Purchase"
+               }
+               parentLabel="Back to Purchases"
+               parentHref="/admin/purchase"
+            />
+         </Stack>
+
          <Stack spacing={1}>
             <Typography variant="h5" fontWeight={700}>
                {editId
@@ -706,12 +723,6 @@ const Publish = () => {
                               ? (data as any)?.customId || editId
                               : idPreview || "—"
                         }
-                        purchaseIdHelper={
-                           editId
-                              ? "Internal Purchase ID"
-                              : "Preview — assigned by the server on save"
-                        }
-                        paymentStatus={totals.paymentStatus}
                      />
                   </SectionCard>
 
@@ -752,40 +763,58 @@ const Publish = () => {
                         hasSupplier={Boolean(supplierId)}
                      />
                   </SectionCard>
-
-                  <Paper variant="outlined" sx={{ borderRadius: 1.5, p: 3 }}>
-                     <Stack spacing={2}>
-                        <Button
-                           variant="contained"
-                           color="primary"
-                           size="large"
-                           fullWidth
-                           type="submit"
-                           sx={{ py: 1.5 }}
-                           disabled={submitting || loadingPurchase}
-                           onClick={handleSubmit(onSubmit)}
-                        >
-                           {submitting
-                              ? "Saving..."
-                              : editId
-                                ? "Update Purchase"
-                                : "Create Purchase"}
-                        </Button>
-                        <Button
-                           variant="text"
-                           color="inherit"
-                           fullWidth
-                           sx={{ py: 1 }}
-                           disabled={submitting}
-                           onClick={() => router.push("/admin/purchase")}
-                        >
-                           Cancel
-                        </Button>
-                     </Stack>
-                  </Paper>
                </Stack>
             </Grid>
          </Grid>
+
+         {/* Bottom actions — the Order Create / Product Create
+             pattern: a right-aligned row under the form, Cancel as
+             the quiet secondary first, the primary action last.
+             (Purchase has no draft support, so the references'
+             middle Save-as-Draft button does not appear.) */}
+         <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            justifyContent="flex-end"
+            alignItems={{ xs: "stretch", sm: "center" }}
+         >
+            <Button
+               variant="text"
+               color="inherit"
+               onClick={() => router.push("/admin/purchase")}
+               disabled={submitting}
+               sx={{ whiteSpace: "nowrap", flexShrink: 0, height: 42, px: 2 }}
+            >
+               Cancel
+            </Button>
+            <Button
+               variant="contained"
+               color="primary"
+               type="submit"
+               onClick={handleSubmit(onSubmit)}
+               disabled={submitting || loadingPurchase}
+               startIcon={
+                  submitting ? (
+                     <CircularProgress size={16} color="inherit" />
+                  ) : undefined
+               }
+               sx={{
+                  textTransform: "none",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  height: 42,
+                  minWidth: 160,
+                  px: 2.5,
+                  fontWeight: 700,
+               }}
+            >
+               {submitting
+                  ? "Saving…"
+                  : editId
+                    ? "Update Purchase"
+                    : "Create Purchase"}
+            </Button>
+         </Stack>
       </Stack>
    );
 };

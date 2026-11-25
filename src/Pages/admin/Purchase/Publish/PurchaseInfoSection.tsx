@@ -2,32 +2,26 @@
 
 // Purchase Create (redesign) — Purchase Information section:
 // internal Purchase ID (server-assigned preview / the record's own
-// ID in edit mode), supplier picker with the selected supplier's
-// contact details, the SUPPLIER's invoice number (kept clearly
-// separate from the internal Purchase ID), purchase date, and the
-// derived payment status. The Purchase model has no status column
-// and no payment-method column, so neither is invented here — the
-// only status the system knows is the payment status, derived from
-// paid vs total by the page's calculation engine.
+// ID in edit mode), purchase date, supplier picker with the
+// selected supplier's contact details, and the SUPPLIER's invoice
+// number (kept clearly separate from the internal Purchase ID).
 //
+// The payment status is NOT shown here — it lives only in the
+// Payment & Summary section, as on the reference create pages.
 // Field presentation follows the Order Create / Product Create
-// form system: a 13px semi-bold secondary label above each field
-// (FieldLabel), size="small" fields, and helper text under the
-// field — guidance by default, replaced by the validation message
-// when the field is in error.
+// form system: FieldLabel above each size="small" field, no
+// standing instructional helper text (helpers appear only as
+// validation messages, the reference pages' pattern).
 
-import { Chip, Grid, Stack, TextField, Typography } from "@mui/material";
+import { Grid, Stack, TextField, Typography } from "@mui/material";
 import React from "react";
 import { Controller } from "react-hook-form";
 import { format } from "date-fns";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import DatePicker from "@src/components/DateRange";
+import Icon from "@src/components/Icon";
 import type { SupplierOption } from "./index";
 import FieldLabel from "./FieldLabel";
-import {
-   paymentStatusLabel,
-   type PurchasePaymentStatus,
-} from "./calculations";
 
 interface PurchaseInfoSectionProps {
    control: any;
@@ -36,14 +30,25 @@ interface PurchaseInfoSectionProps {
    selectedSupplier: SupplierOption | null;
    onSupplierSelect: (supplier: SupplierOption | null) => void;
    purchaseIdText: string;
-   purchaseIdHelper: string;
-   paymentStatus: PurchasePaymentStatus;
 }
 
-const statusColor = (
-   status: PurchasePaymentStatus,
-): "success" | "warning" | "default" =>
-   status === "PAID" ? "success" : status === "PARTIAL" ? "warning" : "default";
+// One compact contact row in the selected-supplier box: a small
+// solar icon (the icon family the reference pages use) + the value.
+const ContactRow = ({
+   icon,
+   value,
+}: {
+   icon: string;
+   value: string;
+}) => (
+   <Stack direction="row" spacing={1} alignItems="flex-start">
+      {/* The shared Icon renders in text.secondary by default. */}
+      <Icon icon={icon} size="15px" style={{ marginTop: 2, flexShrink: 0 }} />
+      <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+         {value}
+      </Typography>
+   </Stack>
+);
 
 const PurchaseInfoSection = ({
    control,
@@ -52,8 +57,6 @@ const PurchaseInfoSection = ({
    selectedSupplier,
    onSupplierSelect,
    purchaseIdText,
-   purchaseIdHelper,
-   paymentStatus,
 }: PurchaseInfoSectionProps) => {
    return (
       <Stack spacing={2}>
@@ -67,32 +70,56 @@ const PurchaseInfoSection = ({
                      fullWidth
                      size="small"
                      disabled
-                     helperText={purchaseIdHelper}
                   />
                </Stack>
             </Grid>
 
-            {/* Payment status — derived, shown here and in the summary. */}
+            {/* Purchase date */}
             <Grid size={{ xs: 12, md: 6 }}>
                <Stack spacing={0.75}>
-                  <FieldLabel>Payment Status</FieldLabel>
-                  <Stack direction="row" alignItems="center" sx={{ minHeight: 40 }}>
-                     <Chip
-                        label={paymentStatusLabel(paymentStatus)}
-                        color={statusColor(paymentStatus)}
-                        sx={{ fontWeight: 600 }}
-                     />
-                  </Stack>
-                  {/* Invisible spacer mirroring the Purchase ID
-                      field's helper-text line, so the chip row aligns
-                      with the field row beside it. */}
-                  <Typography
-                     variant="caption"
-                     sx={{ visibility: "hidden" }}
-                     aria-hidden
-                  >
-                     .
-                  </Typography>
+                  <FieldLabel>Purchase Date</FieldLabel>
+                  <Controller
+                     name="date"
+                     control={control}
+                     render={({ field }) => {
+                        // BUG-E1: the shared DateRange picker speaks in
+                        // [Date, Date] tuples; the schema stores a
+                        // "yyyy-MM-dd" string. Adapt at this boundary
+                        // (moved unchanged from the old Information
+                        // section).
+                        const parsed = field.value
+                           ? new Date(field.value as any)
+                           : null;
+                        const pickerValue: [Date | null, Date | null] =
+                           parsed && !Number.isNaN(parsed.getTime())
+                              ? [parsed, parsed]
+                              : [null, null];
+                        return (
+                           <Stack spacing={0.5}>
+                              <DatePicker
+                                 type="single"
+                                 size="small"
+                                 value={pickerValue}
+                                 onChange={(val) => {
+                                    const d = val?.[0];
+                                    field.onChange(
+                                       d ? format(d, "yyyy-MM-dd") : "",
+                                    );
+                                 }}
+                              />
+                              {errors.date && (
+                                 <Typography
+                                    variant="caption"
+                                    color="error"
+                                    sx={{ ml: 1.75 }}
+                                 >
+                                    {errors.date.message}
+                                 </Typography>
+                              )}
+                           </Stack>
+                        );
+                     }}
+                  />
                </Stack>
             </Grid>
 
@@ -119,10 +146,7 @@ const PurchaseInfoSection = ({
                               onSupplierSelect(option);
                            }}
                            error={!!errors.supplier}
-                           helperText={
-                              errors.supplier?.message ||
-                              "Select the supplier for this purchase."
-                           }
+                           helperText={errors.supplier?.message}
                            getOptionLabel={(option: any) =>
                               typeof option === "string"
                                  ? option
@@ -165,13 +189,16 @@ const PurchaseInfoSection = ({
                      )}
                   />
                   {selectedSupplier && (
+                     // Compact contact box: a hairline border instead
+                     // of the old filled grey panel, one icon row per
+                     // saved detail, missing details hidden.
                      <Stack
-                        spacing={0.25}
+                        spacing={0.75}
                         sx={{
                            px: 1.5,
-                           py: 1,
-                           borderRadius: 1,
-                           bgcolor: "action.hover",
+                           py: 1.25,
+                           borderRadius: 1.5,
+                           border: (t) => `1px solid ${t.palette.divider}`,
                         }}
                      >
                         {selectedSupplier.phone ||
@@ -179,19 +206,22 @@ const PurchaseInfoSection = ({
                         selectedSupplier.address ? (
                            <>
                               {selectedSupplier.phone && (
-                                 <Typography variant="body2">
-                                    Phone: {selectedSupplier.phone}
-                                 </Typography>
+                                 <ContactRow
+                                    icon="solar:phone-linear"
+                                    value={selectedSupplier.phone}
+                                 />
                               )}
                               {selectedSupplier.email && (
-                                 <Typography variant="body2">
-                                    Email: {selectedSupplier.email}
-                                 </Typography>
+                                 <ContactRow
+                                    icon="solar:letter-linear"
+                                    value={selectedSupplier.email}
+                                 />
                               )}
                               {selectedSupplier.address && (
-                                 <Typography variant="body2">
-                                    Address: {selectedSupplier.address}
-                                 </Typography>
+                                 <ContactRow
+                                    icon="solar:map-point-linear"
+                                    value={selectedSupplier.address}
+                                 />
                               )}
                            </>
                         ) : (
@@ -218,64 +248,9 @@ const PurchaseInfoSection = ({
                            size="small"
                            placeholder="Supplier's own invoice number"
                            error={!!errors.invoice}
-                           helperText={
-                              errors.invoice?.message ||
-                              "Enter the invoice number provided by the supplier."
-                           }
+                           helperText={errors.invoice?.message}
                         />
                      )}
-                  />
-               </Stack>
-            </Grid>
-
-            {/* Purchase date */}
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={0.75}>
-                  <FieldLabel>Purchase Date</FieldLabel>
-                  <Controller
-                     name="date"
-                     control={control}
-                     render={({ field }) => {
-                        // BUG-E1: the shared DateRange picker speaks in
-                        // [Date, Date] tuples; the schema stores a
-                        // "yyyy-MM-dd" string. Adapt at this boundary
-                        // (moved unchanged from the old Information
-                        // section).
-                        const parsed = field.value
-                           ? new Date(field.value as any)
-                           : null;
-                        const pickerValue: [Date | null, Date | null] =
-                           parsed && !Number.isNaN(parsed.getTime())
-                              ? [parsed, parsed]
-                              : [null, null];
-                        return (
-                           <Stack spacing={0.5}>
-                              <DatePicker
-                                 type="single"
-                                 size="small"
-                                 value={pickerValue}
-                                 onChange={(val) => {
-                                    const d = val?.[0];
-                                    field.onChange(
-                                       d ? format(d, "yyyy-MM-dd") : "",
-                                    );
-                                 }}
-                              />
-                              {/* Helper line in the same style as the
-                                  MUI helper text under the other
-                                  fields: guidance, or the validation
-                                  message in error colour. */}
-                              <Typography
-                                 variant="caption"
-                                 color={errors.date ? "error" : "textSecondary"}
-                                 sx={{ ml: 1.75 }}
-                              >
-                                 {errors.date?.message ||
-                                    "Select the date of this purchase."}
-                              </Typography>
-                           </Stack>
-                        );
-                     }}
                   />
                </Stack>
             </Grid>

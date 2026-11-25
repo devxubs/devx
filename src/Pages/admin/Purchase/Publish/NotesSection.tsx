@@ -39,7 +39,6 @@ const NotesSection = ({ control, data }: NotesSectionProps) => {
                      rows={3}
                      size="small"
                      placeholder="Note for this purchase…"
-                     helperText="Add any additional information about this purchase."
                   />
                )}
             />

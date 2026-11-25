@@ -116,10 +116,7 @@ const SummarySection = ({
                      size="small"
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.others_cost}
-                     helperText={
-                        errors?.others_cost?.message ||
-                        "Additional costs for this purchase."
-                     }
+                     helperText={errors?.others_cost?.message}
                      sx={{ width: 150 }}
                   />
                )}
@@ -145,10 +142,7 @@ const SummarySection = ({
                      size="small"
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.discount}
-                     helperText={
-                        errors?.discount?.message ||
-                        "Discount applied to this purchase."
-                     }
+                     helperText={errors?.discount?.message}
                      sx={{ width: 150 }}
                   />
                )}
@@ -182,10 +176,7 @@ const SummarySection = ({
                      size="small"
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.pay}
-                     helperText={
-                        errors?.pay?.message ||
-                        "Amount paid to the supplier."
-                     }
+                     helperText={errors?.pay?.message}
                      sx={{ width: 150 }}
                   />
                )}
