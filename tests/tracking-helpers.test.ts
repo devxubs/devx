@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { deriveEmployeeActivities } from "@src/Pages/admin/Order/Details/helpers/trackingHelpers";
+import {
+   deriveEmployeeActivities,
+   deriveTrackingSteps,
+} from "@src/Pages/admin/Order/Details/helpers/trackingHelpers";
 
 // QA fix A2: the Staff Activity timeline's synthesized note fallback
 // is per note type. Orders whose notes were saved without audit
@@ -145,5 +148,135 @@ describe("deriveEmployeeActivities note fallbacks", () => {
 
       expect(notes).toHaveLength(1);
       expect(notes[0].details).toBe('"from-tags"');
+   });
+});
+
+// Final Pre-Production Verification (2026-11-25): the section-6
+// delivery/cancellation fallback fired even when the real terminal
+// transition was already in the persistent audit history — a
+// cancelled order showed TWO "Order Cancelled" entries, the
+// synthesized one claiming "Previous: Active" for an order that was
+// PENDING. The fallback is now suppressed by terminal coverage, and
+// its fabricated previous is gone (the OBS-C3 rule).
+const persistedCancelEvent = {
+   id: "act-audit-1795584950083-u9i76",
+   action: "Order Cancelled",
+   category: "order",
+   actor: { name: "jubayer", role: "System Admin", employeeCode: "EP_1" },
+   details: "Order cancelled. Reason: Cancelled by user or staff",
+   diff: { field: "status", previous: "PENDING", new: "CANCELLED" },
+   timestamp: "2026-11-20T11:00:00.000Z",
+   icon: "solar:close-circle-bold",
+   badgeLabel: "Cancelled",
+   isImportant: true,
+};
+
+describe("deriveEmployeeActivities terminal fallback", () => {
+   it("shows only the persisted cancellation when one is logged", () => {
+      const activities = deriveEmployeeActivities({
+         ...baseOrder,
+         status: "CANCELLED",
+         orderTags: { auditHistory: [persistedCancelEvent] },
+      });
+      const cancels = activities.filter((a) => a.action === "Order Cancelled");
+      expect(cancels).toHaveLength(1);
+      expect(cancels[0].details).toContain("Reason: Cancelled by user or staff");
+      expect(cancels[0].diff).toEqual({
+         field: "status",
+         previous: "PENDING",
+         new: "CANCELLED",
+      });
+      expect(
+         activities.some((a) => a.actor.role === "Order Exception"),
+      ).toBe(false);
+   });
+
+   it("still synthesizes one fallback for a history-less cancelled order, with no fabricated previous", () => {
+      const activities = deriveEmployeeActivities({
+         ...baseOrder,
+         status: "CANCELLED",
+         orderTags: {},
+      });
+      const cancels = activities.filter((a) => a.action === "Order Cancelled");
+      expect(cancels).toHaveLength(1);
+      expect(cancels[0].diff).toEqual({
+         field: "status",
+         previous: null,
+         new: "CANCELLED",
+      });
+   });
+
+   it("does not duplicate a persisted completion with a synthesized delivery entry", () => {
+      const activities = deriveEmployeeActivities({
+         ...baseOrder,
+         status: "COMPLETED",
+         orderTags: {
+            auditHistory: [
+               {
+                  ...persistedCancelEvent,
+                  id: "act-audit-2",
+                  action: "Order Completed",
+                  details: "Order completed",
+                  diff: { field: "status", previous: "OUT_FOR_DELIVERY", new: "COMPLETED" },
+               },
+            ],
+         },
+      });
+      expect(
+         activities.filter((a) => a.action === "Delivered to Customer"),
+      ).toHaveLength(0);
+   });
+
+   it("still synthesizes the delivery entry for a history-less completed order", () => {
+      const activities = deriveEmployeeActivities({
+         ...baseOrder,
+         status: "COMPLETED",
+         orderTags: {},
+      });
+      expect(
+         activities.filter((a) => a.action === "Delivered to Customer"),
+      ).toHaveLength(1);
+   });
+});
+
+// Final Pre-Production Verification (2026-11-25): a PENDING courier
+// (or in-house) order had NO step in state "current" — stage 2 only
+// became current at CONFIRMED — so the tracking header fell back to
+// the last step and announced "Current: Delivered to Customer". The
+// store-pickup workflow already marked its stage 2 current for a
+// pending order; the other two workflows now do the same.
+describe("deriveTrackingSteps current step", () => {
+   it("marks Confirmed & Processing current for a PENDING courier order", () => {
+      const steps = deriveTrackingSteps({
+         status: "PENDING",
+         createdAt: "2026-11-20T10:00:00.000Z",
+         updatedAt: "2026-11-20T10:00:00.000Z",
+      });
+      const currents = steps.filter((s) => s.state === "current");
+      expect(currents).toHaveLength(1);
+      expect(currents[0].title).toBe("Confirmed & Processing");
+   });
+
+   it("marks Confirmed & Assembling current for a PENDING in-house order", () => {
+      const steps = deriveTrackingSteps({
+         status: "PENDING",
+         orderType: "POS",
+         createdAt: "2026-11-20T10:00:00.000Z",
+         updatedAt: "2026-11-20T10:00:00.000Z",
+      });
+      const currents = steps.filter((s) => s.state === "current");
+      expect(currents).toHaveLength(1);
+      expect(currents[0].title).toBe("Confirmed & Assembling");
+   });
+
+   it("keeps a DELIVERED courier order fully completed with no current step", () => {
+      const steps = deriveTrackingSteps({
+         status: "DELIVERED",
+         createdAt: "2026-11-20T10:00:00.000Z",
+         updatedAt: "2026-11-20T11:00:00.000Z",
+         deliveredAt: "2026-11-20T11:00:00.000Z",
+      });
+      expect(steps[steps.length - 1].state).toBe("completed");
+      expect(steps.some((s) => s.state === "current")).toBe(false);
    });
 });

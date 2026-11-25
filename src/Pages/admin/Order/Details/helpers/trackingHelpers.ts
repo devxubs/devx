@@ -369,6 +369,14 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
          procState = "completed";
       } else if (isConfirmedOrAbove) {
          procState = "current";
+      } else {
+         // A live order that has not reached confirmation yet is
+         // CURRENTLY at this stage — the store-pickup workflow above
+         // already treats its assembly stage this way. Without this,
+         // a PENDING order has no current step at all and the
+         // tracking header falls back to the final step, announcing
+         // "Current: Delivered to Customer" for an unshipped order.
+         procState = "current";
       }
 
       steps.push({
@@ -377,8 +385,11 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
          totalStages,
          title: "Confirmed & Processing",
          description: `Payment: ${order.paymentMethod || "Cash on Delivery"} • Order verified and packaged`,
-         date: procState !== "pending" && procState !== "skipped" ? processingTimes.date : undefined,
-         time: procState !== "pending" && procState !== "skipped" ? processingTimes.time : undefined,
+         // procState cannot be "pending" here anymore (every branch
+         // above assigns completed/current/skipped), so only the
+         // skipped case suppresses the stage time.
+         date: procState !== "skipped" ? processingTimes.date : undefined,
+         time: procState !== "skipped" ? processingTimes.time : undefined,
          timestamp:
             procState === "completed"
                ? processingTimes.full
@@ -571,6 +582,12 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
       procState = "completed";
    } else if (isConfirmedOrAbove) {
       procState = "current";
+   } else {
+      // Same fall-through as the courier workflow: a PENDING order
+      // is currently at this stage; leaving it "pending" leaves the
+      // order with no current step and the header falls back to the
+      // final step.
+      procState = "current";
    }
 
    steps.push({
@@ -579,8 +596,11 @@ export function deriveTrackingSteps(order: any): TrackingStep[] {
       totalStages,
       title: "Confirmed & Assembling",
       description: `Payment: ${order.paymentMethod || "Cash"} • Packaging order for in-house rider`,
-      date: procState !== "pending" && procState !== "skipped" ? processingTimes.date : undefined,
-      time: procState !== "pending" && procState !== "skipped" ? processingTimes.time : undefined,
+      // procState cannot be "pending" here anymore (every branch
+      // above assigns completed/current/skipped), so only the
+      // skipped case suppresses the stage time.
+      date: procState !== "skipped" ? processingTimes.date : undefined,
+      time: procState !== "skipped" ? processingTimes.time : undefined,
       timestamp:
          procState === "completed"
             ? processingTimes.full
@@ -746,6 +766,7 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
    let hasPersistentStatusAudit = false;
    let hasPersistentPaymentAudit = false;
    let hasPersistentCourierAudit = false;
+   let hasPersistentTerminalAudit = false;
 
    if (Array.isArray(tagsObj.auditHistory)) {
       for (const item of tagsObj.auditHistory) {
@@ -766,6 +787,19 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
             hasPersistentStatusAudit = true;
          if (item.category === "payment") hasPersistentPaymentAudit = true;
          if (item.category === "courier") hasPersistentCourierAudit = true;
+         // Terminal coverage: a persistent status event whose new
+         // value IS the order's current status. Section 6 below is a
+         // fallback for orders WITHOUT such an event — when the real
+         // terminal transition is already logged, synthesizing
+         // another delivery/cancellation entry duplicates it (and
+         // the synthesized cancellation carried a fabricated
+         // "Previous: Active").
+         if (
+            item.diff?.field === "status" &&
+            String(item.diff?.new || "").toUpperCase() ===
+               String(order.status || "").toUpperCase()
+         )
+            hasPersistentTerminalAudit = true;
 
          const timeParts = formatDateTimeParts(item.timestamp || item.createdAt);
          const itemActorCode =
@@ -943,7 +977,10 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
 
    // 6. Delivery or Cancellation (Fallback if not already logged)
    const rawStatus = String(order.status || "").toUpperCase();
-   if (rawStatus === "DELIVERED" || rawStatus === "COMPLETED") {
+   if (
+      !hasPersistentTerminalAudit &&
+      (rawStatus === "DELIVERED" || rawStatus === "COMPLETED")
+   ) {
       const delTimes = formatDateTimeParts(
          order.deliveredAt || order.updatedAt || order.createdAt,
       );
@@ -964,7 +1001,10 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
          isImportant: true,
          badgeLabel: "Delivered",
       });
-   } else if (rawStatus === "CANCELLED" || rawStatus === "FAILED") {
+   } else if (
+      !hasPersistentTerminalAudit &&
+      (rawStatus === "CANCELLED" || rawStatus === "FAILED")
+   ) {
       const cancelTimes = formatDateTimeParts(order.updatedAt || order.createdAt);
       activities.push({
          id: "act-cancelled",
@@ -979,7 +1019,10 @@ export function deriveEmployeeActivities(order: any): EmployeeActivity[] {
          })`,
          diff: {
             field: "status",
-            previous: "Active",
+            // OBS-C3 rule: no fabricated "previous" — a legacy order
+            // without persistent history has an unknown prior status,
+            // not necessarily "Active".
+            previous: null,
             new: "CANCELLED",
          },
          date: cancelTimes.date,
