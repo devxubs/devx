@@ -144,7 +144,7 @@ const LowStockTab = ({
             params.row.quantity <= 0 ? "error" : "warning",
       },
       { field: "threshold", headerName: "Alert Threshold", width: 140 },
-      { field: "suggestedQty", headerName: "Suggested Order Qty", width: 160 },
+      { field: "suggestedQty", headerName: "Suggested Order Qty", width: 175 },
       {
          field: "supplierName",
          headerName: "Primary Supplier",
@@ -177,12 +177,11 @@ const LowStockTab = ({
    return (
       <Stack spacing={2}>
          <Typography variant="body2" color="text.secondary">
-            Products at or below their alert threshold, plus individual
-            variants at or below their own variant threshold. Suggested
-            qty = threshold − current stock + 1 (restock to just above
-            the alert level). Draft purchases open prefilled for your
-            review — they are never created automatically. Variable
-            products need their variant picked in the purchase form.
+            Products and variants at or below their alert threshold.
+            Suggested qty = threshold − current stock + 1. Draft
+            purchases open prefilled for your review — never created
+            automatically. Variable products need their variant picked
+            in the purchase form.
          </Typography>
          <CustomTable
             rows={rows}

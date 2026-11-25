@@ -14,6 +14,7 @@ import {
    Typography,
 } from "@mui/material";
 import { useSnackbar } from "@src/lib/snackbarContext";
+import Icon from "@src/components/Icon";
 import type { StockProduct } from "./index";
 
 // Phase 3A (3.2): manual stock adjustment. Posts to POST
@@ -150,13 +151,35 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
          )}
 
          {product && (
-            <Typography variant="body2" color="text.secondary">
-               Current stock: <strong>{available ?? 0}</strong>
-               {variant ? ` (variant ${variant.variantName})` : ""}
-            </Typography>
+            <Stack
+               direction="row"
+               spacing={1}
+               alignItems="center"
+               sx={{
+                  px: 1.5,
+                  py: 1,
+                  borderRadius: 1.5,
+                  border: (t) => `1px solid ${t.palette.divider}`,
+                  width: "fit-content",
+               }}
+            >
+               <Icon icon="solar:box-linear" size="16px" />
+               <Typography variant="body2" color="text.secondary">
+                  Current stock:{" "}
+                  <Typography
+                     component="span"
+                     variant="body2"
+                     fontWeight={700}
+                     color="text.primary"
+                  >
+                     {available ?? 0}
+                  </Typography>
+                  {variant ? ` (variant ${variant.variantName})` : ""}
+               </Typography>
+            </Stack>
          )}
 
-         <Stack direction="row" spacing={2} alignItems="center">
+         <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
             <ToggleButtonGroup
                size="small"
                exclusive
@@ -164,10 +187,12 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
                onChange={(_, v) => v && setDirection(v)}
             >
                <ToggleButton value="increase" color="success">
-                  Increase
+                  <Icon icon="solar:add-circle-bold" size="16px" />
+                  &nbsp;Increase
                </ToggleButton>
                <ToggleButton value="decrease" color="error">
-                  Decrease
+                  <Icon icon="solar:minus-circle-bold" size="16px" />
+                  &nbsp;Decrease
                </ToggleButton>
             </ToggleButtonGroup>
             <TextField
@@ -180,6 +205,38 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
                sx={{ width: 140 }}
             />
          </Stack>
+
+         {/* Display-only preview of the resulting stock, computed
+             from the same figures the submit sends — the API and
+             the stock engine remain the authority on save. */}
+         {product &&
+            available != null &&
+            Number.isInteger(Number(quantity)) &&
+            Number(quantity) >= 1 &&
+            (() => {
+               const result =
+                  direction === "increase"
+                     ? available + Number(quantity)
+                     : available - Number(quantity);
+               return result < 0 ? (
+                  <Typography variant="body2" color="error.main">
+                     This decrease exceeds the current stock by{" "}
+                     {Math.abs(result)}.
+                  </Typography>
+               ) : (
+                  <Typography variant="body2" color="text.secondary">
+                     New stock after adjustment:{" "}
+                     <Typography
+                        component="span"
+                        variant="body2"
+                        fontWeight={700}
+                        color="text.primary"
+                     >
+                        {result}
+                     </Typography>
+                  </Typography>
+               );
+            })()}
 
          <TextField
             label="Reason (required)"
@@ -198,6 +255,7 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
                color="primary"
                onClick={handleSubmit}
                disabled={submitting}
+               sx={{ height: 42, px: 3, fontWeight: 700, textTransform: "none" }}
             >
                {submitting ? "Saving..." : "Save Adjustment"}
             </Button>

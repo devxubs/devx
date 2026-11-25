@@ -251,9 +251,10 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
    return (
       <Stack spacing={2}>
          <Stack
-            direction="row"
+            direction={{ xs: "column", sm: "row" }}
             justifyContent="space-between"
-            alignItems="center"
+            alignItems={{ xs: "stretch", sm: "center" }}
+            spacing={1.5}
          >
             <Typography variant="body2" color="text.secondary">
                Stock is mirrored to the default warehouse by the stock
@@ -266,6 +267,7 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
                color="primary"
                startIcon={<Icon icon="mingcute:add-line" />}
                onClick={openCreate}
+               sx={{ flexShrink: 0 }}
             >
                Add Warehouse
             </Button>

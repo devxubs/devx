@@ -9,8 +9,10 @@ import {
    Tab,
    Tabs,
    Typography,
+   alpha,
    useTheme,
 } from "@mui/material";
+import Icon from "@src/components/Icon";
 import { useSettings } from "@src/lib/settingsContext";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
 import MovementsTab from "./MovementsTab";
@@ -136,12 +138,28 @@ const Stock = () => {
       };
    }, [products]);
 
+   // Overview cards follow the project's premium summary-card tone
+   // system (see AnalyticsCard): each metric carries a tone, shown
+   // as a soft-tinted icon square. Values and captions are the same
+   // figures the page has always computed — presentation only.
    const stats = [
-      { label: "Total Products", value: String(overview.totalProducts) },
-      { label: "Total Units in Stock", value: String(overview.totalUnits) },
+      {
+         label: "Total Products",
+         value: String(overview.totalProducts),
+         icon: "solar:box-bold-duotone",
+         tone: "primary" as const,
+      },
+      {
+         label: "Total Units in Stock",
+         value: String(overview.totalUnits),
+         icon: "solar:inbox-bold-duotone",
+         tone: "info" as const,
+      },
       {
          label: "Low Stock Products",
          value: String(overview.lowStockCount),
+         icon: "solar:danger-triangle-bold",
+         tone: "warning" as const,
          accent: overview.lowStockCount > 0,
       },
       {
@@ -150,6 +168,8 @@ const Stock = () => {
             overview.valuedCount > 0
                ? formatCurrency(overview.stockValue)
                : "—",
+         icon: "solar:hand-money-bold-duotone",
+         tone: "success" as const,
          caption:
             overview.valuedCount > 0
                ? `From ${overview.valuedCount} product(s) with a cost price set`
@@ -171,35 +191,66 @@ const Stock = () => {
 
          {/* Overview strip — real figures only. */}
          <Grid container spacing={2}>
-            {stats.map((s) => (
-               <Grid key={s.label} size={{ xs: 12, sm: 6, lg: 3 }}>
-                  <Paper
-                     elevation={0}
-                     sx={{
-                        p: 2,
-                        borderRadius: 1.5,
-                        border: `1px solid ${theme.palette.divider}`,
-                        height: "100%",
-                     }}
-                  >
-                     <Typography variant="body2" color="text.secondary">
-                        {s.label}
-                     </Typography>
-                     <Typography
-                        variant="h5"
-                        fontWeight={700}
-                        color={s.accent ? "warning.main" : "text.primary"}
+            {stats.map((s) => {
+               const toneColor = theme.palette[s.tone].main;
+               return (
+                  <Grid key={s.label} size={{ xs: 12, sm: 6, lg: 3 }}>
+                     <Paper
+                        elevation={0}
+                        sx={{
+                           p: 2.5,
+                           borderRadius: 1.5,
+                           border: `1px solid ${theme.palette.divider}`,
+                           height: "100%",
+                        }}
                      >
-                        {loadingProducts ? "…" : s.value}
-                     </Typography>
-                     {s.caption && (
-                        <Typography variant="caption" color="text.secondary">
-                           {s.caption}
-                        </Typography>
-                     )}
-                  </Paper>
-               </Grid>
-            ))}
+                        <Stack spacing={1.5}>
+                           <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1.5}
+                           >
+                              <Box
+                                 sx={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 1.5,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    bgcolor: alpha(toneColor, 0.1),
+                                    flexShrink: 0,
+                                 }}
+                              >
+                                 <Icon icon={s.icon} size="22px" color={s.tone} />
+                              </Box>
+                              <Typography
+                                 variant="subtitle2"
+                                 color="text.secondary"
+                              >
+                                 {s.label}
+                              </Typography>
+                           </Stack>
+                           <Typography
+                              variant="h4"
+                              fontWeight={700}
+                              color={s.accent ? "warning.main" : "text.primary"}
+                           >
+                              {loadingProducts ? "…" : s.value}
+                           </Typography>
+                           {s.caption && (
+                              <Typography
+                                 variant="caption"
+                                 color="text.secondary"
+                              >
+                                 {s.caption}
+                              </Typography>
+                           )}
+                        </Stack>
+                     </Paper>
+                  </Grid>
+               );
+            })}
          </Grid>
 
          <Paper
@@ -212,19 +263,42 @@ const Stock = () => {
             <Tabs
                value={tab}
                onChange={(_, v) => setTab(v)}
+               variant="scrollable"
+               scrollButtons="auto"
                sx={{
                   px: 2,
                   borderBottom: `1px solid ${theme.palette.divider}`,
+                  "& .MuiTab-root": {
+                     textTransform: "none",
+                     fontWeight: 600,
+                     fontSize: "0.9rem",
+                     minHeight: 52,
+                     gap: 0.75,
+                  },
                }}
             >
-               <Tab label="Movements" />
-               <Tab label="Adjust Stock" />
-               <Tab label="Warehouses" />
                <Tab
+                  icon={<Icon icon="solar:history-bold-duotone" size="19px" />}
+                  iconPosition="start"
+                  label="Movements"
+               />
+               <Tab
+                  icon={<Icon icon="solar:scale-linear" size="19px" />}
+                  iconPosition="start"
+                  label="Adjust Stock"
+               />
+               <Tab
+                  icon={<Icon icon="solar:buildings-bold-duotone" size="19px" />}
+                  iconPosition="start"
+                  label="Warehouses"
+               />
+               <Tab
+                  icon={<Icon icon="solar:danger-triangle-bold" size="19px" />}
+                  iconPosition="start"
                   label={`Low Stock${overview.lowStockCount ? ` (${overview.lowStockCount})` : ""}`}
                />
             </Tabs>
-            <Box p={2}>
+            <Box p={2.5}>
                {tab === 0 && (
                   <MovementsTab products={products} refreshKey={refreshKey} />
                )}
