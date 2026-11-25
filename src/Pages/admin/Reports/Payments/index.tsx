@@ -24,7 +24,7 @@ import AnalyticsCard from "@cmp/AnalyticsCard";
 import { useSettings } from "@src/lib/settingsContext";
 import { useSnackbar } from "@src/lib/snackbarContext";
 import { fetchAllReportRows, reportParams } from "../reportExport";
-import { formatCompactNumber } from "@src/lib/utils";
+import { formatCompactNumber, orderDetailsPath } from "@src/lib/utils";
 
 const todayInputValue = () => {
    const d = new Date();
@@ -118,7 +118,7 @@ const Payments = () => {
       }
    };
 
-   const openOrder = (row: any) => router.push(`/admin/order/${row.orderId}`);
+   const openOrder = (row: any) => router.push(orderDetailsPath(row.orderId));
 
    const totals = report?.totals || {
       orders: 0,

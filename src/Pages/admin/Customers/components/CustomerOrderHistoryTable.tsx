@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import Icon from "@src/components/Icon";
 import { useSettings } from "@src/lib/settingsContext";
 import { OrderRecord } from "./customerAnalyticsHelpers";
+import { orderDetailsPath } from "@src/lib/utils";
 
 interface CustomerOrderHistoryTableProps {
    orders: OrderRecord[];
@@ -114,7 +115,7 @@ export default function CustomerOrderHistoryTable({
    const handleOpenOrderDetails = (order: OrderRecord) => {
       if (onCloseModal) onCloseModal();
       const targetId = order.orderCode || order.orderId || order.customId || order.id;
-      router.push(`/admin/order/${targetId}`);
+      router.push(orderDetailsPath(targetId));
    };
 
    return (

@@ -18,6 +18,7 @@ import CustomBox from "@src/components/CustomBox";
 import { useSettings } from "@src/lib/settingsContext";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { orderDetailsPath } from "@src/lib/utils";
 
 interface SearchResults {
    products: any[];
@@ -123,7 +124,7 @@ export default function FullWidthSuggestions() {
             title: o.orderCode || o.orderId || o.customId,
             subtitle: `${o.customer?.name || "Customer"} • ${formatCurrency(Number(o.total || 0))} • ${o.status}`,
             tag: "Order",
-            url: `/admin/order/${o.orderCode || o.orderId || o.id}`,
+            url: orderDetailsPath(o.orderCode || o.orderId || o.id),
          });
       });
 

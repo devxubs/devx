@@ -152,6 +152,19 @@ export function normalizeOrderLineInput(line: {
 }
 
 /**
+ * The admin order-details path for any order identifier (db id,
+ * customId, orderCode, orderId or invoiceNo). The identifier MUST be
+ * URI-encoded: legacy orderIds are stored with a leading "#"
+ * (e.g. "#6002"), and interpolated raw, the "#" turns the rest of
+ * the path into a URL fragment — navigation silently stays on the
+ * current page and the details view never opens (the same fragment
+ * trap the QuickEdit fetches hit in BUG-C1). Pure.
+ */
+export function orderDetailsPath(id: string): string {
+   return `/admin/order/${encodeURIComponent(id)}`;
+}
+
+/**
  * The overpaid excess of an order (Phase C4, audit C-13 / P2-12):
  * how much of the advance payment exceeds the order total. The
  * totals/due math is unchanged (due floors at 0) — this computed

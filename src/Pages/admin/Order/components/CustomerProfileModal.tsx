@@ -30,6 +30,7 @@ import {
    OrderRecord,
    CourierStatItem,
 } from "@src/Pages/admin/Customers/components/customerAnalyticsHelpers";
+import { orderDetailsPath } from "@src/lib/utils";
 
 interface CustomerProfileModalProps {
    open: boolean;
@@ -197,7 +198,7 @@ export default function CustomerProfileModal({
    const handleOpenOrderDetails = (order: OrderRecord) => {
       onClose();
       const targetId = order.orderCode || order.orderId || order.customId || order.id;
-      router.push(`/admin/order/${targetId}`);
+      router.push(orderDetailsPath(targetId));
    };
 
    // Display customer ID as CUS_ANALYTICS_TEST without modifying DB ID

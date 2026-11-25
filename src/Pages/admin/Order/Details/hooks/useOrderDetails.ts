@@ -22,7 +22,10 @@ export function useOrderDetails(orderIdProp?: string) {
    const fetchOrder = useCallback(async () => {
       if (!id) return;
       try {
-         const res = await fetch(`/api/orders/${id}`);
+         // Encoded for the same reason as orderDetailsPath: a legacy
+         // "#6002"-style id would otherwise truncate the URL at the
+         // fragment and fetch the orders list instead of the order.
+         const res = await fetch(`/api/orders/${encodeURIComponent(id)}`);
          if (!res.ok) {
             throw new Error("Order not found");
          }

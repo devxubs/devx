@@ -23,6 +23,7 @@ import CustomModal from "@src/components/Modal";
 import AlertDialog from "@src/components/AlertDialog";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { usePrint } from "@src/components/TablePrintDocument/PrintPortal";
+import { orderDetailsPath } from "@src/lib/utils";
 
 import { orderStatuses } from "./data";
 import CreateAt from "./CreateAt";
@@ -519,7 +520,7 @@ const OrderTable = () => {
                      "&:hover": { textDecoration: "underline" },
                   }}
                   onClick={() => {
-                     router.push(`/admin/order/${targetId}`);
+                     router.push(orderDetailsPath(targetId));
                   }}
                >
                   {params.row.orderCode ||
@@ -883,7 +884,7 @@ const OrderTable = () => {
                         params.row.customId ||
                         params.row.orderId ||
                         params.row.id;
-                     router.push(`/admin/order/${targetId}`);
+                     router.push(orderDetailsPath(targetId));
                   },
                },
                {
