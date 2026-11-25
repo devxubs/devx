@@ -39,6 +39,7 @@ import CustomAutocomplete from "@src/components/Autocomplete";
 import { useSettings } from "@src/lib/settingsContext";
 import type { ProductOption } from "./index";
 import { lineSubtotal, lineValidation } from "./calculations";
+import { roomyAutocompleteSx, tableInputSx } from "./fieldStyles";
 
 interface ProductSectionProps {
    control: any;
@@ -105,8 +106,9 @@ const ProductSection = ({
             };
 
             return (
-               <Stack spacing={2}>
+               <Stack spacing={3}>
                   <CustomAutocomplete
+                     sx={roomyAutocompleteSx}
                      value={selectedOptions}
                      onChange={(val: any) =>
                         syncSelection(
@@ -212,7 +214,8 @@ const ProductSection = ({
                      <Stack
                         alignItems="center"
                         justifyContent="center"
-                        p={3}
+                        px={3}
+                        py={5}
                         sx={{
                            color: theme.palette.text.secondary,
                            border: `1px dashed ${theme.palette.divider}`,
@@ -238,7 +241,13 @@ const ProductSection = ({
                            "&::-webkit-scrollbar": { display: "none" },
                         }}
                      >
-                        <Table stickyHeader sx={{ minWidth: 640 }}>
+                        <Table
+                           stickyHeader
+                           sx={{
+                              minWidth: 640,
+                              "& .MuiTableCell-root": { py: 1.75 },
+                           }}
+                        >
                            <TableHead
                               sx={{
                                  "& th": {
@@ -428,7 +437,7 @@ const ProductSection = ({
                                                          : parseInt(raw, 10) || 0,
                                                 });
                                              }}
-                                             sx={{ width: 84 }}
+                                             sx={[{ width: 96 }, tableInputSx]}
                                              inputProps={{ min: 1 }}
                                           />
                                        </TableCell>
@@ -448,7 +457,7 @@ const ProductSection = ({
                                                          : parseFloat(raw) || 0,
                                                 });
                                              }}
-                                             sx={{ width: 104 }}
+                                             sx={[{ width: 124 }, tableInputSx]}
                                              inputProps={{ min: 0, step: "0.01" }}
                                           />
                                        </TableCell>

@@ -565,8 +565,8 @@ const Publish = () => {
                Purchase {createdPurchase.customId || ""} created
                successfully — stock has been updated.
             </Alert>
-            <Paper variant="outlined" sx={{ borderRadius: 1.5, p: 3 }}>
-               <Stack spacing={1.5}>
+            <Paper variant="outlined" sx={{ borderRadius: 1.5, p: 4 }}>
+               <Stack spacing={2}>
                   <Typography variant="h6" fontWeight={700}>
                      {createdPurchase.customId || "New Purchase"}
                   </Typography>
@@ -648,8 +648,8 @@ const Publish = () => {
    }
 
    return (
-      <Stack width="100%" maxWidth={1180} mx="auto" component="form" spacing={3}>
-         <Stack spacing={0.5}>
+      <Stack width="100%" maxWidth={1180} mx="auto" component="form" spacing={4}>
+         <Stack spacing={1}>
             <Typography variant="h5" fontWeight={700}>
                {editId
                   ? `Edit Purchase ${(data as any)?.customId || ""}`
@@ -670,9 +670,14 @@ const Publish = () => {
          {prefillNotice && <Alert severity="info">{prefillNotice}</Alert>}
          {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
 
-         <Grid container spacing={3} alignItems="flex-start">
+         {/* No alignItems override: the default stretch makes the
+             right-hand grid item as tall as the row, which is what
+             gives the sticky summary room to travel — with
+             flex-start the item collapsed to the summary's own
+             height and the sticky had no effect (live-check fix). */}
+         <Grid container spacing={4}>
             <Grid size={{ xs: 12, lg: 8 }}>
-               <Stack spacing={3}>
+               <Stack spacing={4}>
                   <SectionCard
                      title="Purchase Information"
                      subtitle="Purchase ID, supplier, invoice and date"
@@ -721,8 +726,8 @@ const Publish = () => {
 
             <Grid size={{ xs: 12, lg: 4 }}>
                <Stack
-                  spacing={3}
-                  sx={{ position: { lg: "sticky" }, top: { lg: 24 } }}
+                  spacing={4}
+                  sx={{ position: { lg: "sticky" }, top: { lg: 88 } }}
                >
                   <SectionCard
                      title="Payment & Summary"
@@ -737,14 +742,15 @@ const Publish = () => {
                      />
                   </SectionCard>
 
-                  <Paper variant="outlined" sx={{ borderRadius: 1.5, p: 2 }}>
-                     <Stack spacing={1.5}>
+                  <Paper variant="outlined" sx={{ borderRadius: 1.5, p: 3 }}>
+                     <Stack spacing={2}>
                         <Button
                            variant="contained"
                            color="primary"
                            size="large"
                            fullWidth
                            type="submit"
+                           sx={{ py: 1.5 }}
                            disabled={submitting || loadingPurchase}
                            onClick={handleSubmit(onSubmit)}
                         >
@@ -758,6 +764,7 @@ const Publish = () => {
                            variant="text"
                            color="inherit"
                            fullWidth
+                           sx={{ py: 1 }}
                            disabled={submitting}
                            onClick={() => router.push("/admin/purchase")}
                         >

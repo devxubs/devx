@@ -39,8 +39,8 @@ const SectionCard = ({
             direction="row"
             justifyContent="space-between"
             alignItems="center"
-            px={2}
-            py={1.5}
+            px={{ xs: 2, sm: 3 }}
+            py={2}
             spacing={1.5}
          >
             <Stack spacing={0.25} sx={{ minWidth: 0 }}>
@@ -80,7 +80,7 @@ const SectionCard = ({
             </Stack>
          </Stack>
          <Collapse in={expanded}>
-            <Stack px={2} pb={2} pt={0.5}>
+            <Stack px={{ xs: 2, sm: 3 }} pb={3} pt={1}>
                {children}
             </Stack>
          </Collapse>

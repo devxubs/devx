@@ -11,6 +11,7 @@
 // paid vs total by the page's calculation engine.
 
 import {
+   Box,
    Chip,
    Grid,
    Stack,
@@ -27,6 +28,7 @@ import {
    paymentStatusLabel,
    type PurchasePaymentStatus,
 } from "./calculations";
+import { roomyAutocompleteSx, roomyInputSx } from "./fieldStyles";
 
 interface PurchaseInfoSectionProps {
    control: any;
@@ -56,10 +58,10 @@ const PurchaseInfoSection = ({
 }: PurchaseInfoSectionProps) => {
    return (
       <Stack spacing={2}>
-         <Grid container spacing={2}>
+         <Grid container spacing={3}>
             {/* Internal Purchase ID — read-only; the server assigns it. */}
             <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
+               <Stack spacing={1.25}>
                   <Typography fontSize={13} fontWeight={500}>
                      Purchase ID
                   </Typography>
@@ -68,30 +70,40 @@ const PurchaseInfoSection = ({
                      fullWidth
                      disabled
                      helperText={purchaseIdHelper}
+                     sx={roomyInputSx}
                   />
                </Stack>
             </Grid>
 
             {/* Payment status — derived, shown here and in the summary. */}
             <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
+               <Stack spacing={1.25}>
                   <Typography fontSize={13} fontWeight={500}>
                      Payment Status
                   </Typography>
-                  <Stack direction="row" alignItems="center" sx={{ height: 40 }}>
+                  <Stack direction="row" alignItems="center" sx={{ minHeight: 58 }}>
                      <Chip
                         label={paymentStatusLabel(paymentStatus)}
                         color={statusColor(paymentStatus)}
-                        size="small"
-                        sx={{ fontWeight: 600 }}
+                        sx={{ fontWeight: 600, fontSize: "0.85rem", height: 32 }}
                      />
                   </Stack>
+                  {/* Invisible spacer mirroring the Purchase ID
+                      field's helper-text line, so the chip row aligns
+                      with the field row beside it. */}
+                  <Typography
+                     variant="caption"
+                     sx={{ visibility: "hidden" }}
+                     aria-hidden
+                  >
+                     .
+                  </Typography>
                </Stack>
             </Grid>
 
             {/* Supplier */}
             <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
+               <Stack spacing={1.25}>
                   <Typography fontSize={13} fontWeight={500}>
                      Supplier
                   </Typography>
@@ -103,6 +115,7 @@ const PurchaseInfoSection = ({
                            placeholder="Search supplier..."
                            arrow
                            label="Supplier"
+                           sx={roomyAutocompleteSx}
                            options={supplierOptions}
                            value={selectedSupplier}
                            onChange={(val: any) => {
@@ -198,7 +211,7 @@ const PurchaseInfoSection = ({
 
             {/* Supplier invoice number — NOT the internal Purchase ID. */}
             <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
+               <Stack spacing={1.25}>
                   <Typography fontSize={13} fontWeight={500}>
                      Supplier Invoice ID
                   </Typography>
@@ -216,6 +229,7 @@ const PurchaseInfoSection = ({
                               errors.invoice?.message ||
                               "Optional — the invoice number on the supplier's bill."
                            }
+                           sx={roomyInputSx}
                         />
                      )}
                   />
@@ -224,7 +238,7 @@ const PurchaseInfoSection = ({
 
             {/* Purchase date */}
             <Grid size={{ xs: 12, md: 6 }}>
-               <Stack spacing={1}>
+               <Stack spacing={1.25}>
                   <Typography fontSize={13} fontWeight={500}>
                      Purchase Date
                   </Typography>
@@ -246,16 +260,22 @@ const PurchaseInfoSection = ({
                               : [null, null];
                         return (
                            <Stack spacing={0.5}>
-                              <DatePicker
-                                 type="single"
-                                 value={pickerValue}
-                                 onChange={(val) => {
-                                    const d = val?.[0];
-                                    field.onChange(
-                                       d ? format(d, "yyyy-MM-dd") : "",
-                                    );
-                                 }}
-                              />
+                              {/* Page-scoped sizing wrapper: the shared
+                                  date picker is not modified; the Box
+                                  sx only enlarges the field rendered
+                                  inside this page. */}
+                              <Box sx={roomyInputSx}>
+                                 <DatePicker
+                                    type="single"
+                                    value={pickerValue}
+                                    onChange={(val) => {
+                                       const d = val?.[0];
+                                       field.onChange(
+                                          d ? format(d, "yyyy-MM-dd") : "",
+                                       );
+                                    }}
+                                 />
+                              </Box>
                               {errors.date && (
                                  <Typography variant="caption" color="error">
                                     {errors.date.message}

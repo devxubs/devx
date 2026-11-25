@@ -24,6 +24,7 @@ import {
    paymentStatusLabel,
    type PurchaseTotals,
 } from "./calculations";
+import { roomyMoneyInputSx } from "./fieldStyles";
 
 interface SummarySectionProps {
    control: any;
@@ -48,6 +49,7 @@ const SummaryRow = ({
       <Typography
          variant="body2"
          fontWeight={bold ? 700 : 400}
+         fontSize={bold ? "1.02rem" : undefined}
          color={bold ? "textPrimary" : "textSecondary"}
       >
          {label}
@@ -55,6 +57,7 @@ const SummaryRow = ({
       <Typography
          variant="body2"
          fontWeight={bold ? 700 : 600}
+         fontSize={bold ? "1.02rem" : undefined}
          color={color || "textPrimary"}
          noWrap
       >
@@ -73,7 +76,7 @@ const SummarySection = ({
    const { formatCurrency } = useSettings();
 
    return (
-      <Stack spacing={1.5}>
+      <Stack spacing={2.25}>
          <SummaryRow
             label="Subtotal"
             value={formatCurrency(totals.productAmount)}
@@ -101,7 +104,7 @@ const SummarySection = ({
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.others_cost}
                      helperText={errors?.others_cost?.message}
-                     sx={{ width: 130 }}
+                     sx={[{ width: 150 }, roomyMoneyInputSx]}
                   />
                )}
             />
@@ -129,7 +132,7 @@ const SummarySection = ({
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.discount}
                      helperText={errors?.discount?.message}
-                     sx={{ width: 130 }}
+                     sx={[{ width: 150 }, roomyMoneyInputSx]}
                   />
                )}
             />
@@ -165,7 +168,7 @@ const SummarySection = ({
                      inputProps={{ min: 0, step: "0.01" }}
                      error={!!errors?.pay}
                      helperText={errors?.pay?.message}
-                     sx={{ width: 130 }}
+                     sx={[{ width: 150 }, roomyMoneyInputSx]}
                   />
                )}
             />

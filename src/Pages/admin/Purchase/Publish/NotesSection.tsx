@@ -11,6 +11,7 @@ import { Stack, TextField, Typography } from "@mui/material";
 import React from "react";
 import { Controller } from "react-hook-form";
 import AttachmentUploader from "./AttachmentUploader";
+import { roomyTextareaSx } from "./fieldStyles";
 
 interface NotesSectionProps {
    control: any;
@@ -19,8 +20,8 @@ interface NotesSectionProps {
 
 const NotesSection = ({ control, data }: NotesSectionProps) => {
    return (
-      <Stack spacing={2.5}>
-         <Stack spacing={1}>
+      <Stack spacing={3}>
+         <Stack spacing={1.25}>
             <Typography fontSize={13} fontWeight={500}>
                Purchase Notes
             </Typography>
@@ -33,15 +34,16 @@ const NotesSection = ({ control, data }: NotesSectionProps) => {
                      {...field}
                      fullWidth
                      multiline
-                     rows={3}
+                     rows={5}
                      placeholder="Optional note for this purchase…"
                      label="Note"
+                     sx={roomyTextareaSx}
                   />
                )}
             />
          </Stack>
 
-         <Stack spacing={1}>
+         <Stack spacing={1.25}>
             <Typography fontSize={13} fontWeight={500}>
                Attachments
             </Typography>
