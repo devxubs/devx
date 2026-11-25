@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useSettings } from "@src/lib/settingsContext";
 import { usePrint } from "@src/components/TablePrintDocument/PrintPortal";
+import { normalizeOrderIdParam } from "@src/lib/utils";
 import { mapOrderToInvoiceData } from "../helpers";
 import { FeedbackState, QuickEditProduct } from "../types";
 
@@ -22,10 +23,14 @@ export function useOrderDetails(orderIdProp?: string) {
    const fetchOrder = useCallback(async () => {
       if (!id) return;
       try {
-         // Encoded for the same reason as orderDetailsPath: a legacy
-         // "#6002"-style id would otherwise truncate the URL at the
-         // fragment and fetch the orders list instead of the order.
-         const res = await fetch(`/api/orders/${encodeURIComponent(id)}`);
+         // The route param for a legacy "#6002"-style id arrives
+         // still percent-encoded ("%236002"); normalise it first so
+         // the id is encoded exactly once here — raw interpolation
+         // truncates the URL at the "#" fragment, and double-encoding
+         // ("%25236002") matches no order.
+         const res = await fetch(
+            `/api/orders/${encodeURIComponent(normalizeOrderIdParam(id))}`,
+         );
          if (!res.ok) {
             throw new Error("Order not found");
          }

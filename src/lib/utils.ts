@@ -165,6 +165,24 @@ export function orderDetailsPath(id: string): string {
 }
 
 /**
+ * Normalise an order identifier that arrived as a route param. The
+ * details route's segment for a "#6002"-style id is "%236002", and
+ * the param value delivered to the page is STILL percent-encoded —
+ * encoding it again for the API fetch produces "%25236002", which
+ * matches nothing (404). Decode first (a no-op for plain ids and for
+ * already-decoded values), then let the caller encode exactly once
+ * for the URL it builds. Malformed encodings are returned as-is.
+ * Pure.
+ */
+export function normalizeOrderIdParam(id: string): string {
+   try {
+      return decodeURIComponent(id);
+   } catch {
+      return id;
+   }
+}
+
+/**
  * The overpaid excess of an order (Phase C4, audit C-13 / P2-12):
  * how much of the advance payment exceeds the order total. The
  * totals/due math is unchanged (due floors at 0) — this computed
