@@ -1,29 +1,50 @@
 "use client";
 
+// Purchase Create (redesign) — premium two-column layout:
+// Purchase Information · Products · Additional Information on the
+// left, a sticky Payment & Summary with the main actions on the
+// right. All behaviour is preserved from the previous page: real
+// supplier/product options, edit mode (?id=), Low Stock prefill
+// (?prefill=), the attachments upload flow, the variant guard, and
+// the server-recomputed totals. What changed is the organisation,
+// the calculation engine (calculations.ts — exact decimals, the
+// server's own formulas), product search by name/SKU/barcode with
+// stock shown, a Purchase ID preview from the entity-sequence peek,
+// and a print action after a successful creation. No schema, API or
+// shared-component changes.
+
 import { yupResolver } from "@hookform/resolvers/yup";
 import {
+   Alert,
    Button,
-   Stack,
    Grid,
-   TextField,
+   Paper,
+   Stack,
    Typography,
-   IconButton,
 } from "@mui/material";
-import Icon from "@src/components/Icon";
-import React, { useState } from "react";
-import { Controller, SubmitHandler, useForm } from "react-hook-form";
+import React, { useMemo, useState } from "react";
+import { SubmitHandler, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { PurchaseTypes } from "..";
 import { useRouter } from "next/navigation";
-import Details from "./Details";
-import Pricing from "./Pricing";
-import Information from "./Information";
+import SectionCard from "./SectionCard";
+import PurchaseInfoSection from "./PurchaseInfoSection";
+import ProductSection from "./ProductSection";
+import SummarySection from "./SummarySection";
+import NotesSection from "./NotesSection";
+import { computePurchaseTotals } from "./calculations";
+import { buildPurchaseInvoicePrint } from "./purchaseInvoicePrint";
 import { uploadImageFile } from "@src/lib/uploadImage";
 import { useSnackbar } from "@src/lib/snackbarContext";
+import { usePrint } from "@src/components/TablePrintDocument/PrintPortal";
+import { useSettings } from "@src/lib/settingsContext";
 
 export interface SupplierOption {
    id: string;
    name: string;
+   phone?: string | null;
+   email?: string | null;
+   address?: string | null;
 }
 
 export interface ProductVariantOption {
@@ -42,6 +63,9 @@ export interface ProductOption {
    code: string;
    barcode?: string | null;
    price: number;
+   // Current stock of the product itself (variable products report
+   // per-variant stock; the section sums the variants).
+   quantity: number;
    // INV-02: variable products carry their live variants so purchase
    // lines can target a variant.
    productType?: string;
@@ -152,10 +176,29 @@ const todayDhaka = (): string =>
       day: "2-digit",
    }).format(new Date());
 
+const blankForm = (): PurchaseFormValues =>
+   ({
+      id: 0,
+      date: todayDhaka(),
+      invoice: "",
+      supplier: "",
+      product: [],
+      product_amount: 0,
+      others_cost: 0,
+      discount: 0,
+      pay: 0,
+      total: 0,
+      due: 0,
+      note: "",
+      attachments: [],
+   }) as PurchaseFormValues;
+
 const Publish = () => {
    const [data, setData] = useState<PurchaseTypes>({} as PurchaseTypes);
    const router = useRouter();
    const { showSnackbar } = useSnackbar();
+   const { printDocument } = usePrint();
+   const { settings, formatCurrency } = useSettings();
 
    const {
       control,
@@ -166,41 +209,37 @@ const Publish = () => {
       formState: { errors },
    } = useForm<PurchaseFormValues>({
       resolver: yupResolver<PurchaseFormValues, any, any>(purchaseSchema),
-      defaultValues: {
-         id: 0,
-         // BUG-E1: default to today (Asia/Dhaka) in the schema's
-         // "yyyy-MM-dd" format so a fresh form is valid without
-         // touching the date picker.
-         date: todayDhaka(),
-         invoice: "",
-         supplier: "",
-         product: [],
-         product_amount: 0,
-         others_cost: 0,
-         discount: 0,
-         total: 0,
-         note: "",
-      },
+      defaultValues: blankForm(),
    });
 
    const [submitting, setSubmitting] = useState(false);
    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-   // Phase 2 (2.4): real option data for the pickers. The previous
-   // implementation read the `suppliersData` / `productsData` mock
-   // exports, which are empty arrays — the supplier picker had no
-   // options and line items never carried a productId, so stock was
-   // never credited for UI-created purchases and supplier was always
-   // null. Options now come from the real APIs.
+   // Phase 2 (2.4): real option data for the pickers, from the real
+   // APIs (the previous mock exports were empty arrays). The
+   // redesign also carries the supplier's contact fields and each
+   // product's current stock for display — same responses, wider
+   // mapping.
    const [supplierOptions, setSupplierOptions] = useState<SupplierOption[]>([]);
    const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
    const [supplierId, setSupplierId] = useState<string | null>(null);
 
-   // Edit mode: /admin/purchase/publish?id=<purchase id> (the list's
-   // Edit action has always linked here; the page previously ignored
-   // the id and created a duplicate purchase instead of editing).
+   // Edit mode: /admin/purchase/publish?id=<purchase id>.
    const [editId, setEditId] = useState<string | null>(null);
    const [loadingPurchase, setLoadingPurchase] = useState(false);
+
+   // Purchase ID preview (create mode) from the same EntitySequence
+   // the POST consumes — the OBS-B1 peek; read-only, never consumes
+   // a number. In edit mode the record's own customId is shown.
+   const [idPreview, setIdPreview] = useState<string | null>(null);
+   const [createdPurchase, setCreatedPurchase] = useState<any | null>(null);
+
+   const fetchIdPreview = React.useCallback(() => {
+      fetch("/api/entity-sequence?type=PURCHASE")
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => setIdPreview(d?.nextId || null))
+         .catch(() => setIdPreview(null));
+   }, []);
 
    React.useEffect(() => {
       fetch("/api/suppliers")
@@ -208,7 +247,13 @@ const Publish = () => {
          .then((list) => {
             const arr = Array.isArray(list) ? list : list?.suppliers || [];
             setSupplierOptions(
-               arr.map((s: any) => ({ id: s.id, name: s.name })),
+               arr.map((s: any) => ({
+                  id: s.id,
+                  name: s.name,
+                  phone: s.phone || null,
+                  email: s.email || null,
+                  address: s.address || null,
+               })),
             );
          })
          .catch(() => {});
@@ -222,6 +267,7 @@ const Publish = () => {
                   code: p.productCode || p.productSku || "",
                   barcode: p.barcode || null,
                   price: Number(p.costPrice ?? p.regularPrice ?? 0),
+                  quantity: Number(p.quantity) || 0,
                   productType: p.productType || "simple",
                   variants: (p.variants || []).map((v: any) => ({
                      id: v.id,
@@ -236,7 +282,8 @@ const Publish = () => {
             );
          })
          .catch(() => {});
-   }, []);
+      fetchIdPreview();
+   }, [fetchIdPreview]);
 
    React.useEffect(() => {
       const id = new URLSearchParams(window.location.search).get("id");
@@ -346,6 +393,36 @@ const Publish = () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
+   // ── Totals: the page's calculation engine keeps the form's
+   // product_amount / total / due in sync with the exact figures the
+   // server will compute (advisory only — the API recomputes).
+   const watchedProducts = watch("product");
+   const watchedDiscount = watch("discount");
+   const watchedOthersCost = watch("others_cost");
+   const watchedPay = watch("pay");
+   const totals = useMemo(
+      () =>
+         computePurchaseTotals(
+            (watchedProducts || []) as any[],
+            Number(watchedOthersCost) || 0,
+            Number(watchedDiscount) || 0,
+            Number(watchedPay) || 0,
+         ),
+      [watchedProducts, watchedDiscount, watchedOthersCost, watchedPay],
+   );
+   React.useEffect(() => {
+      setValue("product_amount", totals.productAmount);
+      setValue("total", totals.total);
+      setValue("due", totals.due);
+   }, [totals, setValue]);
+
+   const supplierNameValue = watch("supplier");
+   const selectedSupplier: SupplierOption | null =
+      supplierOptions.find((s) => s.id === supplierId) ??
+      (supplierId && supplierNameValue
+         ? { id: supplierId, name: supplierNameValue }
+         : null);
+
    const onSubmit: SubmitHandler<PurchaseFormValues> = async (formData) => {
       setSubmitting(true);
       setErrorMsg(null);
@@ -365,15 +442,12 @@ const Publish = () => {
             }
          }
          // B2-2 (audit C-8 / P1-6): attachments the uploader
-         // collected ride in the payload — previously they were
-         // silently dropped on save. The uploader produces File
-         // objects; each new file goes through the existing uploads
-         // flow (POST /api/uploads, the same one product images
-         // use) and is sent as the { name, url, type, size }
-         // descriptor PurchaseAttachment stores. In edit mode the
-         // already-saved attachments are resent as-is so the API's
-         // replace-set reconcile keeps them; entries that already
-         // carry a stored URL (API-shaped values) pass through.
+         // collected ride in the payload. Each new file goes through
+         // the existing uploads flow (POST /api/uploads) and is sent
+         // as the { name, url, type, size } descriptor
+         // PurchaseAttachment stores. In edit mode the already-saved
+         // attachments are resent as-is so the API's replace-set
+         // reconcile keeps them.
          const attachmentDescriptors: Array<{
             name: string;
             url: string;
@@ -414,15 +488,13 @@ const Publish = () => {
             }
          }
 
-         // Line items now include their productId (Phase 2, 2.4) so the
+         // Line items include their productId (Phase 2, 2.4) so the
          // API can net stock correctly; totals are recomputed on the
          // server for both POST and PUT — client totals are advisory.
          const payload = {
             supplierId: supplierId || null,
-            // BUG-E1 follow-through: the form's date is now actually
-            // sent — the API stores it as the purchase's date
-            // (createdAt). It was previously dropped here, so the
-            // field silently did nothing.
+            // BUG-E1 follow-through: the form's date is sent — the API
+            // stores it as the purchase's date (createdAt).
             date: formData.date || undefined,
             invoice: formData.invoice?.trim() || undefined,
             items: (formData.product || []).map((p: any) => ({
@@ -460,15 +532,24 @@ const Publish = () => {
             );
          }
 
-         // BUG-E1 follow-through: a successful save previously gave
-         // no confirmation at all. Same pattern as Product Publish —
-         // the snackbar provider lives in the admin Layout, so the
-         // message survives the navigation back to the list.
+         const saved = await res.json().catch(() => null);
+
+         // BUG-E1 follow-through: a successful save confirms via the
+         // snackbar (the provider lives in the admin Layout).
          showSnackbar(
             editId ? "Purchase updated." : "Purchase added.",
             "success",
          );
-         router.push("/admin/purchase");
+         if (editId) {
+            router.push("/admin/purchase");
+         } else {
+            // Redesign: after a successful creation, stay on the page
+            // with a success panel — the new Purchase ID, the totals,
+            // and the Print Purchase Invoice action — instead of
+            // navigating away instantly.
+            setCreatedPurchase(saved);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+         }
       } catch (err: any) {
          setErrorMsg(err.message || "Failed to save purchase");
       } finally {
@@ -476,112 +557,217 @@ const Publish = () => {
       }
    };
 
-   return (
-      <Stack
-         width={"100%"}
-         maxWidth={650}
-         mx={"auto"}
-         height={"100%"}
-         component="form"
-      >
-         {prefillNotice && (
-            <Typography
-               variant="body2"
-               color="primary"
-               sx={{
-                  mb: 2,
-                  p: 1.5,
-                  borderRadius: 1.5,
-                  bgcolor: "primary.lighter",
-               }}
-            >
-               {prefillNotice}
-            </Typography>
-         )}
-         {editId && (
-            <Stack spacing={0.5} mb={3}>
-               <Typography variant="h6" fontWeight={700}>
-                  Edit Purchase {(data as any)?.customId || ""}
-               </Typography>
-               <Typography variant="body2" color="textSecondary">
-                  Internal Purchase ID: {(data as any)?.customId || editId} —
-                  the supplier&apos;s own invoice number is edited in the
-                  Information section below.
-               </Typography>
-               {loadingPurchase && (
-                  <Typography variant="body2" color="textSecondary">
-                     Loading purchase…
+   // ── Success panel after a successful creation ──────────────────
+   if (createdPurchase && !editId) {
+      return (
+         <Stack width="100%" maxWidth={720} mx="auto" spacing={3}>
+            <Alert severity="success">
+               Purchase {createdPurchase.customId || ""} created
+               successfully — stock has been updated.
+            </Alert>
+            <Paper variant="outlined" sx={{ borderRadius: 1.5, p: 3 }}>
+               <Stack spacing={1.5}>
+                  <Typography variant="h6" fontWeight={700}>
+                     {createdPurchase.customId || "New Purchase"}
                   </Typography>
-               )}
-            </Stack>
-         )}
-         <Stack spacing={4}>
-            <Stack>
-               <Details
-                  data={data || {}}
-                  control={control}
-                  errors={errors}
-                  supplierOptions={supplierOptions}
-                  productOptions={productOptions}
-                  onSupplierSelect={(name) => {
-                     const match = supplierOptions.find((s) => s.name === name);
-                     setSupplierId(match ? match.id : null);
-                  }}
-               />
-            </Stack>
-            <Stack>
-               <Information
-                  data={data || {}}
-                  control={control}
-                  errors={errors}
-               />
-            </Stack>
-            <Stack>
-               <Pricing
-                  data={data || {}}
-                  control={control}
-                  errors={errors}
-                  setValue={setValue}
-                  watch={watch}
-               />
-            </Stack>
+                  <Stack spacing={0.5}>
+                     <Typography variant="body2" color="textSecondary">
+                        Supplier:{" "}
+                        {createdPurchase.supplier?.name || "—"}
+                        {createdPurchase.invoice
+                           ? ` · Supplier Invoice: ${createdPurchase.invoice}`
+                           : ""}
+                     </Typography>
+                     <Typography variant="body2" color="textSecondary">
+                        Items: {(createdPurchase.items || []).length} ·
+                        Grand Total:{" "}
+                        {formatCurrency(Number(createdPurchase.total) || 0)} ·
+                        Paid:{" "}
+                        {formatCurrency(Number(createdPurchase.paid) || 0)} ·
+                        Due:{" "}
+                        {formatCurrency(Number(createdPurchase.due) || 0)}
+                     </Typography>
+                     {createdPurchase.creationOverpayment && (
+                        <Typography variant="body2" color="warning.main">
+                           Overpayment of{" "}
+                           {formatCurrency(
+                              Number(
+                                 createdPurchase.creationOverpayment.amount,
+                              ) || 0,
+                           )}{" "}
+                           was recorded as supplier credit (
+                           {createdPurchase.creationOverpayment
+                              .supplierPaymentCustomId || "unallocated payment"}
+                           ).
+                        </Typography>
+                     )}
+                  </Stack>
+                  <Stack
+                     direction={{ xs: "column", sm: "row" }}
+                     spacing={1.5}
+                     pt={1}
+                  >
+                     <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() =>
+                           printDocument(
+                              buildPurchaseInvoicePrint(
+                                 createdPurchase,
+                                 settings,
+                              ),
+                           )
+                        }
+                     >
+                        Print Purchase Invoice
+                     </Button>
+                     <Button
+                        variant="outlined"
+                        onClick={() => {
+                           setCreatedPurchase(null);
+                           setSupplierId(null);
+                           setData({} as PurchaseTypes);
+                           reset(blankForm());
+                           fetchIdPreview();
+                        }}
+                     >
+                        Create Another
+                     </Button>
+                     <Button
+                        variant="text"
+                        color="inherit"
+                        onClick={() => router.push("/admin/purchase")}
+                     >
+                        Back to Purchases
+                     </Button>
+                  </Stack>
+               </Stack>
+            </Paper>
          </Stack>
+      );
+   }
 
-         <Stack
-            spacing={2}
-            direction={"row"}
-            justifyContent={"flex-end"}
-            width={"100%"}
-            mt={2}
-         >
-            {errorMsg && (
-               <Typography color="error" variant="body2" sx={{ mb: 1 }}>
-                  {errorMsg}
+   return (
+      <Stack width="100%" maxWidth={1180} mx="auto" component="form" spacing={3}>
+         <Stack spacing={0.5}>
+            <Typography variant="h5" fontWeight={700}>
+               {editId
+                  ? `Edit Purchase ${(data as any)?.customId || ""}`
+                  : "Create Purchase"}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+               {editId
+                  ? "Update this purchase — stock and totals are recalculated by the server on save."
+                  : "Record a supplier purchase. Stock increases when the purchase is saved."}
+            </Typography>
+            {loadingPurchase && (
+               <Typography variant="body2" color="textSecondary">
+                  Loading purchase…
                </Typography>
             )}
-            <Button
-               variant="text"
-               color="inherit"
-               disabled={submitting}
-               onClick={() => router.push("/admin/purchase")}
-            >
-               Cancel
-            </Button>
-
-            <Button
-               variant="contained"
-               color="primary"
-               type="submit"
-               disabled={submitting || loadingPurchase}
-               onClick={handleSubmit(onSubmit)}
-            >
-               {submitting
-                  ? "Saving..."
-                  : editId
-                    ? "Update Purchase"
-                    : "Add Purchase"}
-            </Button>
          </Stack>
+
+         {prefillNotice && <Alert severity="info">{prefillNotice}</Alert>}
+         {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
+
+         <Grid container spacing={3} alignItems="flex-start">
+            <Grid size={{ xs: 12, lg: 8 }}>
+               <Stack spacing={3}>
+                  <SectionCard
+                     title="Purchase Information"
+                     subtitle="Purchase ID, supplier, invoice and date"
+                  >
+                     <PurchaseInfoSection
+                        control={control}
+                        errors={errors}
+                        supplierOptions={supplierOptions}
+                        selectedSupplier={selectedSupplier}
+                        onSupplierSelect={(option) =>
+                           setSupplierId(option ? option.id : null)
+                        }
+                        purchaseIdText={
+                           editId
+                              ? (data as any)?.customId || editId
+                              : idPreview || "—"
+                        }
+                        purchaseIdHelper={
+                           editId
+                              ? "Internal Purchase ID"
+                              : "Preview — assigned by the server on save"
+                        }
+                        paymentStatus={totals.paymentStatus}
+                     />
+                  </SectionCard>
+
+                  <SectionCard
+                     title="Products"
+                     subtitle="Search by name, SKU or barcode — quantities and prices are editable"
+                  >
+                     <ProductSection
+                        control={control}
+                        errors={errors}
+                        productOptions={productOptions}
+                     />
+                  </SectionCard>
+
+                  <SectionCard
+                     title="Additional Information"
+                     subtitle="Notes and attachments"
+                  >
+                     <NotesSection control={control} data={data || {}} />
+                  </SectionCard>
+               </Stack>
+            </Grid>
+
+            <Grid size={{ xs: 12, lg: 4 }}>
+               <Stack
+                  spacing={3}
+                  sx={{ position: { lg: "sticky" }, top: { lg: 24 } }}
+               >
+                  <SectionCard
+                     title="Payment & Summary"
+                     subtitle="Calculated with the server's formulas"
+                  >
+                     <SummarySection
+                        control={control}
+                        errors={errors}
+                        data={data || {}}
+                        totals={totals}
+                        hasSupplier={Boolean(supplierId)}
+                     />
+                  </SectionCard>
+
+                  <Paper variant="outlined" sx={{ borderRadius: 1.5, p: 2 }}>
+                     <Stack spacing={1.5}>
+                        <Button
+                           variant="contained"
+                           color="primary"
+                           size="large"
+                           fullWidth
+                           type="submit"
+                           disabled={submitting || loadingPurchase}
+                           onClick={handleSubmit(onSubmit)}
+                        >
+                           {submitting
+                              ? "Saving..."
+                              : editId
+                                ? "Update Purchase"
+                                : "Create Purchase"}
+                        </Button>
+                        <Button
+                           variant="text"
+                           color="inherit"
+                           fullWidth
+                           disabled={submitting}
+                           onClick={() => router.push("/admin/purchase")}
+                        >
+                           Cancel
+                        </Button>
+                     </Stack>
+                  </Paper>
+               </Stack>
+            </Grid>
+         </Grid>
       </Stack>
    );
 };
