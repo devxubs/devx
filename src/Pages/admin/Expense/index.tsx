@@ -609,7 +609,11 @@ const Expense = () => {
             // OBS-H4: the dialog named only the expense's category —
             // with several expenses in one category it didn't identify
             // WHICH record was being deleted. Amount + date pin it down.
-            title={`Are you sure you want to delete <b>${deleteItem?.type}</b> (৳ ${Number(deleteItem?.amount || 0).toFixed(2)}${deleteItem?.date ? `, ${deleteItem.date}` : ""})?`}
+            title={
+               deleteItem
+                  ? `Are you sure you want to delete <b>${deleteItem.type}</b> (৳ ${Number(deleteItem.amount || 0).toFixed(2)}${deleteItem.date ? `, ${deleteItem.date}` : ""})?`
+                  : "Are you sure you want to delete this expense?"
+            }
          />
       </Stack>
    );
