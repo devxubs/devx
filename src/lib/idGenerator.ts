@@ -73,6 +73,81 @@ export async function getEntityPrefix(entityType: EntityType, client?: any): Pro
    }
 }
 
+// ── Phase 4: Invoice Number Prefix ───────────────────────────────────
+//
+// The invoice number shares the ORDER EntitySequence (existing
+// design: ORD_126 ↔ INV_126 advance together, and Order.invoiceNo
+// is @unique), so its uniqueness and continuity come from the
+// same atomic counter. What Phase 4 adds is the PREFIX: until now
+// generation hardcoded "INV_" and ignored the long-standing
+// StoreSetting.invoicePrefix column. The stored convention for
+// that column is the bare token ("INV", no separator — schema
+// default, settings UI placeholder); the separator stays "_",
+// exactly like every other identifier in the system, so today's
+// output is unchanged: formatInvoiceNo(resolveInvoicePrefix(x), n).
+
+export const DEFAULT_INVOICE_PREFIX = "INV";
+
+/** Normalise a stored invoice prefix: trim, drop trailing separators, empty → "INV". */
+export function resolveInvoicePrefix(raw: unknown): string {
+   if (typeof raw !== "string") return DEFAULT_INVOICE_PREFIX;
+   const cleaned = raw.trim().replace(/[\s_-]+$/, "");
+   return cleaned === "" ? DEFAULT_INVOICE_PREFIX : cleaned;
+}
+
+/** The invoice number for an order sequence value, e.g. ("DEVX-INV", 126) → "DEVX-INV_126". */
+export function formatInvoiceNo(prefix: string, seq: number): string {
+   return `${resolveInvoicePrefix(prefix)}_${seq}`;
+}
+
+/** Read the configured invoice prefix server-side (pass the caller's transaction client so the read is consistent with the order write). */
+export async function getInvoicePrefix(client?: any): Promise<string> {
+   const db = client || prisma;
+   try {
+      const setting = await db.storeSetting.findUnique({ where: { id: "default" } });
+      return resolveInvoicePrefix(setting?.invoicePrefix);
+   } catch {
+      return DEFAULT_INVOICE_PREFIX;
+   }
+}
+
+/**
+ * Phase 4 validation for the two prefix settings this phase owns
+ * (prefixOrder, invoicePrefix), applied by the settings PUT
+ * before anything is saved. Conventions follow the existing IDs:
+ * letters, digits, hyphens and underscores only; max 20 chars
+ * after trimming. An empty value is valid — the read paths fall
+ * back to the defaults ("ORD_" / "INV"), so an empty prefix can
+ * never produce a bare-number identifier.
+ */
+export const MAX_PREFIX_LENGTH = 20;
+const PREFIX_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+export function validatePrefixSettingValue(
+   value: unknown,
+   fieldLabel: string,
+): { ok: true } | { ok: false; message: string } {
+   if (value === undefined || value === null) return { ok: true };
+   if (typeof value !== "string") {
+      return { ok: false, message: `${fieldLabel} must be a string.` };
+   }
+   const trimmed = value.trim();
+   if (trimmed === "") return { ok: true };
+   if (trimmed.length > MAX_PREFIX_LENGTH) {
+      return {
+         ok: false,
+         message: `${fieldLabel} must be at most ${MAX_PREFIX_LENGTH} characters.`,
+      };
+   }
+   if (!PREFIX_PATTERN.test(trimmed)) {
+      return {
+         ok: false,
+         message: `${fieldLabel} may contain only letters, digits, hyphens and underscores.`,
+      };
+   }
+   return { ok: true };
+}
+
 /**
  * Atomically generate the next sequential ID starting from 1 for an entity type,
  * with automatic collision prevention against existing records.

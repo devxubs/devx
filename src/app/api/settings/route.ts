@@ -5,6 +5,7 @@ import { sanitizeCustomConfig } from "@src/lib/customConfig";
 import { validateDefaultCourierStatusInConfig } from "@src/lib/courierSubmission";
 import { validateDecreaseStockOnInConfig } from "@src/lib/productSettings";
 import { validateOrderCreateDefaultsInConfig } from "@src/lib/orderStatusDisplay";
+import { validatePrefixSettingValue } from "@src/lib/idGenerator";
 import {
    logAudit,
    auditActorFromContext,
@@ -156,6 +157,25 @@ export async function PUT(request: NextRequest) {
 
    try {
       const body = await request.json();
+
+      // Phase 4: validate the Order ID / Invoice Number prefix
+      // settings before anything is trimmed or saved (letters,
+      // digits, hyphens, underscores; max 20 chars; empty is
+      // allowed — read paths fall back to the defaults).
+      for (const [field, label] of [
+         ["prefixOrder", "Order ID Prefix"],
+         ["invoicePrefix", "Invoice Number Prefix"],
+      ] as const) {
+         if (body[field] !== undefined) {
+            const verdict = validatePrefixSettingValue(body[field], label);
+            if (!verdict.ok) {
+               return NextResponse.json(
+                  { error: "Validation error", message: verdict.message },
+                  { status: 400 },
+               );
+            }
+         }
+      }
 
       const dataToUpdate: any = {};
       // Phase 1C: set inside the customConfig block below when the

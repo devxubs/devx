@@ -9,7 +9,11 @@ import {
    normalizeOrderLineInput,
    overpaidAmountOf,
 } from "@src/lib/utils";
-import { generateNextEntityId } from "@src/lib/idGenerator";
+import {
+   formatInvoiceNo,
+   generateNextEntityId,
+   getInvoicePrefix,
+} from "@src/lib/idGenerator";
 import {
    loadStockSettings,
    deductStockForItems,
@@ -894,7 +898,11 @@ export async function POST(request: NextRequest) {
 
          const { customId, orderCode, seq } = await generateNextEntityId("ORDER", tx);
          const orderId = orderCode || customId;
-         const invoiceNo = `INV_${seq}`;
+         // Phase 4: the invoice prefix comes from settings
+         // (StoreSetting.invoicePrefix, read inside this
+         // transaction); the number still shares the ORDER
+         // sequence, so continuity and uniqueness are unchanged.
+         const invoiceNo = formatInvoiceNo(await getInvoicePrefix(tx), seq);
 
          // Phase 1B: the order begins holding stock at creation
          // only when its initial status has already reached the

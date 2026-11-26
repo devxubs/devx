@@ -118,7 +118,7 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                   value={values.invoicePrefix || "INV"}
                   onChange={(e) => onChange("invoicePrefix", e.target.value)}
                   placeholder="INV"
-                  helperText="e.g. INV-10024"
+                  helperText="New invoices look like INV_126 — the number shares the order sequence and never restarts when the prefix changes."
                />
             </Grid>
 
