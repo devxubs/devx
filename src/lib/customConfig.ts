@@ -22,6 +22,18 @@
  *     orders-list bulk courier modal; validated on save against
  *     COURIER_STATUSES in src/lib/courierSubmission.ts).
  *
+ * PERSISTED, NOT YET CONSUMED (Phase 1 Product Settings,
+ * 2026-11-26 — Settings → Products & Inventory writes them; the
+ * business-logic consumers land in a later phase):
+ *   - defaultWarehouseId, stockOutProductCanOrder,
+ *     outOfStockCanSubmitCourier, variationSelectOnOrder,
+ *     decreaseStockOn. The UI defaults mirror the behaviour
+ *     audited at introduction (out-of-stock orders rejected by
+ *     the stock engine, no stock gate on courier submission,
+ *     variant-less variable lines rejected, deduction at order
+ *     creation for every stock-holding status), so persisting
+ *     them changes nothing until the consumers ship.
+ *
  * DEAD keys (no consumer exists — UI removed, and stripped here on
  * save so they stop being persisted):
  *   compactTableDensity, loyaltyRewardRate, supplierCreditDays,

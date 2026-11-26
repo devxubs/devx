@@ -9,6 +9,20 @@ import {
 // keys pass through untouched.
 
 describe("sanitizeCustomConfig", () => {
+   it("keeps the Phase 1 Product Settings keys with their values", () => {
+      // Persisted by Settings → Products & Inventory (Phase 1);
+      // consumers land in a later phase, so the sanitizer must
+      // pass them through untouched until then.
+      const input = {
+         defaultWarehouseId: "wh_123",
+         stockOutProductCanOrder: false,
+         outOfStockCanSubmitCourier: true,
+         variationSelectOnOrder: true,
+         decreaseStockOn: "CONFIRMED",
+      };
+      expect(sanitizeCustomConfig(input)).toEqual(input);
+   });
+
    it("strips every audited dead key", () => {
       const input: Record<string, any> = {};
       for (const k of DEAD_CUSTOM_CONFIG_KEYS) input[k] = true;
