@@ -32,6 +32,7 @@ import {
 } from "@mui/material";
 
 import Icon from "@src/components/Icon";
+import { useSettings } from "@src/lib/settingsContext";
 import { formatBDT, lineDiscountAmount, lineTotal, num } from "./orderCalculations";
 import type { OrderLine } from "./types";
 
@@ -89,6 +90,13 @@ const ProductTable = ({
    currencySymbol = "৳",
 }: ProductTableProps) => {
    const theme = useTheme();
+   // Phase 1D: when Stock Out Product can Order is ON, the table's
+   // stock clamps and "Max N" warnings stand down (the server
+   // engine is relaxed the same way). Default (setting off/unset)
+   // reproduces the previous behaviour exactly.
+   const { settings } = useSettings();
+   const stockOutCanOrder =
+      (settings as any)?.customConfig?.stockOutProductCanOrder === true;
 
    // INV-02: picking a variant retargets the line at that variant's
    // SKU, price and stock pool.
@@ -105,7 +113,9 @@ const ProductTable = ({
          barcode: variant.barcode || line.productBarcode,
          stock: variantStock,
          listPrice: num(variant.salePrice ?? variant.regularPrice),
-         quantity: Math.max(1, Math.min(line.quantity, Math.max(1, variantStock))),
+         quantity: stockOutCanOrder
+            ? Math.max(1, line.quantity)
+            : Math.max(1, Math.min(line.quantity, Math.max(1, variantStock))),
       });
    };
 
@@ -174,7 +184,7 @@ const ProductTable = ({
 
             <TableBody>
                {lines.map((line) => {
-                  const overStock = line.quantity > line.stock;
+                  const overStock = !stockOutCanOrder && line.quantity > line.stock;
 
                   return (
                      <TableRow key={line.key}>
@@ -366,7 +376,7 @@ const ProductTable = ({
                               }
                               inputProps={{
                                  min: 1,
-                                 max: line.stock,
+                                 max: stockOutCanOrder ? undefined : line.stock,
                                  style: { textAlign: "center" },
                               }}
                               sx={{
