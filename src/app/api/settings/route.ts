@@ -4,6 +4,7 @@ import { prisma } from "@src/lib/prisma";
 import { sanitizeCustomConfig } from "@src/lib/customConfig";
 import { validateDefaultCourierStatusInConfig } from "@src/lib/courierSubmission";
 import { validateDecreaseStockOnInConfig } from "@src/lib/productSettings";
+import { validateOrderCreateDefaultsInConfig } from "@src/lib/orderStatusDisplay";
 import {
    logAudit,
    auditActorFromContext,
@@ -122,6 +123,11 @@ export async function GET(request: NextRequest) {
             "orderStatusHidden",
             "orderListDefaultStatuses",
             "orderTableColumns",
+            // Phase 3: Order Creation Defaults — the create form
+            // (staff roles) reads these on init.
+            "orderCreateDefaultProductId",
+            "orderCreateDefaultSource",
+            "orderCreateDefaultStatus",
          ]) {
             if (key in cfg) scrubbed[key] = cfg[key];
          }
@@ -256,6 +262,17 @@ export async function PUT(request: NextRequest) {
          if (!decreaseVerdict.ok) {
             return NextResponse.json(
                { error: "Validation error", message: decreaseVerdict.message },
+               { status: 400 },
+            );
+         }
+         // Phase 3: the Order Creation Defaults keys are validated
+         // the same way (a present default status must be a real
+         // OrderStatus; product/source must be strings).
+         const createDefaultsVerdict =
+            validateOrderCreateDefaultsInConfig(body.customConfig);
+         if (!createDefaultsVerdict.ok) {
+            return NextResponse.json(
+               { error: "Validation error", message: createDefaultsVerdict.message },
                { status: 400 },
             );
          }

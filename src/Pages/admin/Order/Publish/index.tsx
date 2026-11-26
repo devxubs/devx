@@ -38,6 +38,12 @@ import ChargesSection from "../create/ChargesSection";
 import OrderSummaryPanel from "../create/OrderSummaryPanel";
 import NotesSection from "../create/NotesSection";
 import Breadcrumbs from "@src/components/Breadcrumbs";
+import { orderSources } from "../data";
+import {
+   ORDER_STATUS_LABELS,
+   resolveOrderCreateDefaultStatus,
+   resolveOrderCreateDefaults,
+} from "@src/lib/orderStatusDisplay";
 
 const toTitleStatus = (s?: string | null) =>
    s
@@ -48,7 +54,7 @@ const Publish = () => {
    const router = useRouter();
    const params = useSearchParams();
    const editId = params?.get("id");
-   const { settings } = useSettings();
+   const { settings, loading: settingsLoading } = useSettings();
    const currencySymbol = settings.currencySymbol || "৳";
 
    const oc = useOrderCreate();
@@ -70,6 +76,54 @@ const Publish = () => {
       });
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [settings, editId]);
+
+   // Phase 3: Order Creation Defaults — applied ONCE for a NEW
+   // order, after the real settings have loaded, only while the
+   // form is still untouched and no draft is waiting to restore.
+   // The ref makes sure an employee removing the default product
+   // (or changing source/status) never sees it restored during
+   // the session, and edit mode is never touched.
+   const createDefaultsApplied = useRef(false);
+   useEffect(() => {
+      if (createDefaultsApplied.current || editId || settingsLoading) return;
+      if (oc.restorableDraft) return;
+      if (form.lines.length > 0 || form.customer.name || form.customer.phone)
+         return;
+      createDefaultsApplied.current = true;
+
+      const defaults = resolveOrderCreateDefaults(settings?.customConfig);
+      const statusValue = resolveOrderCreateDefaultStatus(settings?.customConfig);
+      const patchData: Record<string, string> = {};
+      if (defaults.source && orderSources.includes(defaults.source)) {
+         patchData.orderSource = defaults.source;
+      }
+      if (statusValue) {
+         patchData.status = ORDER_STATUS_LABELS[statusValue];
+      }
+      if (Object.keys(patchData).length > 0) patch(patchData);
+
+      if (defaults.productId) {
+         const productId = defaults.productId;
+         (async () => {
+            try {
+               const res = await fetch(`/api/products/${productId}`);
+               if (!res.ok) return;
+               const product = await res.json();
+               // An inactive/deleted default is skipped, never
+               // forced. A live product goes through the page's
+               // own addProduct, so stock gates, variant handling
+               // (no variant is pre-picked), pricing and duplicate
+               // rules all apply exactly as for a manual pick.
+               if (!product?.id || product.isDeleted) return;
+               if (product.status && product.status !== "ACTIVE") return;
+               oc.addProduct(product);
+            } catch {
+               /* an unavailable default is skipped silently */
+            }
+         })();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [settings, settingsLoading, editId, oc.restorableDraft]);
 
    // Edit mode: load the order and hydrate the form (previous behaviour).
    useEffect(() => {

@@ -2,6 +2,7 @@
 
 import React from "react";
 import OrderDisplaySection from "./OrderDisplaySection";
+import OrderCreateDefaultsSection from "./OrderCreateDefaultsSection";
 import {
    Grid,
    MenuItem,
@@ -178,6 +179,9 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
          {/* Phase 2: Order Display & Sorting (status order,
              visibility, list defaults, table columns). */}
          <OrderDisplaySection values={values} onConfigChange={onConfigChange} />
+
+         {/* Phase 3: Order Creation Defaults. */}
+         <OrderCreateDefaultsSection values={values} onConfigChange={onConfigChange} />
       </Stack>
    );
 }

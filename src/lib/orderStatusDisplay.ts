@@ -214,6 +214,101 @@ export function resolveOrderTableColumns(
    return { order, hidden };
 }
 
+// ── Phase 3: Order Creation Defaults ─────────────────────────────────
+//
+//   orderCreateDefaultProductId: string  — Product.id
+//   orderCreateDefaultSource:     string  — an Order Source label
+//   orderCreateDefaultStatus:     string  — an OrderStatus enum value
+//
+// Applied ONCE when a NEW Order Create form initialises (never on
+// edit, never over a restorable draft, never re-applied after the
+// employee changes anything). The status default respects the
+// Phase 2 create-location visibility: a configured status that is
+// hidden from create pickers falls back to Pending when visible,
+// else to the first create-visible status.
+
+export const ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY = "orderCreateDefaultProductId";
+export const ORDER_CREATE_DEFAULT_SOURCE_KEY = "orderCreateDefaultSource";
+export const ORDER_CREATE_DEFAULT_STATUS_KEY = "orderCreateDefaultStatus";
+
+export interface OrderCreateDefaults {
+   productId: string | null;
+   source: string | null;
+   status: OrderStatusValue | null;
+}
+
+export function resolveOrderCreateDefaults(customConfig: unknown): OrderCreateDefaults {
+   const cfg = asConfigObject(customConfig);
+   const productId = cfg[ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY];
+   const source = cfg[ORDER_CREATE_DEFAULT_SOURCE_KEY];
+   const status = cfg[ORDER_CREATE_DEFAULT_STATUS_KEY];
+   return {
+      productId:
+         typeof productId === "string" && productId.trim() !== "" ? productId : null,
+      source: typeof source === "string" && source.trim() !== "" ? source : null,
+      status:
+         typeof status === "string" && KNOWN.has(status)
+            ? (status as OrderStatusValue)
+            : null,
+   };
+}
+
+/**
+ * The status a new order should start with, or null when no
+ * default is configured (the form's built-in default stands).
+ * A configured-but-create-hidden status falls back safely:
+ * Pending when create-visible, else the first create-visible
+ * status, else Pending.
+ */
+export function resolveOrderCreateDefaultStatus(
+   customConfig: unknown,
+): OrderStatusValue | null {
+   const configured = resolveOrderCreateDefaults(customConfig).status;
+   if (!configured) return null;
+   const visible = statusOptionsFor("create", customConfig).map((o) => o.value);
+   if (visible.includes(configured)) return configured;
+   if (visible.includes("PENDING")) return "PENDING";
+   return visible[0] ?? "PENDING";
+}
+
+/**
+ * Settings-PUT validation for the Phase 3 keys, mirroring the
+ * decreaseStockOn validator's contract: unset keys are valid;
+ * a present status must be a known OrderStatus; product/source
+ * must be strings when present.
+ */
+export function validateOrderCreateDefaultsInConfig(customConfig: unknown):
+   | { ok: true }
+   | { ok: false; message: string } {
+   if (
+      !customConfig ||
+      typeof customConfig !== "object" ||
+      Array.isArray(customConfig)
+   ) {
+      return { ok: true };
+   }
+   const cfg = customConfig as Record<string, unknown>;
+   const status = cfg[ORDER_CREATE_DEFAULT_STATUS_KEY];
+   if (
+      status !== undefined &&
+      status !== null &&
+      status !== "" &&
+      (typeof status !== "string" || !KNOWN.has(status))
+   ) {
+      return {
+         ok: false,
+         message: `${ORDER_CREATE_DEFAULT_STATUS_KEY} must be one of: ${ORDER_STATUSES.join(", ")}.`,
+      };
+   }
+   for (const key of [ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY, ORDER_CREATE_DEFAULT_SOURCE_KEY]) {
+      const v = cfg[key];
+      if (v !== undefined && v !== null && typeof v !== "string") {
+         return { ok: false, message: `${key} must be a string.` };
+      }
+   }
+   return { ok: true };
+}
+
 /** Apply a resolved column layout to a columns array (keeps non-configurable columns, e.g. actions, pinned at the end in their original relative order). */
 export function applyColumnLayout<T extends { field: string }>(
    columns: T[],

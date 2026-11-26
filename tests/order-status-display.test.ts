@@ -9,6 +9,9 @@ import {
    resolveOrderListDefaultStatuses,
    resolveOrderTableColumns,
    applyColumnLayout,
+   resolveOrderCreateDefaults,
+   resolveOrderCreateDefaultStatus,
+   validateOrderCreateDefaultsInConfig,
    ORDER_TABLE_CONFIGURABLE_FIELDS,
 } from "@src/lib/orderStatusDisplay";
 import { ORDER_STATUSES } from "@src/lib/orderStatus";
@@ -154,5 +157,77 @@ describe("order table columns", () => {
          "orderId",
          "@actions",
       ]);
+   });
+});
+
+describe("Phase 3 — Order Creation Defaults", () => {
+   it("resolves nothing when unconfigured (built-in defaults stand)", () => {
+      expect(resolveOrderCreateDefaults(null)).toEqual({
+         productId: null,
+         source: null,
+         status: null,
+      });
+      expect(resolveOrderCreateDefaultStatus(null)).toBeNull();
+      expect(resolveOrderCreateDefaultStatus({})).toBeNull();
+   });
+
+   it("resolves the configured triple, ignoring blanks and unknown statuses", () => {
+      expect(
+         resolveOrderCreateDefaults({
+            orderCreateDefaultProductId: "p-1",
+            orderCreateDefaultSource: "Facebook",
+            orderCreateDefaultStatus: "CONFIRMED",
+         }),
+      ).toEqual({ productId: "p-1", source: "Facebook", status: "CONFIRMED" });
+      expect(
+         resolveOrderCreateDefaults({
+            orderCreateDefaultProductId: "  ",
+            orderCreateDefaultStatus: "RETURNED",
+         }).status,
+      ).toBeNull();
+   });
+
+   it("a create-visible configured status is used as-is", () => {
+      expect(
+         resolveOrderCreateDefaultStatus({ orderCreateDefaultStatus: "PROCESSING" }),
+      ).toBe("PROCESSING");
+   });
+
+   it("a create-HIDDEN configured status falls back to Pending when visible", () => {
+      const cfg = {
+         orderCreateDefaultStatus: "HOLD",
+         orderStatusHidden: { create: ["HOLD"] },
+      };
+      expect(resolveOrderCreateDefaultStatus(cfg)).toBe("PENDING");
+   });
+
+   it("falls back to the first create-visible status when Pending is also hidden", () => {
+      const cfg = {
+         orderCreateDefaultStatus: "HOLD",
+         orderStatusHidden: { create: ["HOLD", "PENDING"] },
+         orderStatusOrder: ["SHIPPED", "PENDING", "HOLD"],
+      };
+      expect(resolveOrderCreateDefaultStatus(cfg)).toBe("SHIPPED");
+   });
+
+   it("settings-PUT validation accepts unset/valid and rejects bad values", () => {
+      expect(validateOrderCreateDefaultsInConfig(null).ok).toBe(true);
+      expect(validateOrderCreateDefaultsInConfig({}).ok).toBe(true);
+      expect(
+         validateOrderCreateDefaultsInConfig({
+            orderCreateDefaultStatus: "CONFIRMED",
+            orderCreateDefaultProductId: "p-1",
+         }).ok,
+      ).toBe(true);
+      expect(
+         validateOrderCreateDefaultsInConfig({
+            orderCreateDefaultStatus: "RETURNED",
+         }).ok,
+      ).toBe(false);
+      expect(
+         validateOrderCreateDefaultsInConfig({
+            orderCreateDefaultProductId: 42,
+         }).ok,
+      ).toBe(false);
    });
 });
