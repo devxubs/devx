@@ -6,16 +6,14 @@ import {
    Box,
    Button,
    Chip,
-   FormControl,
    Grid,
    IconButton,
-   MenuItem,
-   Select,
    Stack,
    Tooltip,
    Typography,
 } from "@mui/material";
 import { useSnackbar } from "@src/lib/snackbarContext";
+import CustomAutocomplete from "@src/components/Autocomplete";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import FilterModalShell from "@src/components/FilterModalShell";
@@ -156,6 +154,19 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
       setDraft(filters);
       setFilterOpen(true);
    };
+
+   // Filter-modal product options for the shared CustomAutocomplete:
+   // a synthetic "All products" entry (id "") heads the list, exactly
+   // the entry the old Select offered — selecting it clears the
+   // product filter. The draft's selected option is derived from
+   // draft.productId the same way Adjust Stock derives its product.
+   const productFilterOptions: any[] = [
+      { id: "", productName: "All products" },
+      ...products,
+   ];
+   const draftProductOption =
+      productFilterOptions.find((p) => p.id === draft.productId) ||
+      productFilterOptions[0];
 
    const columns: ColumnConfig[] = [
       { field: "date", headerName: "Date", width: 180 },
@@ -344,44 +355,46 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
             <Grid container spacing={2}>
                <Grid size={{ xs: 12, sm: 6 }}>
                   <FieldLabel>Movement Type</FieldLabel>
-                  <FormControl size="small" fullWidth>
-                     <Select
-                        value={draft.type}
-                        onChange={(e) =>
-                           setDraft({
-                              ...draft,
-                              type: String(e.target.value),
-                           })
-                        }
-                     >
-                        {TYPE_OPTIONS.map((t) => (
-                           <MenuItem key={t} value={t}>
-                              {t}
-                           </MenuItem>
-                        ))}
-                     </Select>
-                  </FormControl>
+                  {/* Shared CustomAutocomplete (arrow mode, small) —
+                      the same component/pattern as Purchase Create
+                      and Adjust Stock. Options and the "All" default
+                      are unchanged. */}
+                  <CustomAutocomplete
+                     arrow
+                     size="small"
+                     options={TYPE_OPTIONS}
+                     value={draft.type}
+                     onChange={(val: any) =>
+                        setDraft({
+                           ...draft,
+                           type: typeof val === "string" && val ? val : "All",
+                        })
+                     }
+                  />
                </Grid>
                <Grid size={{ xs: 12, sm: 6 }}>
                   <FieldLabel>Product</FieldLabel>
-                  <FormControl size="small" fullWidth>
-                     <Select
-                        value={draft.productId}
-                        onChange={(e) =>
-                           setDraft({
-                              ...draft,
-                              productId: String(e.target.value),
-                           })
-                        }
-                     >
-                        <MenuItem value="">All products</MenuItem>
-                        {products.map((p) => (
-                           <MenuItem key={p.id} value={p.id}>
-                              {p.productName}
-                           </MenuItem>
-                        ))}
-                     </Select>
-                  </FormControl>
+                  <CustomAutocomplete
+                     placeholder="Search product..."
+                     arrow
+                     size="small"
+                     options={productFilterOptions}
+                     value={draftProductOption}
+                     onChange={(val: any) =>
+                        setDraft({
+                           ...draft,
+                           productId: val?.id || "",
+                        })
+                     }
+                     getOptionLabel={(option: any) =>
+                        typeof option === "string"
+                           ? option
+                           : option?.productName || ""
+                     }
+                     isOptionEqualToValue={(option: any, value: any) =>
+                        option?.id === value?.id
+                     }
+                  />
                </Grid>
                <Grid size={{ xs: 12, sm: 6 }}>
                   <FieldLabel>Date Range</FieldLabel>
