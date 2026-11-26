@@ -3,11 +3,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
    Badge,
+   Box,
    Button,
    Chip,
    FormControl,
+   Grid,
    IconButton,
-   InputLabel,
    MenuItem,
    Select,
    Stack,
@@ -19,6 +20,7 @@ import CustomTable, { ColumnConfig } from "@src/components/Table";
 import DateRange from "@src/components/DateRange";
 import FilterModalShell from "@src/components/FilterModalShell";
 import Icon from "@src/components/Icon";
+import FieldLabel from "./FieldLabel";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import type { StockProduct } from "./index";
 
@@ -162,8 +164,12 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
          headerName: "Product",
          flex: 1,
          renderCell: (params: any) => (
-            <Stack spacing={0} sx={{ py: 0.5 }}>
-               <Typography variant="body2">{params.row.productName}</Typography>
+            <Stack spacing={0} sx={{ py: 0.5, minWidth: 0 }}>
+               <Tooltip title={params.row.productName} disableInteractive>
+                  <Typography variant="body2" noWrap>
+                     {params.row.productName}
+                  </Typography>
+               </Tooltip>
                {params.row.variantName && (
                   <Typography
                      variant="caption"
@@ -203,7 +209,18 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
          ),
       },
       { field: "reference", headerName: "Reference", width: 170 },
-      { field: "note", headerName: "Reason / Note", flex: 1 },
+      {
+         field: "note",
+         headerName: "Reason / Note",
+         flex: 1,
+         renderCell: (params: any) => (
+            <Tooltip title={params.row.note} disableInteractive>
+               <Typography variant="body2" noWrap>
+                  {params.row.note}
+               </Typography>
+            </Tooltip>
+         ),
+      },
    ];
 
    // P3-6: applied-filter chips. The tab's filters live in local
@@ -320,48 +337,66 @@ const MovementsTab = ({ products, refreshKey }: MovementsTabProps) => {
             }}
             onReset={() => setDraft(EMPTY_FILTERS)}
          >
-            <FormControl size="small" fullWidth>
-               <InputLabel>Movement Type</InputLabel>
-               <Select
-                  label="Movement Type"
-                  value={draft.type}
-                  onChange={(e) =>
-                     setDraft({ ...draft, type: String(e.target.value) })
-                  }
-               >
-                  {TYPE_OPTIONS.map((t) => (
-                     <MenuItem key={t} value={t}>
-                        {t}
-                     </MenuItem>
-                  ))}
-               </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-               <InputLabel>Product</InputLabel>
-               <Select
-                  label="Product"
-                  value={draft.productId}
-                  onChange={(e) =>
-                     setDraft({
-                        ...draft,
-                        productId: String(e.target.value),
-                     })
-                  }
-               >
-                  <MenuItem value="">All products</MenuItem>
-                  {products.map((p) => (
-                     <MenuItem key={p.id} value={p.id}>
-                        {p.productName}
-                     </MenuItem>
-                  ))}
-               </Select>
-            </FormControl>
-            <DateRange
-               size="small"
-               title="Date Range"
-               value={draft.range}
-               onChange={(v: any) => setDraft({ ...draft, range: v })}
-            />
+            {/* Field layout follows the create-page form system:
+                labels above small fields, two per row on sm+,
+                full-width stacked on mobile. The shell owns the
+                frame, scroll and the Reset / Cancel / Apply footer. */}
+            <Grid container spacing={2}>
+               <Grid size={{ xs: 12, sm: 6 }}>
+                  <FieldLabel>Movement Type</FieldLabel>
+                  <FormControl size="small" fullWidth>
+                     <Select
+                        value={draft.type}
+                        onChange={(e) =>
+                           setDraft({
+                              ...draft,
+                              type: String(e.target.value),
+                           })
+                        }
+                     >
+                        {TYPE_OPTIONS.map((t) => (
+                           <MenuItem key={t} value={t}>
+                              {t}
+                           </MenuItem>
+                        ))}
+                     </Select>
+                  </FormControl>
+               </Grid>
+               <Grid size={{ xs: 12, sm: 6 }}>
+                  <FieldLabel>Product</FieldLabel>
+                  <FormControl size="small" fullWidth>
+                     <Select
+                        value={draft.productId}
+                        onChange={(e) =>
+                           setDraft({
+                              ...draft,
+                              productId: String(e.target.value),
+                           })
+                        }
+                     >
+                        <MenuItem value="">All products</MenuItem>
+                        {products.map((p) => (
+                           <MenuItem key={p.id} value={p.id}>
+                              {p.productName}
+                           </MenuItem>
+                        ))}
+                     </Select>
+                  </FormControl>
+               </Grid>
+               <Grid size={{ xs: 12, sm: 6 }}>
+                  <FieldLabel>Date Range</FieldLabel>
+                  <Box>
+                     <DateRange
+                        size="small"
+                        title="Select range"
+                        value={draft.range}
+                        onChange={(v: any) =>
+                           setDraft({ ...draft, range: v })
+                        }
+                     />
+                  </Box>
+               </Grid>
+            </Grid>
          </FilterModalShell>
       </Stack>
    );

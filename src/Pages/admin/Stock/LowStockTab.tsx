@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Button, Stack, Typography } from "@mui/material";
+import { Button, Stack, Tooltip, Typography } from "@mui/material";
 import { useRouter } from "next/navigation";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import Icon from "@src/components/Icon";
@@ -120,8 +120,12 @@ const LowStockTab = ({
          headerName: "Product",
          flex: 1,
          renderCell: (params: any) => (
-            <Stack spacing={0} sx={{ py: 0.5 }}>
-               <Typography variant="body2">{params.row.productName}</Typography>
+            <Stack spacing={0} sx={{ py: 0.5, minWidth: 0 }}>
+               <Tooltip title={params.row.productName} disableInteractive>
+                  <Typography variant="body2" noWrap>
+                     {params.row.productName}
+                  </Typography>
+               </Tooltip>
                <Typography variant="caption" color="text.secondary">
                   SKU: {params.row.productSku}
                   {params.row.isVariant

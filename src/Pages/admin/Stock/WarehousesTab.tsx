@@ -18,6 +18,7 @@ import { useSnackbar } from "@src/lib/snackbarContext";
 import CustomTable, { ColumnConfig } from "@src/components/Table";
 import CustomModal from "@src/components/Modal";
 import Icon from "@src/components/Icon";
+import FieldLabel from "./FieldLabel";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 
 // Phase 3A (3.2): warehouses from the warehouses API (GET list with
@@ -210,8 +211,10 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
          headerName: "Name",
          flex: 1,
          renderCell: (params: any) => (
-            <Stack direction="row" spacing={1} alignItems="center">
-               <Typography variant="body2">{params.row.name}</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+               <Typography variant="body2" noWrap>
+                  {params.row.name}
+               </Typography>
                {params.row.isDefault && (
                   <Chip
                      size="small"
@@ -312,59 +315,87 @@ const WarehousesTab = ({ refreshKey }: { refreshKey: number }) => {
             title={editing ? "Edit Warehouse" : "Add Warehouse"}
          >
             <Stack spacing={2} sx={{ mt: 1, minWidth: { sm: 420 } }}>
-               <TextField
-                  label="Name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  fullWidth
-                  size="small"
-                  required
-               />
-               <TextField
-                  label="Code (optional)"
-                  value={form.code}
-                  onChange={(e) => setForm({ ...form, code: e.target.value })}
-                  fullWidth
-                  size="small"
-               />
-               <TextField
-                  label="Address"
-                  value={form.address}
-                  onChange={(e) =>
-                     setForm({ ...form, address: e.target.value })
-                  }
-                  fullWidth
-                  size="small"
-               />
-               <TextField
-                  label="Phone"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  fullWidth
-                  size="small"
-               />
-               <FormControlLabel
-                  control={
-                     <Switch
-                        checked={form.isDefault}
-                        onChange={(e) =>
-                           setForm({ ...form, isDefault: e.target.checked })
-                        }
-                        color="primary"
-                     />
-                  }
-                  label={
-                     <Box>
-                        <Typography variant="subtitle2" fontWeight={600}>
-                           Default warehouse
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                           The stock engine mirrors stock changes to the
-                           default warehouse
-                        </Typography>
-                     </Box>
-                  }
-               />
+               <Box>
+                  <FieldLabel>Name</FieldLabel>
+                  <TextField
+                     value={form.name}
+                     onChange={(e) =>
+                        setForm({ ...form, name: e.target.value })
+                     }
+                     fullWidth
+                     size="small"
+                     required
+                  />
+               </Box>
+               <Box>
+                  <FieldLabel optional>Code</FieldLabel>
+                  <TextField
+                     value={form.code}
+                     onChange={(e) =>
+                        setForm({ ...form, code: e.target.value })
+                     }
+                     fullWidth
+                     size="small"
+                  />
+               </Box>
+               <Box>
+                  <FieldLabel optional>Address</FieldLabel>
+                  <TextField
+                     value={form.address}
+                     onChange={(e) =>
+                        setForm({ ...form, address: e.target.value })
+                     }
+                     fullWidth
+                     size="small"
+                  />
+               </Box>
+               <Box>
+                  <FieldLabel optional>Phone</FieldLabel>
+                  <TextField
+                     value={form.phone}
+                     onChange={(e) =>
+                        setForm({ ...form, phone: e.target.value })
+                     }
+                     fullWidth
+                     size="small"
+                  />
+               </Box>
+               {/* The Default Warehouse control lives ONLY in the
+                   edit flow (owner request): creating a warehouse
+                   never shows it — the server's default-warehouse
+                   system is untouched (the first warehouse still
+                   becomes default server-side), and reassigning the
+                   default happens by editing another warehouse. */}
+               {editing && (
+                  <FormControlLabel
+                     control={
+                        <Switch
+                           checked={form.isDefault}
+                           onChange={(e) =>
+                              setForm({
+                                 ...form,
+                                 isDefault: e.target.checked,
+                              })
+                           }
+                           color="primary"
+                        />
+                     }
+                     label={
+                        <Box>
+                           <Typography variant="subtitle2" fontWeight={600}>
+                              Default warehouse
+                           </Typography>
+                           <Typography
+                              variant="caption"
+                              color="text.secondary"
+                           >
+                              The stock engine mirrors stock changes to the
+                              default warehouse
+                           </Typography>
+                        </Box>
+                     }
+                  />
+               )}
                <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
                   <Button
                      variant="text"
