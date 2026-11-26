@@ -15,6 +15,7 @@ import React, { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Icon from "@src/components/Icon";
 import useQueryParams from "@src/handler/useQueryParams";
+import { usePathname, useRouter } from "next/navigation";
 import Header from "./Header";
 import CustomBox from "@src/components/CustomBox";
 import { useSettings } from "@src/lib/settingsContext";
@@ -87,7 +88,25 @@ const tabMeta: Record<string, { title: string; subtitle: string; icon: string }>
 const Layout = () => {
    const theme = useTheme();
    const query = useQueryParams();
-   const selectedTab = query.get("tab") || "general";
+   const router = useRouter();
+   const pathname = usePathname();
+   // RP-1 (C6): an unknown ?tab= value used to render the General
+   // tab silently under a wrong URL. Validate against tabMeta and
+   // correct the URL (replace, so Back doesn't loop) to the tab
+   // actually shown.
+   const requestedTab = query.get("tab") || "general";
+   const selectedTab =
+      requestedTab in tabMeta ? requestedTab : "general";
+   useEffect(() => {
+      if (requestedTab !== selectedTab) {
+         const params = new URLSearchParams(query.toString());
+         params.set("tab", selectedTab);
+         router.replace(`${pathname}?${params.toString()}`, {
+            scroll: false,
+         });
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [requestedTab, selectedTab]);
    const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
 
    const { settings, loading, updateSettings, getLastSaveError, resetSettings } = useSettings();
@@ -305,11 +324,18 @@ const Layout = () => {
                   </Stack>
                </Stack>
 
-               {/* Render Tab Component */}
-               <Box sx={{ pb: 6 }}>{renderTabContent()}</Box>
+               {/* Render Tab Component — RP-1 (S1): bottom padding
+                   sized to clear the action bar below (bar ≈ 60px +
+                   breathing room), so the last row of every tab is
+                   fully visible at scroll end. */}
+               <Box sx={{ pb: 10 }}>{renderTabContent()}</Box>
             </Stack>
 
-            {/* Persistent Bottom Action Bar */}
+            {/* Persistent Bottom Action Bar — RP-1 (S1): sticky
+                to the bottom of the settings column with its own
+                stacking layer and no flex compression, so it can
+                never ride over the tab content when the shell's
+                height maths differs from this page's 100vh calc. */}
             <Paper
                elevation={3}
                sx={{
@@ -321,6 +347,10 @@ const Layout = () => {
                   justifyContent: "space-between",
                   alignItems: "center",
                   bgcolor: "background.paper",
+                  position: "sticky",
+                  bottom: 0,
+                  zIndex: 2,
+                  flexShrink: 0,
                }}
             >
                <Typography variant="caption" color="text.secondary">

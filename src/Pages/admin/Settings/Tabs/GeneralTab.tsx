@@ -189,7 +189,7 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
                <TextField
                   select
                   fullWidth
@@ -207,7 +207,7 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                </TextField>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
                <TextField
                   select
                   fullWidth
@@ -225,7 +225,7 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                </TextField>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
                <TextField
                   select
                   fullWidth

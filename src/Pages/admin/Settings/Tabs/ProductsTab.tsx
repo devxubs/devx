@@ -147,7 +147,7 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
                         label={
                            <Box>
                               <Typography variant="subtitle2" fontWeight={600}>
-                                 Stock Out Product can Order
+                                 Allow ordering out-of-stock products
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
                                  Allow orders to be placed for products that are out of stock

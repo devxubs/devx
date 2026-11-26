@@ -102,22 +102,12 @@ export default function CourierProvidersCard() {
                                     verification (D5) is complete.
                                  </Typography>
                               ) : (
-                                 <>
-                                    <Typography variant="body2" color="text.secondary">
-                                       Missing environment variables:
-                                    </Typography>
-                                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                                       {p.missing.map((key) => (
-                                          <Chip
-                                             key={key}
-                                             size="small"
-                                             variant="outlined"
-                                             label={key}
-                                             sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}
-                                          />
-                                       ))}
-                                    </Stack>
-                                 </>
+                                 <Typography variant="body2" color="text.secondary">
+                                    Not connected. Courier integrations are
+                                    configured on the server by your system
+                                    administrator — there is nothing to enter
+                                    here.
+                                 </Typography>
                               )}
                            </Stack>
                         </CardContent>
