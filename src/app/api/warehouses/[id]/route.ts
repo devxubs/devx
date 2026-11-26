@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { normalizeWarehouseUpdate } from "@src/lib/warehouse";
+import { writeDefaultWarehouseIdSetting } from "@src/lib/productSettings";
 
 // P2-1: warehouse update/delete. Warehouses borrow the product
 // permission family (the warehouses POST does the same — audit S-5
@@ -112,6 +113,17 @@ export async function PUT(
             data,
          });
       });
+
+      // Phase 1C (warehouse → setting direction): setting this
+      // warehouse as default mirrors into the Product Settings
+      // defaultWarehouseId. Best effort, as in the create path.
+      if (data.isDefault === true) {
+         try {
+            await writeDefaultWarehouseIdSetting(prisma, target.id);
+         } catch {
+            /* mirror failure must not fail the warehouse update */
+         }
+      }
 
       return NextResponse.json(updated);
    } catch (error: any) {

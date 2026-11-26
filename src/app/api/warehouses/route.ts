@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { generateNextEntityId } from "@src/lib/idGenerator";
+import { writeDefaultWarehouseIdSetting } from "@src/lib/productSettings";
 
 export async function GET(request: NextRequest) {
    const sessionGate = await requireActiveSession(request);
@@ -79,6 +80,18 @@ export async function POST(request: NextRequest) {
             isDefault: makeDefault,
          },
       });
+
+      // Phase 1C (warehouse → setting direction): when this create
+      // made the warehouse the default, mirror it into the Product
+      // Settings defaultWarehouseId so both views agree. Best
+      // effort — the warehouse row is the source of truth.
+      if (makeDefault) {
+         try {
+            await writeDefaultWarehouseIdSetting(prisma, warehouse.id);
+         } catch {
+            /* mirror failure must not fail the warehouse create */
+         }
+      }
 
       return NextResponse.json(warehouse, { status: 201 });
    } catch (error: any) {

@@ -33,6 +33,159 @@
  * back together.
  */
 
+import { resolveStockOutProductCanOrder } from "@src/lib/productSettings";
+
+// ── Phase 1E: courier-submission stock availability ──────────────────
+
+export interface CourierShortage {
+   productId: string;
+   variantId: string | null;
+   productName: string;
+   required: number;
+   available: number;
+}
+
+/**
+ * Thrown by the single-order update paths when the Out Of Stock
+ * can Submit Courier setting is OFF and an order being assigned a
+ * courier does not have the stock to fulfil it. Mapped to a 400
+ * by the route, like InsufficientStockError.
+ */
+export class CourierStockError extends Error {
+   shortages: CourierShortage[];
+
+   constructor(shortages: CourierShortage[]) {
+      super(
+         `Insufficient stock for courier submission: ${shortages
+            .map((s) => `${s.productName} (need ${s.required}, have ${s.available})`)
+            .join("; ")}`,
+      );
+      this.name = "CourierStockError";
+      this.shortages = shortages;
+   }
+}
+
+type CourierProductRow = {
+   id: string;
+   productName: string;
+   quantity: number;
+   trackInventory?: boolean | null;
+   allowNegativeStock?: boolean | null;
+   variants?: Array<{ id: string; quantity: number }> | null;
+};
+
+type CourierItemLine = {
+   productId: string | null;
+   variantId?: string | null;
+   quantity: number;
+   name?: string | null;
+};
+
+/**
+ * Pure shortage computation for a courier submission. Required
+ * quantities are aggregated per (productId, variantId) pool and
+ * compared against the pool's CURRENT quantity plus whatever of
+ * that pool the order itself already holds (heldItems — its own
+ * deducted lines, whose units are already out of the pool and
+ * reserved for it). Lines are skipped when the product does not
+ * track inventory or allows negative stock (it can always be
+ * fulfilled), and when the product no longer exists (nothing to
+ * verify against — the stock engine skips those lines too). This
+ * check deliberately ignores the Stock Out Product can Order
+ * setting: courier submission is gated on physical availability.
+ */
+export function findCourierShortages(
+   products: CourierProductRow[],
+   items: CourierItemLine[],
+   heldItems: CourierItemLine[] = [],
+): CourierShortage[] {
+   const productMap = new Map(products.map((p) => [p.id, p]));
+   const pools = new Map<
+      string,
+      { product: CourierProductRow; variantId: string | null; required: number; held: number }
+   >();
+   const keyOf = (productId: string, variantId: string | null) =>
+      `${productId}::${variantId ?? ""}`;
+
+   const accumulate = (lines: CourierItemLine[], field: "required" | "held") => {
+      for (const line of lines) {
+         if (!line.productId) continue;
+         const product = productMap.get(line.productId);
+         if (!product) continue;
+         if (product.trackInventory === false) continue;
+         if (product.allowNegativeStock) continue;
+         const key = keyOf(line.productId, line.variantId ?? null);
+         const pool = pools.get(key) || {
+            product,
+            variantId: line.variantId ?? null,
+            required: 0,
+            held: 0,
+         };
+         pool[field] += line.quantity || 0;
+         pools.set(key, pool);
+      }
+   };
+   accumulate(items, "required");
+   accumulate(heldItems, "held");
+
+   const shortages: CourierShortage[] = [];
+   for (const pool of pools.values()) {
+      if (pool.required <= 0) continue;
+      let available = pool.product.quantity;
+      if (pool.variantId) {
+         const variant = (pool.product.variants || []).find(
+            (v) => v.id === pool.variantId,
+         );
+         available = variant ? variant.quantity : 0;
+      }
+      if (available + pool.held < pool.required) {
+         shortages.push({
+            productId: pool.product.id,
+            variantId: pool.variantId,
+            productName: pool.product.productName,
+            required: pool.required,
+            available: available + pool.held,
+         });
+      }
+   }
+   return shortages;
+}
+
+/**
+ * Load the products behind the required lines and compute courier
+ * shortages. `heldItems` are the lines whose units are already out
+ * of stock for this order (its deducted lines — for an edit, the
+ * PRE-edit lines; for a status/courier-only write, the same
+ * lines). Works with any Prisma-like client.
+ */
+export async function checkCourierStockAvailability(
+   db: any,
+   items: CourierItemLine[],
+   heldItems: CourierItemLine[] = [],
+): Promise<CourierShortage[]> {
+   const ids = Array.from(
+      new Set(
+         [...items, ...heldItems].map((i) => i.productId).filter(Boolean),
+      ),
+   ) as string[];
+   if (ids.length === 0) return [];
+   const products = await db.product.findMany({
+      where: { id: { in: ids } },
+      select: {
+         id: true,
+         productName: true,
+         quantity: true,
+         trackInventory: true,
+         allowNegativeStock: true,
+         variants: {
+            where: { isDeleted: false },
+            select: { id: true, quantity: true },
+         },
+      },
+   });
+   return findCourierShortages(products, items, heldItems);
+}
+
 export class InsufficientStockError extends Error {
    productId: string;
    productName: string;
@@ -138,6 +291,25 @@ export async function findVariantlessVariableLine(
 export interface StockSettings {
    enableStockValidation: boolean;
    enableLowStockAlert: boolean;
+   /**
+    * Phase 1D (Product Settings → Stock Out Product can Order):
+    * when true, order-side stock validation is relaxed — orders
+    * may deduct past zero. Optional so existing callers/tests that
+    * build settings literals keep the strict behaviour.
+    */
+   stockOutProductCanOrder?: boolean;
+}
+
+/**
+ * The effective ORDER-side validation switch: the master
+ * enableStockValidation column AND NOT the Stock Out Product can
+ * Order setting. Per-product allowNegativeStock is applied
+ * separately at each guard site, exactly as before. Purchase and
+ * manual-adjustment paths do not use this helper — the setting
+ * governs ordering only.
+ */
+export function orderStockValidationOn(settings: StockSettings): boolean {
+   return settings.enableStockValidation && settings.stockOutProductCanOrder !== true;
 }
 
 /**
@@ -149,14 +321,23 @@ export async function loadStockSettings(db: any): Promise<StockSettings> {
       const s = await db.storeSetting.findUnique({ where: { id: "default" } });
       if (!s) {
          // Schema defaults: validation on, low-stock alerts on.
-         return { enableStockValidation: true, enableLowStockAlert: true };
+         return {
+            enableStockValidation: true,
+            enableLowStockAlert: true,
+            stockOutProductCanOrder: false,
+         };
       }
       return {
          enableStockValidation: s.enableStockValidation !== false,
          enableLowStockAlert: s.enableLowStockAlert !== false,
+         stockOutProductCanOrder: resolveStockOutProductCanOrder(s.customConfig),
       };
    } catch {
-      return { enableStockValidation: true, enableLowStockAlert: true };
+      return {
+         enableStockValidation: true,
+         enableLowStockAlert: true,
+         stockOutProductCanOrder: false,
+      };
    }
 }
 
@@ -439,7 +620,7 @@ export async function deductStockForItems(
       const variant = resolveVariant(variantMap, entry);
       const qty = entry.quantity;
 
-      if (opts.settings.enableStockValidation && !product.allowNegativeStock) {
+      if (orderStockValidationOn(opts.settings) && !product.allowNegativeStock) {
          if (variant) {
             if (variant.quantity < qty) {
                throw new InsufficientStockError(
@@ -468,7 +649,7 @@ export async function deductStockForItems(
       // decremented first so a variant race leaves no partial
       // product write behind.
       const guarded =
-         opts.settings.enableStockValidation && !product.allowNegativeStock;
+         orderStockValidationOn(opts.settings) && !product.allowNegativeStock;
       if (variant) {
          await decrementVariantGuarded(tx, product, variant, qty, guarded);
       }
@@ -604,7 +785,7 @@ export async function applyStockDifference(
    }
 
    if (diff > 0) {
-      if (opts.settings.enableStockValidation && !product.allowNegativeStock) {
+      if (orderStockValidationOn(opts.settings) && !product.allowNegativeStock) {
          if (variant) {
             if (variant.quantity < diff) {
                throw new InsufficientStockError(
@@ -627,7 +808,7 @@ export async function applyStockDifference(
       // C4-5 (audit R-1 / P2-22): conditional decrement, same race
       // guard as deductStockForItems (variant pool first).
       const guarded =
-         opts.settings.enableStockValidation && !product.allowNegativeStock;
+         orderStockValidationOn(opts.settings) && !product.allowNegativeStock;
       if (variant) {
          await decrementVariantGuarded(tx, product, variant, diff, guarded);
       }

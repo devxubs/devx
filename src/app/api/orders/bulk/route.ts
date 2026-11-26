@@ -5,6 +5,7 @@ import {
    loadStockSettings,
    deductStockForItems,
    restoreStockForItems,
+   checkCourierStockAvailability,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
@@ -12,6 +13,7 @@ import { lockOrderRow } from "@src/lib/orderLock";
 import {
    decideStockHolding,
    loadDecreaseStockOn,
+   loadOutOfStockCanSubmitCourier,
 } from "@src/lib/productSettings";
 import { logAudit, requestAuditContext } from "@src/lib/audit";
 import {
@@ -406,6 +408,36 @@ export async function POST(request: NextRequest) {
                   courierStatus === "In Courier" && !order.courierSubmittedAt
                      ? new Date()
                      : undefined;
+               // Phase 1E: when Out Of Stock can Submit Courier is
+               // OFF, an actual submission (a courier change, or
+               // the first "In Courier" stamp) is gated on physical
+               // stock availability for this order's lines — the
+               // order fails alone with a clear error and is
+               // excluded from the print set; a pure no-op
+               // re-assignment is not gated. The order's own
+               // already-deducted units count as held for it.
+               if (
+                  (Object.keys(courierChanges).length > 0 || stampSubmittedAt) &&
+                  !(await loadOutOfStockCanSubmitCourier(tx))
+               ) {
+                  const shortages = await checkCourierStockAvailability(
+                     tx,
+                     order.items,
+                     order.stockDeducted ? order.items : [],
+                  );
+                  if (shortages.length > 0) {
+                     return {
+                        ok: false,
+                        displayId,
+                        error: `Insufficient stock for courier submission: ${shortages
+                           .map(
+                              (s) =>
+                                 `${s.productName} (need ${s.required}, have ${s.available})`,
+                           )
+                           .join("; ")}`,
+                     };
+                  }
+               }
                if (Object.keys(courierChanges).length === 0) {
                   if (stampSubmittedAt) {
                      await tx.order.update({

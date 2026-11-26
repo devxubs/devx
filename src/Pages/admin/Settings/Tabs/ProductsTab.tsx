@@ -67,10 +67,13 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
       };
    }, []);
    const flaggedDefaultWarehouse = warehouses.find((w) => w.isDefault);
-   const selectedWarehouse =
-      warehouses.find(
-         (w) => w.id === (config.defaultWarehouseId ?? flaggedDefaultWarehouse?.id),
-      ) || null;
+   // Phase 1C: a stored defaultWarehouseId that no longer resolves
+   // (warehouse deleted since the save) must not mask the flagged
+   // default — fall back to it for display.
+   const storedWarehouse = config.defaultWarehouseId
+      ? warehouses.find((w) => w.id === config.defaultWarehouseId)
+      : undefined;
+   const selectedWarehouse = storedWarehouse ?? flaggedDefaultWarehouse ?? null;
 
    return (
       <Stack spacing={3}>

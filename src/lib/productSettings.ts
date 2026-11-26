@@ -187,6 +187,108 @@ export async function loadDecreaseStockOn(
    }
 }
 
+// ── The remaining Phase 1 Product Settings keys ─────────────────────
+//
+// stockOutProductCanOrder / outOfStockCanSubmitCourier /
+// variationSelectOnOrder are booleans with audited defaults from
+// the pre-settings behaviour (Phase 1 audit): ordering a stock-out
+// product was BLOCKED (default false), courier submission had NO
+// stock check (default true), and a variant was REQUIRED for
+// variable products on orders (default true). Only an explicit
+// boolean in customConfig overrides the default — anything else
+// (missing key, wrong type) resolves to the default, so a corrupt
+// or partial blob can never silently change behaviour.
+
+export const STOCK_OUT_PRODUCT_CAN_ORDER_KEY = "stockOutProductCanOrder";
+export const OUT_OF_STOCK_CAN_SUBMIT_COURIER_KEY = "outOfStockCanSubmitCourier";
+export const VARIATION_SELECT_ON_ORDER_KEY = "variationSelectOnOrder";
+export const DEFAULT_WAREHOUSE_ID_KEY = "defaultWarehouseId";
+
+function resolveBooleanSetting(
+   customConfig: unknown,
+   key: string,
+   defaultValue: boolean,
+): boolean {
+   if (
+      !customConfig ||
+      typeof customConfig !== "object" ||
+      Array.isArray(customConfig)
+   ) {
+      return defaultValue;
+   }
+   const value = (customConfig as Record<string, unknown>)[key];
+   return typeof value === "boolean" ? value : defaultValue;
+}
+
+export function resolveStockOutProductCanOrder(customConfig: unknown): boolean {
+   return resolveBooleanSetting(customConfig, STOCK_OUT_PRODUCT_CAN_ORDER_KEY, false);
+}
+
+export function resolveOutOfStockCanSubmitCourier(customConfig: unknown): boolean {
+   return resolveBooleanSetting(customConfig, OUT_OF_STOCK_CAN_SUBMIT_COURIER_KEY, true);
+}
+
+export function resolveVariationSelectOnOrder(customConfig: unknown): boolean {
+   return resolveBooleanSetting(customConfig, VARIATION_SELECT_ON_ORDER_KEY, true);
+}
+
+async function loadCustomConfig(db: any): Promise<unknown> {
+   try {
+      const s = await db.storeSetting.findUnique({
+         where: { id: "default" },
+         select: { customConfig: true },
+      });
+      return s?.customConfig;
+   } catch {
+      return undefined;
+   }
+}
+
+export async function loadStockOutProductCanOrder(db: any): Promise<boolean> {
+   return resolveStockOutProductCanOrder(await loadCustomConfig(db));
+}
+
+export async function loadOutOfStockCanSubmitCourier(db: any): Promise<boolean> {
+   return resolveOutOfStockCanSubmitCourier(await loadCustomConfig(db));
+}
+
+export async function loadVariationSelectOnOrder(db: any): Promise<boolean> {
+   return resolveVariationSelectOnOrder(await loadCustomConfig(db));
+}
+
+/**
+ * Phase 1C (warehouse → setting direction): mirror the current
+ * default warehouse into customConfig.defaultWarehouseId.
+ * Read-modify-write merge — every other key is preserved by
+ * construction. A null id removes the key (no default configured).
+ * Callers invoke this AFTER a warehouse write that changed which
+ * warehouse is default; failures are swallowed by the callers'
+ * own error handling contract (the warehouse write is the source
+ * of truth and must not fail because the mirror write did).
+ */
+export async function writeDefaultWarehouseIdSetting(
+   db: any,
+   warehouseId: string | null,
+): Promise<void> {
+   const current = await db.storeSetting.findUnique({
+      where: { id: "default" },
+      select: { customConfig: true },
+   });
+   const cfg: Record<string, unknown> =
+      current?.customConfig &&
+      typeof current.customConfig === "object" &&
+      !Array.isArray(current.customConfig)
+         ? { ...(current.customConfig as Record<string, unknown>) }
+         : {};
+   if (warehouseId) cfg[DEFAULT_WAREHOUSE_ID_KEY] = warehouseId;
+   else delete cfg[DEFAULT_WAREHOUSE_ID_KEY];
+   await db.storeSetting.upsert({
+      where: { id: "default" },
+      update: { customConfig: cfg },
+      create: { id: "default", customConfig: cfg },
+   });
+}
+
 /**
  * Whether an order created directly in `status` begins life
  * holding stock under `trigger`: it has already reached the

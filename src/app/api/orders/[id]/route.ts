@@ -7,12 +7,16 @@ import {
    deductStockForItems,
    restoreStockForItems,
    findVariantlessVariableLine,
+   checkCourierStockAvailability,
+   CourierStockError,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
 import {
    decideStockHolding,
    loadDecreaseStockOn,
+   loadOutOfStockCanSubmitCourier,
+   loadVariationSelectOnOrder,
 } from "@src/lib/productSettings";
 import {
    findOrderWithTxId,
@@ -986,13 +990,18 @@ export async function PUT(
          // the Product.quantity = Σ variant quantities invariant.
          // This also heals pre-fix orders on their next item edit:
          // the message names the product that needs a variant picked.
-         const variantless = await findVariantlessVariableLine(
-            prisma,
-            finalItemsData.map((it) => ({
-               productId: it.productId,
-               variantId: it.variantId,
-            })),
-         );
+         // Phase 1F: gated by Variation Select on Order, exactly as
+         // in order creation — OFF accepts the variant-less line
+         // and the netting below allocates it to the product pool.
+         const variantless = (await loadVariationSelectOnOrder(prisma))
+            ? await findVariantlessVariableLine(
+                 prisma,
+                 finalItemsData.map((it) => ({
+                    productId: it.productId,
+                    variantId: it.variantId,
+                 })),
+              )
+            : null;
          if (variantless) {
             return NextResponse.json(
                {
@@ -1182,6 +1191,25 @@ export async function PUT(
                      freshWill,
                   );
                }
+            }
+
+            // Phase 1E: when this edit also assigns a courier and
+            // Out Of Stock can Submit Courier is OFF, the POST-EDIT
+            // lines must be physically available — the units the
+            // order currently holds (its pre-edit lines, when
+            // deducted) count toward them. A shortage aborts the
+            // whole update with a 400.
+            if (
+               (normalizedCourier !== undefined ||
+                  body.courierStatus !== undefined) &&
+               !(await loadOutOfStockCanSubmitCourier(tx))
+            ) {
+               const shortages = await checkCourierStockAvailability(
+                  tx,
+                  finalItemsData,
+                  wasHoldingStock ? existingOrder.items : [],
+               );
+               if (shortages.length > 0) throw new CourierStockError(shortages);
             }
 
             // 1. Delete removed order items
@@ -1446,6 +1474,24 @@ export async function PUT(
             trigger: decreaseStockOn,
          });
 
+         // Phase 1E: when this update assigns a courier and Out
+         // Of Stock can Submit Courier is OFF, the order's lines
+         // must be physically available — its own already-deducted
+         // units count as held. A shortage aborts the whole update
+         // with a 400 (CourierStockError, mapped in the catch).
+         if (
+            (normalizedCourier !== undefined ||
+               body.courierStatus !== undefined) &&
+            !(await loadOutOfStockCanSubmitCourier(tx))
+         ) {
+            const shortages = await checkCourierStockAvailability(
+               tx,
+               itemLines,
+               freshWas ? itemLines : [],
+            );
+            if (shortages.length > 0) throw new CourierStockError(shortages);
+         }
+
          if (freshWas && !freshWill) {
             await restoreStockForItems(tx, itemLines, {
                orderId: existingOrder.id,
@@ -1541,6 +1587,12 @@ export async function PUT(
       if (err instanceof InsufficientStockError) {
          return NextResponse.json(
             { error: "Insufficient stock", message: err.message },
+            { status: 400 },
+         );
+      }
+      if (err instanceof CourierStockError) {
+         return NextResponse.json(
+            { error: "Insufficient stock for courier", message: err.message },
             { status: 400 },
          );
       }

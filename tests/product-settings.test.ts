@@ -7,6 +7,10 @@ import {
    validateDecreaseStockOnValue,
    validateDecreaseStockOnInConfig,
    resolveDecreaseStockOn,
+   resolveStockOutProductCanOrder,
+   resolveOutOfStockCanSubmitCourier,
+   resolveVariationSelectOnOrder,
+   writeDefaultWarehouseIdSetting,
    orderReachesTrigger,
    decideStockHolding,
 } from "@src/lib/productSettings";
@@ -185,5 +189,60 @@ describe("decideStockHolding (lifecycle)", () => {
       expect(decide(true, "CONFIRMED", "CANCELLED", "PENDING")).toBe(false);
       expect(decide(false, "PENDING", "PENDING", "PENDING")).toBe(false);
       expect(decide(true, "PENDING", "PENDING", "PENDING")).toBe(true);
+   });
+});
+
+describe("Phase 1C/1D/1E/1F boolean setting resolvers", () => {
+   it("resolve the audited defaults when keys are missing or corrupt", () => {
+      for (const cfg of [null, undefined, {}, { stockOutProductCanOrder: "yes" }]) {
+         expect(resolveStockOutProductCanOrder(cfg)).toBe(false);
+         expect(resolveOutOfStockCanSubmitCourier(cfg)).toBe(true);
+         expect(resolveVariationSelectOnOrder(cfg)).toBe(true);
+      }
+   });
+
+   it("honour explicit booleans", () => {
+      expect(resolveStockOutProductCanOrder({ stockOutProductCanOrder: true })).toBe(true);
+      expect(resolveStockOutProductCanOrder({ stockOutProductCanOrder: false })).toBe(false);
+      expect(resolveOutOfStockCanSubmitCourier({ outOfStockCanSubmitCourier: false })).toBe(false);
+      expect(resolveVariationSelectOnOrder({ variationSelectOnOrder: false })).toBe(false);
+   });
+});
+
+describe("writeDefaultWarehouseIdSetting (Phase 1C mirror)", () => {
+   const makeDb = (initialConfig: unknown) => {
+      const state: { customConfig: unknown } = { customConfig: initialConfig };
+      const db = {
+         storeSetting: {
+            findUnique: async () => ({ customConfig: state.customConfig }),
+            upsert: async ({ update, create }: any) => {
+               state.customConfig = update?.customConfig ?? create?.customConfig;
+               return { id: "default", customConfig: state.customConfig };
+            },
+         },
+      };
+      return { db, state };
+   };
+
+   it("sets the key and preserves every other key", async () => {
+      const { db, state } = makeDb({ decreaseStockOn: "SHIPPED", other: 1 });
+      await writeDefaultWarehouseIdSetting(db, "wh-9");
+      expect(state.customConfig).toEqual({
+         decreaseStockOn: "SHIPPED",
+         other: 1,
+         defaultWarehouseId: "wh-9",
+      });
+   });
+
+   it("removes the key on null without touching the rest", async () => {
+      const { db, state } = makeDb({ defaultWarehouseId: "wh-9", other: 1 });
+      await writeDefaultWarehouseIdSetting(db, null);
+      expect(state.customConfig).toEqual({ other: 1 });
+   });
+
+   it("works when no settings row exists yet", async () => {
+      const { db, state } = makeDb(null);
+      await writeDefaultWarehouseIdSetting(db, "wh-1");
+      expect(state.customConfig).toEqual({ defaultWarehouseId: "wh-1" });
    });
 });

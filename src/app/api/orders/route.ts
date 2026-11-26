@@ -19,6 +19,7 @@ import {
 } from "@src/lib/stock";
 import {
    loadDecreaseStockOn,
+   loadVariationSelectOnOrder,
    orderReachesTrigger,
 } from "@src/lib/productSettings";
 import {
@@ -704,13 +705,22 @@ export async function POST(request: NextRequest) {
       // from the product pool only, silently breaking the
       // Product.quantity = Σ variant quantities invariant. Reject it;
       // the caller must pick the variant being sold.
-      const variantless = await findVariantlessVariableLine(
-         prisma,
-         products.map((p: any) => ({
-            productId: p.id || null,
-            variantId: p.variantId || null,
-         })),
-      );
+      // Phase 1F: the rejection applies only while Variation
+      // Select on Order is ON (the default). When the setting is
+      // OFF, a variant-less line is accepted deliberately and the
+      // stock engine allocates it to the product pool (the
+      // invariant interaction is documented in the Phase 1
+      // report — the engine's movements record variantId = null
+      // for such lines, and restoration mirrors them exactly).
+      const variantless = (await loadVariationSelectOnOrder(prisma))
+         ? await findVariantlessVariableLine(
+              prisma,
+              products.map((p: any) => ({
+                 productId: p.id || null,
+                 variantId: p.variantId || null,
+              })),
+           )
+         : null;
       if (variantless) {
          return NextResponse.json(
             {

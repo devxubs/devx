@@ -17,6 +17,7 @@
 //     orderTags, all stored inside the create transaction. No follow-up
 //     PUT is needed, so notes can no longer be lost silently.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSettings } from "@src/lib/settingsContext";
 import { calculateOrderTotals, lineEffectiveUnitPrice, num } from "./orderCalculations";
 import {
    EMPTY_CUSTOMER,
@@ -63,6 +64,20 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    const [restorableDraft, setRestorableDraft] = useState<(OrderCreateFormState & DraftMeta) | null>(null);
    const [isDirty, setIsDirty] = useState(false);
    const submitLock = useRef(false);
+
+   // Phase 1D / 1F (Product Settings): the two order-create gates,
+   // read from the settings context. Until settings load — and
+   // whenever the keys are unset — the defaults reproduce the
+   // pre-settings behaviour exactly: stock-out products cannot be
+   // ordered, and a variant must be selected for variable products.
+   // The server enforces the same rules (stock engine guard /
+   // variant-less rejection), so these gates are the friendly
+   // surface, never the only line of defence.
+   const { settings } = useSettings();
+   const stockOutCanOrder =
+      (settings as any)?.customConfig?.stockOutProductCanOrder === true;
+   const variationOptional =
+      (settings as any)?.customConfig?.variationSelectOnOrder === false;
 
    const patch = useCallback((partial: Partial<OrderCreateFormState>) => {
       setForm((prev) => ({ ...prev, ...partial }));
@@ -125,7 +140,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
    const addProduct = useCallback(
       (product: ApiProduct, preselectVariantId?: string | null): string | null => {
          const stock = Math.max(0, num(product.quantity));
-         if (stock <= 0) return `${product.productName} is out of stock`;
+         if (!stockOutCanOrder && stock <= 0) return `${product.productName} is out of stock`;
          const variants = Array.isArray(product.variants) ? product.variants : [];
          const isVariable = product.productType === "Variable" && variants.length > 0;
          // Barcode scans of a variant label preselect that variant
@@ -140,7 +155,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          }
          if (preselect) {
             const variantStock = Math.max(0, num(preselect.quantity));
-            if (variantStock <= 0) {
+            if (!stockOutCanOrder && variantStock <= 0) {
                return `${product.productName} (${preselect.variantName}) is out of stock`;
             }
          }
@@ -155,7 +170,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
             if (!isVariable) {
                const existing = prev.lines.find((l) => l.productId === product.id);
                if (existing) {
-                  if (existing.quantity >= stock) {
+                  if (!stockOutCanOrder && existing.quantity >= stock) {
                      message = `Only ${stock} in stock for ${product.productName}`;
                      return prev;
                   }
@@ -175,7 +190,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
                   (l) => l.productId === product.id && l.variantId === preselect.id,
                );
                if (existing) {
-                  if (existing.quantity >= variantStock) {
+                  if (!stockOutCanOrder && existing.quantity >= variantStock) {
                      message = `Only ${variantStock} in stock for ${product.productName} (${preselect.variantName})`;
                      return prev;
                   }
@@ -221,7 +236,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
          setIsDirty(true);
          return message;
       },
-      [],
+      [stockOutCanOrder],
    );
 
    // Barcode scan (Phase 4, §4.1): exact lookup via
@@ -291,11 +306,11 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       }
       if (form.lines.length === 0) errors.push("Add at least one product");
       for (const line of form.lines) {
-         if (line.variants.length > 0 && !line.variantId) {
+         if (!variationOptional && line.variants.length > 0 && !line.variantId) {
             errors.push(`Select a variant for ${line.name}`);
          }
          if (line.quantity < 1) errors.push(`Quantity for ${line.name} must be at least 1`);
-         if (line.quantity > line.stock) errors.push(`Quantity for ${line.name} exceeds available stock (${line.stock})`);
+         if (!stockOutCanOrder && line.quantity > line.stock) errors.push(`Quantity for ${line.name} exceeds available stock (${line.stock})`);
          if (line.listPrice < 0) errors.push(`Price for ${line.name} cannot be negative`);
       }
       if (num(form.deliveryCharge) < 0) errors.push("Delivery charge cannot be negative");
@@ -309,7 +324,7 @@ export function useOrderCreate(defaults?: Partial<OrderCreateFormState>) {
       if (!form.paymentMethod) errors.push("Payment method is required");
       if (!form.status) errors.push("Order status is required");
       return errors;
-   }, [form, totals.grandTotal]);
+   }, [form, totals.grandTotal, stockOutCanOrder, variationOptional]);
 
    // ── Payload ──────────────────────────────────────────────────────────────
    const buildPayload = useCallback(

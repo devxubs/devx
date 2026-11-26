@@ -8,6 +8,7 @@ import {
    adjustStock,
    findVariantlessVariableLine,
    orderHoldsStock,
+   orderStockValidationOn,
    InsufficientStockError,
    StockReversalUnsafeError,
    InvalidVariantError,
@@ -523,5 +524,81 @@ describe("orderHoldsStock", () => {
          expect(orderHoldsStock({ status, isDeleted: false })).toBe(false);
       }
       expect(orderHoldsStock({ status: "DELIVERED", isDeleted: false })).toBe(true);
+   });
+});
+
+describe("Phase 1D — Stock Out Product can Order (engine guard)", () => {
+   const STOCK_OUT_ALLOWED: StockSettings = {
+      enableStockValidation: true,
+      enableLowStockAlert: true,
+      stockOutProductCanOrder: true,
+   };
+
+   it("orderStockValidationOn folds the setting into the master switch", () => {
+      expect(orderStockValidationOn(VALIDATED)).toBe(true);
+      expect(orderStockValidationOn(UNVALIDATED)).toBe(false);
+      expect(orderStockValidationOn(STOCK_OUT_ALLOWED)).toBe(false);
+      expect(
+         orderStockValidationOn({
+            enableStockValidation: false,
+            enableLowStockAlert: true,
+            stockOutProductCanOrder: true,
+         }),
+      ).toBe(false);
+   });
+
+   it("with the setting ON, deduction past zero succeeds and records the movement", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Rice", quantity: 2 }],
+      });
+      await deductStockForItems(
+         f.tx,
+         [{ productId: "p1", quantity: 5 }],
+         { settings: STOCK_OUT_ALLOWED, orderId: "o1", note: "sale" },
+      );
+      expect(f.productQty("p1")).toBe(-3);
+      expect(f.movements).toHaveLength(1);
+      expect(f.movements[0]).toMatchObject({ type: "SALE", quantity: -5 });
+   });
+
+   it("with the setting OFF (default), the same deduction still throws", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Rice", quantity: 2 }],
+      });
+      await expect(
+         deductStockForItems(
+            f.tx,
+            [{ productId: "p1", quantity: 5 }],
+            { settings: VALIDATED, orderId: "o1", note: "sale" },
+         ),
+      ).rejects.toBeInstanceOf(InsufficientStockError);
+      expect(f.productQty("p1")).toBe(2);
+   });
+
+   it("with the setting ON, an edit increase past zero also succeeds", async () => {
+      const f = makeFakeTx({
+         products: [{ id: "p1", productName: "Rice", quantity: 2 }],
+      });
+      await applyStockDifference(f.tx, "p1", 5, {
+         settings: STOCK_OUT_ALLOWED,
+         orderId: "o1",
+         increaseNote: "edit",
+         decreaseNote: "edit",
+      });
+      expect(f.productQty("p1")).toBe(-3);
+   });
+
+   it("per-product allowNegativeStock still wins independently of the setting", async () => {
+      const f = makeFakeTx({
+         products: [
+            { id: "p1", productName: "Rice", quantity: 2, allowNegativeStock: true },
+         ],
+      });
+      await deductStockForItems(
+         f.tx,
+         [{ productId: "p1", quantity: 5 }],
+         { settings: VALIDATED, orderId: "o1", note: "sale" },
+      );
+      expect(f.productQty("p1")).toBe(-3);
    });
 });

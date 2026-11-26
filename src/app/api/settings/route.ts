@@ -104,7 +104,19 @@ export async function GET(request: NextRequest) {
       ) {
          const cfg = payload.customConfig as Record<string, unknown>;
          const scrubbed: Record<string, unknown> = {};
-         for (const key of ["defaultCourierStatus", "defaultExpenseCategory"]) {
+         // Phase 1D/1E/1F: the order-flow Product Settings keys are
+         // operational (Order Create reads them to apply the
+         // stock-out / courier / variation gates), so roles without
+         // settings permission still receive them — the same
+         // treatment defaultCourierStatus already had.
+         for (const key of [
+            "defaultCourierStatus",
+            "defaultExpenseCategory",
+            "stockOutProductCanOrder",
+            "outOfStockCanSubmitCourier",
+            "variationSelectOnOrder",
+            "defaultWarehouseId",
+         ]) {
             if (key in cfg) scrubbed[key] = cfg[key];
          }
          return NextResponse.json({ ...payload, customConfig: scrubbed });
@@ -134,6 +146,9 @@ export async function PUT(request: NextRequest) {
       const body = await request.json();
 
       const dataToUpdate: any = {};
+      // Phase 1C: set inside the customConfig block below when the
+      // save carries a valid defaultWarehouseId to synchronise.
+      let defaultWarehouseSyncId: string | null = null;
 
       // General
       if (body.storeName !== undefined) dataToUpdate.storeName = body.storeName.trim();
@@ -238,6 +253,39 @@ export async function PUT(request: NextRequest) {
                { status: 400 },
             );
          }
+         // Phase 1C (settings → warehouse direction): when this
+         // save carries a non-empty defaultWarehouseId, the
+         // Warehouse.isDefault flag is moved to match inside the
+         // save transaction below — the setting and the flag are
+         // two views of one fact and must not drift. An empty or
+         // absent value leaves the flag untouched (no default
+         // configured → existing behaviour preserved). A stale id
+         // is rejected here instead of being stored.
+         if (
+            body.customConfig &&
+            typeof body.customConfig === "object" &&
+            !Array.isArray(body.customConfig) &&
+            "defaultWarehouseId" in body.customConfig
+         ) {
+            const candidate = (body.customConfig as Record<string, unknown>)
+               .defaultWarehouseId;
+            if (typeof candidate === "string" && candidate.trim() !== "") {
+               const warehouse = await prisma.warehouse.findFirst({
+                  where: { id: candidate, isDeleted: false },
+                  select: { id: true },
+               });
+               if (!warehouse) {
+                  return NextResponse.json(
+                     {
+                        error: "Validation error",
+                        message: "defaultWarehouseId does not match an existing warehouse.",
+                     },
+                     { status: 400 },
+                  );
+               }
+               defaultWarehouseSyncId = candidate;
+            }
+         }
          dataToUpdate.customConfig = sanitizeCustomConfig(body.customConfig);
       }
 
@@ -303,6 +351,21 @@ export async function PUT(request: NextRequest) {
                   });
                }
             }
+         }
+
+         // Phase 1C: move the Warehouse.isDefault flag to the
+         // warehouse named by the saved defaultWarehouseId, in the
+         // same transaction as the settings upsert — the two can
+         // never be observed out of sync.
+         if (defaultWarehouseSyncId) {
+            await tx.warehouse.updateMany({
+               where: { isDefault: true, id: { not: defaultWarehouseSyncId } },
+               data: { isDefault: false },
+            });
+            await tx.warehouse.update({
+               where: { id: defaultWarehouseSyncId },
+               data: { isDefault: true },
+            });
          }
 
          return result;
