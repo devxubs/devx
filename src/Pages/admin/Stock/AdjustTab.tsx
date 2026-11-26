@@ -15,6 +15,7 @@ import {
    Typography,
 } from "@mui/material";
 import { useSnackbar } from "@src/lib/snackbarContext";
+import CustomAutocomplete from "@src/components/Autocomplete";
 import Icon from "@src/components/Icon";
 import FieldLabel from "./FieldLabel";
 import type { StockProduct } from "./index";
@@ -131,36 +132,44 @@ const AdjustTab = ({ products, onAdjusted }: AdjustTabProps) => {
          <Grid container spacing={2} sx={{ maxWidth: 920 }}>
             <Grid size={{ xs: 12, md: isVariable ? 7 : 12 }}>
                <FieldLabel>Product</FieldLabel>
-               <FormControl fullWidth size="small">
-                  <Select
-                     displayEmpty
-                     value={productId}
-                     onChange={(e) => {
-                        setProductId(String(e.target.value));
-                        setVariantId("");
-                     }}
-                     renderValue={(v) => {
-                        const p = products.find((x) => x.id === v);
-                        return p ? (
-                           p.productName
-                        ) : (
-                           <Typography
-                              component="span"
-                              variant="body2"
-                              color="text.secondary"
-                           >
-                              Select a product
+               {/* The shared CustomAutocomplete, used exactly as on
+                   the Purchase Create supplier field: arrow mode,
+                   small size, object options, id equality. The
+                   dropdown rows keep the stock figure the old
+                   Select menu showed. Selection state stays the
+                   productId string — the component receives the
+                   derived product object as its value. */}
+               <CustomAutocomplete
+                  placeholder="Search product..."
+                  arrow
+                  size="small"
+                  options={products}
+                  value={product}
+                  onChange={(val: any) => {
+                     setProductId(val?.id || "");
+                     setVariantId("");
+                  }}
+                  getOptionLabel={(option: any) =>
+                     typeof option === "string"
+                        ? option
+                        : option?.productName || ""
+                  }
+                  isOptionEqualToValue={(option: any, value: any) =>
+                     option?.id === value?.id
+                  }
+                  renderOption={(props: any, option: any) => (
+                     <li {...props} key={option.id}>
+                        <Stack spacing={0}>
+                           <Typography variant="body2">
+                              {option.productName}
                            </Typography>
-                        );
-                     }}
-                  >
-                     {products.map((p) => (
-                        <MenuItem key={p.id} value={p.id}>
-                           {p.productName} — Stock: {p.quantity}
-                        </MenuItem>
-                     ))}
-                  </Select>
-               </FormControl>
+                           <Typography variant="caption" color="text.secondary">
+                              Stock: {option.quantity}
+                           </Typography>
+                        </Stack>
+                     </li>
+                  )}
+               />
             </Grid>
 
             {isVariable && (
