@@ -10,6 +10,7 @@ import {
    Tabs,
    Typography,
    alpha,
+   useMediaQuery,
    useTheme,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
@@ -56,6 +57,8 @@ const Stock = () => {
    const [loadingProducts, setLoadingProducts] = useState(true);
    const [refreshKey, setRefreshKey] = useState(0);
 
+   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
    const loadProducts = useCallback(async () => {
       setLoadingProducts(true);
       try {
@@ -70,36 +73,35 @@ const Stock = () => {
             (d) => d.total,
          );
          const mapped: StockProduct[] = allProducts.map((p: any) => ({
-                  id: p.id,
-                  productName: p.productName,
-                  productSku: p.productSku || p.productCode || "",
-                  productCode: p.productCode,
-                  quantity: Number(p.quantity) || 0,
-                  lowStockAlert: Number(p.lowStockAlert ?? 10),
-                  costPrice:
-                     p.costPrice != null && Number(p.costPrice) > 0
-                        ? Number(p.costPrice)
-                        : null,
-                  productType: p.productType || "simple",
-                  primarySupplier: p.primarySupplier
-                     ? {
-                          id: p.primarySupplier.id,
-                          name: p.primarySupplier.name,
-                       }
-                     : null,
-                  variants: (p.variants || []).map((v: any) => ({
-                     id: v.id,
-                     variantName: v.variantName,
-                     sku: v.sku || "",
-                     quantity: Number(v.quantity) || 0,
-                     // P2-19: variant-level low-stock surfacing reads
-                     // the variant's own threshold (schema default 5).
-                     lowStockAlert: Number(v.lowStockAlert ?? 5),
-                     costPrice:
-                        v.costPrice != null ? Number(v.costPrice) : null,
-                     attributes: v.attributes ?? null,
-                  })),
-               }));
+            id: p.id,
+            productName: p.productName,
+            productSku: p.productSku || p.productCode || "",
+            productCode: p.productCode,
+            quantity: Number(p.quantity) || 0,
+            lowStockAlert: Number(p.lowStockAlert ?? 10),
+            costPrice:
+               p.costPrice != null && Number(p.costPrice) > 0
+                  ? Number(p.costPrice)
+                  : null,
+            productType: p.productType || "simple",
+            primarySupplier: p.primarySupplier
+               ? {
+                    id: p.primarySupplier.id,
+                    name: p.primarySupplier.name,
+                 }
+               : null,
+            variants: (p.variants || []).map((v: any) => ({
+               id: v.id,
+               variantName: v.variantName,
+               sku: v.sku || "",
+               quantity: Number(v.quantity) || 0,
+               // P2-19: variant-level low-stock surfacing reads
+               // the variant's own threshold (schema default 5).
+               lowStockAlert: Number(v.lowStockAlert ?? 5),
+               costPrice: v.costPrice != null ? Number(v.costPrice) : null,
+               attributes: v.attributes ?? null,
+            })),
+         }));
          // A failed load (empty result on a refresh) keeps the
          // previous list, matching the old behaviour; a genuinely
          // empty catalogue still clears it.
@@ -118,9 +120,7 @@ const Stock = () => {
    }, [loadProducts, refreshKey]);
 
    const overview = useMemo(() => {
-      const lowStock = products.filter(
-         (p) => p.quantity <= p.lowStockAlert,
-      );
+      const lowStock = products.filter((p) => p.quantity <= p.lowStockAlert);
       let stockValue = 0;
       let valuedCount = 0;
       for (const p of products) {
@@ -163,17 +163,13 @@ const Stock = () => {
          accent: overview.lowStockCount > 0,
       },
       {
-         label: "Stock Value (at cost)",
+         label: "Stock Value",
          value:
             overview.valuedCount > 0
                ? formatCurrency(overview.stockValue)
                : "—",
          icon: "solar:hand-money-bold-duotone",
          tone: "success" as const,
-         caption:
-            overview.valuedCount > 0
-               ? `From ${overview.valuedCount} product(s) with a cost price set`
-               : "No product has a cost price set",
       },
    ];
 
@@ -222,7 +218,11 @@ const Stock = () => {
                                     flexShrink: 0,
                                  }}
                               >
-                                 <Icon icon={s.icon} size="22px" color={s.tone} />
+                                 <Icon
+                                    icon={s.icon}
+                                    size="22px"
+                                    color={s.tone}
+                                 />
                               </Box>
                               <Typography
                                  variant="subtitle2"
@@ -238,14 +238,14 @@ const Stock = () => {
                            >
                               {loadingProducts ? "…" : s.value}
                            </Typography>
-                           {s.caption && (
+                           {/* {s.caption && (
                               <Typography
                                  variant="caption"
                                  color="text.secondary"
                               >
                                  {s.caption}
                               </Typography>
-                           )}
+                           )} */}
                         </Stack>
                      </Paper>
                   </Grid>
@@ -268,6 +268,7 @@ const Stock = () => {
                sx={{
                   px: 2,
                   borderBottom: `1px solid ${theme.palette.divider}`,
+                  justifyContent: isMobile ? "center" : "flex-start",
                   "& .MuiTab-root": {
                      textTransform: "none",
                      fontWeight: 600,
@@ -280,22 +281,28 @@ const Stock = () => {
                <Tab
                   icon={<Icon icon="solar:history-bold-duotone" size="19px" />}
                   iconPosition="start"
-                  label="Movements"
+                  label={!isMobile ? "Movements" : ""}
                />
                <Tab
                   icon={<Icon icon="solar:scale-linear" size="19px" />}
                   iconPosition="start"
-                  label="Adjust Stock"
+                  label={!isMobile ? "Adjust Stock" : ""}
                />
                <Tab
-                  icon={<Icon icon="solar:buildings-bold-duotone" size="19px" />}
+                  icon={
+                     <Icon icon="solar:buildings-bold-duotone" size="19px" />
+                  }
                   iconPosition="start"
-                  label="Warehouses"
+                  label={!isMobile ? "Warehouses" : ""}
                />
                <Tab
                   icon={<Icon icon="solar:danger-triangle-bold" size="19px" />}
                   iconPosition="start"
-                  label={`Low Stock${overview.lowStockCount ? ` (${overview.lowStockCount})` : ""}`}
+                  label={
+                     !isMobile
+                        ? `Low Stock${overview.lowStockCount ? ` (${overview.lowStockCount})` : ""}`
+                        : ""
+                  }
                />
             </Tabs>
             <Box p={2.5}>
