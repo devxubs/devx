@@ -119,6 +119,12 @@ export async function GET(request: NextRequest) {
             "outOfStockCanSubmitCourier",
             "variationSelectOnOrder",
             "defaultWarehouseId",
+            // Final-verification fix: decreaseStockOn belongs with
+            // its Phase 1 siblings — it was the one operational
+            // Product Settings key missing from this allowlist.
+            // (All enforcement reads are server-side; this keeps
+            // staff-role settings payloads complete and consistent.)
+            "decreaseStockOn",
             // Phase 2: order display/sorting config is operational
             // UI configuration for every order-facing role.
             "orderStatusOrder",

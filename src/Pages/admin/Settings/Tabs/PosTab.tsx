@@ -98,17 +98,12 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-               <TextField
-                  fullWidth
-                  label="Order ID Prefix"
-                  size="small"
-                  value={values.orderPrefix || "#"}
-                  onChange={(e) => onChange("orderPrefix", e.target.value)}
-                  placeholder="#"
-                  helperText="e.g. #10024"
-               />
-            </Grid>
+            {/* Final-verification fix: the legacy orderPrefix ("#")
+                field was removed — it edited a StoreSetting column
+                nothing consumes (a leftover of the old #6001 ID
+                scheme) and sat confusingly beside the real prefixes.
+                The actual Order ID prefix is prefixOrder, edited in
+                the ID Prefixes tab. The column itself is untouched. */}
 
          </Grid>
 
