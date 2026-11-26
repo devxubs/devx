@@ -25,7 +25,14 @@ import { useFilterQuery } from "@src/handler/useFilterQuery";
 import { usePrint } from "@src/components/TablePrintDocument/PrintPortal";
 import { orderDetailsPath } from "@src/lib/utils";
 
-import { orderStatuses } from "./data";
+import {
+   ORDER_STATUS_LABELS,
+   ORDER_TABLE_CONFIGURABLE_FIELDS,
+   applyColumnLayout,
+   resolveOrderListDefaultStatuses,
+   resolveOrderTableColumns,
+   statusLabelsFor,
+} from "@src/lib/orderStatusDisplay";
 import CreateAt from "./CreateAt";
 import User from "../Customers/CustomerInfo";
 import OrderFilter from "./OrderFilter";
@@ -67,12 +74,9 @@ const statusColor: Record<
 // per-status groupBy (`ordersByStatus` in GET /api/orders). Until the
 // first response arrives, tabs render without a count chip rather
 // than with an invented number.
-const orderStatus: StatusProps[] = [
-   {
-      label: "All",
-   },
-   ...orderStatuses.map((os) => ({ label: os })),
-];
+// Phase 2: the tab list is built inside the component from the
+// central order-display config (global status order + filter
+// visibility) — see statusTabs below.
 
 const statusLabelToApi: Record<string, string> = {
    Pending: "PENDING",
@@ -103,7 +107,20 @@ const BULK_COURIER_STATUSES = COURIER_STATUSES;
 
 const OrderTable = () => {
    const router = useRouter();
-   const { formatCurrency, settings } = useSettings();
+   const { formatCurrency, settings, loading: settingsLoading } = useSettings();
+
+   // Phase 2: status tabs from the central config — the global
+   // status order, minus statuses hidden from filters. "All" is
+   // always present: hiding a status never restricts the list.
+   const statusTabs: StatusProps[] = React.useMemo(
+      () => [
+         { label: "All" },
+         ...statusLabelsFor("filter", settings?.customConfig).map((label) => ({
+            label,
+         })),
+      ],
+      [settings],
+   );
    const { showSnackbar } = useSnackbar();
    const { printDocument } = usePrint();
    const [status, setStatus] = useState<{
@@ -202,7 +219,7 @@ const OrderTable = () => {
          // the API uppercases what it receives, so a raw label like
          // "Out for Delivery" never matched the OUT_FOR_DELIVERY
          // enum value.
-         const currentStatus = orderStatus[orderTab]?.label;
+         const currentStatus = statusTabs[orderTab]?.label;
          if (currentStatus && currentStatus !== "All") {
             params.set(
                "status",
@@ -478,7 +495,7 @@ const OrderTable = () => {
 
    useEffect(() => {
       if (filterQueryData.orderData?.status) {
-         const findOSIndex = orderStatus.findIndex(
+         const findOSIndex = statusTabs.findIndex(
             (os) => os.label === filterQueryData.orderData?.status,
          );
          if (findOSIndex !== -1) {
@@ -490,12 +507,42 @@ const OrderTable = () => {
    useEffect(() => {
       setFilterQueryData({
          orderData: {
-            status: orderStatus[orderTab]?.label || "",
+            status: statusTabs[orderTab]?.label || "",
          },
       });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [orderTab]);
 
-   const columns: ColumnConfig[] = [
+   // Phase 2 (§1): apply the configured default status filter
+   // ONCE, when settings have loaded. One status selects its tab;
+   // several ride the filter query as a comma-joined label list
+   // (the orders API already accepts multi-status). Anything the
+   // user does afterwards is untouched — this is an opening view,
+   // not a restriction, and the All tab always remains available.
+   const defaultStatusAppliedRef = React.useRef(false);
+   useEffect(() => {
+      if (defaultStatusAppliedRef.current || settingsLoading) return;
+      defaultStatusAppliedRef.current = true;
+      const defaults = resolveOrderListDefaultStatuses(settings?.customConfig);
+      if (defaults.length === 0) return;
+      if (defaults.length === 1) {
+         const idx = statusTabs.findIndex(
+            (t) => statusLabelToApi[t.label] === defaults[0],
+         );
+         if (idx > 0) {
+            setOrderTab(idx);
+            return;
+         }
+      }
+      setFilterQueryData({
+         orderData: {
+            status: defaults.map((s) => ORDER_STATUS_LABELS[s]).join(","),
+         },
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [settingsLoading, settings]);
+
+   const baseColumns: ColumnConfig[] = [
       {
          field: "orderId",
          headerName: "ID",
@@ -713,9 +760,19 @@ const OrderTable = () => {
       { field: "@actions", headerName: "", flex: 0.1 },
    ];
 
+   // Phase 2 (§3): apply the configured column order/visibility.
+   // The actions column is not configurable and always stays last.
+   const columns: ColumnConfig[] = applyColumnLayout(
+      baseColumns,
+      resolveOrderTableColumns(
+         settings?.customConfig,
+         ORDER_TABLE_CONFIGURABLE_FIELDS.map((f) => f.field),
+      ),
+   );
+
    // Real per-status counts from the API (see NEW-02 note above). A
    // status with no API count yet gets no chip, never a fake number.
-   const orderStatusWithCounts: StatusProps[] = orderStatus.map((s) => {
+   const orderStatusWithCounts: StatusProps[] = statusTabs.map((s) => {
       if (!statusCounts) return s;
       if (s.label === "All") {
          const total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
@@ -935,7 +992,7 @@ const OrderTable = () => {
          >
             <Menu
                item={
-                  orderStatuses?.map((s) => ({
+                  statusLabelsFor("change", settings?.customConfig).map((s) => ({
                      label: s,
                      onClick: async (l) => {
                         const targetId = status.orderRow.id;
@@ -969,7 +1026,7 @@ const OrderTable = () => {
             transformOrigin={{ vertical: "top", horizontal: "right" }}
          >
             <Menu
-               item={orderStatuses.map((s) => ({
+               item={statusLabelsFor("change", settings?.customConfig).map((s) => ({
                   label: s,
                   onClick: () => {
                      setBulkStatusAnchor(null);

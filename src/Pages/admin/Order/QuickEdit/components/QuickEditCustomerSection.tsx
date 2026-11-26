@@ -3,6 +3,8 @@ import { Grid, Paper, Stack, TextField, Typography } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import Icon from "@src/components/Icon";
 import { QuickEditCustomerData } from "../types";
+import { useSettings } from "@src/lib/settingsContext";
+import { statusOptionsFor } from "@src/lib/orderStatusDisplay";
 
 interface QuickEditCustomerSectionProps {
    customer: QuickEditCustomerData;
@@ -21,16 +23,11 @@ interface StatusOption {
    value: string;
 }
 
-const STATUS_OPTIONS: StatusOption[] = [
-   { label: "Pending", value: "PENDING" },
-   { label: "Confirmed", value: "CONFIRMED" },
-   { label: "Processing", value: "PROCESSING" },
-   { label: "Shipped", value: "SHIPPED" },
-   { label: "Delivered", value: "DELIVERED" },
-   { label: "Completed", value: "COMPLETED" },
-   { label: "Hold", value: "HOLD" },
-   { label: "Cancelled", value: "CANCELLED" },
-];
+// Phase 2: the status options come from the central order-
+// display config inside the component (statusOptionsFor with
+// the "change" location — every status, in the global order).
+// The previous local list silently omitted Out for Delivery
+// and Failed; the central list cannot drift that way again.
 
 const ORDER_SOURCES = [
    "Direct Sales",
@@ -68,6 +65,11 @@ export const QuickEditCustomerSection: React.FC<
    onChangeCourier,
    disabled = false,
 }) => {
+   const { settings } = useSettings();
+   const STATUS_OPTIONS: StatusOption[] = statusOptionsFor(
+      "change",
+      settings?.customConfig,
+   );
    // Match current status with formatted label option
    const selectedStatusOption =
       STATUS_OPTIONS.find(

@@ -18,7 +18,9 @@ import {
 import React, { useEffect, useState } from "react";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionCard from "./SectionCard";
-import { orderSources, orderStatuses } from "../data";
+import { orderSources } from "../data";
+import { useSettings } from "@src/lib/settingsContext";
+import { statusLabelsFor, withCurrentStatus } from "@src/lib/orderStatusDisplay";
 
 const COURIER_OPTIONS = ["", "Steadfast", "Pathao", "RedX", "Sundarban", "Home Delivery", "Store Pickup"];
 
@@ -32,6 +34,14 @@ interface OrderInfoSectionProps {
 
 
 const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoSectionProps) => {
+   // Phase 2: status options from the central order-display
+   // config (global order, create-location visibility); the
+   // current value is always kept selectable.
+   const { settings } = useSettings();
+   const statusOptions = withCurrentStatus(
+      statusLabelsFor("create", settings?.customConfig),
+      status,
+   );
    const [orderPreview, setOrderPreview] = useState("Assigned on save");
    const [invoicePreview, setInvoicePreview] = useState("Assigned on save");
 
@@ -141,7 +151,7 @@ const OrderInfoSection = ({ orderSource, status, courier, onChange }: OrderInfoS
                   </Typography>
                   <CustomAutocomplete
                      arrow
-                     options={orderStatuses}
+                     options={statusOptions}
                      value={status || null}
                      onChange={(v) => onChange({ status: v ?? "Pending" })}
                      placeholder="Select status"

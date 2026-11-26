@@ -17,7 +17,9 @@ import DateRange from "../../../components/DateRange";
 import CustomAutocomplete from "../../../components/Autocomplete";
 import { OrderFilter } from "../../../components/Table/Filter";
 import { useState } from "react";
-import { orderStatuses, districts, orderSources, products } from "./data";
+import { districts, orderSources, products } from "./data";
+import { useSettings } from "@src/lib/settingsContext";
+import { statusLabelsFor } from "@src/lib/orderStatusDisplay";
 
 const couriers = ["All", "Pathao", "Steadfast", "RedX", "Paperfly", "Sundarban", "SA Paribahan", "E-Courier", "Manual/Direct"];
 const courierStatusesList = ["All", "Pending", "In Courier", "Delivered", "Cancelled", "Returned", "Hold"];
@@ -65,6 +67,13 @@ const OrderFilterModal = ({
    onCloseModal: Function;
 }) => {
    const theme = useTheme();
+   // Phase 2: status options from the central order-display
+   // config (global order, filter-location visibility).
+   const { settings } = useSettings();
+   const statusFilterOptions = [
+      "All",
+      ...statusLabelsFor("filter", settings?.customConfig),
+   ];
    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
    const [filterData, setFilterData] = useState<OrderFilter>({
       order_created_at: filterValue.order_created_at,
@@ -201,7 +210,7 @@ const OrderFilterModal = ({
                      <CustomAutocomplete
                         size={inputSize}
                         label="Status"
-                        options={["All", ...orderStatuses]}
+                        options={statusFilterOptions}
                         value={filterData.status || "All"}
                         onChange={(v: any) => updateField("status", v === "All" ? "" : v || "")}
                      />

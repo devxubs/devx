@@ -23,10 +23,11 @@ import {
    CustomerFilterErrors,
    CustomerFilterState,
    NumericRange,
-   ORDER_STATUS_OPTIONS,
    RangeOp,
    StatusFilter,
 } from "./customerFilterUtils";
+import { useSettings } from "@src/lib/settingsContext";
+import { statusOptionsFor } from "@src/lib/orderStatusDisplay";
 
 interface CustomerFiltersProps {
    value: CustomerFilterState;
@@ -450,6 +451,13 @@ const CustomerFilters = ({
    showErrors = false,
    currencySymbol = "৳",
 }: CustomerFiltersProps) => {
+   // Phase 2: the order-status multi-select follows the central
+   // order-display config (global order, filter visibility) —
+   // values stay enum strings, as this filter's contract expects.
+   const { settings } = useSettings();
+   const statusOptions = statusOptionsFor("filter", settings?.customConfig).map(
+      (o) => o.value,
+   );
    const set = (partial: Partial<CustomerFilterState>) =>
       onChange({ ...value, ...partial });
    const err = (key: keyof CustomerFilterErrors) =>
@@ -715,11 +723,11 @@ const CustomerFilters = ({
                               ? "All statuses"
                               : ""
                         }
-                        options={ORDER_STATUS_OPTIONS}
+                        options={statusOptions}
                         value={value.orderStatuses}
                         onChange={(v: any) => {
                            const list = (Array.isArray(v) ? v : []).filter(
-                              (s: any) => ORDER_STATUS_OPTIONS.includes(s),
+                              (s: any) => statusOptions.includes(s),
                            );
                            set({ orderStatuses: list });
                         }}

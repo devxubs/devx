@@ -12,7 +12,9 @@ import {
 import React, { useState } from "react";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
-import { orderSources, orderStatuses } from "../data";
+import { orderSources } from "../data";
+import { useSettings } from "@src/lib/settingsContext";
+import { statusLabelsFor, withCurrentStatus } from "@src/lib/orderStatusDisplay";
 import { OrderType } from "../type";
 import { Controller } from "react-hook-form";
 
@@ -24,6 +26,14 @@ interface DetailsProps {
 
 const OrderInfo = ({ control, errors, data }: DetailsProps) => {
    const [expanded, setExpanded] = useState(true);
+   // Phase 2: status options from the central order-display
+   // config (global order, create-location visibility); the
+   // order's own status always stays selectable on edit.
+   const { settings } = useSettings();
+   const statusOptions = withCurrentStatus(
+      statusLabelsFor("create", settings?.customConfig),
+      (data as any)?.status,
+   );
 
    return (
       <Paper sx={{ borderRadius: 1.5, boxShadow: 15, overflow: "hidden" }}>
@@ -164,7 +174,7 @@ const OrderInfo = ({ control, errors, data }: DetailsProps) => {
                                  error={!!errors.status}
                                  helperText={errors.status?.message}
                                  arrow
-                                 options={orderStatuses}
+                                 options={statusOptions}
                                  placeholder="Status"
                                  label="Status"
                                  getOptionLabel={(option) => option.toString()}

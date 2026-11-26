@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import OrderDisplaySection from "./OrderDisplaySection";
 import {
    Grid,
    MenuItem,
@@ -30,7 +31,7 @@ const paymentMethods = [
    "Cash on Delivery",
 ];
 
-export default function PosTab({ values, onChange }: PosTabProps) {
+export default function PosTab({ values, onChange, onConfigChange }: PosTabProps) {
 
    return (
       <Stack spacing={3}>
@@ -173,6 +174,10 @@ export default function PosTab({ values, onChange }: PosTabProps) {
 
 
          </Grid>
+
+         {/* Phase 2: Order Display & Sorting (status order,
+             visibility, list defaults, table columns). */}
+         <OrderDisplaySection values={values} onConfigChange={onConfigChange} />
       </Stack>
    );
 }

@@ -116,6 +116,12 @@ export async function GET(request: NextRequest) {
             "outOfStockCanSubmitCourier",
             "variationSelectOnOrder",
             "defaultWarehouseId",
+            // Phase 2: order display/sorting config is operational
+            // UI configuration for every order-facing role.
+            "orderStatusOrder",
+            "orderStatusHidden",
+            "orderListDefaultStatuses",
+            "orderTableColumns",
          ]) {
             if (key in cfg) scrubbed[key] = cfg[key];
          }
