@@ -1091,6 +1091,15 @@ export async function adjustStock(
  * restore of a FAILED order deducts nothing. Stock transitions must
  * key off this predicate so each deduction is reversed exactly once
  * (ORD-02 duplicate-prevention).
+ *
+ * Phase 1B note: this predicate is the PRE-1B rule, retained for
+ * reference and for the historical backfill
+ * (scripts/backfill-stock-deducted.js), whose status-based
+ * expectation it defines. Order write paths no longer decide from
+ * it — the recorded Order.stockDeducted flag plus
+ * decideStockHolding (lib/productSettings) are authoritative,
+ * because a configurable trigger cannot be derived from status
+ * alone (HOLD is reachable from both sides of any trigger).
  */
 export function orderHoldsStock(order: {
    status: string;

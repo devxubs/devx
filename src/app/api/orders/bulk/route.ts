@@ -5,10 +5,14 @@ import {
    loadStockSettings,
    deductStockForItems,
    restoreStockForItems,
-   orderHoldsStock,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import { lockOrderRow } from "@src/lib/orderLock";
+import {
+   decideStockHolding,
+   loadDecreaseStockOn,
+} from "@src/lib/productSettings";
 import { logAudit, requestAuditContext } from "@src/lib/audit";
 import {
    normalizeOrderStatus,
@@ -184,6 +188,14 @@ export async function POST(request: NextRequest) {
          const label = orderId;
          try {
             const outcome = await prisma.$transaction(async (tx) => {
+               // Phase 1B (Step 6): lock the order row FIRST — the
+               // single-order PUT has always done this; without it,
+               // two concurrent bulk operations (or a bulk + single
+               // pair) on the same order could both read the same
+               // stockDeducted flag and deduct or restore twice.
+               // The read below runs after the lock, so it sees the
+               // latest committed flag and status.
+               await lockOrderRow(tx, orderId);
                const order = await tx.order.findUnique({
                   where: { id: orderId },
                   include: { items: true },
@@ -217,10 +229,18 @@ export async function POST(request: NextRequest) {
                         error: `An order in status ${order.status} cannot be changed to ${target}`,
                      };
                   }
-                  const wasHoldingStock = orderHoldsStock(order);
-                  const willHoldStock = orderHoldsStock({
-                     status: target,
-                     isDeleted: order.isDeleted,
+                  // Phase 1B: holding state is the recorded
+                  // stockDeducted flag (read after the row lock
+                  // above), decided through the shared
+                  // decideStockHolding rules with the configured
+                  // Decrease Stock On trigger.
+                  const decreaseStockOn = await loadDecreaseStockOn(tx);
+                  const wasHoldingStock = Boolean(order.stockDeducted);
+                  const willHoldStock = decideStockHolding({
+                     wasDeducted: wasHoldingStock,
+                     fromStatus: order.status,
+                     toStatus: target,
+                     trigger: decreaseStockOn,
                   });
                   const itemLines = order.items
                      .filter((it) => it.productId)
@@ -233,14 +253,14 @@ export async function POST(request: NextRequest) {
                   if (wasHoldingStock && !willHoldStock) {
                      await restoreStockForItems(tx, itemLines, {
                         orderId: order.id,
-                        note: `Order ${displayId} ${target === "FAILED" ? "failed" : "cancelled"} (bulk) — stock restored`,
+                        note: `Order ${displayId} ${target === "FAILED" ? "failed" : target === "CANCELLED" ? "cancelled" : `moved to ${target}`} (bulk) — stock restored`,
                      });
                   } else if (!wasHoldingStock && willHoldStock) {
                      const stockSettings = await loadStockSettings(tx);
                      await deductStockForItems(tx, itemLines, {
                         settings: stockSettings,
                         orderId: order.id,
-                        note: `Order ${displayId} reactivated (bulk) — stock deducted`,
+                        note: `Order ${displayId} reached ${target} (bulk) — stock deducted`,
                      });
                   }
 
@@ -270,6 +290,7 @@ export async function POST(request: NextRequest) {
                      where: { id: order.id },
                      data: {
                         status: target as any,
+                        stockDeducted: willHoldStock,
                         total,
                         dueAmount: due,
                         orderTags: {
@@ -298,14 +319,16 @@ export async function POST(request: NextRequest) {
                if (action === "delete") {
                   // O7: mirror the single-order DELETE exactly —
                   // soft-delete to the Bin (never permanent), stock
-                  // released exactly once via orderHoldsStock (an
-                  // already-deleted order is rejected above by the
-                  // shared `!order || order.isDeleted` guard, and a
-                  // CANCELLED/FAILED order restores nothing), and a
-                  // DELETE AuditLog row in the same transaction.
+                  // released exactly once via the recorded
+                  // stockDeducted flag (Phase 1B; an already-deleted
+                  // order is rejected above by the shared
+                  // `!order || order.isDeleted` guard, and an order
+                  // that never reached its trigger restores
+                  // nothing), and a DELETE AuditLog row in the same
+                  // transaction.
                   // The single DELETE appends no orderTags history
                   // event, so neither does this.
-                  const stockRestored = orderHoldsStock(order);
+                  const stockRestored = Boolean(order.stockDeducted);
                   if (stockRestored) {
                      await restoreStockForItems(
                         tx,
@@ -324,7 +347,11 @@ export async function POST(request: NextRequest) {
                   }
                   await tx.order.update({
                      where: { id: order.id },
-                     data: { isDeleted: true, deletedAt: new Date() },
+                     data: {
+                        isDeleted: true,
+                        deletedAt: new Date(),
+                        stockDeducted: false,
+                     },
                   });
                   await logAudit(tx, {
                      actor: auditActorRef,

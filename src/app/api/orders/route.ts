@@ -13,11 +13,14 @@ import { generateNextEntityId } from "@src/lib/idGenerator";
 import {
    loadStockSettings,
    deductStockForItems,
-   orderHoldsStock,
    findVariantlessVariableLine,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import {
+   loadDecreaseStockOn,
+   orderReachesTrigger,
+} from "@src/lib/productSettings";
 import {
    normalizeOrderStatus,
    VALID_ORDER_WHERE,
@@ -883,6 +886,17 @@ export async function POST(request: NextRequest) {
          const orderId = orderCode || customId;
          const invoiceNo = `INV_${seq}`;
 
+         // Phase 1B: the order begins holding stock at creation
+         // only when its initial status has already reached the
+         // configured Decrease Stock On trigger; the recorded
+         // stockDeducted flag is written with the order itself and
+         // the deduction below runs in this same transaction.
+         const decreaseStockOn = await loadDecreaseStockOn(tx);
+         const createdDeducted = orderReachesTrigger(
+            normalizedStatus,
+            decreaseStockOn,
+         );
+
          const createdOrder = await tx.order.create({
             data: {
                customId: orderId,
@@ -890,6 +904,7 @@ export async function POST(request: NextRequest) {
                orderId,
                invoiceNo,
                status: normalizedStatus as any,
+               stockDeducted: createdDeducted,
                orderNote: orderNote || null,
                orderSource: orderSource || null,
                courier: body.courier ? String(body.courier) : null,
@@ -929,10 +944,13 @@ export async function POST(request: NextRequest) {
          // transaction via the shared stock engine, honouring
          // StoreSetting.enableStockValidation and per-product
          // allowNegativeStock; warehouse stock is mirrored (INV-01).
-         // An order created directly in a terminal status (CANCELLED
-         // or FAILED — Phase B1, P1-1) never holds stock, so no
-         // deduction happens for it.
-         if (orderHoldsStock({ status: normalizedStatus, isDeleted: false })) {
+         // Phase 1B: deduction happens only when the creation
+         // status has reached the Decrease Stock On trigger
+         // (createdDeducted, recorded on the order above) — an
+         // order created in PENDING with trigger CONFIRMED holds
+         // no stock until it is confirmed, and an order created
+         // directly in a terminal status never holds stock.
+         if (createdDeducted) {
             const stockSettings = await loadStockSettings(tx);
             await deductStockForItems(
                tx,

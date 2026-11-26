@@ -6,11 +6,14 @@ import {
    applyStockDifference,
    deductStockForItems,
    restoreStockForItems,
-   orderHoldsStock,
    findVariantlessVariableLine,
    InsufficientStockError,
    InvalidVariantError,
 } from "@src/lib/stock";
+import {
+   decideStockHolding,
+   loadDecreaseStockOn,
+} from "@src/lib/productSettings";
 import {
    findOrderWithTxId,
    duplicateTxIdMessage,
@@ -1003,21 +1006,28 @@ export async function PUT(
          // Step 4: Calculate net stock difference per product.
          // ORD-02 fix: the difference is computed between the stock
          // the order EFFECTIVELY held before and after this update.
-         // An order only holds stock while it is neither CANCELLED,
-         // FAILED (terminal, Phase B1 P1-1) nor deleted — so
-         // transitioning into CANCELLED/FAILED releases the full item
-         // quantities, and leaving a terminal status re-deducts them,
-         // instead of stock leaking on every status change. Both
-         // sides go through orderHoldsStock so the predicate can
-         // never drift between the before/after computations.
-         const wasHoldingStock = orderHoldsStock(existingOrder);
+         // Phase 1B: holding state is the RECORDED stockDeducted
+         // flag, not a status derivation — an order holds stock
+         // from the moment it reaches the configured Decrease
+         // Stock On trigger until it is cancelled, failed or
+         // deleted, so transitioning into CANCELLED/FAILED releases
+         // the full item quantities exactly once and moving back
+         // before the trigger restores them. Both sides go through
+         // decideStockHolding (lib/productSettings) so the rules
+         // can never drift between the before/after computations;
+         // the in-transaction re-check below re-decides from the
+         // locked row's fresh flag.
+         const decreaseStockOn = await loadDecreaseStockOn(prisma);
          const nextStatus =
             normalizedStatus !== undefined
                ? normalizedStatus
                : existingOrder.status;
-         const willHoldStock = orderHoldsStock({
-            status: nextStatus,
-            isDeleted: existingOrder.isDeleted,
+         const wasHoldingStock = Boolean(existingOrder.stockDeducted);
+         const willHoldStock = decideStockHolding({
+            wasDeducted: wasHoldingStock,
+            fromStatus: existingOrder.status,
+            toStatus: nextStatus,
+            trigger: decreaseStockOn,
          });
 
          // INV-02 + O6: differences are netted per product +
@@ -1026,7 +1036,7 @@ export async function PUT(
          // to zero. The netting itself is the pure
          // planOrderStockDiffs helper (lib/orderLineVariants),
          // computed from the complete before/after sets above.
-         const stockDiffs = planOrderStockDiffs(
+         let stockDiffs = planOrderStockDiffs(
             existingOrder.items,
             finalItemsData,
             wasHoldingStock,
@@ -1143,6 +1153,37 @@ export async function PUT(
                if (clash) throw new DuplicateTxIdError(paymentTxIdUpdate, clash);
             }
 
+            // Phase 1B: re-decide holding from the locked row's
+            // FRESH flag — a concurrent writer may have flipped
+            // stockDeducted since the pre-transaction snapshot, and
+            // deciding from the stale flag could deduct or restore
+            // twice. When the fresh decision differs, the diffs are
+            // re-planned from the same item sets with the fresh
+            // before/after states.
+            let effectiveWillHolding = willHoldStock;
+            const freshOrder = await tx.order.findUnique({
+               where: { id: existingOrder.id },
+               select: { status: true, stockDeducted: true },
+            });
+            if (freshOrder) {
+               const freshWas = Boolean(freshOrder.stockDeducted);
+               const freshWill = decideStockHolding({
+                  wasDeducted: freshWas,
+                  fromStatus: freshOrder.status,
+                  toStatus: nextStatus,
+                  trigger: decreaseStockOn,
+               });
+               if (freshWas !== wasHoldingStock || freshWill !== willHoldStock) {
+                  effectiveWillHolding = freshWill;
+                  stockDiffs = planOrderStockDiffs(
+                     existingOrder.items,
+                     finalItemsData,
+                     freshWas,
+                     freshWill,
+                  );
+               }
+            }
+
             // 1. Delete removed order items
             for (const it of itemsToDelete) {
                await tx.orderItem.delete({ where: { id: it.id } });
@@ -1227,6 +1268,7 @@ export async function PUT(
             const updatedOrder = await tx.order.update({
                where: { id: existingOrder.id },
                data: {
+                  stockDeducted: effectiveWillHolding,
                   subtotal: calculatedSubtotal,
                   deliveryCharge:
                      rawDeliveryCharge !== undefined ? delivery : undefined,
@@ -1333,11 +1375,9 @@ export async function PUT(
          normalizedStatus !== undefined
             ? normalizedStatus
             : existingOrder.status;
-      const wasHoldingStock = orderHoldsStock(existingOrder);
-      const willHoldStock = orderHoldsStock({
-         status: nextStatus,
-         isDeleted: existingOrder.isDeleted,
-      });
+      // Phase 1B: the holding decision for this path is made
+      // INSIDE the transaction below, from the locked row's fresh
+      // recorded stockDeducted flag (decideStockHolding).
 
       const updated = await prisma.$transaction(async (tx) => {
          // C4-5 (audit R-1 / P2-22): FIRST statement — the order-row
@@ -1388,23 +1428,42 @@ export async function PUT(
                variantId: it.variantId,
             }));
 
-         if (wasHoldingStock && !willHoldStock) {
+         // Phase 1B: decide from the locked row's FRESH recorded
+         // flag — restore or deduct exactly once when the move
+         // crosses the Decrease Stock On trigger or a terminal
+         // boundary; the flag flips in the order update below, in
+         // this same transaction.
+         const freshOrder = await tx.order.findUnique({
+            where: { id: existingOrder.id },
+            select: { status: true, stockDeducted: true },
+         });
+         const freshWas = Boolean(freshOrder?.stockDeducted);
+         const decreaseStockOn = await loadDecreaseStockOn(tx);
+         const freshWill = decideStockHolding({
+            wasDeducted: freshWas,
+            fromStatus: freshOrder?.status || existingOrder.status,
+            toStatus: nextStatus,
+            trigger: decreaseStockOn,
+         });
+
+         if (freshWas && !freshWill) {
             await restoreStockForItems(tx, itemLines, {
                orderId: existingOrder.id,
-               note: `Order ${existingOrder.orderId || existingOrder.orderCode} ${nextStatus === "FAILED" ? "failed" : "cancelled"} — stock restored`,
+               note: `Order ${existingOrder.orderId || existingOrder.orderCode} ${nextStatus === "FAILED" ? "failed" : nextStatus === "CANCELLED" ? "cancelled" : `moved to ${nextStatus}`} — stock restored`,
             });
-         } else if (!wasHoldingStock && willHoldStock) {
+         } else if (!freshWas && freshWill) {
             const stockSettings = await loadStockSettings(tx);
             await deductStockForItems(tx, itemLines, {
                settings: stockSettings,
                orderId: existingOrder.id,
-               note: `Order ${existingOrder.orderId || existingOrder.orderCode} reactivated — stock deducted`,
+               note: `Order ${existingOrder.orderId || existingOrder.orderCode} reached ${nextStatus} — stock deducted`,
             });
          }
 
          const updatedOrder = await tx.order.update({
             where: { id: existingOrder.id },
             data: {
+               stockDeducted: freshWill,
                status: normalizedStatus,
                orderNote: updatedOrderNote,
                orderTags: updatedOrderTags,
@@ -1521,6 +1580,13 @@ export async function DELETE(
       // already-cancelled order, whose stock was released at cancel
       // time) never restores stock twice.
       const order = await prisma.$transaction(async (tx) => {
+         // Phase 1B: lock the order row first (same discipline as
+         // the PUT paths) so a concurrent status writer cannot
+         // interleave with the flag check below.
+         const locked = await lockOrderRow(tx, id);
+         if (!locked) {
+            throw new Error("Order not found");
+         }
          const existing = await tx.order.findUnique({
             where: { id },
             include: { items: true },
@@ -1538,7 +1604,10 @@ export async function DELETE(
             // (P1-1): FAILED is terminal exactly like CANCELLED, so
             // the summary names the actual status instead of
             // hard-coding "cancelled".
-            const stockRestored = orderHoldsStock(existing);
+            // Phase 1B: "holds stock" is the recorded stockDeducted
+            // flag — an order deleted before reaching its trigger
+            // never deducted, so it restores nothing.
+            const stockRestored = Boolean(existing.stockDeducted);
             if (stockRestored) {
                await restoreStockForItems(
                   tx,
@@ -1558,7 +1627,11 @@ export async function DELETE(
 
             const deleted = await tx.order.update({
                where: { id },
-               data: { isDeleted: true, deletedAt: new Date() },
+               data: {
+                  isDeleted: true,
+                  deletedAt: new Date(),
+                  stockDeducted: false,
+               },
             });
 
             // Phase 4 (D1): audit in the same transaction.

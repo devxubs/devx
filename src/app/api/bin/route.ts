@@ -5,9 +5,13 @@ import {
    loadStockSettings,
    deductStockForItems,
    addStockForPurchaseItems,
-   orderHoldsStock,
    InsufficientStockError,
 } from "@src/lib/stock";
+import { lockOrderRow } from "@src/lib/orderLock";
+import {
+   loadDecreaseStockOn,
+   orderReachesTrigger,
+} from "@src/lib/productSettings";
 import {
    logAudit,
    auditActorFromContext,
@@ -255,41 +259,51 @@ export async function POST(request: NextRequest) {
          if (action === "restore") {
             // BIN-02/ORD-02 fix: soft-deleting the order released its
             // stock, so restoring must deduct it again (validated,
-            // same transaction) — unless the order is in a terminal
-            // status (CANCELLED, or FAILED since Phase B1 P1-1), in
-            // which case it holds no stock either way. The decision
-            // is orderHoldsStock evaluated on the RESTORED state
-            // (isDeleted: false), the exact mirror of the delete.
+            // same transaction) — the exact mirror of the delete.
+            // Phase 1B: the mirror is the recorded stockDeducted
+            // flag plus the Decrease Stock On trigger — restore
+            // re-deducts only when the order is not already marked
+            // deducted AND its (unchanged) status has reached the
+            // trigger; a terminal order, or one deleted before its
+            // trigger, comes back holding nothing.
             await prisma.$transaction(async (tx) => {
+               // Lock first, as in the other order stock writers.
+               await lockOrderRow(tx, id);
                const order = await tx.order.findUnique({
                   where: { id },
                   include: { items: true },
                });
                if (!order) throw new Error("Order not found");
-               if (
-                  order.isDeleted &&
-                  orderHoldsStock({ status: order.status, isDeleted: false })
-               ) {
-                  const stockSettings = await loadStockSettings(tx);
-                  await deductStockForItems(
-                     tx,
-                     order.items
-                        .filter((it) => it.productId)
-                        .map((it) => ({
-                           productId: it.productId as string,
-                           quantity: it.quantity,
-                           variantId: it.variantId,
-                        })),
-                     {
-                        settings: stockSettings,
-                        orderId: order.id,
-                        note: `Order ${order.orderId || order.customId} restored from bin — stock deducted`,
-                     },
-                  );
+               let restoredDeducted = Boolean(order.stockDeducted);
+               if (order.isDeleted && !order.stockDeducted) {
+                  const decreaseStockOn = await loadDecreaseStockOn(tx);
+                  if (orderReachesTrigger(order.status, decreaseStockOn)) {
+                     const stockSettings = await loadStockSettings(tx);
+                     await deductStockForItems(
+                        tx,
+                        order.items
+                           .filter((it) => it.productId)
+                           .map((it) => ({
+                              productId: it.productId as string,
+                              quantity: it.quantity,
+                              variantId: it.variantId,
+                           })),
+                        {
+                           settings: stockSettings,
+                           orderId: order.id,
+                           note: `Order ${order.orderId || order.customId} restored from bin — stock deducted`,
+                        },
+                     );
+                     restoredDeducted = true;
+                  }
                }
                await tx.order.update({
                   where: { id },
-                  data: { isDeleted: false, deletedAt: null },
+                  data: {
+                     isDeleted: false,
+                     deletedAt: null,
+                     stockDeducted: restoredDeducted,
+                  },
                });
 
                // Phase 4 (D1): audit in the same transaction.

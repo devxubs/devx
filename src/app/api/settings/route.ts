@@ -3,6 +3,7 @@ import { requireActiveSession, requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { sanitizeCustomConfig } from "@src/lib/customConfig";
 import { validateDefaultCourierStatusInConfig } from "@src/lib/courierSubmission";
+import { validateDecreaseStockOnInConfig } from "@src/lib/productSettings";
 import {
    logAudit,
    auditActorFromContext,
@@ -221,6 +222,19 @@ export async function PUT(request: NextRequest) {
          if (!courierVerdict.ok) {
             return NextResponse.json(
                { error: "Validation error", message: courierVerdict.message },
+               { status: 400 },
+            );
+         }
+         // Phase 1B: the Decrease Stock On trigger
+         // (customConfig.decreaseStockOn) is validated the same
+         // way — an unsupported status is rejected on save instead
+         // of being stored and silently misapplied when the stock
+         // engine resolves it (the resolver falls back to
+         // CONFIRMED, which would hide the mistake).
+         const decreaseVerdict = validateDecreaseStockOnInConfig(body.customConfig);
+         if (!decreaseVerdict.ok) {
+            return NextResponse.json(
+               { error: "Validation error", message: decreaseVerdict.message },
                { status: 400 },
             );
          }

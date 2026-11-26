@@ -396,6 +396,14 @@ model Order {
   deliveredAt        DateTime?
   isDeleted          Boolean     @default(false)
   deletedAt          DateTime?
+  // Phase 1B: recorded stock-holding state for the configurable
+  // Decrease Stock On trigger (customConfig.decreaseStockOn).
+  // True exactly while this order's items are deducted from stock;
+  // flipped in the same transaction as the deduction/restoration
+  // it authorises. Existing rows default false — run
+  // scripts/backfill-stock-deducted.js after db push to set the
+  // historically correct values before relying on the flag.
+  stockDeducted      Boolean     @default(false)
 
   // Courier & Delivery details
   courier            String? // e.g. Steadfast, Pathao, RedX
