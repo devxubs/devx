@@ -119,6 +119,14 @@ export async function GET(request: NextRequest) {
       }
    }
 
+   // RP-2 (D2): the low-stock count in the batch below honours
+   // the store-wide configured threshold fallback
+   // (StoreSetting.defaultLowStockAlert).
+   const lowStockSetting = await prisma.storeSetting.findUnique({
+      where: { id: "default" },
+      select: { defaultLowStockAlert: true },
+   });
+
    try {
       const [
          totalOrders,
@@ -184,7 +192,7 @@ export async function GET(request: NextRequest) {
          prisma.$queryRaw<Array<{ id: string }>>`
             SELECT id FROM Product
             WHERE isDeleted = 0
-              AND ${Prisma.raw(lowStockSqlCondition())}
+              AND ${Prisma.raw(lowStockSqlCondition("quantity", "lowStockAlert", lowStockSetting?.defaultLowStockAlert))}
          `,
          prisma.order.findMany({
             where: { isDeleted: false },

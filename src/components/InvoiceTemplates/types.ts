@@ -71,10 +71,15 @@ export interface InvoiceCustomization {
    // showTermsOnReceipt in customConfig, and the print document
    // spreads customConfig into the customization — the renderer
    // accepts either name, the canonical field above winning.
+   // RP-2 (D6/D7): showLogoOnReceipt / showBarcodeOnReceipt
+   // joined this list — they previously persisted to dead
+   // StoreSetting COLUMNS no renderer read.
    showCustomerOnReceipt?: boolean;
    showCashierOnReceipt?: boolean;
    showCourierOnReceipt?: boolean;
    showTermsOnReceipt?: boolean;
+   showLogoOnReceipt?: boolean;
+   showBarcodeOnReceipt?: boolean;
    showBarcode?: boolean;
    showSkuColumn?: boolean;
    showSubtotalBreakdown?: boolean;

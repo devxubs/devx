@@ -34,6 +34,10 @@
  */
 
 import { resolveStockOutProductCanOrder } from "@src/lib/productSettings";
+import {
+   DEFAULT_PRODUCT_LOW_STOCK_ALERT,
+   globalLowStockFallback,
+} from "@src/lib/lowStock";
 
 // ── Phase 1E: courier-submission stock availability ──────────────────
 
@@ -298,6 +302,37 @@ export interface StockSettings {
     * build settings literals keep the strict behaviour.
     */
    stockOutProductCanOrder?: boolean;
+   /**
+    * RP-2 (D2): the store-wide low-stock threshold
+    * (StoreSetting.defaultLowStockAlert) — the fallback between
+    * a product's own lowStockAlert and the built-in default 10
+    * in resolveLowStockThreshold. Optional so existing
+    * callers/tests that build settings literals keep the
+    * historical behaviour.
+    */
+   defaultLowStockAlert?: number | null;
+}
+
+/**
+ * RP-2 (D2): the low-stock notification threshold resolution —
+ * the product's own threshold wins, then the store-wide
+ * configured default (StoreSetting.defaultLowStockAlert), then
+ * the built-in default 10:
+ *   product.lowStockAlert ?? settings.defaultLowStockAlert ?? 10
+ * One doctrine refinement: Product.lowStockAlert is a NOT NULL
+ * column whose "no own threshold" marker is a stored 0 (the
+ * P2-19 doctrine in lib/lowStock — the product API coerces a
+ * blank field to 10, and an explicit 0 means "use the
+ * default"), so 0 is treated as unset here exactly like the
+ * listing predicate treats it; without that, the global
+ * fallback could never be reached in this path.
+ */
+export function resolveLowStockThreshold(
+   productLowStockAlert: number | null | undefined,
+   settingsDefault: number | null | undefined,
+): number {
+   if (productLowStockAlert) return productLowStockAlert;
+   return globalLowStockFallback(settingsDefault);
 }
 
 /**
@@ -325,18 +360,24 @@ export async function loadStockSettings(db: any): Promise<StockSettings> {
             enableStockValidation: true,
             enableLowStockAlert: true,
             stockOutProductCanOrder: false,
+            defaultLowStockAlert: DEFAULT_PRODUCT_LOW_STOCK_ALERT,
          };
       }
       return {
          enableStockValidation: s.enableStockValidation !== false,
          enableLowStockAlert: s.enableLowStockAlert !== false,
          stockOutProductCanOrder: resolveStockOutProductCanOrder(s.customConfig),
+         defaultLowStockAlert:
+            typeof s.defaultLowStockAlert === "number"
+               ? s.defaultLowStockAlert
+               : null,
       };
    } catch {
       return {
          enableStockValidation: true,
          enableLowStockAlert: true,
          stockOutProductCanOrder: false,
+         defaultLowStockAlert: DEFAULT_PRODUCT_LOW_STOCK_ALERT,
       };
    }
 }
@@ -551,7 +592,10 @@ async function maybeNotifyLowStock(
    afterQty: number,
 ): Promise<void> {
    if (!settings.enableLowStockAlert) return;
-   const threshold = product.lowStockAlert ?? 10;
+   const threshold = resolveLowStockThreshold(
+      product.lowStockAlert,
+      settings.defaultLowStockAlert,
+   );
    // Notify only on the downward crossing — restocking and further
    // sales below the threshold do not spam new notifications.
    if (beforeQty > threshold && afterQty <= threshold) {

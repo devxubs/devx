@@ -46,7 +46,11 @@ export default function InvoiceRenderer({
       (customization.showCourierInfo ?? customization.showCourierOnReceipt) !== false;
    const showCashier =
       (customization.showCashierName ?? customization.showCashierOnReceipt) !== false;
-   const showBarcode = customization.showBarcode !== false;
+   // RP-2 (D7): the Settings toggle persists as
+   // showBarcodeOnReceipt in customConfig — accept it as the
+   // fallback for the canonical name, like the toggles above.
+   const showBarcode =
+      (customization.showBarcode ?? customization.showBarcodeOnReceipt) !== false;
    const showSku = customization.showSkuColumn !== false;
    const showTerms =
       (customization.showTerms ?? customization.showTermsOnReceipt) !== false;

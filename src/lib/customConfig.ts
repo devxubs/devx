@@ -16,6 +16,12 @@
  *     renderer consumes them via the print document's customization
  *     (the four *OnReceipt keys and the template id are mapped onto
  *     the renderer's field names at the consumption sites).
+ *   - showLogoOnReceipt, showBarcodeOnReceipt — RP-2 (D6/D7):
+ *     the Settings toggles now persist HERE (they previously wrote
+ *     the dead StoreSetting columns of the same name). Consumed by
+ *     the invoice renderer (barcode, as the fallback for its
+ *     showBarcode field) and by the print document's tabular
+ *     header (logo).
  *   - defaultCourierStatus (O4) — the bulk courier submission
  *     applies it when no explicit courier status is chosen (read
  *     server-side by POST /api/orders/bulk and pre-selected in the

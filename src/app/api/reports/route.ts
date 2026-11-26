@@ -3,6 +3,7 @@ import { requirePermission } from "@src/lib/auth";
 import { prisma } from "@src/lib/prisma";
 import { calculateNetProfit } from "@src/lib/finance";
 import { standingCreditOf } from "@src/lib/purchaseReturns";
+import { globalLowStockFallback } from "@src/lib/lowStock";
 import {
    VALID_ORDER_WHERE,
    INVALID_ORDER_STATUSES,
@@ -714,6 +715,18 @@ export async function GET(request: NextRequest) {
 
       // 6. PRODUCTS REPORT
       if (tab === "products") {
+         // RP-2 (D2): the low-stock queries below honour the
+         // store-wide configured threshold fallback
+         // (StoreSetting.defaultLowStockAlert, sanitized by
+         // globalLowStockFallback; interpolated as a bound
+         // parameter in each $queryRaw template).
+         const lowStockSetting = await prisma.storeSetting.findUnique({
+            where: { id: "default" },
+            select: { defaultLowStockAlert: true },
+         });
+         const globalLowStockDefault = globalLowStockFallback(
+            lowStockSetting?.defaultLowStockAlert,
+         );
          const [allProducts, lowStockPageRows, lowStockTotalRows, topSold, stockAgg, outOfStockAll, totalProductsAll, lowExclusiveTotalRows] = await Promise.all([
             prisma.product.findMany({
                where: { isDeleted: false },
@@ -739,7 +752,7 @@ export async function GET(request: NextRequest) {
                SELECT id, customId, productName, quantity, lowStockAlert
                FROM Product
                WHERE isDeleted = 0
-                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), 10)
+                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), ${globalLowStockDefault})
                ORDER BY quantity ASC
                LIMIT ${limit} OFFSET ${skip}
             `,
@@ -747,7 +760,7 @@ export async function GET(request: NextRequest) {
                SELECT COUNT(*) AS total
                FROM Product
                WHERE isDeleted = 0
-                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), 10)
+                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), ${globalLowStockDefault})
             `,
             prisma.orderItem.groupBy({
                by: ["name"],
@@ -795,7 +808,7 @@ export async function GET(request: NextRequest) {
                FROM Product
                WHERE isDeleted = 0
                  AND quantity > 0
-                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), 10)
+                 AND quantity <= COALESCE(NULLIF(lowStockAlert, 0), ${globalLowStockDefault})
             `,
          ]);
 

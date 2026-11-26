@@ -84,8 +84,8 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
       onChange("receiptPaperSize", "A4");
       onChange("invoiceHeader", "Official Sales Invoice & Receipt");
       onChange("invoiceFooter", "Thank you for shopping with us! Please come again.");
-      onChange("showLogoOnReceipt", true);
-      onChange("showBarcodeOnReceipt", true);
+      onConfigChange("showLogoOnReceipt", true);
+      onConfigChange("showBarcodeOnReceipt", true);
       onConfigChange("showCustomerOnReceipt", true);
       onConfigChange("showCashierOnReceipt", true);
       onConfigChange("showCourierOnReceipt", true);
@@ -373,15 +373,19 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
             <Grid container spacing={2}>
                {[
                   {
+                     // RP-2 (D6/D7): these two persist to customConfig
+                     // like the other six — they used to write the
+                     // StoreSetting columns of the same name, which
+                     // no renderer reads (split-brain storage).
                      key: "showLogoOnReceipt",
-                     isRoot: true,
+                     isRoot: false,
                      label: "Print Store Logo",
                      desc: "Render store brand logo at the top of invoices",
                      defaultVal: true,
                   },
                   {
                      key: "showBarcodeOnReceipt",
-                     isRoot: true,
+                     isRoot: false,
                      label: "Print Barcode / QR Code",
                      desc: "Generate scannable order barcode at bottom of receipt",
                      defaultVal: true,

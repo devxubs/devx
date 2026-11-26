@@ -152,15 +152,21 @@ export default function TablePrintDocument({
       >
          {/* HEADER SECTION (Centered Company Branding & Document Details) */}
          <div style={{ textAlign: "center", marginBottom: "20px" }}>
-            {settings.logoUrl && (
-               <div style={{ marginBottom: "8px" }}>
-                  <img
-                     src={settings.logoUrl}
-                     alt={settings.storeName || "DevX POS"}
-                     style={{ maxHeight: "50px", objectFit: "contain" }}
-                  />
-               </div>
-            )}
+            {/* RP-2 (D6): the header logo honours the Settings
+                "Print Store Logo" toggle (customConfig
+                showLogoOnReceipt, default on) — it previously
+                rendered whenever a logo URL existed because the
+                toggle persisted to a dead column. */}
+            {settings.logoUrl &&
+               settings?.customConfig?.showLogoOnReceipt !== false && (
+                  <div style={{ marginBottom: "8px" }}>
+                     <img
+                        src={settings.logoUrl}
+                        alt={settings.storeName || "DevX POS"}
+                        style={{ maxHeight: "50px", objectFit: "contain" }}
+                     />
+                  </div>
+               )}
             <div style={{ fontSize: "22px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1px", color: "#0f172a" }}>
                {settings.storeName || "DevX POS"}
             </div>

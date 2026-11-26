@@ -23,11 +23,32 @@
 export const DEFAULT_PRODUCT_LOW_STOCK_ALERT = 10;
 export const DEFAULT_VARIANT_LOW_STOCK_ALERT = 5;
 
-/** Effective product threshold: stored 0/null/undefined → 10. */
+/**
+ * RP-2 (D2): the store-wide fallback is now configurable —
+ * StoreSetting.defaultLowStockAlert (Settings → Products &
+ * Inventory). Callers that have loaded the setting pass it as
+ * the fallback; it replaces the constant 10 in the SAME `||`
+ * semantics documented above (a stored 0/null product value —
+ * or a non-positive configured global — falls back to 10).
+ * Callers that pass nothing keep the historical behaviour
+ * exactly.
+ */
+export function globalLowStockFallback(
+   configured: number | null | undefined,
+): number {
+   return typeof configured === "number" &&
+      Number.isFinite(configured) &&
+      configured > 0
+      ? Math.trunc(configured)
+      : DEFAULT_PRODUCT_LOW_STOCK_ALERT;
+}
+
+/** Effective product threshold: stored 0/null/undefined → fallback. */
 export function effectiveProductThreshold(
    lowStockAlert: number | null | undefined,
+   fallback?: number | null,
 ): number {
-   return lowStockAlert || DEFAULT_PRODUCT_LOW_STOCK_ALERT;
+   return lowStockAlert || globalLowStockFallback(fallback);
 }
 
 /** Effective variant threshold: stored 0/null/undefined → 5. */
@@ -37,12 +58,13 @@ export function effectiveVariantThreshold(
    return lowStockAlert || DEFAULT_VARIANT_LOW_STOCK_ALERT;
 }
 
-/** Canonical product predicate: quantity <= (lowStockAlert || 10). */
+/** Canonical product predicate: quantity <= (lowStockAlert || fallback). */
 export function isProductLowStock(
    quantity: number,
    lowStockAlert: number | null | undefined,
+   fallback?: number | null,
 ): boolean {
-   return quantity <= effectiveProductThreshold(lowStockAlert);
+   return quantity <= effectiveProductThreshold(lowStockAlert, fallback);
 }
 
 /** Variant predicate: quantity <= (lowStockAlert || 5). */
@@ -65,6 +87,7 @@ export function isVariantLowStock(
 export function lowStockSqlCondition(
    quantityColumn = "quantity",
    thresholdColumn = "lowStockAlert",
+   fallback?: number | null,
 ): string {
-   return `${quantityColumn} <= COALESCE(NULLIF(${thresholdColumn}, 0), ${DEFAULT_PRODUCT_LOW_STOCK_ALERT})`;
+   return `${quantityColumn} <= COALESCE(NULLIF(${thresholdColumn}, 0), ${globalLowStockFallback(fallback)})`;
 }
