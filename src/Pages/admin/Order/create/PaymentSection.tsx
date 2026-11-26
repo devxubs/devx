@@ -16,21 +16,14 @@ import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionCard from "./SectionCard";
 import { formatBDT } from "./orderCalculations";
 import { isMobilePaymentMethod } from "../paymentMethods";
+import { useSettings } from "@src/lib/settingsContext";
+import { paymentMethodOptionsFor } from "@src/lib/paymentMethods";
 import type { OrderTotals } from "./types";
 
-/** Existing methods (data.ts) plus the mobile-banking methods used in BD. */
-export const PAYMENT_METHODS = [
-   "Cash",
-   "Cash on Delivery",
-   "bKash",
-   "Nagad",
-   "Rocket",
-   "Card",
-   "Bank Transfer",
-   "Wallet",
-   "Credit Card",
-   "Other",
-];
+// Phase 5: the method list is centralised in @src/lib/paymentMethods
+// (configurable in Settings → Sales & POS → Payment Methods). The
+// hardcoded PAYMENT_METHODS list that lived here is retired; its
+// contents became the lib's built-in defaults.
 
 interface PaymentSectionProps {
    paymentMethod: string;
@@ -43,6 +36,11 @@ interface PaymentSectionProps {
 }
 
 const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", paymentSenderNumber = "", totals, onChange, currencySymbol = "৳" }: PaymentSectionProps) => {
+   // Phase 5: options come from the central payment-method
+   // config (active methods, configured order); the current
+   // value is merged back so it always stays selectable.
+   const { settings } = useSettings();
+   const methodOptions = paymentMethodOptionsFor(settings?.customConfig, paymentMethod);
    const showTxFields = isMobilePaymentMethod(paymentMethod);
    const statusColor =
       totals.paymentStatus === "Paid" ? "success" : totals.paymentStatus === "Partial" ? "warning" : "error";
@@ -58,7 +56,7 @@ const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", payme
                   </Typography>
                   <CustomAutocomplete
                      arrow
-                     options={PAYMENT_METHODS}
+                     options={methodOptions}
                      value={paymentMethod || null}
                      onChange={(v) => onChange({ paymentMethod: v ?? "" })}
                      placeholder="Select method"

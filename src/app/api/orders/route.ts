@@ -38,6 +38,10 @@ import {
    orderTxIdMethodError,
 } from "@src/lib/payments";
 import {
+   paymentMethodSelectionError,
+   resolveDefaultPaymentMethod,
+} from "@src/lib/paymentMethods";
+import {
    logAudit,
    auditActorFromContext,
    requestAuditContext,
@@ -791,12 +795,34 @@ export async function POST(request: NextRequest) {
       const paymentSenderNumber = String(
          pricing?.paymentSenderNumber ?? body.paymentSenderNumber ?? "",
       ).trim();
+      // Phase 5: the payment-method config (customConfig list +
+      // defaultPaymentMethod column) drives both the fallback for
+      // a missing method and the inactive-method rejection below.
+      const paymentSetting = await prisma.storeSetting.findUnique({
+         where: { id: "default" },
+         select: { customConfig: true, defaultPaymentMethod: true },
+      });
+      const effectivePaymentMethod =
+         pricing?.paymentMethod ||
+         resolveDefaultPaymentMethod(
+            paymentSetting?.customConfig,
+            paymentSetting?.defaultPaymentMethod,
+         );
+      const inactiveMethodError = paymentMethodSelectionError(
+         paymentSetting?.customConfig,
+         effectivePaymentMethod,
+         { isNewSelection: true },
+      );
+      if (inactiveMethodError) {
+         return NextResponse.json(
+            { error: "Validation error", message: inactiveMethodError },
+            { status: 400 },
+         );
+      }
       // C4-2 (audit P2-11): a TxID is only meaningful with a mobile
       // payment method — reject the pairing with 400 instead of
       // storing an unreconcilable reference (neither POST nor PUT
       // checked this before; POST now enforces the stricter rule).
-      const effectivePaymentMethod =
-         pricing?.paymentMethod || "Cash on Delivery";
       const txMethodError = orderTxIdMethodError(
          effectivePaymentMethod,
          paymentTxId,

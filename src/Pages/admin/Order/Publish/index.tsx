@@ -44,6 +44,7 @@ import {
    resolveOrderCreateDefaultStatus,
    resolveOrderCreateDefaults,
 } from "@src/lib/orderStatusDisplay";
+import { resolveDefaultPaymentMethod } from "@src/lib/paymentMethods";
 
 const toTitleStatus = (s?: string | null) =>
    s
@@ -70,7 +71,14 @@ const Publish = () => {
       settingsApplied.current = true;
       patch({
          deliveryCharge: Number(settings.defaultDeliveryCharge) || 0,
-         paymentMethod: settings.defaultPaymentMethod || "Cash on Delivery",
+         // Phase 5: the configured default, resolved through the
+         // payment-method list — a deactivated default falls back
+         // to Cash / the first active method instead of landing
+         // in the form as an unselectable value.
+         paymentMethod: resolveDefaultPaymentMethod(
+            settings?.customConfig,
+            settings.defaultPaymentMethod,
+         ),
          taxRate: Number(settings.defaultTaxRate) || 0,
          taxEnabled: (Number(settings.defaultTaxRate) || 0) > 0,
       });

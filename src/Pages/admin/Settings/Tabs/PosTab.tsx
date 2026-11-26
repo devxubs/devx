@@ -3,9 +3,9 @@
 import React from "react";
 import OrderDisplaySection from "./OrderDisplaySection";
 import OrderCreateDefaultsSection from "./OrderCreateDefaultsSection";
+import PaymentMethodsSection from "./PaymentMethodsSection";
 import {
    Grid,
-   MenuItem,
    Stack,
    TextField,
    Typography,
@@ -21,16 +21,6 @@ interface PosTabProps {
    onChange: (field: string, value: any) => void;
    onConfigChange: (key: string, value: any) => void;
 }
-
-const paymentMethods = [
-   "Cash",
-   "Credit / Debit Card",
-   "bKash / Mobile Banking",
-   "Nagad",
-   "Rocket",
-   "Bank Transfer",
-   "Cash on Delivery",
-];
 
 export default function PosTab({ values, onChange, onConfigChange }: PosTabProps) {
 
@@ -92,23 +82,9 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-               <TextField
-                  select
-                  fullWidth
-                  label="Default Payment Method"
-                  size="small"
-                  value={values.defaultPaymentMethod || "Cash"}
-                  onChange={(e) => onChange("defaultPaymentMethod", e.target.value)}
-                  helperText="Preselected payment method on new orders"
-               >
-                  {paymentMethods.map((pm) => (
-                     <MenuItem key={pm} value={pm}>
-                        {pm}
-                     </MenuItem>
-                  ))}
-               </TextField>
-            </Grid>
+            {/* Phase 5: the Default Payment Method selector moved
+                into the Payment Methods section below, where its
+                options come from the managed method list. */}
 
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <TextField
@@ -182,6 +158,9 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
          {/* Phase 3: Order Creation Defaults. */}
          <OrderCreateDefaultsSection values={values} onConfigChange={onConfigChange} />
+
+         {/* Phase 5: Payment Methods + default payment method. */}
+         <PaymentMethodsSection values={values} onChange={onChange} onConfigChange={onConfigChange} />
       </Stack>
    );
 }

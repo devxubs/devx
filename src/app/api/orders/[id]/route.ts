@@ -24,6 +24,7 @@ import {
    DuplicateTxIdError,
    orderTxIdMethodError,
 } from "@src/lib/payments";
+import { paymentMethodSelectionError } from "@src/lib/paymentMethods";
 import {
    normalizeOrderStatus,
    isOrderStatusTransitionAllowed,
@@ -529,6 +530,27 @@ export async function PUT(
          if (txMethodError) {
             return NextResponse.json(
                { error: "Validation error", message: txMethodError },
+               { status: 400 },
+            );
+         }
+      }
+      // Phase 5: a CHANGED payment method is a new selection and
+      // must not name a deactivated method. An unchanged method —
+      // including one deactivated since the order was recorded —
+      // is never rejected, so historical orders stay editable.
+      if (methodChanged) {
+         const paymentSetting = await prisma.storeSetting.findUnique({
+            where: { id: "default" },
+            select: { customConfig: true },
+         });
+         const inactiveMethodError = paymentMethodSelectionError(
+            paymentSetting?.customConfig,
+            carriedMethod,
+            { isNewSelection: true },
+         );
+         if (inactiveMethodError) {
+            return NextResponse.json(
+               { error: "Validation error", message: inactiveMethodError },
                { status: 400 },
             );
          }

@@ -6,6 +6,7 @@ import { validateDefaultCourierStatusInConfig } from "@src/lib/courierSubmission
 import { validateDecreaseStockOnInConfig } from "@src/lib/productSettings";
 import { validateOrderCreateDefaultsInConfig } from "@src/lib/orderStatusDisplay";
 import { validatePrefixSettingValue } from "@src/lib/idGenerator";
+import { validatePaymentMethodsInConfig } from "@src/lib/paymentMethods";
 import {
    logAudit,
    auditActorFromContext,
@@ -129,6 +130,9 @@ export async function GET(request: NextRequest) {
             "orderCreateDefaultProductId",
             "orderCreateDefaultSource",
             "orderCreateDefaultStatus",
+            // Phase 5: the payment method list — every payment
+            // selector (staff roles) reads it.
+            "paymentMethods",
          ]) {
             if (key in cfg) scrubbed[key] = cfg[key];
          }
@@ -293,6 +297,16 @@ export async function PUT(request: NextRequest) {
          if (!createDefaultsVerdict.ok) {
             return NextResponse.json(
                { error: "Validation error", message: createDefaultsVerdict.message },
+               { status: 400 },
+            );
+         }
+         // Phase 5: the paymentMethods list is validated the same
+         // way (well-formed entries, unique names).
+         const paymentMethodsVerdict =
+            validatePaymentMethodsInConfig(body.customConfig);
+         if (!paymentMethodsVerdict.ok) {
+            return NextResponse.json(
+               { error: "Validation error", message: paymentMethodsVerdict.message },
                { status: 400 },
             );
          }

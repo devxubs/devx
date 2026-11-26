@@ -11,6 +11,8 @@ import {
 import CustomAutocomplete from "@src/components/Autocomplete";
 import Icon from "@src/components/Icon";
 import { isMobilePaymentMethod } from "../../paymentMethods";
+import { useSettings } from "@src/lib/settingsContext";
+import { paymentMethodOptionsFor } from "@src/lib/paymentMethods";
 import { QuickEditPricingData } from "../types";
 
 interface QuickEditPricingSectionProps {
@@ -19,18 +21,21 @@ interface QuickEditPricingSectionProps {
    disabled?: boolean;
 }
 
-const PAYMENT_METHODS = [
-   "Cash on Delivery",
-   "bKash",
-   "Nagad",
-   "Rocket",
-   "Card",
-   "Bank Transfer",
-];
+// Phase 5: the method list is centralised in @src/lib/paymentMethods
+// (the local 6-item list that lived here — which notably lacked
+// "Cash" — is retired in favour of the configured list).
 
 export const QuickEditPricingSection: React.FC<
    QuickEditPricingSectionProps
 > = ({ pricing, onChangeField, disabled = false }) => {
+   // Phase 5: options from the central payment-method config;
+   // the order's recorded method is merged back so a historical
+   // (possibly deactivated) method stays selectable here.
+   const { settings } = useSettings();
+   const methodOptions = paymentMethodOptionsFor(
+      settings?.customConfig,
+      pricing.paymentMethod,
+   );
    const isPaidInFull = Number(pricing.dueAmount) <= 0;
    const showTxFields = isMobilePaymentMethod(pricing.paymentMethod);
 
@@ -108,7 +113,7 @@ export const QuickEditPricingSection: React.FC<
                      arrow
                      label="Payment Method"
                      placeholder="Select payment method..."
-                     options={PAYMENT_METHODS}
+                     options={methodOptions}
                      disabled={disabled}
                      value={pricing.paymentMethod || "Cash on Delivery"}
                      onChange={(val: any) => {
