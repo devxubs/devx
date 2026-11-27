@@ -18,6 +18,14 @@ const Sidebar = ({ onItemClick }: SidebarProps) => {
    // lives in the 270px drawer, where full labels fit and stay.
    const isCompact = useMediaQuery(theme.breakpoints.between("sm", "lg"));
 
+   // Mount-only initialization: read the initial ?tab= once (or
+   // default it) when the Settings page first mounts. The empty
+   // dependency array is INTENTIONAL (audit L-4): `query` is a
+   // fresh object on every render (see handler/useQueryParams),
+   // so adding it as a dependency would re-run this effect on
+   // every render — and the else branch navigates via
+   // query.set(), which would retrigger the effect. Tab changes
+   // after mount flow through handleSelectTab, not this effect.
    useEffect(() => {
       const tab = query.get("tab");
       if (tab) {
@@ -26,6 +34,7 @@ const Sidebar = ({ onItemClick }: SidebarProps) => {
          query.set("tab", "general", false);
          setActive("general");
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    const handleSelectTab = (tabKey: string) => {

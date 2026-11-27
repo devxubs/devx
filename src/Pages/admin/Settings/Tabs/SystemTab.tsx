@@ -42,6 +42,11 @@ export default function SystemTab({
    const [isExporting, setIsExporting] = useState(false);
    const [isResetting, setIsResetting] = useState(false);
    const { showSnackbar } = useSnackbar();
+   // Audit L-1: factory reset and data export are administrator
+   // actions server-side (requireAdmin). The settings GET reports
+   // that capability separately (canAdminSettings) so editors who
+   // are not admins see them disabled instead of hitting a 403.
+   const canAdmin = values?.canAdminSettings === true;
 
    const handleExportData = async () => {
       setIsExporting(true);
@@ -162,13 +167,18 @@ export default function SystemTab({
                      <Typography variant="body2" color="text.secondary">
                         Generates a JSON export containing: settings, products, categories, units, orders (with items and customer), customers, suppliers, expenses, assets, and roles.
                      </Typography>
+                     {!canAdmin && (
+                        <Typography variant="caption" color="text.secondary">
+                           Administrator only.
+                        </Typography>
+                     )}
                   </Stack>
                   <Button
                      variant="contained"
                      color="primary"
                      startIcon={isExporting ? <CircularProgress size={18} color="inherit" /> : <Icon icon="solar:download-square-bold-duotone" size="small" />}
                      onClick={handleExportData}
-                     disabled={isExporting}
+                     disabled={isExporting || !canAdmin}
                      sx={{ whiteSpace: "nowrap" }}
                   >
                      {isExporting ? "Exporting..." : "Download Data Export"}
@@ -238,12 +248,18 @@ export default function SystemTab({
                   <Typography variant="body2" color="text.secondary">
                      This resets tax rates, currency, store metadata, receipt templates, and defaults without deleting orders or products.
                   </Typography>
+                  {!canAdmin && (
+                     <Typography variant="caption" color="text.secondary">
+                        Administrator only.
+                     </Typography>
+                  )}
                </Stack>
                <Button
                   variant="outlined"
                   color="error"
                   startIcon={<Icon icon="solar:restart-bold" size="small" />}
                   onClick={() => setOpenResetDialog(true)}
+                  disabled={!canAdmin}
                   sx={{ whiteSpace: "nowrap" }}
                >
                   Reset Defaults

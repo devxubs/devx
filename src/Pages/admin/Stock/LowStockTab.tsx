@@ -7,18 +7,28 @@ import CustomTable, { ColumnConfig } from "@src/components/Table";
 import Icon from "@src/components/Icon";
 import { useFilterQuery } from "@src/handler/useFilterQuery";
 import {
+   effectiveProductThreshold,
    effectiveVariantThreshold,
+   isProductLowStock,
    isVariantLowStock,
 } from "@src/lib/lowStock";
+import { useSettings } from "@src/lib/settingsContext";
 import type { StockProduct } from "./index";
 
-// Phase 3A (3.3): low-stock restocking. A product is low when
-// quantity <= lowStockAlert — the same rule the Dashboard and Product
-// list use. Suggested order qty is a simple, labelled rule:
-// (alert threshold − current stock + 1), i.e. restock to just above
-// the alert level. "Start draft purchase" opens the existing Purchase
-// create form PREFILLED (supplier + this line) for manual review —
-// nothing is created or submitted automatically.
+// Phase 3A (3.3): low-stock restocking. A product is low under the
+// canonical rule (src/lib/lowStock): quantity <= the EFFECTIVE
+// threshold — the product's own lowStockAlert, or, when that is
+// stored as 0/unset, the store-wide Default Low Stock Threshold
+// (StoreSetting.defaultLowStockAlert), or 10. This is the same
+// rule the Dashboard count, the Products low-stock filter, the
+// Reports tab and the low-stock notification use (RP-2); this tab
+// previously compared against the raw stored value and diverged
+// for stored-0 products (integration audit M-1). Suggested order
+// qty is a simple, labelled rule: (effective threshold − current
+// stock + 1), i.e. restock to just above the alert level. "Start
+// draft purchase" opens the existing Purchase create form
+// PREFILLED (supplier + this line) for manual review — nothing is
+// created or submitted automatically.
 const LowStockTab = ({
    products,
    loading = false,
@@ -35,23 +45,31 @@ const LowStockTab = ({
    const { filterQueryData } = useFilterQuery();
    const search = (filterQueryData.searchText || "").trim().toLowerCase();
 
+   // M-1: the store-wide fallback for products without their own
+   // threshold (same value the server-side surfaces resolve with).
+   const { settings } = useSettings();
+   const globalFallback = settings?.defaultLowStockAlert;
+
    const rows = useMemo(() => {
       const productRows = products
-         .filter((p) => p.quantity <= p.lowStockAlert)
-         .map((p) => ({
+         .filter((p) => isProductLowStock(p.quantity, p.lowStockAlert, globalFallback))
+         .map((p) => {
+            const threshold = effectiveProductThreshold(p.lowStockAlert, globalFallback);
+            return {
             id: p.id,
             productName: p.productName,
             productSku: p.productSku,
             quantity: p.quantity,
-            threshold: p.lowStockAlert,
-            suggestedQty: Math.max(p.lowStockAlert - p.quantity + 1, 1),
+            threshold,
+            suggestedQty: Math.max(threshold - p.quantity + 1, 1),
             supplierName: p.primarySupplier?.name || null,
             isVariable: p.productType === "variable",
             isVariant: false,
             variantId: null as string | null,
             variantName: null as string | null,
             product: p,
-         }));
+            };
+         });
       // P2-19: variant-level low stock — a variant at or below its
       // OWN lowStockAlert (schema default 5) is surfaced with its
       // product context, even when the product's aggregate quantity
@@ -87,7 +105,7 @@ const LowStockTab = ({
             (r.variantName || "").toLowerCase().includes(search) ||
             (r.supplierName || "").toLowerCase().includes(search),
       );
-   }, [products, search]);
+   }, [products, search, globalFallback]);
 
    const startDraftPurchase = (row: any) => {
       const p: StockProduct = row.product;

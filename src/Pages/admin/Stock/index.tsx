@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import { useSettings } from "@src/lib/settingsContext";
+import { isProductLowStock } from "@src/lib/lowStock";
 import { fetchAllPages } from "@src/lib/fetchAllPages";
 import MovementsTab from "./MovementsTab";
 import AdjustTab from "./AdjustTab";
@@ -23,9 +24,11 @@ import LowStockTab from "./LowStockTab";
 
 // Phase 3A (roadmap 3.2 / 3.3): dedicated Stock workspace — movement
 // ledger, manual adjustments, warehouses and low-stock restocking.
-// All figures come from the real product data: low stock uses the same
-// rule as the Dashboard and Product list (quantity <= lowStockAlert),
-// and stock value is Σ quantity × costPrice, counted only for products
+// All figures come from the real product data: low stock uses the
+// canonical rule (src/lib/lowStock — the product's own threshold,
+// or the store-wide default when the product's is 0/unset), the
+// same rule as the Dashboard and Product list since RP-2, and
+// stock value is Σ quantity × costPrice, counted only for products
 // that have a cost price set.
 
 export interface StockProduct {
@@ -51,7 +54,7 @@ export interface StockProduct {
 
 const Stock = () => {
    const theme = useTheme();
-   const { formatCurrency } = useSettings();
+   const { settings, formatCurrency } = useSettings();
    const [tab, setTab] = useState(0);
    const [products, setProducts] = useState<StockProduct[]>([]);
    const [loadingProducts, setLoadingProducts] = useState(true);
@@ -120,7 +123,13 @@ const Stock = () => {
    }, [loadProducts, refreshKey]);
 
    const overview = useMemo(() => {
-      const lowStock = products.filter((p) => p.quantity <= p.lowStockAlert);
+      // Audit M-1: the header stat uses the same canonical rule as
+      // the Low Stock tab below (it previously compared against
+      // the raw stored threshold and undercounted stored-0
+      // products that the tab itself listed).
+      const lowStock = products.filter((p) =>
+         isProductLowStock(p.quantity, p.lowStockAlert, settings?.defaultLowStockAlert),
+      );
       let stockValue = 0;
       let valuedCount = 0;
       for (const p of products) {
@@ -136,7 +145,7 @@ const Stock = () => {
          stockValue,
          valuedCount,
       };
-   }, [products]);
+   }, [products, settings?.defaultLowStockAlert]);
 
    // Overview cards follow the project's premium summary-card tone
    // system (see AnalyticsCard): each metric carries a tone, shown

@@ -111,6 +111,15 @@ export async function GET(request: NextRequest) {
          "setting_update_setting",
          "setting_update",
       ]);
+      // Audit L-1: a SEPARATE capability for the admin-only actions
+      // presented on the System tab (factory reset, data export).
+      // Derived from the exact predicate requireAdmin enforces —
+      // AuthContext.isAdmin (System Admin role or the "all"
+      // permission, see src/lib/auth.ts) — so a role that can edit
+      // settings but is not an administrator no longer sees those
+      // actions enabled only to receive a 403. Presentation only;
+      // both routes keep their requireAdmin enforcement.
+      const canAdminSettings = sessionGate.isAdmin === true;
       if (
          !canSeeSettings &&
          payload &&
@@ -176,10 +185,11 @@ export async function GET(request: NextRequest) {
             ...payload,
             customConfig: scrubbed,
             canUpdateSettings,
+            canAdminSettings,
          });
       }
 
-      return NextResponse.json({ ...payload, canUpdateSettings });
+      return NextResponse.json({ ...payload, canUpdateSettings, canAdminSettings });
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch settings" },
@@ -206,8 +216,24 @@ export async function PUT(request: NextRequest) {
       // settings before anything is trimmed or saved (letters,
       // digits, hyphens, underscores; max 20 chars; empty is
       // allowed — read paths fall back to the defaults).
+      // Audit L-3: the same validation now covers ALL 14 prefix
+      // fields — previously the other twelve were only trimmed,
+      // so values with spaces or symbols could be stored and flow
+      // into generated entity IDs.
       for (const [field, label] of [
+         ["prefixEmployee", "Employee ID Prefix"],
+         ["prefixCustomer", "Customer ID Prefix"],
+         ["prefixSupplier", "Supplier ID Prefix"],
          ["prefixOrder", "Order ID Prefix"],
+         ["prefixPurchase", "Purchase ID Prefix"],
+         ["prefixProduct", "Product ID Prefix"],
+         ["prefixCategory", "Category ID Prefix"],
+         ["prefixUnit", "Unit ID Prefix"],
+         ["prefixExpense", "Expense ID Prefix"],
+         ["prefixAsset", "Asset ID Prefix"],
+         ["prefixRole", "Role ID Prefix"],
+         ["prefixBilling", "Billing ID Prefix"],
+         ["prefixWarehouse", "Warehouse ID Prefix"],
          ["invoicePrefix", "Invoice Number Prefix"],
       ] as const) {
          if (body[field] !== undefined) {

@@ -157,4 +157,33 @@ describe("prefix settings validation", () => {
       expect(validatePrefixSettingValue("A".repeat(21), "X").ok).toBe(false);
       expect(validatePrefixSettingValue(42, "X").ok).toBe(false);
    });
+
+   it("L-3: errors are field-specific (the label reaches the message)", () => {
+      // The settings PUT runs this validator for all 14 prefix
+      // fields with each field's own label, so the 400 response
+      // names the offending field.
+      const space = validatePrefixSettingValue("EM P", "Employee ID Prefix");
+      expect(space.ok).toBe(false);
+      if (!space.ok) expect(space.message).toContain("Employee ID Prefix");
+      const symbol = validatePrefixSettingValue("WH#", "Warehouse ID Prefix");
+      expect(symbol.ok).toBe(false);
+      if (!symbol.ok) expect(symbol.message).toContain("Warehouse ID Prefix");
+      const long = validatePrefixSettingValue(
+         "P".repeat(21),
+         "Purchase ID Prefix",
+      );
+      expect(long.ok).toBe(false);
+      if (!long.ok) {
+         expect(long.message).toContain("Purchase ID Prefix");
+         expect(long.message).toContain("20");
+      }
+   });
+
+   it("L-3: whitespace-only and boundary-length values stay valid", () => {
+      // Whitespace-only trims to empty, which the read paths treat
+      // as unset (default prefix) — valid by design.
+      expect(validatePrefixSettingValue("   ", "X").ok).toBe(true);
+      // Exactly at the 20-character maximum is valid.
+      expect(validatePrefixSettingValue("A".repeat(20), "X").ok).toBe(true);
+   });
 });

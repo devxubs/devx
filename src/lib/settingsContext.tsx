@@ -8,6 +8,14 @@ export interface StoreSettings {
    // setting; the PUT whitelist ignores it. Defaults to false
    // (fail-closed) until the first successful fetch.
    canUpdateSettings?: boolean;
+   // Audit L-1: separate from canUpdateSettings — true only for
+   // administrators per the server's requireAdmin rule (System
+   // Admin role or the "all" permission). Gates the presentation
+   // of the admin-only actions on the System tab (factory reset,
+   // data export); the server enforces requireAdmin regardless.
+   // Server-computed in the settings GET response, never from the
+   // client role.
+   canAdminSettings?: boolean;
    storeName: string;
    tagline?: string;
    logoUrl?: string;
@@ -67,6 +75,10 @@ export interface StoreSettings {
 
 const defaultSettings: StoreSettings = {
    canUpdateSettings: false,
+   // Audit L-1: fail-closed like canUpdateSettings — until the
+   // server says this session is an administrator, the System
+   // tab's admin-only actions stay disabled.
+   canAdminSettings: false,
    storeName: "DevX POS",
    tagline: "Smart Retail & Point of Sale",
    logoUrl: "",

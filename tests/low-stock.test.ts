@@ -124,6 +124,25 @@ describe("RP-2 (D2) global low-stock fallback", () => {
       expect(isProductLowStock(30, null, 25)).toBe(false);
    });
 
+   it("M-1 audit cases: stored 0 + global 50; product 8 wins; fallback 10", () => {
+      // The exact scenarios the Stock Low Stock tab must agree on
+      // with Dashboard / Products / Reports after the M-1 fix.
+      // Stored threshold 0 (unset) with a configured global of 50:
+      // the effective threshold is 50, so stock 30 IS low.
+      expect(effectiveProductThreshold(0, 50)).toBe(50);
+      expect(isProductLowStock(30, 0, 50)).toBe(true);
+      expect(isProductLowStock(51, 0, 50)).toBe(false);
+      // A product's own threshold (8) still wins over the global 50:
+      // stock 30 is NOT low, stock 8 is.
+      expect(effectiveProductThreshold(8, 50)).toBe(8);
+      expect(isProductLowStock(30, 8, 50)).toBe(false);
+      expect(isProductLowStock(8, 8, 50)).toBe(true);
+      // Stored 0 with the global itself at the built-in 10.
+      expect(effectiveProductThreshold(0, 10)).toBe(10);
+      expect(isProductLowStock(10, 0, 10)).toBe(true);
+      expect(isProductLowStock(11, 0, 10)).toBe(false);
+   });
+
    it("listing predicate: no global configured keeps the default 10", () => {
       expect(effectiveProductThreshold(null, undefined)).toBe(10);
       expect(effectiveProductThreshold(null, null)).toBe(10);

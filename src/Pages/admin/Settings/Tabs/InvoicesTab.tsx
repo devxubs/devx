@@ -127,18 +127,31 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
    };
 
    const handleConfirmReset = () => {
-      onConfigChange("invoiceTemplateId", "classic-pro");
-      onConfigChange("accentColor", "#1E3A8A");
-      onChange("invoiceHeader", "Official Sales Invoice & Receipt");
+      // Audit L-2: aligned with the FACTORY defaults — the same
+      // state the global Reset Defaults produces. The reset route
+      // restores the invoiceHeader/invoiceFooter COLUMNS to the
+      // literals below and replaces customConfig with an empty
+      // object, so every config key is CLEARED here (undefined):
+      // the template falls back to classic-pro, the accent to the
+      // template's own default, the terms text to the renderer's
+      // default, and every visibility toggle to its default (on).
+      // Previously this reset restored a different header
+      // ("Official Sales Invoice & Receipt"), a hard-coded navy
+      // accent, and never reset termsText. Form-state only, like
+      // the other section resets — dirty until the user saves.
+      onConfigChange("invoiceTemplateId", undefined);
+      onConfigChange("accentColor", undefined);
+      onChange("invoiceHeader", "DevX POS - Retail Invoice");
       onChange("invoiceFooter", "Thank you for shopping with us! Please come again.");
-      onConfigChange("showLogoOnReceipt", true);
-      onConfigChange("showBarcodeOnReceipt", true);
-      onConfigChange("showCustomerOnReceipt", true);
-      onConfigChange("showCashierOnReceipt", true);
-      onConfigChange("showCourierOnReceipt", true);
-      onConfigChange("showSkuColumn", true);
-      onConfigChange("showSignatureBox", true);
-      onConfigChange("showTermsOnReceipt", true);
+      onConfigChange("termsText", undefined);
+      onConfigChange("showLogoOnReceipt", undefined);
+      onConfigChange("showBarcodeOnReceipt", undefined);
+      onConfigChange("showCustomerOnReceipt", undefined);
+      onConfigChange("showCashierOnReceipt", undefined);
+      onConfigChange("showCourierOnReceipt", undefined);
+      onConfigChange("showSkuColumn", undefined);
+      onConfigChange("showSignatureBox", undefined);
+      onConfigChange("showTermsOnReceipt", undefined);
       setResetConfirmOpen(false);
    };
 
