@@ -19,6 +19,8 @@ interface HeaderProps {
    onShowSidebar: () => void;
    onSave: () => void;
    isSaving?: boolean;
+   // RP-3 (U3): hide the Save action for read-only roles.
+   canUpdate?: boolean;
    searchQuery?: string;
    onSearchChange?: (val: string) => void;
 }
@@ -27,6 +29,7 @@ const Header = ({
    onShowSidebar,
    onSave,
    isSaving = false,
+   canUpdate = true,
    searchQuery = "",
    onSearchChange,
 }: HeaderProps) => {
@@ -71,22 +74,24 @@ const Header = ({
             />
          )}
 
-         <Button
-            variant="contained"
-            color="primary"
-            startIcon={
-               isSaving ? (
-                  <CircularProgress size={16} color="inherit" />
-               ) : (
-                  <Icon icon="solar:diskette-bold" size={isSmDown ? "small" : "medium"} />
-               )
-            }
-            size={isSmDown ? "small" : "medium"}
-            onClick={onSave}
-            disabled={isSaving}
-         >
-            {isSaving ? "Saving..." : "Save Changes"}
-         </Button>
+         {canUpdate && (
+            <Button
+               variant="contained"
+               color="primary"
+               startIcon={
+                  isSaving ? (
+                     <CircularProgress size={16} color="inherit" />
+                  ) : (
+                     <Icon icon="solar:diskette-bold" size={isSmDown ? "small" : "medium"} />
+                  )
+               }
+               size={isSmDown ? "small" : "medium"}
+               onClick={onSave}
+               disabled={isSaving}
+            >
+               {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+         )}
 
          {/* Search Slide Sm screen */}
          <Slide direction="down" in={openSearch} mountOnEnter unmountOnExit>

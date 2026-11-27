@@ -3,6 +3,11 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 
 export interface StoreSettings {
+   // RP-3 (U3): server-computed capability (GET /api/settings) —
+   // true when the signed-in role may save settings. Not a stored
+   // setting; the PUT whitelist ignores it. Defaults to false
+   // (fail-closed) until the first successful fetch.
+   canUpdateSettings?: boolean;
    storeName: string;
    tagline?: string;
    logoUrl?: string;
@@ -61,6 +66,7 @@ export interface StoreSettings {
 }
 
 const defaultSettings: StoreSettings = {
+   canUpdateSettings: false,
    storeName: "DevX POS",
    tagline: "Smart Retail & Point of Sale",
    logoUrl: "",

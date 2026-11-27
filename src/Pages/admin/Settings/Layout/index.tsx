@@ -10,6 +10,8 @@ import {
    CircularProgress,
    Button,
    Paper,
+   Alert,
+   Chip,
 } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
@@ -110,6 +112,11 @@ const Layout = () => {
    const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
 
    const { settings, loading, updateSettings, getLastSaveError, resetSettings } = useSettings();
+   // RP-3 (U3): roles without the settings update permission get
+   // a read-only page — the form is disabled, the save actions
+   // are hidden, and a notice explains why. The server still
+   // enforces the permission on PUT/reset regardless.
+   const canUpdate = settings?.canUpdateSettings === true;
    const { showSnackbar } = useSnackbar();
    const [formValues, setFormValues] = useState<any>({});
    const [isSaving, setIsSaving] = useState(false);
@@ -286,6 +293,7 @@ const Layout = () => {
                onShowSidebar={() => setShowSidebar(true)}
                onSave={handleSave}
                isSaving={isSaving}
+               canUpdate={canUpdate}
                searchQuery={searchQuery}
                onSearchChange={setSearchQuery}
             />
@@ -324,11 +332,38 @@ const Layout = () => {
                   </Stack>
                </Stack>
 
+               {/* RP-3 (U3): read-only notice for roles that may
+                   view but not save settings. */}
+               {!canUpdate && !loading && (
+                  <Alert severity="info" variant="outlined">
+                     You can view these settings, but your role does not
+                     have permission to change them. Saving requires the
+                     settings permission — ask an administrator if
+                     something needs to change.
+                  </Alert>
+               )}
+
                {/* Render Tab Component — RP-1 (S1): bottom padding
                    sized to clear the action bar below (bar ≈ 60px +
                    breathing room), so the last row of every tab is
-                   fully visible at scroll end. */}
-               <Box sx={{ pb: 10 }}>{renderTabContent()}</Box>
+                   fully visible at scroll end. RP-3 (U3): the
+                   fieldset disables every form control in the tab
+                   for read-only roles (native fieldset semantics;
+                   style reset so it adds no chrome of its own). */}
+               <Box
+                  component="fieldset"
+                  disabled={!canUpdate}
+                  sx={{
+                     pb: 10,
+                     border: 0,
+                     m: 0,
+                     paddingTop: 0,
+                     paddingInline: 0,
+                     minInlineSize: "auto",
+                  }}
+               >
+                  {renderTabContent()}
+               </Box>
             </Stack>
 
             {/* Persistent Bottom Action Bar — RP-1 (S1): sticky
@@ -356,32 +391,37 @@ const Layout = () => {
                <Typography variant="caption" color="text.secondary">
                   Default currency: <strong>{formValues.currency || "BDT"} ({formValues.currencySymbol || "৳"})</strong> • Changes apply across entire POS system
                </Typography>
-               <Stack direction="row" spacing={1.5}>
-                  <Button
-                     variant="outlined"
-                     color="inherit"
-                     size="small"
-                     onClick={() => setFormValues({ ...settings })}
-                  >
-                     Discard Changes
-                  </Button>
-                  <Button
-                     variant="contained"
-                     color="primary"
-                     size="small"
-                     startIcon={
-                        isSaving ? (
-                           <CircularProgress size={16} color="inherit" />
-                        ) : (
-                           <Icon icon="solar:diskette-bold" size="small" />
-                        )
-                     }
-                     onClick={handleSave}
-                     disabled={isSaving}
-                  >
-                     {isSaving ? "Saving..." : "Save Settings"}
-                  </Button>
-               </Stack>
+               {canUpdate ? (
+                  <Stack direction="row" spacing={1.5}>
+                     <Button
+                        variant="outlined"
+                        color="inherit"
+                        size="small"
+                        onClick={() => setFormValues({ ...settings })}
+                     >
+                        Discard Changes
+                     </Button>
+                     <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        startIcon={
+                           isSaving ? (
+                              <CircularProgress size={16} color="inherit" />
+                           ) : (
+                              <Icon icon="solar:diskette-bold" size="small" />
+                           )
+                        }
+                        onClick={handleSave}
+                        disabled={isSaving}
+                     >
+                        {isSaving ? "Saving..." : "Save Settings"}
+                     </Button>
+                  </Stack>
+               ) : (
+                  // RP-3 (U3): no save actions for read-only roles.
+                  <Chip label="Read-only" size="small" variant="outlined" />
+               )}
             </Paper>
          </Stack>
       </Stack>

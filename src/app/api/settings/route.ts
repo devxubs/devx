@@ -99,6 +99,18 @@ export async function GET(request: NextRequest) {
          "setting_update_setting",
          "setting_update",
       ]);
+      // RP-3 (U3): the update capability mirrors the PUT gate's
+      // permission list exactly (no view-only entries). It is
+      // returned with the payload so the Settings page can render
+      // read-only for roles that cannot save, instead of letting
+      // them edit and fail at Save. Server-side enforcement is
+      // unchanged — this flag is presentation only.
+      const canUpdateSettings = sessionGate.hasPermission([
+         "settings",
+         "setting",
+         "setting_update_setting",
+         "setting_update",
+      ]);
       if (
          !canSeeSettings &&
          payload &&
@@ -139,13 +151,35 @@ export async function GET(request: NextRequest) {
             // Phase 5: the payment method list — every payment
             // selector (staff roles) reads it.
             "paymentMethods",
+            // RP-3 (F1): the invoice presentation keys — the
+            // print renderers read settings.customConfig
+            // client-side, so without these a staff-printed
+            // invoice silently fell back to renderer defaults
+            // instead of the store's configured template,
+            // visibility and terms. Presentational only: this is
+            // content customers see on every printed invoice.
+            "invoiceTemplateId",
+            "accentColor",
+            "termsText",
+            "showSkuColumn",
+            "showSignatureBox",
+            "showCustomerOnReceipt",
+            "showCashierOnReceipt",
+            "showCourierOnReceipt",
+            "showTermsOnReceipt",
+            "showLogoOnReceipt",
+            "showBarcodeOnReceipt",
          ]) {
             if (key in cfg) scrubbed[key] = cfg[key];
          }
-         return NextResponse.json({ ...payload, customConfig: scrubbed });
+         return NextResponse.json({
+            ...payload,
+            customConfig: scrubbed,
+            canUpdateSettings,
+         });
       }
 
-      return NextResponse.json(payload);
+      return NextResponse.json({ ...payload, canUpdateSettings });
    } catch {
       return NextResponse.json(
          { error: "Failed to fetch settings" },
