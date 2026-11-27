@@ -8,7 +8,9 @@ import {
    Typography,
    Box,
    Button,
+   ButtonBase,
    LinearProgress,
+   Tooltip,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
@@ -44,6 +46,15 @@ const languages = [
    { value: "en", label: "English (US / UK)" },
    { value: "bn", label: "বাংলা (Bengali)" },
 ];
+
+// Currency Symbol options for the autocomplete — derived from
+// the currency list above (each symbol is unique there). The
+// label keeps the code next to the symbol so the field stays
+// searchable by either ("$" or "USD").
+const currencySymbols = currencies.map((c) => ({
+   symbol: c.symbol,
+   label: `${c.symbol} (${c.code})`,
+}));
 
 // RP-6 (D1): the Date Format select was removed — nothing in the
 // app ever read StoreSetting.dateFormat (dates render in fixed
@@ -93,6 +104,13 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
 
    const currencyValue =
       currencies.find((c) => c.code === values.currency) || currencies[0];
+   // The stored symbol may be a custom value outside the known
+   // list (the field is freeSolo) — then the raw string itself
+   // is the value, so it displays and round-trips unchanged.
+   const currencySymbolValue =
+      currencySymbols.find((s) => s.symbol === values.currencySymbol) ||
+      values.currencySymbol ||
+      "৳";
    const timezoneValue =
       timezones.find((tz) => tz.value === values.timezone) || timezones[0];
    const languageValue =
@@ -186,64 +204,76 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   Store Logo
                </Typography>
                <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-                  <Box
-                     sx={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 1.5,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        bgcolor: "background.paper",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        overflow: "hidden",
-                        flexShrink: 0,
-                     }}
+                  {/* The whole preview/placeholder box is the
+                      upload control (a ButtonBase, so it is
+                      keyboard-operable with a visible focus
+                      state). There is no separate Upload button;
+                      Remove stays a sibling action so clicking it
+                      can never open the file picker. */}
+                  <Tooltip
+                     title={values.logoUrl ? "Replace logo" : "Upload logo"}
+                     disableInteractive
                   >
-                     {values.logoUrl ? (
-                        <Box
-                           component="img"
-                           src={values.logoUrl}
-                           alt="Store Logo"
-                           sx={{ width: "100%", height: "100%", objectFit: "contain" }}
-                        />
-                     ) : (
-                        <Icon icon="solar:gallery-bold-duotone" size="large" />
-                     )}
-                  </Box>
+                     <ButtonBase
+                        onClick={() => logoInputRef.current?.click()}
+                        disabled={logoUploading}
+                        aria-label={values.logoUrl ? "Replace store logo" : "Upload store logo"}
+                        sx={{
+                           width: 64,
+                           height: 64,
+                           borderRadius: 1.5,
+                           border: "1px solid",
+                           borderColor: "divider",
+                           bgcolor: "background.paper",
+                           display: "flex",
+                           alignItems: "center",
+                           justifyContent: "center",
+                           overflow: "hidden",
+                           flexShrink: 0,
+                           transition: "border-color 120ms ease, background-color 120ms ease",
+                           "&:hover": {
+                              borderColor: "primary.main",
+                              bgcolor: "action.hover",
+                           },
+                           "&.Mui-focusVisible": {
+                              outline: "2px solid",
+                              outlineColor: "primary.main",
+                              outlineOffset: 2,
+                           },
+                        }}
+                     >
+                        {values.logoUrl ? (
+                           <Box
+                              component="img"
+                              src={values.logoUrl}
+                              alt="Store Logo"
+                              sx={{ width: "100%", height: "100%", objectFit: "contain" }}
+                           />
+                        ) : (
+                           <Icon icon="solar:gallery-bold-duotone" size="large" />
+                        )}
+                     </ButtonBase>
+                  </Tooltip>
                   <Stack spacing={1}>
-                     <Stack direction="row" spacing={1}>
+                     {values.logoUrl && (
                         <Button
-                           variant="outlined"
+                           variant="text"
+                           color="error"
                            size="small"
                            disabled={logoUploading}
-                           startIcon={<Icon icon="solar:upload-minimalistic-bold" size="small" />}
-                           onClick={() => logoInputRef.current?.click()}
+                           onClick={() => {
+                              setLogoError(null);
+                              onChange("logoUrl", "");
+                           }}
+                           sx={{ alignSelf: "flex-start" }}
                         >
-                           {logoUploading
-                              ? "Uploading..."
-                              : values.logoUrl
-                                ? "Replace Logo"
-                                : "Upload Logo"}
+                           Remove
                         </Button>
-                        {values.logoUrl && (
-                           <Button
-                              variant="text"
-                              color="error"
-                              size="small"
-                              disabled={logoUploading}
-                              onClick={() => {
-                                 setLogoError(null);
-                                 onChange("logoUrl", "");
-                              }}
-                           >
-                              Remove
-                           </Button>
-                        )}
-                     </Stack>
+                     )}
                      <Typography variant="caption" color="text.secondary">
-                        PNG, JPEG, WebP, GIF or AVIF, up to 5 MB.
+                        {logoUploading
+                           ? "Uploading..."
+                           : "Click the logo to upload or replace. PNG, JPEG, WebP, GIF or AVIF, up to 5 MB."}
                      </Typography>
                   </Stack>
                </Stack>
@@ -299,13 +329,45 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-               <TextField
-                  fullWidth
-                  label="Currency Symbol"
+               <CustomAutocomplete
                   size="small"
-                  value={values.currencySymbol || "৳"}
-                  onChange={(e) => onChange("currencySymbol", e.target.value)}
-                  placeholder="৳"
+                  label="Currency Symbol"
+                  options={currencySymbols}
+                  getOptionLabel={(o: any) =>
+                     typeof o === "string" ? o : o?.label || ""
+                  }
+                  isOptionEqualToValue={(a: any, b: any) =>
+                     (typeof a === "string" ? a : a?.symbol) ===
+                     (typeof b === "string" ? b : b?.symbol)
+                  }
+                  value={currencySymbolValue}
+                  onChange={(next: any) => {
+                     // CustomAutocomplete is value-first (Phase 1
+                     // lesson). Without the `arrow` prop the
+                     // component is freeSolo, so `next` is an
+                     // option object when picked from the list,
+                     // or the typed string for a custom symbol —
+                     // both are stored as the symbol string, the
+                     // same shape the old text field saved.
+                     if (next == null) return;
+                     onChange(
+                        "currencySymbol",
+                        typeof next === "string" ? next : next.symbol,
+                     );
+                  }}
+                  onInputChange={(_e: any, inputValue: string, reason: string) => {
+                     // This MUI version's freeSolo does NOT
+                     // commit typed text on blur (only Enter or a
+                     // list pick fires onChange) — a custom symbol
+                     // would silently never reach the form. Commit
+                     // keystrokes directly, like the old text
+                     // field did. "reset" (list picks and
+                     // external value changes) is left to
+                     // onChange above.
+                     if (reason === "input" || reason === "clear") {
+                        onChange("currencySymbol", inputValue);
+                     }
+                  }}
                />
             </Grid>
 

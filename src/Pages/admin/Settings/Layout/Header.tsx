@@ -6,7 +6,6 @@ import {
    TextField,
    Button,
    Chip,
-   Tooltip,
    useMediaQuery,
    useTheme,
    Slide,
@@ -32,9 +31,6 @@ interface HeaderProps {
    isDirty?: boolean;
    searchQuery?: string;
    onSearchChange?: (val: string) => void;
-   // Full-screen modal mode: renders the modal's Close (X) at
-   // the far right of the header. Absent on the settings page.
-   onClose?: () => void;
 }
 
 const Header = ({
@@ -46,7 +42,6 @@ const Header = ({
    isDirty = false,
    searchQuery = "",
    onSearchChange,
-   onClose,
 }: HeaderProps) => {
    const theme = useTheme();
    const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
@@ -138,18 +133,11 @@ const Header = ({
             // bottom bar used to show.
             <Chip label="Read-only" size="small" variant="outlined" />
          )}
-
-         {onClose && (
-            <Tooltip title="Close settings" disableInteractive>
-               <IconButton
-                  onClick={onClose}
-                  aria-label="Close settings"
-                  sx={{ ml: 0.5, flexShrink: 0 }}
-               >
-                  <Icon icon="eva:close-fill" />
-               </IconButton>
-            </Tooltip>
-         )}
+         {/* The full-screen Settings modal has no Close (X) in
+             this header — Discard / Save Changes sit at the far
+             right. The modal still closes with Escape, routed
+             through the layout's registered close handler, so
+             the dirty-state discard confirmation still applies. */}
 
          {/* Search Slide Sm screen */}
          <Slide direction="down" in={openSearch} mountOnEnter unmountOnExit>

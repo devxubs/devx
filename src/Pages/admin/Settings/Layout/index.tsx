@@ -91,9 +91,10 @@ interface LayoutProps {
    // Settings modal (Layout/SettingsModal) instead of on the
    // /admin/settings page. Tab selection becomes local state
    // (the page's URL belongs to whatever app view is underneath
-   // the modal, so the ?tab= machinery is not used), the root
-   // fills its container instead of the page-height calc, and a
-   // close action appears in the header.
+   // the modal, so the ?tab= machinery is not used), and the
+   // root fills its container instead of the page-height calc.
+   // The modal header carries no close button — the shell's
+   // close requests (Escape) arrive via registerCloseHandler.
    embedded?: boolean;
    onClose?: () => void;
    // The modal shell routes its own close requests (Escape,
@@ -413,7 +414,6 @@ const Layout = ({ embedded = false, onClose, registerCloseHandler }: LayoutProps
                isDirty={isDirty}
                searchQuery={searchQuery}
                onSearchChange={setSearchQuery}
-               onClose={embedded ? requestClose : undefined}
             />
 
             {/* Scrollable Tab Body */}
