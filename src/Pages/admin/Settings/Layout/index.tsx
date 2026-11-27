@@ -9,6 +9,7 @@ import {
    Drawer,
    CircularProgress,
    Alert,
+   alpha,
 } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
@@ -21,6 +22,7 @@ import { useSettings } from "@src/lib/settingsContext";
 import { useSnackbar } from "@src/lib/snackbarContext";
 import { isSettingsFormDirty } from "@src/lib/settingsDirty";
 import AlertDialog from "@src/components/AlertDialog";
+import { settingsDesignSx } from "./settingsDesign";
 
 import GeneralTab from "../Tabs/GeneralTab";
 import PosTab from "../Tabs/PosTab";
@@ -325,6 +327,9 @@ const Layout = ({ embedded = false, onClose, registerCloseHandler }: LayoutProps
          flex={1}
          borderRadius={2}
          height={embedded ? "100%" : "calc(100vh - 64px - 44px)"}
+         // Settings UI design layer — every visual rule is
+         // scoped to this subtree (see settingsDesign.ts).
+         sx={settingsDesignSx(theme)}
       >
          {/* Sidebar */}
          {isSmDown ? (
@@ -368,6 +373,7 @@ const Layout = ({ embedded = false, onClose, registerCloseHandler }: LayoutProps
             </Drawer>
          ) : (
             <Stack
+               className="settings-nav"
                py={2}
                pl={{ sm: 1, md: 2 }}
                pr={1}
@@ -416,32 +422,67 @@ const Layout = ({ embedded = false, onClose, registerCloseHandler }: LayoutProps
                onSearchChange={setSearchQuery}
             />
 
-            {/* Scrollable Tab Body */}
-            <Stack p={{ xs: 2, sm: 3 }} spacing={2} overflow={"auto"} flex={1}>
-               {/* Section Title Banner */}
-               <Stack direction={"row"} alignItems={"center"} spacing={2} flexWrap={"wrap"}>
+            {/* Scrollable Tab Body — content is capped at a
+                readable measure (GitHub-style) instead of
+                stretching fields across very wide screens, and
+                the scrollbar is thinned to match. */}
+            <Stack
+               p={{ xs: 2, sm: 3 }}
+               spacing={3}
+               overflow={"auto"}
+               flex={1}
+               sx={{
+                  scrollbarWidth: "thin",
+                  scrollbarColor: `${alpha(theme.palette.text.primary, 0.22)} transparent`,
+                  "&::-webkit-scrollbar": { width: 8 },
+                  "&::-webkit-scrollbar-thumb": {
+                     backgroundColor: alpha(theme.palette.text.primary, 0.18),
+                     borderRadius: 8,
+                  },
+                  "&::-webkit-scrollbar-thumb:hover": {
+                     backgroundColor: alpha(theme.palette.text.primary, 0.3),
+                  },
+               }}
+            >
+               {/* Section Title Banner — a soft tinted icon tile
+                   (not a solid block), a quieter title, and a
+                   hairline under the header row to separate it
+                   from the form, GitHub-settings style. */}
+               <Stack
+                  direction={"row"}
+                  alignItems={"center"}
+                  spacing={2}
+                  flexWrap={"wrap"}
+                  sx={{
+                     width: "100%",
+                     maxWidth: 1120,
+                     pb: 2.5,
+                     borderBottom: 1,
+                     borderColor: "divider",
+                  }}
+               >
                   <Box
                      sx={{
-                        width: 48,
-                        height: 48,
+                        width: 44,
+                        height: 44,
                         borderRadius: 1.5,
-                        bgcolor: "primary.main",
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        boxShadow: 2,
+                        flexShrink: 0,
                      }}
                   >
                      <Icon
                         icon={currentMeta.icon}
                         size="large"
                         style={{
-                           color: theme.palette.common.white,
+                           color: theme.palette.primary.main,
                         }}
                      />
                   </Box>
-                  <Stack flex={1}>
-                     <Typography variant="h5" fontWeight={700} fontSize={{ xs: "1.3rem", sm: "1.5rem" }}>
+                  <Stack flex={1} spacing={0.25}>
+                     <Typography variant="h5" fontWeight={650} fontSize={{ xs: "1.25rem", sm: "1.375rem" }} letterSpacing="-0.01em">
                         {currentMeta.title}
                      </Typography>
                      <Typography variant="body2" color="text.secondary">
@@ -453,7 +494,7 @@ const Layout = ({ embedded = false, onClose, registerCloseHandler }: LayoutProps
                {/* RP-3 (U3): read-only notice for roles that may
                    view but not save settings. */}
                {!canUpdate && !loading && (
-                  <Alert severity="info" variant="outlined">
+                  <Alert severity="info" variant="outlined" sx={{ width: "100%", maxWidth: 1120, borderRadius: "8px" }}>
                      You can view these settings, but your role does not
                      have permission to change them. Saving requires the
                      settings permission — ask an administrator if
@@ -479,6 +520,8 @@ const Layout = ({ embedded = false, onClose, registerCloseHandler }: LayoutProps
                      paddingTop: 0,
                      paddingInline: 0,
                      minInlineSize: "auto",
+                     width: "100%",
+                     maxWidth: 1120,
                   }}
                >
                   {renderTabContent()}
