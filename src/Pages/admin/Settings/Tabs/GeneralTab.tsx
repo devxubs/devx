@@ -1,15 +1,18 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
    Grid,
-   MenuItem,
    Stack,
    TextField,
    Typography,
    Box,
-   Avatar,
+   Button,
+   LinearProgress,
 } from "@mui/material";
+import Icon from "@src/components/Icon";
+import CustomAutocomplete from "@src/components/Autocomplete";
+import { uploadImageFile } from "@src/lib/uploadImage";
 import SectionResetButton from "./SectionResetButton";
 
 interface GeneralTabProps {
@@ -37,30 +40,70 @@ const timezones = [
    { value: "America/New_York", label: "(GMT-5:00) New York, USA" },
 ];
 
+const languages = [
+   { value: "en", label: "English (US / UK)" },
+   { value: "bn", label: "বাংলা (Bengali)" },
+];
+
 // RP-6 (D1): the Date Format select was removed — nothing in the
 // app ever read StoreSetting.dateFormat (dates render in fixed
 // formats). The column and its stored value are untouched.
 
+// Phase 4: logo uploads follow the product form's conventions
+// (ProductMediaSection): the same POST /api/uploads route via
+// uploadImageFile, the same accepted raster types and the same
+// 5 MB cap (the server re-validates type by magic bytes and
+// size against the actual buffer).
+const LOGO_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/avif";
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+
 export default function GeneralTab({ values, onChange }: GeneralTabProps) {
-   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = currencies.find((c) => c.code === e.target.value);
-      onChange("currency", e.target.value);
-      if (selected) {
-         onChange("currencySymbol", selected.symbol);
+   const [logoUploading, setLogoUploading] = useState(false);
+   const [logoError, setLogoError] = useState<string | null>(null);
+   const logoInputRef = useRef<HTMLInputElement>(null);
+
+   const handleLogoFile = async (file: File | undefined) => {
+      if (!file) return;
+      setLogoError(null);
+      if (!LOGO_ACCEPT.split(",").includes(file.type)) {
+         setLogoError("Please choose a PNG, JPEG, WebP, GIF or AVIF image.");
+         return;
+      }
+      if (file.size > LOGO_MAX_BYTES) {
+         setLogoError("Image is larger than 5 MB.");
+         return;
+      }
+      setLogoUploading(true);
+      try {
+         const url = await uploadImageFile(file);
+         // Only a successful upload touches the form value — a
+         // failed or cancelled upload leaves the saved logo as is.
+         onChange("logoUrl", url);
+      } catch (err) {
+         setLogoError(
+            err instanceof Error
+               ? err.message
+               : "Logo upload failed. Please try again.",
+         );
+      } finally {
+         setLogoUploading(false);
+         if (logoInputRef.current) logoInputRef.current.value = "";
       }
    };
 
+   const currencyValue =
+      currencies.find((c) => c.code === values.currency) || currencies[0];
+   const timezoneValue =
+      timezones.find((tz) => tz.value === values.timezone) || timezones[0];
+   const languageValue =
+      languages.find((l) => l.value === values.language) || languages[0];
+
    return (
-      <Stack spacing={3}>
-         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-            <Box>
-               <Typography variant="h6" fontWeight={600}>
-                  General Store Profile
-               </Typography>
-               <Typography variant="body2" color="text.secondary">
-                  Configure your business identity, primary contact information, currency, and locale.
-               </Typography>
-            </Box>
+      <Stack spacing={2}>
+         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+            <Typography variant="h6" fontWeight={600}>
+               General Store Profile
+            </Typography>
             <SectionResetButton
                section="General Store Profile"
                onReset={() => {
@@ -84,7 +127,6 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   value={values.storeName || ""}
                   onChange={(e) => onChange("storeName", e.target.value)}
                   placeholder="DevX POS"
-                  helperText="Displayed across receipts, invoices, and the dashboard navigation"
                />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
@@ -95,7 +137,6 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   value={values.tagline || ""}
                   onChange={(e) => onChange("tagline", e.target.value)}
                   placeholder="Smart Retail & Point of Sale"
-                  helperText="Short business motto printed on receipts"
                />
             </Grid>
 
@@ -108,7 +149,6 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   value={values.email || ""}
                   onChange={(e) => onChange("email", e.target.value)}
                   placeholder="contact@devxpos.com"
-                  helperText="Official email for customer correspondence"
                />
             </Grid>
             <Grid size={{ xs: 12, md: 6 }}>
@@ -119,7 +159,6 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   value={values.phone || ""}
                   onChange={(e) => onChange("phone", e.target.value)}
                   placeholder="+880 1700-123456"
-                  helperText="Customer support telephone or mobile number"
                />
             </Grid>
 
@@ -133,44 +172,102 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   value={values.address || ""}
                   onChange={(e) => onChange("address", e.target.value)}
                   placeholder="House 42, Road 11, Banani, Dhaka-1213, Bangladesh"
-                  helperText="Physical shop or warehouse location displayed on invoice headers"
                />
             </Grid>
 
-            <Grid size={{ xs: 12, md: 8 }}>
-               <TextField
-                  fullWidth
-                  label="Store Logo Image URL"
-                  size="small"
-                  value={values.logoUrl || ""}
-                  onChange={(e) => onChange("logoUrl", e.target.value)}
-                  placeholder="https://example.com/logo.png"
-                  helperText="Direct URL or web path to your business logo"
-               />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-               <Stack direction="row" alignItems="center" spacing={2} sx={{ mt: 0.5 }}>
-                  <Avatar
-                     src={values.logoUrl || "/assets/avatar.jpg"}
-                     alt="Store Logo"
-                     sx={{ width: 44, height: 44, borderRadius: 1 }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                     Logo Preview
-                  </Typography>
+            {/* Store Logo — Phase 4: uploader replacing the raw
+                URL field. The stored value is unchanged (a logo
+                reference in values.logoUrl: an uploaded
+                "/uploads/…" path, or a legacy URL/data-URL from
+                before — all keep rendering in invoices, print
+                and exports exactly as they did). */}
+            <Grid size={12}>
+               <Typography variant="subtitle2" fontWeight={600} mb={1}>
+                  Store Logo
+               </Typography>
+               <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                  <Box
+                     sx={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 1.5,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        bgcolor: "background.paper",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                     }}
+                  >
+                     {values.logoUrl ? (
+                        <Box
+                           component="img"
+                           src={values.logoUrl}
+                           alt="Store Logo"
+                           sx={{ width: "100%", height: "100%", objectFit: "contain" }}
+                        />
+                     ) : (
+                        <Icon icon="solar:gallery-bold-duotone" size="large" />
+                     )}
+                  </Box>
+                  <Stack spacing={1}>
+                     <Stack direction="row" spacing={1}>
+                        <Button
+                           variant="outlined"
+                           size="small"
+                           disabled={logoUploading}
+                           startIcon={<Icon icon="solar:upload-minimalistic-bold" size="small" />}
+                           onClick={() => logoInputRef.current?.click()}
+                        >
+                           {logoUploading
+                              ? "Uploading..."
+                              : values.logoUrl
+                                ? "Replace Logo"
+                                : "Upload Logo"}
+                        </Button>
+                        {values.logoUrl && (
+                           <Button
+                              variant="text"
+                              color="error"
+                              size="small"
+                              disabled={logoUploading}
+                              onClick={() => {
+                                 setLogoError(null);
+                                 onChange("logoUrl", "");
+                              }}
+                           >
+                              Remove
+                           </Button>
+                        )}
+                     </Stack>
+                     <Typography variant="caption" color="text.secondary">
+                        PNG, JPEG, WebP, GIF or AVIF, up to 5 MB.
+                     </Typography>
+                  </Stack>
                </Stack>
+               <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept={LOGO_ACCEPT}
+                  hidden
+                  aria-label="Upload store logo"
+                  onChange={(e) => handleLogoFile(e.target.files?.[0])}
+               />
+               {logoUploading && <LinearProgress sx={{ mt: 1.5, borderRadius: 1 }} />}
+               {logoError && (
+                  <Typography variant="caption" color="error" role="alert" display="block" mt={1}>
+                     {logoError}
+                  </Typography>
+               )}
             </Grid>
          </Grid>
 
-         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} sx={{ pt: 1 }}>
-            <Box>
-               <Typography variant="h6" fontWeight={600}>
-                  Currency & Localization
-               </Typography>
-               <Typography variant="body2" color="text.secondary">
-                  Select your store currency, timezone, and calendar date preferences.
-               </Typography>
-            </Box>
+         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="h6" fontWeight={600}>
+               Currency & Localization
+            </Typography>
             <SectionResetButton
                section="Currency & Localization"
                onReset={() => {
@@ -184,21 +281,21 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
 
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-               <TextField
-                  select
-                  fullWidth
-                  label="Default Currency"
+               <CustomAutocomplete
+                  arrow
                   size="small"
-                  value={values.currency || "BDT"}
-                  onChange={handleCurrencyChange}
-                  helperText="Base transactional currency"
-               >
-                  {currencies.map((c) => (
-                     <MenuItem key={c.code} value={c.code}>
-                        {c.label}
-                     </MenuItem>
-                  ))}
-               </TextField>
+                  label="Default Currency"
+                  options={currencies}
+                  getOptionLabel={(o: any) => o?.label || ""}
+                  isOptionEqualToValue={(a: any, b: any) => a?.code === b?.code}
+                  value={currencyValue}
+                  onChange={(next: any) => {
+                     // CustomAutocomplete is value-first (Phase 1 lesson).
+                     if (!next) return;
+                     onChange("currency", next.code);
+                     onChange("currencySymbol", next.symbol);
+                  }}
+               />
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 2 }}>
@@ -208,41 +305,38 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   size="small"
                   value={values.currencySymbol || "৳"}
                   onChange={(e) => onChange("currencySymbol", e.target.value)}
-                  helperText="e.g. ৳ or $"
+                  placeholder="৳"
                />
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 6 }}>
-               <TextField
-                  select
-                  fullWidth
-                  label="System Timezone"
+               <CustomAutocomplete
+                  arrow
                   size="small"
-                  value={values.timezone || "Asia/Dhaka"}
-                  onChange={(e) => onChange("timezone", e.target.value)}
-                  helperText="Used for order timestamping"
-               >
-                  {timezones.map((tz) => (
-                     <MenuItem key={tz.value} value={tz.value}>
-                        {tz.label}
-                     </MenuItem>
-                  ))}
-               </TextField>
+                  label="System Timezone"
+                  options={timezones}
+                  getOptionLabel={(o: any) => o?.label || ""}
+                  isOptionEqualToValue={(a: any, b: any) => a?.value === b?.value}
+                  value={timezoneValue}
+                  onChange={(next: any) => {
+                     if (next) onChange("timezone", next.value);
+                  }}
+               />
             </Grid>
 
             <Grid size={{ xs: 12, sm: 6, md: 6 }}>
-               <TextField
-                  select
-                  fullWidth
-                  label="Language"
+               <CustomAutocomplete
+                  arrow
                   size="small"
-                  value={values.language || "en"}
-                  onChange={(e) => onChange("language", e.target.value)}
-                  helperText="Application display language"
-               >
-                  <MenuItem value="en">English (US / UK)</MenuItem>
-                  <MenuItem value="bn">বাংলা (Bengali)</MenuItem>
-               </TextField>
+                  label="Language"
+                  options={languages}
+                  getOptionLabel={(o: any) => o?.label || ""}
+                  isOptionEqualToValue={(a: any, b: any) => a?.value === b?.value}
+                  value={languageValue}
+                  onChange={(next: any) => {
+                     if (next) onChange("language", next.value);
+                  }}
+               />
             </Grid>
          </Grid>
       </Stack>

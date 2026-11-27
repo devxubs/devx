@@ -55,6 +55,10 @@ export async function POST(request: NextRequest) {
       "product",
       "product_create",
       "product_update",
+      // Phase 4 (General Store cleanup): the Settings store-logo
+      // uploader uses this same route — a settings editor without
+      // product permissions must be able to upload a logo.
+      "settings",
    ]);
    if (gate instanceof NextResponse) return gate;
 
