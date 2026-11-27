@@ -321,9 +321,14 @@ const Layout = () => {
                pr={1}
                bgcolor={"background.default"}
                borderRadius={2}
+               // RP-5: the full 260px labelled sidebar applies from
+               // lg up. Between sm and lg the admin shell's own nav
+               // plus a 260px settings sidebar squeezed the content
+               // column to ~330px at 905px (clipped labels/values);
+               // the icon rail (140px) now covers that whole band.
                width={{
                   sm: 140,
-                  md: 260,
+                  lg: 260,
                }}
                height={"100%"}
                sx={{
@@ -338,8 +343,10 @@ const Layout = () => {
             </Stack>
          )}
 
-         {/* Content Area */}
-         <Stack flex={1} bgcolor={"background.default"} borderRadius={2} overflow="hidden">
+         {/* Content Area — RP-5: minWidth 0 lets the flex column
+             actually shrink to the space left by the two navs
+             instead of being forced wide by its content. */}
+         <Stack flex={1} minWidth={0} bgcolor={"background.default"} borderRadius={2} overflow="hidden">
             {/* Header */}
             <Header
                onShowSidebar={() => setShowSidebar(true)}
@@ -443,9 +450,14 @@ const Layout = () => {
                   bottom: 0,
                   zIndex: 2,
                   flexShrink: 0,
+                  // RP-5: in a narrow content column the caption and
+                  // the actions wrap onto two rows instead of
+                  // clipping each other.
+                  flexWrap: "wrap",
+                  rowGap: 1,
                }}
             >
-               <Stack direction="row" spacing={1.5} alignItems="center">
+               <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
                   <Typography variant="caption" color="text.secondary">
                      Default currency: <strong>{formValues.currency || "BDT"} ({formValues.currencySymbol || "৳"})</strong> • Changes apply across entire POS system
                   </Typography>
@@ -460,13 +472,14 @@ const Layout = () => {
                   )}
                </Stack>
                {canUpdate ? (
-                  <Stack direction="row" spacing={1.5}>
+                  <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
                      <Button
                         variant="outlined"
                         color="inherit"
                         size="small"
                         onClick={handleDiscard}
                         disabled={!isDirty || isSaving}
+                        sx={{ whiteSpace: "nowrap" }}
                      >
                         Discard Changes
                      </Button>
@@ -483,6 +496,7 @@ const Layout = () => {
                         }
                         onClick={handleSave}
                         disabled={!isDirty || isSaving}
+                        sx={{ whiteSpace: "nowrap" }}
                      >
                         {isSaving ? "Saving..." : "Save Settings"}
                      </Button>

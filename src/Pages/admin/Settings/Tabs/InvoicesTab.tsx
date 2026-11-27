@@ -99,7 +99,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
       <Stack spacing={4}>
          {/* 1. SECTION: TEMPLATE GALLERY (18 TEMPLATES) */}
          <Box>
-            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} mb={1}>
+            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} mb={1} sx={{ flexWrap: "wrap", columnGap: 2 }}>
                <Box>
                   <Typography variant="h6" fontWeight={700}>
                      18 Distinct Invoice & Receipt Templates
@@ -114,7 +114,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                   size="small"
                   startIcon={<Icon icon="solar:restart-bold" size="small" />}
                   onClick={() => setResetConfirmOpen(true)}
-                  sx={{ mt: { xs: 1, sm: 0 }, alignSelf: { xs: "flex-start", sm: "center" } }}
+                  sx={{ mt: { xs: 1, sm: 0 }, alignSelf: { xs: "flex-start", sm: "center" }, whiteSpace: "nowrap", flexShrink: 0 }}
                >
                   Reset Defaults
                </Button>
@@ -138,7 +138,10 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                {filteredTemplates.map((template) => {
                   const isSelected = activeTemplateId === template.id;
                   return (
-                     <Grid size={{ xs: 12, sm: 6, md: 4 }} key={template.id}>
+                     // RP-5: three-across only from lg up — in the
+                     // sm–lg band the squeezed content column made
+                     // the cards ~110px slivers with clipped titles.
+                     <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={template.id}>
                         <Card
                            variant="outlined"
                            sx={{

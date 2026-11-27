@@ -13,7 +13,10 @@ const Sidebar = ({ onItemClick }: SidebarProps) => {
    const theme = useTheme();
    const query = useQueryParams();
    const [active, setActive] = useState<string>("general");
-   const isSm = useMediaQuery(theme.breakpoints.only("sm"));
+   // RP-5: icon-rail mode for the whole sm–lg band (600–1199px),
+   // matching the Layout's sidebar width. Below sm the sidebar
+   // lives in the 270px drawer, where full labels fit and stay.
+   const isCompact = useMediaQuery(theme.breakpoints.between("sm", "lg"));
 
    useEffect(() => {
       const tab = query.get("tab");
@@ -98,7 +101,7 @@ const Sidebar = ({ onItemClick }: SidebarProps) => {
 
    return (
       <Stack flex={1}>
-         <CustomList items={items} fullMenu={!isSm} />
+         <CustomList items={items} fullMenu={!isCompact} />
       </Stack>
    );
 };

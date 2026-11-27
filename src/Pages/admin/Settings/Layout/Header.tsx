@@ -91,6 +91,7 @@ const Header = ({
                size={isSmDown ? "small" : "medium"}
                onClick={onSave}
                disabled={isSaving || !isDirty}
+               sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
             >
                {isSaving ? "Saving..." : "Save Changes"}
             </Button>
