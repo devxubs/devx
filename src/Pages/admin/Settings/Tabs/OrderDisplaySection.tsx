@@ -4,8 +4,6 @@ import React, { useRef, useState } from "react";
 import {
    Box,
    Button,
-   Card,
-   CardContent,
    Chip,
    IconButton,
    Stack,
@@ -100,6 +98,12 @@ function MoveButtons({
  * values they had when it opened, so a cancelled edit never
  * reaches the form (and therefore never the server). "Done"
  * keeps the edits in the form for the normal Settings Save.
+ *
+ * Sales & POS cleanup: the preview and the editor modal are
+ * independent sibling elements — the preview is plain section
+ * content in the tab's continuous form (no card wrapper), and
+ * the modal (configuration controls only, no preview inside)
+ * renders separately through its portal.
  */
 export default function OrderDisplaySection({
    values,
@@ -162,9 +166,9 @@ export default function OrderDisplaySection({
       columnLayout.order.length - columnLayout.hidden.length;
 
    return (
-      <Card variant="outlined">
-         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-            <Stack spacing={1.5}>
+      <>
+         {/* ── Section preview (independent of the modal) ── */}
+         <Stack spacing={1.5}>
                <Stack
                   direction="row"
                   justifyContent="space-between"
@@ -172,7 +176,7 @@ export default function OrderDisplaySection({
                   spacing={2}
                >
                   <Box>
-                     <Typography variant="subtitle1" fontWeight={600}>
+                     <Typography variant="h6" fontWeight={600}>
                         Order Display &amp; Sorting
                      </Typography>
                      <Typography variant="body2" color="text.secondary">
@@ -234,10 +238,9 @@ export default function OrderDisplaySection({
                      {columnLayout.order.length} visible
                   </Typography>
                </Stack>
-            </Stack>
-         </CardContent>
+         </Stack>
 
-         {/* ── Editor modal ── */}
+         {/* ── Editor modal (sibling of the preview) ── */}
          <CustomModal
             open={editOpen}
             onClose={cancelEdit}
@@ -491,6 +494,6 @@ export default function OrderDisplaySection({
                </Stack>
             </Stack>
          </CustomModal>
-      </Card>
+      </>
    );
 }

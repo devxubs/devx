@@ -4,8 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
    Box,
    Button,
-   Card,
-   CardContent,
    Chip,
    Divider,
    IconButton,
@@ -163,12 +161,15 @@ export default function PaymentMethodsSection({
    );
 
    return (
-      <Card variant="outlined">
-         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-            <Stack spacing={2}>
+      <>
+         {/* ── Section preview (independent of the modal) ──
+             Sales & POS cleanup: plain section content in the
+             tab's continuous form — no card wrapper; the editor
+             modal below is a sibling element. */}
+         <Stack spacing={2}>
                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                   <Box>
-                     <Typography variant="subtitle1" fontWeight={600}>
+                     <Typography variant="h6" fontWeight={600}>
                         Payment Methods
                      </Typography>
                      <Typography variant="body2" color="text.secondary">
@@ -261,10 +262,9 @@ export default function PaymentMethodsSection({
                      </Stack>
                   ))}
                </Stack>
-            </Stack>
-         </CardContent>
+         </Stack>
 
-         {/* ── Editor modal ── */}
+         {/* ── Editor modal (sibling of the preview) ── */}
          <CustomModal
             open={editOpen}
             onClose={cancelEdit}
@@ -462,6 +462,6 @@ export default function PaymentMethodsSection({
                </Stack>
             </Stack>
          </CustomModal>
-      </Card>
+      </>
    );
 }

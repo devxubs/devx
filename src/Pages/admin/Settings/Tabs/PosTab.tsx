@@ -11,10 +11,9 @@ import {
    TextField,
    Typography,
    Box,
+   Divider,
    FormControlLabel,
    Switch,
-   Card,
-   CardContent,
    Chip,
 } from "@mui/material";
 
@@ -43,9 +42,13 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
    return (
       <Stack spacing={2}>
-         <Typography variant="h6" fontWeight={600}>
-            Sales & Point-of-Sale Configuration
-         </Typography>
+         {/* Sales & POS cleanup: the tab-level "Sales &
+             Point-of-Sale Configuration" heading was removed —
+             it only repeated the tab's own name in the Settings
+             navigation/banner. The five categories below read as
+             one continuous form: a heading per section with a
+             subtle divider between sections, no per-section
+             cards. */}
 
          {/* RP-7 (C5): section quick-nav */}
          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
@@ -146,42 +149,37 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
          </Grid>
 
-         <Box sx={{ pt: 1, scrollMarginTop: 12 }} id="pos-policies">
-            <Typography variant="h6" fontWeight={600}>
+         <Divider />
+
+         <Box sx={{ scrollMarginTop: 12 }} id="pos-policies">
+            <Typography variant="h6" fontWeight={600} sx={{ mb: 1.5 }}>
                POS Checkout Policies & Controls
             </Typography>
+            {/* Sales & POS cleanup: the switch row sits directly
+                in the form (no per-policy card), like the toggle
+                rows in the other Settings sections. */}
+            <FormControlLabel
+               control={
+                  <Switch
+                     checked={Boolean(values.enableStockValidation)}
+                     onChange={(e) => onChange("enableStockValidation", e.target.checked)}
+                     color="primary"
+                  />
+               }
+               label={
+                  <Box>
+                     <Typography variant="subtitle2" fontWeight={600}>
+                        Strict Stock Validation
+                     </Typography>
+                     <Typography variant="caption" color="text.secondary">
+                        Prevent checkout when inventory is insufficient (disallow negative stock)
+                     </Typography>
+                  </Box>
+               }
+            />
          </Box>
 
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={Boolean(values.enableStockValidation)}
-                              onChange={(e) => onChange("enableStockValidation", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Strict Stock Validation
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Prevent checkout when inventory is insufficient (disallow negative stock)
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-
-
-
-         </Grid>
+         <Divider />
 
          {/* Phase 2: Order Display & Sorting (status order,
              visibility, list defaults, table columns). */}
@@ -189,10 +187,14 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
             <OrderDisplaySection values={values} onConfigChange={onConfigChange} />
          </Box>
 
+         <Divider />
+
          {/* Phase 3: Order Creation Defaults. */}
          <Box id="pos-order-defaults" sx={{ scrollMarginTop: 12 }}>
             <OrderCreateDefaultsSection values={values} onConfigChange={onConfigChange} />
          </Box>
+
+         <Divider />
 
          {/* Phase 5: Payment Methods + default payment method. */}
          <Box id="pos-payment-methods" sx={{ scrollMarginTop: 12 }}>
