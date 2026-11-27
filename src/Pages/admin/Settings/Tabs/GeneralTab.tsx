@@ -36,11 +36,9 @@ const timezones = [
    { value: "America/New_York", label: "(GMT-5:00) New York, USA" },
 ];
 
-const dateFormats = [
-   { value: "DD/MM/YYYY", label: "DD/MM/YYYY (e.g. 28/10/2026)" },
-   { value: "MM/DD/YYYY", label: "MM/DD/YYYY (e.g. 10/28/2026)" },
-   { value: "YYYY-MM-DD", label: "YYYY-MM-DD (e.g. 2026-10-28)" },
-];
+// RP-6 (D1): the Date Format select was removed — nothing in the
+// app ever read StoreSetting.dateFormat (dates render in fixed
+// formats). The column and its stored value are untouched.
 
 export default function GeneralTab({ values, onChange }: GeneralTabProps) {
    const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,24 +200,6 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   {timezones.map((tz) => (
                      <MenuItem key={tz.value} value={tz.value}>
                         {tz.label}
-                     </MenuItem>
-                  ))}
-               </TextField>
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
-               <TextField
-                  select
-                  fullWidth
-                  label="Date Format"
-                  size="small"
-                  value={values.dateFormat || "DD/MM/YYYY"}
-                  onChange={(e) => onChange("dateFormat", e.target.value)}
-                  helperText="Receipt and table date display"
-               >
-                  {dateFormats.map((df) => (
-                     <MenuItem key={df.value} value={df.value}>
-                        {df.label}
                      </MenuItem>
                   ))}
                </TextField>

@@ -248,71 +248,13 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
              "Real-time Stock Deduction" and "Scanner Quick-Add"
              toggles were also write-only (stock always deducts on
              order save; the scanner flow does not read a setting)
-             and have been removed. */}
-         <Box sx={{ pt: 1 }}>
-            <Typography variant="h6" fontWeight={600}>
-               SKU, Barcode & Stock Automation
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Automate product identifiers and inventory management workflows.
-            </Typography>
-         </Box>
-
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={Boolean(values.autoGenerateSku)}
-                              onChange={(e) => onChange("autoGenerateSku", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Auto-generate Product SKU
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Automatically generate unique SKU codes (e.g. PRD-82914) on product creation
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={Boolean(values.autoGenerateBarcode)}
-                              onChange={(e) => onChange("autoGenerateBarcode", e.target.checked)}
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Auto-generate EAN/UPC Barcode
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Automatically generate standard scannable 12-digit barcodes for new items
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-
-
-         </Grid>
+             and have been removed.
+             RP-6 (D3/D4): the "SKU, Barcode & Stock Automation"
+             section (Auto-generate Product SKU / Auto-generate
+             EAN-UPC Barcode toggles) was removed the same way —
+             product create never read autoGenerateSku or
+             autoGenerateBarcode. The columns and their stored
+             values are untouched. */}
       </Stack>
    );
 }

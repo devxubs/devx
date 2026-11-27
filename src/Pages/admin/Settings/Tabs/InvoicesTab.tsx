@@ -33,12 +33,10 @@ interface InvoicesTabProps {
    onConfigChange: (key: string, value: any) => void;
 }
 
-const paperSizes = [
-   { value: "80mm", label: "80mm Standard POS Thermal Receipt" },
-   { value: "58mm", label: "58mm Compact Mobile Thermal Receipt" },
-   { value: "A4", label: "A4 Full Page Laser / Inkjet Sheet" },
-   { value: "A5", label: "A5 Half Sheet Business Invoice" },
-];
+// RP-6 (D5): the Paper Size select was removed — nothing ever
+// read StoreSetting.receiptPaperSize (paper behaviour comes from
+// the selected invoice template). The column and its stored
+// value are untouched.
 
 const accentColorPresets = [
    { name: "Teal", hex: "#0F766E" },
@@ -66,11 +64,8 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
       return t.category === categoryFilter;
    });
 
-   const handleSelectDefaultTemplate = (templateId: string, defaultPaperSize?: string) => {
+   const handleSelectDefaultTemplate = (templateId: string) => {
       onConfigChange("invoiceTemplateId", templateId);
-      if (defaultPaperSize) {
-         onChange("receiptPaperSize", defaultPaperSize);
-      }
    };
 
    const handleOpenPreview = (templateId: string) => {
@@ -81,7 +76,6 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
    const handleConfirmReset = () => {
       onConfigChange("invoiceTemplateId", "classic-pro");
       onConfigChange("accentColor", "#1E3A8A");
-      onChange("receiptPaperSize", "A4");
       onChange("invoiceHeader", "Official Sales Invoice & Receipt");
       onChange("invoiceFooter", "Thank you for shopping with us! Please come again.");
       onConfigChange("showLogoOnReceipt", true);
@@ -197,7 +191,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                                  color={isSelected ? "primary" : "inherit"}
                                  size="small"
                                  fullWidth
-                                 onClick={() => handleSelectDefaultTemplate(template.id, template.paperSize)}
+                                 onClick={() => handleSelectDefaultTemplate(template.id)}
                               >
                                  {isSelected ? "Selected" : "Set as Default"}
                               </Button>
@@ -231,24 +225,6 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
             </Typography>
 
             <Grid container spacing={2.5}>
-               <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                     select
-                     fullWidth
-                     label="Paper Size"
-                     size="small"
-                     value={values.receiptPaperSize || "A4"}
-                     onChange={(e) => onChange("receiptPaperSize", e.target.value)}
-                     helperText="Dimensions used when invoking browser print or PDF"
-                  >
-                     {paperSizes.map((p) => (
-                        <MenuItem key={p.value} value={p.value}>
-                           {p.label}
-                        </MenuItem>
-                     ))}
-                  </TextField>
-               </Grid>
-
                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                      select

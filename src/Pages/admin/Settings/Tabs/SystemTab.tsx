@@ -93,21 +93,10 @@ export default function SystemTab({
             </Typography>
          </Box>
 
-         {/* Alert Recipients */}
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <TextField
-                  fullWidth
-                  label="System Notification Email"
-                  type="email"
-                  size="small"
-                  value={values.notifyEmail || ""}
-                  onChange={(e) => onChange("notifyEmail", e.target.value)}
-                  placeholder="admin@devxpos.com"
-                  helperText="Recipient for critical alerts and low-stock warnings"
-               />
-            </Grid>
-         </Grid>
+         {/* RP-6 (D9): the "System Notification Email" field was
+             removed — nothing ever read StoreSetting.notifyEmail
+             (the app has no mailer; alerts are in-app only). The
+             column and its stored value are untouched. */}
 
          <Box sx={{ pt: 1 }}>
             <Typography variant="h6" fontWeight={600}>
