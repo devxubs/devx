@@ -247,7 +247,14 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                <Box
                   {...logoDragHandlers}
                   sx={{
-                     maxWidth: 520,
+                     position: "relative",
+                     // Preview state: the box hugs the logo, so
+                     // its size follows the image's natural
+                     // dimensions. Empty state: a compact fixed
+                     // box (max-width 520, content height 136).
+                     ...(values.logoUrl
+                        ? { display: "inline-block", maxWidth: "100%", p: 1 }
+                        : { maxWidth: 520 }),
                      border: "1.5px dashed",
                      borderColor: logoError
                         ? "error.main"
@@ -272,26 +279,27 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                      }),
                   }}
                >
-                  <Box sx={{ position: "relative", height: 136 }}>
+                  <>
                      {values.logoUrl ? (
-                        /* Preview state — the logo fills the box,
-                           contained and centered; Replace/Remove
-                           live in a small overlay that appears on
-                           hover/focus (always visible on touch
-                           devices, where there is no hover). */
+                        /* Preview state — the image renders at its
+                           natural size (no fixed frame, no
+                           object-fit scaling); maxWidth only
+                           shrinks it proportionally when it is
+                           wider than the available space.
+                           Replace/Remove live in a small overlay
+                           that appears on hover/focus (always
+                           visible on touch devices, where there
+                           is no hover). */
                         <>
                            <Box
                               component="img"
                               src={values.logoUrl}
                               alt="Store Logo"
                               sx={{
-                                 position: "absolute",
-                                 inset: 0,
-                                 width: "100%",
-                                 height: "100%",
-                                 objectFit: "contain",
-                                 p: 1.5,
-                                 boxSizing: "border-box",
+                                 display: "block",
+                                 width: "auto",
+                                 height: "auto",
+                                 maxWidth: "100%",
                               }}
                            />
                            <Stack
@@ -366,7 +374,7 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                            aria-label="Upload store logo"
                            sx={{
                               width: "100%",
-                              height: "100%",
+                              height: 136,
                               borderRadius: 1.5,
                               "&.Mui-focusVisible": {
                                  outline: "2px solid",
@@ -395,7 +403,7 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                            <LinearProgress sx={{ borderRadius: 1 }} />
                         </Box>
                      )}
-                  </Box>
+                  </>
 
                   {logoError && (
                      <Typography
