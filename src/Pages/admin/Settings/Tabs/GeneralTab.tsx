@@ -250,10 +250,18 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                      position: "relative",
                      // Preview state: the box hugs the logo, so
                      // its size follows the image's natural
-                     // dimensions. Empty state: a compact fixed
-                     // box (max-width 520, content height 136).
+                     // dimensions. The preview is capped at a
+                     // 250px-wide image: the cap lives on the BOX
+                     // (250 + 16px padding + 2px border = 268),
+                     // not on the img — a max-width on the img
+                     // alone does not shrink an inline-block
+                     // box's shrink-to-fit width, so the box
+                     // would keep the natural width with empty
+                     // space beside the capped image. Empty
+                     // state: a compact fixed box (max-width
+                     // 520, content height 136).
                      ...(values.logoUrl
-                        ? { display: "inline-block", maxWidth: "100%", p: 1 }
+                        ? { display: "inline-block", maxWidth: "min(268px, 100%)", p: 1 }
                         : { maxWidth: 520 }),
                      border: "1.5px dashed",
                      borderColor: logoError
@@ -283,13 +291,17 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                      {values.logoUrl ? (
                         /* Preview state — the image renders at its
                            natural size (no fixed frame, no
-                           object-fit scaling); maxWidth only
-                           shrinks it proportionally when it is
-                           wider than the available space.
-                           Replace/Remove live in a small overlay
-                           that appears on hover/focus (always
-                           visible on touch devices, where there
-                           is no hover). */
+                           object-fit scaling); the box's cap
+                           (see above) limits it to 250px wide and
+                           the available space can shrink it
+                           further — both proportionally, since
+                           the height stays automatic and the
+                           aspect ratio is always preserved. Logos
+                           narrower than 250px keep their natural
+                           dimensions. Replace/Remove live in a
+                           small overlay that appears on
+                           hover/focus (always visible on touch
+                           devices, where there is no hover). */
                         <>
                            <Box
                               component="img"
