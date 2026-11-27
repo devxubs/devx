@@ -7,12 +7,21 @@ import useQueryParams from "@src/handler/useQueryParams";
 
 interface SidebarProps {
    onItemClick?: (tab: string) => void;
+   // Controlled mode (full-screen Settings modal): the tab
+   // state is owned by the Layout's local state, because the
+   // page URL belongs to the app view underneath the modal.
+   // When onSelectTab is provided, the ?tab= machinery below
+   // is not used at all.
+   activeTab?: string;
+   onSelectTab?: (tab: string) => void;
 }
 
-const Sidebar = ({ onItemClick }: SidebarProps) => {
+const Sidebar = ({ onItemClick, activeTab, onSelectTab }: SidebarProps) => {
    const theme = useTheme();
    const query = useQueryParams();
-   const [active, setActive] = useState<string>("general");
+   const [internalActive, setInternalActive] = useState<string>("general");
+   const active = onSelectTab ? activeTab ?? "general" : internalActive;
+   const setActive = onSelectTab ? onSelectTab : setInternalActive;
    // RP-5: icon-rail mode for the whole sm–lg band (600–1199px),
    // matching the Layout's sidebar width. Below sm the sidebar
    // lives in the 270px drawer, where full labels fit and stay.
@@ -27,18 +36,21 @@ const Sidebar = ({ onItemClick }: SidebarProps) => {
    // query.set(), which would retrigger the effect. Tab changes
    // after mount flow through handleSelectTab, not this effect.
    useEffect(() => {
+      if (onSelectTab) return; // controlled mode: no URL state
       const tab = query.get("tab");
       if (tab) {
-         setActive(tab);
+         setInternalActive(tab);
       } else {
          query.set("tab", "general", false);
-         setActive("general");
+         setInternalActive("general");
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    const handleSelectTab = (tabKey: string) => {
-      query.set("tab", tabKey);
+      if (!onSelectTab) {
+         query.set("tab", tabKey);
+      }
       setActive(tabKey);
       if (onItemClick) {
          onItemClick(tabKey);

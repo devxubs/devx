@@ -153,14 +153,13 @@ const items: NavItem[] = [
       adminKeys: ["bin"],
    },
    {
+      // Settings is intentionally NOT a sidebar nav item: it
+      // opens as the full-screen Settings modal from the
+      // sidebar account popup (see SidebarAccount). The
+      // /admin/settings route itself still exists for direct
+      // links. This first ACCOUNT-group entry carries the
+      // group heading for the items below.
       heading: { title: "ACCOUNT", id: "account" },
-      icon: "solar:settings-bold-duotone",
-      label: "Setting",
-      url: "/admin/settings",
-      adminKeys: ["settings", "setting"],
-   },
-   {
-      headingId: "account",
       icon: "solar:lock-keyhole-bold-duotone",
       label: "Roles",
       url: "/admin/roles",
@@ -428,13 +427,18 @@ const Sidebar = () => {
 
          {/* Account section — pinned below the scrolling nav
              (the nav Stack above is flex:1 with overflow auto,
-             so this stays at the bottom of the sidebar). */}
+             so this stays at the bottom of the sidebar). The
+             Settings entry inside its popup follows the same
+             permission rule the old Settings nav item used
+             (admin, or the settings/setting key). */}
          <SidebarAccount
             user={user}
             layout={layout}
-            canSeeSettings={visibleItems.some(
-               (i) => i.url === "/admin/settings",
-            )}
+            canSeeSettings={
+               isAdmin ||
+               permissions?.["settings"] === true ||
+               permissions?.["setting"] === true
+            }
             onNavigate={() => {
                if (isSmDown) {
                   globalState.set("layoutFull", false);

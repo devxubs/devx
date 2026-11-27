@@ -3,7 +3,6 @@ import {
    alpha,
    Badge,
    IconButton,
-   keyframes,
    Paper,
    Stack,
    Typography,
@@ -147,11 +146,6 @@ const Header = () => {
 
    const globalState = useGlobalState();
 
-   const rotate = keyframes`
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  `;
-
    return (
       <>
          <Paper
@@ -247,24 +241,16 @@ const Header = () => {
                    the sidebar (SidebarAccount) — it was removed
                    from the header, including the old profile
                    drawer and the placeholder "Alice Johnson"
-                   popover. */}
-
-               {/* Settings */}
+                   popover. The appearance (Settings) drawer
+                   stays mounted here and is opened from the
+                   account popup's Personalization item via the
+                   devx:open-appearance event — the header gear
+                   button itself was removed. */}
                <SettingsDrawer
                   open={openSettings}
                   onClose={() => setOpenSettings(false)}
                   onOpen={() => setOpenSettings(true)}
                />
-               <IconButton
-                  onClick={() => setOpenSettings(true)}
-                  sx={{
-                     color: "text.secondary",
-                     "& svg": { animation: `${rotate} 8s linear infinite` },
-                  }}
-               >
-                  <Icon icon="solar:settings-bold-duotone" />
-               </IconButton>
-
             </Stack>
          </Paper>
 

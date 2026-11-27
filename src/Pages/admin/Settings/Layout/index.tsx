@@ -86,7 +86,23 @@ const tabMeta: Record<string, { title: string; subtitle: string; icon: string }>
    },
 };
 
-const Layout = () => {
+interface LayoutProps {
+   // Embedded mode: the layout renders inside the full-screen
+   // Settings modal (Layout/SettingsModal) instead of on the
+   // /admin/settings page. Tab selection becomes local state
+   // (the page's URL belongs to whatever app view is underneath
+   // the modal, so the ?tab= machinery is not used), the root
+   // fills its container instead of the page-height calc, and a
+   // close action appears in the header.
+   embedded?: boolean;
+   onClose?: () => void;
+   // The modal shell routes its own close requests (Escape,
+   // backdrop) through the handler registered here, so a dirty
+   // form gets the same discard confirmation as the X button.
+   registerCloseHandler?: (fn: () => void) => void;
+}
+
+const Layout = ({ embedded = false, onClose, registerCloseHandler }: LayoutProps) => {
    const theme = useTheme();
    const query = useQueryParams();
    const router = useRouter();
@@ -96,18 +112,21 @@ const Layout = () => {
    // correct the URL (replace, so Back doesn't loop) to the tab
    // actually shown.
    const requestedTab = query.get("tab") || "general";
-   const selectedTab =
+   const pageTab =
       requestedTab in tabMeta ? requestedTab : "general";
+   const [embeddedTab, setEmbeddedTab] = useState("general");
+   const selectedTab = embedded ? embeddedTab : pageTab;
    useEffect(() => {
-      if (requestedTab !== selectedTab) {
+      if (embedded) return;
+      if (requestedTab !== pageTab) {
          const params = new URLSearchParams(query.toString());
-         params.set("tab", selectedTab);
+         params.set("tab", pageTab);
          router.replace(`${pathname}?${params.toString()}`, {
             scroll: false,
          });
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [requestedTab, selectedTab]);
+   }, [requestedTab, pageTab]);
    const isSmDown = useMediaQuery((theme: any) => theme.breakpoints.down("sm"));
 
    const { settings, loading, updateSettings, getLastSaveError, resetSettings } = useSettings();
@@ -217,7 +236,31 @@ const Layout = () => {
          setFormValues(JSON.parse(JSON.stringify(baseline)));
       }
       setDiscardOpen(false);
+      // Embedded close flow: a close requested while dirty runs
+      // through this same confirmation; confirming completes it.
+      if (closeAfterDiscardRef.current) {
+         closeAfterDiscardRef.current = false;
+         onClose?.();
+      }
    };
+
+   // Embedded (modal) close: with unsaved changes, ask first via
+   // the RP-4 discard dialog; otherwise close immediately. The
+   // modal shell's Escape/backdrop requests arrive through the
+   // registered handler, so every close path behaves the same.
+   const closeAfterDiscardRef = React.useRef(false);
+   const requestClose = () => {
+      if (!onClose) return;
+      if (isDirty) {
+         closeAfterDiscardRef.current = true;
+         setDiscardOpen(true);
+      } else {
+         onClose();
+      }
+   };
+   useEffect(() => {
+      registerCloseHandler?.(requestClose);
+   });
 
    const handleResetDefaults = async (): Promise<boolean> => {
       const ok = await resetSettings();
@@ -280,11 +323,18 @@ const Layout = () => {
          bgcolor={"background.paper"}
          flex={1}
          borderRadius={2}
-         height={"calc(100vh - 64px - 44px)"}
+         height={embedded ? "100%" : "calc(100vh - 64px - 44px)"}
       >
          {/* Sidebar */}
          {isSmDown ? (
-            <Drawer open={showSidebar} onClose={() => setShowSidebar(false)}>
+            <Drawer
+               open={showSidebar}
+               onClose={() => setShowSidebar(false)}
+               // Embedded: the tab drawer must sit above the
+               // full-screen modal surface (MUI modal z-index
+               // 1300; the drawer default is 1200).
+               sx={embedded ? { zIndex: 1350 } : undefined}
+            >
                <CustomBox
                   sx={{
                      width: 270,
@@ -307,7 +357,11 @@ const Layout = () => {
                         },
                      }}
                   >
-                     <Sidebar onItemClick={() => setShowSidebar(false)} />
+                     <Sidebar
+                        onItemClick={() => setShowSidebar(false)}
+                        activeTab={embedded ? embeddedTab : undefined}
+                        onSelectTab={embedded ? setEmbeddedTab : undefined}
+                     />
                   </Stack>
                </CustomBox>
             </Drawer>
@@ -336,7 +390,10 @@ const Layout = () => {
                   },
                }}
             >
-               <Sidebar />
+               <Sidebar
+                  activeTab={embedded ? embeddedTab : undefined}
+                  onSelectTab={embedded ? setEmbeddedTab : undefined}
+               />
             </Stack>
          )}
 
@@ -356,6 +413,7 @@ const Layout = () => {
                isDirty={isDirty}
                searchQuery={searchQuery}
                onSearchChange={setSearchQuery}
+               onClose={embedded ? requestClose : undefined}
             />
 
             {/* Scrollable Tab Body */}
@@ -430,7 +488,12 @@ const Layout = () => {
             {/* RP-4: Discard confirmation. */}
             <AlertDialog
                open={discardOpen}
-               onClose={() => setDiscardOpen(false)}
+               onClose={() => {
+                  // Cancelling a close-triggered discard keeps
+                  // the user in the (modal) settings, edits intact.
+                  closeAfterDiscardRef.current = false;
+                  setDiscardOpen(false);
+               }}
                type="warning"
                title="Discard unsaved changes? Your edits will be replaced with the last saved values."
                onConfirm={confirmDiscard}

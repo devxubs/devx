@@ -29,6 +29,11 @@ interface CustomModalProps extends Omit<
    title?: string;
    closeIcon?: boolean;
    size?: CustomModalSize;
+   // Full-screen variant: the surface covers the whole viewport
+   // (no centering, no radius, no padding) — used by the
+   // full-screen Settings modal. Size/title behaviour unchanged
+   // for every existing caller.
+   fullScreen?: boolean;
 }
 
 export default function CustomModal({
@@ -39,6 +44,7 @@ export default function CustomModal({
    title,
    closeIcon = false,
    size,
+   fullScreen = false,
    ...rest
 }: CustomModalProps) {
    return (
@@ -68,6 +74,20 @@ export default function CustomModal({
                   },
                   borderRadius: 2,
                   ...(size ? { width: sizeWidths[size] } : {}),
+                  ...(fullScreen
+                     ? {
+                          top: 0,
+                          left: 0,
+                          transform: "none",
+                          width: "100%",
+                          height: "100%",
+                          borderRadius: 0,
+                          p: 0,
+                          px: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                       }
+                     : {}),
                   ...sx,
                }}
             >

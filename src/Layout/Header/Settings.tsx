@@ -78,6 +78,11 @@ const SettingsDrawer: React.FC<SettingsProps> = ({ open, onClose, onOpen }) => {
                backdropFilter: "blur(6px)",
             },
          }}
+         // Above the full-screen Settings modal (MUI modal
+         // z-index 1300): the drawer's open action lives inside
+         // that modal's Appearance tab, so it must not open
+         // behind it.
+         sx={{ zIndex: 1400 }}
       >
          <CustomBox sx={{ height: "100%" }}>
             <Scrollbar autoHide thumbSize={6} darkMode>

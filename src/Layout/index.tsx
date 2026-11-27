@@ -3,6 +3,7 @@ import React from "react";
 import { Container, Stack } from "@mui/material";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import SettingsModal from "./SettingsModal";
 import { usePathname } from "next/navigation";
 import { SnackbarProvider } from "@src/lib/snackbarContext";
 import SessionWatcher from "./SessionWatcher";
@@ -28,6 +29,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
    return (
       <SnackbarProvider>
          <SessionWatcher />
+         {/* Full-screen Settings modal (opened from the sidebar
+             account popup); renders nothing until first opened. */}
+         {!isAuthPage && !isErrorPage && <SettingsModal />}
          <Stack
             direction={isAuthPage ? "column" : "row"}
             height="100vh"

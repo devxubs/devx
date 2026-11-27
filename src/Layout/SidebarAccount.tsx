@@ -4,15 +4,17 @@
 // profile drawer (Header/Profile.tsx) and the placeholder header
 // user popover. The section is pinned to the bottom of the
 // sidebar (outside the scrolling nav), and the popup opens
-// upward from it.
+// upward from it with a short fade + rise + scale animation.
 //
 // Only actions that already exist in the app are offered:
 //   - Personalization → the header appearance drawer, via the
 //     same "devx:open-appearance" window event the Settings
 //     Appearance tab uses (Phase 2, 2.11).
-//   - Settings → /admin/settings, shown only when the signed-in
-//     user can see the Settings nav entry (same permission
-//     filter as the sidebar itself).
+//   - Settings → the full-screen Settings modal, via the
+//     "devx:open-settings" event (Layout/SettingsModal). Shown
+//     only when the signed-in user holds the settings
+//     permission (the rule the old sidebar Settings nav item
+//     used before it was removed).
 //   - Log out → POST /api/auth/logout, then /auth (the exact
 //     handler the old profile drawer used).
 // There is no upgrade/Plus plan and no help destination in the
@@ -32,11 +34,27 @@ import {
    Stack,
    Tooltip,
    Typography,
+   keyframes,
 } from "@mui/material";
-import { useRouter } from "next/navigation";
 import AnimatedAvatar from "@src/components/AnimateAvatar";
 import CustomBox from "@src/components/CustomBox";
 import Icon from "@src/components/Icon";
+
+// Opening: fade in while rising slightly and scaling up from
+// the account section (transform origin bottom-left, where the
+// popup is anchored). Closing reverses it, shorter. The
+// animation runs on an inner wrapper — the Popper positions the
+// outer element with its own transform, which an animation on
+// the same element would fight.
+const popupIn = keyframes`
+   from { opacity: 0; transform: translateY(6px) scale(0.97); }
+   to { opacity: 1; transform: translateY(0) scale(1); }
+`;
+const popupOut = keyframes`
+   from { opacity: 1; transform: translateY(0) scale(1); }
+   to { opacity: 0; transform: translateY(4px) scale(0.98); }
+`;
+const CLOSE_MS = 130;
 
 interface SidebarAccountProps {
    user: any;
@@ -51,10 +69,11 @@ export default function SidebarAccount({
    canSeeSettings,
    onNavigate,
 }: SidebarAccountProps) {
-   const router = useRouter();
    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+   const [popState, setPopState] = useState<"closed" | "open" | "closing">("closed");
    const buttonRef = useRef<HTMLButtonElement>(null);
-   const open = Boolean(anchorEl);
+   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+   const open = popState !== "closed";
 
    const name = user?.name || "User";
    const email = user?.email || "";
@@ -63,19 +82,39 @@ export default function SidebarAccount({
          ? user?.role?.name || "Staff"
          : user?.role || "Staff";
 
-   const close = () => setAnchorEl(null);
+   // Close with the exit animation, then unmount. Actions that
+   // follow a menu click fire immediately — the fade completes
+   // underneath whatever they open.
+   const requestClose = () => {
+      setPopState((prev) => {
+         if (prev !== "open") return prev;
+         if (closeTimer.current) clearTimeout(closeTimer.current);
+         closeTimer.current = setTimeout(() => {
+            setAnchorEl(null);
+            setPopState("closed");
+         }, CLOSE_MS);
+         return "closing";
+      });
+   };
+
+   useEffect(() => {
+      return () => {
+         if (closeTimer.current) clearTimeout(closeTimer.current);
+      };
+   }, []);
 
    // Escape closes the popup and returns focus to the section.
    useEffect(() => {
       if (!open) return;
       const onKey = (e: KeyboardEvent) => {
          if (e.key === "Escape") {
-            close();
+            requestClose();
             buttonRef.current?.focus();
          }
       };
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [open ]);
 
    const handleLogout = async () => {
@@ -106,74 +145,81 @@ export default function SidebarAccount({
          ]}
          sx={{ zIndex: 1400 }}
       >
-         <ClickAwayListener onClickAway={close}>
-            <CustomBox
+         <ClickAwayListener onClickAway={requestClose}>
+            <Box
                sx={{
-                  width: 264,
-                  borderRadius: 2.5,
-                  py: 1,
+                  transformOrigin: "bottom left",
+                  animation: `${popState === "closing" ? popupOut : popupIn} ${popState === "closing" ? CLOSE_MS : 170}ms ease-out both`,
                }}
             >
-               {/* Profile identity */}
-               <Stack direction="row" spacing={1.5} alignItems="center" px={2} py={1.5}>
-                  <AnimatedAvatar size="small" alt={name} />
-                  <Box minWidth={0}>
-                     <Typography variant="subtitle2" fontWeight={600} noWrap>
-                        {name}
-                     </Typography>
-                     <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {email}
-                     </Typography>
-                     <Chip
-                        label={role}
-                        size="small"
-                        variant="outlined"
-                        sx={{ height: 20, mt: 0.5, fontSize: 11 }}
-                     />
-                  </Box>
-               </Stack>
+               <CustomBox
+                  sx={{
+                     width: 264,
+                     borderRadius: 1,
+                     py: 1,
+                  }}
+               >
+                  {/* Profile identity */}
+                  <Stack direction="row" spacing={1.5} alignItems="center" px={2} py={1.5}>
+                     <AnimatedAvatar size="small" alt={name} />
+                     <Box minWidth={0}>
+                        <Typography variant="subtitle2" fontWeight={600} noWrap>
+                           {name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap display="block">
+                           {email}
+                        </Typography>
+                        <Chip
+                           label={role}
+                           size="small"
+                           variant="outlined"
+                           sx={{ height: 20, mt: 0.5, fontSize: 11 }}
+                        />
+                     </Box>
+                  </Stack>
 
-               <Divider sx={{ my: 1 }} />
+                  <Divider sx={{ my: 1 }} />
 
-               <Stack px={1} spacing={0.25}>
-                  <ButtonBase
-                     sx={itemSx}
-                     onClick={() => {
-                        close();
-                        window.dispatchEvent(new Event("devx:open-appearance"));
-                        onNavigate?.();
-                     }}
-                  >
-                     <Icon icon="solar:palette-bold-duotone" size="small" />
-                     <Typography variant="body2">Personalization</Typography>
-                  </ButtonBase>
-                  {canSeeSettings && (
+                  <Stack px={1} spacing={0.25}>
                      <ButtonBase
                         sx={itemSx}
                         onClick={() => {
-                           close();
-                           router.push("/admin/settings");
+                           requestClose();
+                           window.dispatchEvent(new Event("devx:open-appearance"));
                            onNavigate?.();
                         }}
                      >
-                        <Icon icon="solar:settings-bold-duotone" size="small" />
-                        <Typography variant="body2">Settings</Typography>
+                        <Icon icon="solar:palette-bold-duotone" size="small" />
+                        <Typography variant="body2">Personalization</Typography>
                      </ButtonBase>
-                  )}
-               </Stack>
+                     {canSeeSettings && (
+                        <ButtonBase
+                           sx={itemSx}
+                           onClick={() => {
+                              requestClose();
+                              window.dispatchEvent(new Event("devx:open-settings"));
+                              onNavigate?.();
+                           }}
+                        >
+                           <Icon icon="solar:settings-bold-duotone" size="small" />
+                           <Typography variant="body2">Settings</Typography>
+                        </ButtonBase>
+                     )}
+                  </Stack>
 
-               <Divider sx={{ my: 1 }} />
+                  <Divider sx={{ my: 1 }} />
 
-               <Stack px={1}>
-                  <ButtonBase
-                     sx={{ ...itemSx, color: "error.main" }}
-                     onClick={handleLogout}
-                  >
-                     <Icon icon="solar:logout-2-bold-duotone" size="small" />
-                     <Typography variant="body2">Log out</Typography>
-                  </ButtonBase>
-               </Stack>
-            </CustomBox>
+                  <Stack px={1}>
+                     <ButtonBase
+                        sx={{ ...itemSx, color: "error.main" }}
+                        onClick={handleLogout}
+                     >
+                        <Icon icon="solar:logout-2-bold-duotone" size="small" />
+                        <Typography variant="body2">Log out</Typography>
+                     </ButtonBase>
+                  </Stack>
+               </CustomBox>
+            </Box>
          </ClickAwayListener>
       </Popper>
    );
@@ -181,13 +227,20 @@ export default function SidebarAccount({
    const section = (
       <ButtonBase
          ref={buttonRef}
-         onClick={(e) => setAnchorEl(open ? null : e.currentTarget)}
+         onClick={(e) => {
+            if (open) {
+               requestClose();
+            } else {
+               setAnchorEl(e.currentTarget);
+               setPopState("open");
+            }
+         }}
          aria-haspopup="true"
          aria-expanded={open}
          aria-label="Account menu"
          sx={{
             width: "100%",
-            borderRadius: 2,
+            borderRadius: 1,
             justifyContent: layout ? "flex-start" : "center",
             gap: 1.5,
             p: 1,
