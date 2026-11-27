@@ -41,6 +41,14 @@ type ProductOption = {
  * Order Create form initialises — never on edit, never over a
  * restorable draft, and never re-applied after the employee
  * changes or removes them (see the Publish page effect).
+ *
+ * NOTE on handlers: the shared CustomAutocomplete calls its
+ * onChange VALUE-FIRST — onChange(newValue, event) — unlike raw
+ * MUI Autocomplete's (event, newValue). These handlers take the
+ * value as the first argument. (Cleanup Phase 1: the Phase 2/3
+ * sections originally used the MUI order, so the selection landed
+ * in the ignored slot and the field appeared to clear on blur —
+ * the value never reached the form state.)
  */
 export default function OrderCreateDefaultsSection({
    values,
@@ -108,19 +116,16 @@ export default function OrderCreateDefaultsSection({
 
    return (
       <Card variant="outlined">
-         <CardContent>
-            <Stack spacing={2.5}>
+         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+            <Stack spacing={2}>
                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                   <Box>
                      <Typography variant="subtitle1" fontWeight={600}>
                         Order Creation Defaults
                      </Typography>
                      <Typography variant="body2" color="text.secondary">
-                        Starting values for a NEW order. They are applied once
-                        when the Order Create page opens — employees can change
-                        or remove them freely, editing an existing order never
-                        touches them, and an unavailable default product is
-                        skipped rather than forced.
+                        Starting values for a new order, applied once when
+                        Order Create opens.
                      </Typography>
                   </Box>
                   <SectionResetButton
@@ -144,7 +149,7 @@ export default function OrderCreateDefaultsSection({
                      getOptionLabel={(o: any) => o?.productName || ""}
                      isOptionEqualToValue={(a: any, b: any) => a?.id === b?.id}
                      value={selectedProduct}
-                     onChange={(_: any, next: any) =>
+                     onChange={(next: any) =>
                         onConfigChange(
                            ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY,
                            next?.id || undefined,
@@ -171,7 +176,7 @@ export default function OrderCreateDefaultsSection({
                      size="small"
                      options={orderSources}
                      value={defaults.source}
-                     onChange={(_: any, next: any) =>
+                     onChange={(next: any) =>
                         onConfigChange(
                            ORDER_CREATE_DEFAULT_SOURCE_KEY,
                            next || undefined,
@@ -192,7 +197,7 @@ export default function OrderCreateDefaultsSection({
                      getOptionLabel={(o: any) => o?.label || ""}
                      isOptionEqualToValue={(a: any, b: any) => a?.value === b?.value}
                      value={selectedStatus}
-                     onChange={(_: any, next: any) =>
+                     onChange={(next: any) =>
                         onConfigChange(
                            ORDER_CREATE_DEFAULT_STATUS_KEY,
                            next?.value || undefined,
@@ -201,11 +206,9 @@ export default function OrderCreateDefaultsSection({
                      placeholder="Select status"
                   />
                   <Typography variant="caption" color="text.secondary">
-                     Only statuses visible in Create pickers (Phase 2) can be
-                     a default. If the default is later hidden, new orders
-                     fall back to{" "}
-                     {ORDER_STATUS_LABELS.PENDING} or the first visible
-                     status.
+                     Only statuses visible in Create pickers can be a
+                     default; if it is later hidden, new orders fall back
+                     to {ORDER_STATUS_LABELS.PENDING}.
                   </Typography>
                </Stack>
             </Stack>

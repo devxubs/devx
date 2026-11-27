@@ -6,6 +6,7 @@ import {
    Button,
    Card,
    CardContent,
+   Chip,
    Divider,
    IconButton,
    Stack,
@@ -16,6 +17,7 @@ import {
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
+import CustomModal from "@src/components/Modal";
 import SectionResetButton from "./SectionResetButton";
 import {
    PAYMENT_METHODS_KEY,
@@ -40,14 +42,18 @@ interface PaymentMethodsSectionProps {
  * settings write).
  *
  * History safety is structural: payment records store the method
- * NAME as a string, so renaming or deactivating a method here
- * never rewrites a past payment — history keeps the name it was
- * recorded with. There is deliberately no hard delete:
- * deactivation is the removal path.
+ * NAME as a string, so renaming, deactivating or removing a
+ * method here never rewrites a past payment — history keeps the
+ * name it was recorded with.
  *
- * Text fields edit a local draft (committed on blur) so typing
- * spaces inside a name behaves normally; switches, moves and the
- * add form write through immediately.
+ * Cleanup Phase 1: the section shows a compact preview (default
+ * method picker + read-only method list) with an Edit button;
+ * the full editor lives in a CustomModal. Cancelling the modal
+ * restores the list snapshot taken when it opened, so a
+ * cancelled edit never reaches the form. Text fields inside the
+ * modal edit a local draft (committed on blur) so typing spaces
+ * inside a name behaves normally; switches, moves, remove and
+ * the add form write through immediately.
  */
 export default function PaymentMethodsSection({
    values,
@@ -87,6 +93,14 @@ export default function PaymentMethodsSection({
       write(next);
    };
 
+   const removeRow = (index: number) => {
+      // Drafts are keyed by row index; a removal shifts rows, so
+      // in-flight text drafts are dropped rather than misapplied.
+      setDraftNames({});
+      setDraftDescriptions({});
+      write(methods.filter((_, i) => i !== index));
+   };
+
    // Text edits stay local until blur (see the header comment).
    const [draftNames, setDraftNames] = useState<Record<number, string>>({});
    const [draftDescriptions, setDraftDescriptions] = useState<Record<number, string>>({});
@@ -109,6 +123,39 @@ export default function PaymentMethodsSection({
       setNewDescription("");
    };
 
+   // ── Edit modal (snapshot on open; Cancel restores) ──
+   // The snapshot keeps BOTH the resolved list (for the local
+   // state) and the RAW config value: on a store that has never
+   // saved the list, the raw value is undefined and the resolver
+   // supplies the defaults — restoring the resolved list into
+   // the form instead would leave the form dirty against the
+   // baseline even though nothing semantically changed.
+   const [editOpen, setEditOpen] = useState(false);
+   const snapshotRef = useRef<{
+      raw: any;
+      methods: PaymentMethodConfig[];
+   } | null>(null);
+   const openEdit = () => {
+      snapshotRef.current = {
+         raw: config?.[PAYMENT_METHODS_KEY],
+         methods: JSON.parse(JSON.stringify(methods)),
+      };
+      setEditOpen(true);
+   };
+   const cancelEdit = () => {
+      const snap = snapshotRef.current;
+      if (snap) {
+         lastWritten.current = snap.methods;
+         setMethods(snap.methods);
+         onConfigChange(PAYMENT_METHODS_KEY, snap.raw);
+      }
+      setDraftNames({});
+      setDraftDescriptions({});
+      setNewName("");
+      setNewDescription("");
+      setEditOpen(false);
+   };
+
    const activeNames = activePaymentMethodNames(config);
    const defaultMethod = resolveDefaultPaymentMethod(
       config,
@@ -117,36 +164,45 @@ export default function PaymentMethodsSection({
 
    return (
       <Card variant="outlined">
-         <CardContent>
-            <Stack spacing={2.5}>
+         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+            <Stack spacing={2}>
                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
                   <Box>
                      <Typography variant="subtitle1" fontWeight={600}>
                         Payment Methods
                      </Typography>
                      <Typography variant="body2" color="text.secondary">
-                        The methods offered for NEW payments, in display order.
-                        Deactivate a method to remove it from new transactions —
-                        past payments always keep the name they were recorded
-                        with, and renaming a method never rewrites history.
-                        There is no hard delete, by design.
+                        Methods offered for new payments, in display order.
                      </Typography>
                   </Box>
-                  {/* RP-7 (X2): clearing the list restores the
-                      built-in default methods (the resolver's
-                      fallback) and Cash as the default method. */}
-                  <SectionResetButton
-                     section="Payment Methods"
-                     onReset={() => {
-                        const defaults = resolvePaymentMethods(undefined);
-                        lastWritten.current = defaults;
-                        setMethods(defaults);
-                        setDraftNames({});
-                        setDraftDescriptions({});
-                        onConfigChange(PAYMENT_METHODS_KEY, undefined);
-                        onChange("defaultPaymentMethod", "Cash");
-                     }}
-                  />
+                  <Stack direction="row" spacing={1} alignItems="center">
+                     {/* RP-7 (X2): clearing the list restores the
+                         built-in default methods (the resolver's
+                         fallback) and Cash as the default method. */}
+                     <SectionResetButton
+                        section="Payment Methods"
+                        onReset={() => {
+                           const defaults = resolvePaymentMethods(undefined);
+                           lastWritten.current = defaults;
+                           setMethods(defaults);
+                           setDraftNames({});
+                           setDraftDescriptions({});
+                           onConfigChange(PAYMENT_METHODS_KEY, undefined);
+                           onChange("defaultPaymentMethod", "Cash");
+                        }}
+                     />
+                     <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={
+                           <Icon icon="solar:pen-2-bold-duotone" size="small" />
+                        }
+                        onClick={openEdit}
+                        sx={{ whiteSpace: "nowrap" }}
+                     >
+                        Edit
+                     </Button>
+                  </Stack>
                </Stack>
 
                <Stack spacing={0.75}>
@@ -158,18 +214,70 @@ export default function PaymentMethodsSection({
                      size="small"
                      options={activeNames}
                      value={defaultMethod}
-                     onChange={(_: any, next: any) =>
+                     onChange={(next: any) =>
                         next && onChange("defaultPaymentMethod", next)
                      }
                      placeholder="Select default"
                   />
-                  <Typography variant="caption" color="text.secondary">
-                     Preselected on new orders. If it is deactivated, new
-                     orders fall back to Cash or the first active method.
-                  </Typography>
                </Stack>
 
                <Divider />
+
+               {/* ── Compact preview list ── */}
+               <Stack spacing={0.75}>
+                  {methods.map((method, index) => (
+                     <Stack
+                        key={`${method.name}-${index}`}
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        useFlexGap
+                        flexWrap="wrap"
+                     >
+                        <Typography variant="body2" sx={{ minWidth: 22, color: "text.secondary" }}>
+                           {index + 1}.
+                        </Typography>
+                        <Typography
+                           variant="body2"
+                           fontWeight={600}
+                           color={method.active ? "text.primary" : "text.secondary"}
+                        >
+                           {method.name}
+                        </Typography>
+                        {method.description && (
+                           <Typography variant="body2" color="text.secondary">
+                              {method.description}
+                           </Typography>
+                        )}
+                        {!method.active && (
+                           <Chip label="Inactive" size="small" variant="outlined" />
+                        )}
+                        {paymentMethodRequiresTxId(
+                           { [PAYMENT_METHODS_KEY]: methods },
+                           method.name,
+                        ) && (
+                           <Chip label="TxID" size="small" variant="outlined" />
+                        )}
+                     </Stack>
+                  ))}
+               </Stack>
+            </Stack>
+         </CardContent>
+
+         {/* ── Editor modal ── */}
+         <CustomModal
+            open={editOpen}
+            onClose={cancelEdit}
+            title="Payment Methods"
+            size="lg"
+            closeIcon
+         >
+            <Stack spacing={2} sx={{ mt: 1 }}>
+               <Typography variant="body2" color="text.secondary">
+                  Renaming, deactivating or removing a method never changes
+                  past payments — they keep the name they were recorded
+                  with.
+               </Typography>
 
                <Stack spacing={1.25}>
                   {methods.map((method, index) => (
@@ -234,7 +342,7 @@ export default function PaymentMethodsSection({
                                  });
                               }
                            }}
-                           sx={{ flex: 1 }}
+                           sx={{ flex: 1, minWidth: 160 }}
                         />
                         <Stack direction="row" alignItems="center" spacing={0.5}>
                            <Typography variant="caption" color="text.secondary">
@@ -290,6 +398,18 @@ export default function PaymentMethodsSection({
                                  </IconButton>
                               </span>
                            </Tooltip>
+                           <Tooltip title="Remove method">
+                              <span>
+                                 <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => removeRow(index)}
+                                    aria-label={`Remove ${method.name}`}
+                                 >
+                                    <Icon icon="solar:trash-bin-trash-bold-duotone" size="small" />
+                                 </IconButton>
+                              </span>
+                           </Tooltip>
                         </Stack>
                      </Stack>
                   ))}
@@ -320,17 +440,28 @@ export default function PaymentMethodsSection({
                   </Button>
                </Stack>
 
-               <Typography variant="caption" color="text.secondary">
-                  Note: the TxID switch controls whether order forms ask
-                  for a transaction ID with that method, and the server
-                  enforces the same rule on order writes. Methods saved
-                  before this switch existed keep their previous
-                  behaviour (bKash, Nagad and Rocket use TxIDs) until
-                  you set the switch explicitly — so renaming a wallet
-                  no longer removes its TxID fields.
-               </Typography>
+               <Stack
+                  direction="row"
+                  justifyContent="flex-end"
+                  spacing={1.5}
+                  sx={{ pt: 1 }}
+               >
+                  <Button
+                     variant="outlined"
+                     color="inherit"
+                     onClick={cancelEdit}
+                  >
+                     Cancel
+                  </Button>
+                  <Button
+                     variant="contained"
+                     onClick={() => setEditOpen(false)}
+                  >
+                     Done
+                  </Button>
+               </Stack>
             </Stack>
-         </CardContent>
+         </CustomModal>
       </Card>
    );
 }

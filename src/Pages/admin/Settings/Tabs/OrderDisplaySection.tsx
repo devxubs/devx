@@ -1,11 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
    Box,
    Button,
    Card,
    CardContent,
+   Chip,
    IconButton,
    Stack,
    Switch,
@@ -13,6 +14,7 @@ import {
    Typography,
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
+import CustomModal from "@src/components/Modal";
 import Icon from "@src/components/Icon";
 import {
    ORDER_LIST_DEFAULT_STATUSES_KEY,
@@ -34,6 +36,7 @@ interface OrderDisplaySectionProps {
 }
 
 const ALL_COLUMN_FIELDS = ORDER_TABLE_CONFIGURABLE_FIELDS.map((f) => f.field);
+const ALL_STATUS_VALUES = Object.keys(ORDER_STATUS_LABELS) as OrderStatusValue[];
 
 function move<T>(list: T[], index: number, delta: number): T[] {
    const next = [...list];
@@ -90,6 +93,13 @@ function MoveButtons({
  * uses move buttons — the project ships no drag-and-drop library,
  * and the ordering model (a single saved array) is identical
  * either way.
+ *
+ * Cleanup Phase 1: the section now shows a compact preview with
+ * an Edit button; the full editor lives in a CustomModal.
+ * Cancelling the modal restores the four config keys to the
+ * values they had when it opened, so a cancelled edit never
+ * reaches the form (and therefore never the server). "Done"
+ * keeps the edits in the form for the normal Settings Save.
  */
 export default function OrderDisplaySection({
    values,
@@ -102,6 +112,30 @@ export default function OrderDisplaySection({
    const hiddenInFilter = resolveHiddenStatuses(config, "filter");
    const defaultStatuses = resolveOrderListDefaultStatuses(config);
    const columnLayout = resolveOrderTableColumns(config, ALL_COLUMN_FIELDS);
+
+   const [editOpen, setEditOpen] = useState(false);
+   const snapshotRef = useRef<Record<string, any> | null>(null);
+
+   const openEdit = () => {
+      snapshotRef.current = {
+         [ORDER_STATUS_ORDER_KEY]: config?.[ORDER_STATUS_ORDER_KEY],
+         [ORDER_STATUS_HIDDEN_KEY]: config?.[ORDER_STATUS_HIDDEN_KEY],
+         [ORDER_LIST_DEFAULT_STATUSES_KEY]:
+            config?.[ORDER_LIST_DEFAULT_STATUSES_KEY],
+         [ORDER_TABLE_COLUMNS_KEY]: config?.[ORDER_TABLE_COLUMNS_KEY],
+      };
+      setEditOpen(true);
+   };
+
+   const cancelEdit = () => {
+      const snap = snapshotRef.current;
+      if (snap) {
+         for (const key of Object.keys(snap)) {
+            onConfigChange(key, snap[key]);
+         }
+      }
+      setEditOpen(false);
+   };
 
    const writeHidden = (
       location: "create" | "filter",
@@ -124,23 +158,94 @@ export default function OrderDisplaySection({
       label: ORDER_STATUS_LABELS[s],
    }));
 
+   const visibleColumns =
+      columnLayout.order.length - columnLayout.hidden.length;
+
    return (
       <Card variant="outlined">
-         <CardContent>
-            <Stack spacing={3}>
-               <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                     Order Display &amp; Sorting
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                     One global order for order statuses, applied to every
-                     status selector in the POS. Hiding a status only
-                     affects the picker named — orders in that status
-                     always display normally, and status-change menus
-                     always offer every status.
-                  </Typography>
-               </Box>
+         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+            <Stack spacing={1.5}>
+               <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="flex-start"
+                  spacing={2}
+               >
+                  <Box>
+                     <Typography variant="subtitle1" fontWeight={600}>
+                        Order Display &amp; Sorting
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                        Status order, picker visibility, list defaults and
+                        table columns for orders.
+                     </Typography>
+                  </Box>
+                  <Button
+                     variant="outlined"
+                     size="small"
+                     startIcon={
+                        <Icon icon="solar:pen-2-bold-duotone" size="small" />
+                     }
+                     onClick={openEdit}
+                     sx={{ whiteSpace: "nowrap" }}
+                  >
+                     Edit
+                  </Button>
+               </Stack>
 
+               {/* ── Compact preview ── */}
+               <Stack spacing={0.75}>
+                  <Typography variant="body2">
+                     <strong>Status order:</strong>{" "}
+                     {statusOrder
+                        .map((s) => ORDER_STATUS_LABELS[s])
+                        .join(" · ")}
+                  </Typography>
+                  <Stack
+                     direction="row"
+                     spacing={0.75}
+                     alignItems="center"
+                     useFlexGap
+                     flexWrap="wrap"
+                  >
+                     <Typography variant="body2">
+                        <strong>List opens with:</strong>
+                     </Typography>
+                     {defaultStatuses.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                           All statuses
+                        </Typography>
+                     ) : (
+                        defaultStatuses.map((s) => (
+                           <Chip
+                              key={s}
+                              label={ORDER_STATUS_LABELS[s]}
+                              size="small"
+                              variant="outlined"
+                           />
+                        ))
+                     )}
+                  </Stack>
+                  <Typography variant="body2">
+                     <strong>Visibility:</strong>{" "}
+                     {hiddenInCreate.size} hidden in Create,{" "}
+                     {hiddenInFilter.size} hidden in Filters ·{" "}
+                     <strong>Columns:</strong> {visibleColumns} of{" "}
+                     {columnLayout.order.length} visible
+                  </Typography>
+               </Stack>
+            </Stack>
+         </CardContent>
+
+         {/* ── Editor modal ── */}
+         <CustomModal
+            open={editOpen}
+            onClose={cancelEdit}
+            title="Order Display & Sorting"
+            size="lg"
+            closeIcon
+         >
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
                {/* ── Global status order + per-location visibility ── */}
                <Stack spacing={1}>
                   <Stack
@@ -161,6 +266,11 @@ export default function OrderDisplaySection({
                         Reset order
                      </Button>
                   </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                     One global order for statuses, applied to every status
+                     selector. Hiding affects only the named picker —
+                     status-change menus always offer every status.
+                  </Typography>
                   <Stack
                      direction="row"
                      spacing={1}
@@ -238,9 +348,8 @@ export default function OrderDisplaySection({
                      Order List — Default Statuses
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                     The Order List opens filtered to these statuses. Staff
-                     can switch to any status or All at any time — this is
-                     a starting view, not a restriction. Empty means All.
+                     The Order List opens filtered to these statuses. Empty
+                     means All.
                   </Typography>
                   <CustomAutocomplete
                      multiple
@@ -252,10 +361,18 @@ export default function OrderDisplaySection({
                      value={statusOptions.filter((o) =>
                         defaultStatuses.includes(o.value),
                      )}
-                     onChange={(_: any, next: any) =>
+                     onChange={(next: any) =>
+                        // Cleanup Phase 1: CustomAutocomplete calls
+                        // onChange value-first (see the note in
+                        // OrderCreateDefaultsSection). Only known
+                        // status values are written to the form.
                         onConfigChange(
                            ORDER_LIST_DEFAULT_STATUSES_KEY,
-                           (next || []).map((o: any) => o.value),
+                           (next || [])
+                              .map((o: any) => o.value)
+                              .filter((v: any) =>
+                                 ALL_STATUS_VALUES.includes(v),
+                              ),
                         )
                      }
                      placeholder="All statuses"
@@ -336,7 +453,14 @@ export default function OrderDisplaySection({
                   })}
                </Stack>
 
-               <Box>
+               {/* ── Footer ── */}
+               <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  spacing={2}
+                  sx={{ pt: 1 }}
+               >
                   <Button
                      size="small"
                      color="inherit"
@@ -347,11 +471,26 @@ export default function OrderDisplaySection({
                         onConfigChange(ORDER_TABLE_COLUMNS_KEY, undefined);
                      }}
                   >
-                     Reset all order display settings
+                     Reset all
                   </Button>
-               </Box>
+                  <Stack direction="row" spacing={1.5}>
+                     <Button
+                        variant="outlined"
+                        color="inherit"
+                        onClick={cancelEdit}
+                     >
+                        Cancel
+                     </Button>
+                     <Button
+                        variant="contained"
+                        onClick={() => setEditOpen(false)}
+                     >
+                        Done
+                     </Button>
+                  </Stack>
+               </Stack>
             </Stack>
-         </CardContent>
+         </CustomModal>
       </Card>
    );
 }

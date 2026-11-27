@@ -5,6 +5,7 @@ import {
    IconButton,
    TextField,
    Button,
+   Chip,
    useMediaQuery,
    useTheme,
    Slide,
@@ -18,6 +19,11 @@ import React, { useState } from "react";
 interface HeaderProps {
    onShowSidebar: () => void;
    onSave: () => void;
+   // Cleanup Phase 1: the header is now the SINGLE save location
+   // (the fixed bottom bar was removed) — it also carries the
+   // Discard action and the unsaved-changes indicator that used
+   // to live in that bar. RP-4 dirty tracking itself is unchanged.
+   onDiscard?: () => void;
    isSaving?: boolean;
    // RP-3 (U3): hide the Save action for read-only roles.
    canUpdate?: boolean;
@@ -30,6 +36,7 @@ interface HeaderProps {
 const Header = ({
    onShowSidebar,
    onSave,
+   onDiscard,
    isSaving = false,
    canUpdate = true,
    isDirty = false,
@@ -77,24 +84,54 @@ const Header = ({
             />
          )}
 
-         {canUpdate && (
-            <Button
-               variant="contained"
-               color="primary"
-               startIcon={
-                  isSaving ? (
-                     <CircularProgress size={16} color="inherit" />
-                  ) : (
-                     <Icon icon="solar:diskette-bold" size={isSmDown ? "small" : "medium"} />
-                  )
-               }
-               size={isSmDown ? "small" : "medium"}
-               onClick={onSave}
-               disabled={isSaving || !isDirty}
-               sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
+         {canUpdate ? (
+            <Stack
+               direction="row"
+               spacing={1}
+               alignItems="center"
+               sx={{ flexShrink: 0 }}
             >
-               {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
+               {isDirty && (
+                  <Chip
+                     label="Unsaved changes"
+                     size="small"
+                     color="warning"
+                     variant="outlined"
+                     sx={{ display: { xs: "none", sm: "inline-flex" } }}
+                  />
+               )}
+               <Button
+                  variant="outlined"
+                  color="inherit"
+                  size={isSmDown ? "small" : "medium"}
+                  onClick={onDiscard}
+                  disabled={isSaving || !isDirty}
+                  sx={{ whiteSpace: "nowrap" }}
+               >
+                  Discard
+               </Button>
+               <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={
+                     isSaving ? (
+                        <CircularProgress size={16} color="inherit" />
+                     ) : (
+                        <Icon icon="solar:diskette-bold" size={isSmDown ? "small" : "medium"} />
+                     )
+                  }
+                  size={isSmDown ? "small" : "medium"}
+                  onClick={onSave}
+                  disabled={isSaving || !isDirty}
+                  sx={{ whiteSpace: "nowrap", flexShrink: 0 }}
+               >
+                  {isSaving ? "Saving..." : "Save Changes"}
+               </Button>
+            </Stack>
+         ) : (
+            // RP-3 (U3): read-only roles get the chip the removed
+            // bottom bar used to show.
+            <Chip label="Read-only" size="small" variant="outlined" />
          )}
 
          {/* Search Slide Sm screen */}

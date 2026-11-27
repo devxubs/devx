@@ -8,10 +8,7 @@ import {
    useMediaQuery,
    Drawer,
    CircularProgress,
-   Button,
-   Paper,
    Alert,
-   Chip,
 } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
@@ -347,10 +344,13 @@ const Layout = () => {
              actually shrink to the space left by the two navs
              instead of being forced wide by its content. */}
          <Stack flex={1} minWidth={0} bgcolor={"background.default"} borderRadius={2} overflow="hidden">
-            {/* Header */}
+            {/* Header — Cleanup Phase 1: the single save
+                location (carries Save, Discard and the dirty
+                indicator since the bottom bar was removed). */}
             <Header
                onShowSidebar={() => setShowSidebar(true)}
                onSave={handleSave}
+               onDiscard={handleDiscard}
                isSaving={isSaving}
                canUpdate={canUpdate}
                isDirty={isDirty}
@@ -359,7 +359,7 @@ const Layout = () => {
             />
 
             {/* Scrollable Tab Body */}
-            <Stack p={{ xs: 2, sm: 3 }} spacing={3} overflow={"auto"} flex={1}>
+            <Stack p={{ xs: 2, sm: 3 }} spacing={2} overflow={"auto"} flex={1}>
                {/* Section Title Banner */}
                <Stack direction={"row"} alignItems={"center"} spacing={2} flexWrap={"wrap"}>
                   <Box
@@ -403,18 +403,19 @@ const Layout = () => {
                   </Alert>
                )}
 
-               {/* Render Tab Component — RP-1 (S1): bottom padding
-                   sized to clear the action bar below (bar ≈ 60px +
-                   breathing room), so the last row of every tab is
-                   fully visible at scroll end. RP-3 (U3): the
-                   fieldset disables every form control in the tab
-                   for read-only roles (native fieldset semantics;
-                   style reset so it adds no chrome of its own). */}
+               {/* Render Tab Component — RP-3 (U3): the fieldset
+                   disables every form control in the tab for
+                   read-only roles (native fieldset semantics;
+                   style reset so it adds no chrome of its own).
+                   Cleanup Phase 1: the RP-1 bottom padding that
+                   cleared the old fixed action bar is gone with
+                   the bar — the header now carries Save, Discard
+                   and the dirty indicator on every tab. */}
                <Box
                   component="fieldset"
                   disabled={!canUpdate}
                   sx={{
-                     pb: 10,
+                     pb: 2,
                      border: 0,
                      m: 0,
                      paddingTop: 0,
@@ -425,88 +426,6 @@ const Layout = () => {
                   {renderTabContent()}
                </Box>
             </Stack>
-
-            {/* Persistent Bottom Action Bar — RP-1 (S1): sticky
-                to the bottom of the settings column with its own
-                stacking layer and no flex compression, so it can
-                never ride over the tab content when the shell's
-                height maths differs from this page's 100vh calc.
-                RP-4: hidden entirely on the tabs that hold no
-                editable settings fields (customers, appearance,
-                permissions) — there is nothing to save there. */}
-            {!["customers", "appearance", "permissions"].includes(selectedTab) && (
-            <Paper
-               elevation={3}
-               sx={{
-                  px: 3,
-                  py: 1.5,
-                  borderTop: 1,
-                  borderColor: "divider",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  bgcolor: "background.paper",
-                  position: "sticky",
-                  bottom: 0,
-                  zIndex: 2,
-                  flexShrink: 0,
-                  // RP-5: in a narrow content column the caption and
-                  // the actions wrap onto two rows instead of
-                  // clipping each other.
-                  flexWrap: "wrap",
-                  rowGap: 1,
-               }}
-            >
-               <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary">
-                     Default currency: <strong>{formValues.currency || "BDT"} ({formValues.currencySymbol || "৳"})</strong> • Changes apply across entire POS system
-                  </Typography>
-                  {/* RP-4: the unsaved-changes indicator. */}
-                  {isDirty && (
-                     <Chip
-                        label="Unsaved changes"
-                        size="small"
-                        color="warning"
-                        variant="outlined"
-                     />
-                  )}
-               </Stack>
-               {canUpdate ? (
-                  <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
-                     <Button
-                        variant="outlined"
-                        color="inherit"
-                        size="small"
-                        onClick={handleDiscard}
-                        disabled={!isDirty || isSaving}
-                        sx={{ whiteSpace: "nowrap" }}
-                     >
-                        Discard Changes
-                     </Button>
-                     <Button
-                        variant="contained"
-                        color="primary"
-                        size="small"
-                        startIcon={
-                           isSaving ? (
-                              <CircularProgress size={16} color="inherit" />
-                           ) : (
-                              <Icon icon="solar:diskette-bold" size="small" />
-                           )
-                        }
-                        onClick={handleSave}
-                        disabled={!isDirty || isSaving}
-                        sx={{ whiteSpace: "nowrap" }}
-                     >
-                        {isSaving ? "Saving..." : "Save Settings"}
-                     </Button>
-                  </Stack>
-               ) : (
-                  // RP-3 (U3): no save actions for read-only roles.
-                  <Chip label="Read-only" size="small" variant="outlined" />
-               )}
-            </Paper>
-            )}
 
             {/* RP-4: Discard confirmation. */}
             <AlertDialog

@@ -42,15 +42,10 @@ interface PosTabProps {
 export default function PosTab({ values, onChange, onConfigChange }: PosTabProps) {
 
    return (
-      <Stack spacing={3}>
-         <Box>
-            <Typography variant="h6" fontWeight={600}>
-               Sales & Point-of-Sale Configuration
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Fine-tune default VAT/taxes, shipping rates, payment gateways, and POS terminal rules.
-            </Typography>
-         </Box>
+      <Stack spacing={2}>
+         <Typography variant="h6" fontWeight={600}>
+            Sales & Point-of-Sale Configuration
+         </Typography>
 
          {/* RP-7 (C5): section quick-nav */}
          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
@@ -68,15 +63,10 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
          {/* Pricing & Fees — RP-7: the section gains its visible
              heading (the C5 anchor names it) and its X2 reset. */}
-         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-            <Box>
-               <Typography variant="h6" fontWeight={600}>
-                  Pricing & Fees
-               </Typography>
-               <Typography variant="body2" color="text.secondary">
-                  Default amounts prefilled on new orders and invoices.
-               </Typography>
-            </Box>
+         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+            <Typography variant="h6" fontWeight={600}>
+               Pricing & Fees
+            </Typography>
             <SectionResetButton
                section="Pricing & Fees"
                onReset={() => {
@@ -103,7 +93,6 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                   size="small"
                   value={values.defaultTaxRate ?? 0}
                   onChange={(e) => onChange("defaultTaxRate", parseFloat(e.target.value) || 0)}
-                  helperText="Default VAT percentage applied on checkout"
                   inputProps={{ min: 0, max: 100, step: 0.5 }}
                />
             </Grid>
@@ -116,7 +105,6 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                   size="small"
                   value={values.defaultDeliveryCharge ?? 60}
                   onChange={(e) => onChange("defaultDeliveryCharge", parseFloat(e.target.value) || 0)}
-                  helperText="Standard home delivery or shipping rate"
                   inputProps={{ min: 0, step: 5 }}
                />
             </Grid>
@@ -129,7 +117,6 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                   size="small"
                   value={values.defaultDiscountRate ?? 0}
                   onChange={(e) => onChange("defaultDiscountRate", parseFloat(e.target.value) || 0)}
-                  helperText="Standard promotional discount on sales"
                   inputProps={{ min: 0, max: 100, step: 1 }}
                />
             </Grid>
@@ -146,7 +133,7 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                   value={values.invoicePrefix || "INV"}
                   onChange={(e) => onChange("invoicePrefix", e.target.value)}
                   placeholder="INV"
-                  helperText="New invoices look like INV_126 — the number shares the order sequence and never restarts when the prefix changes."
+                  helperText="e.g. INV_126 — shares the order number sequence."
                />
             </Grid>
 
@@ -162,9 +149,6 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
          <Box sx={{ pt: 1, scrollMarginTop: 12 }} id="pos-policies">
             <Typography variant="h6" fontWeight={600}>
                POS Checkout Policies & Controls
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Configure stock verification for checkout.
             </Typography>
          </Box>
 
