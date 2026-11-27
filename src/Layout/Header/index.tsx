@@ -25,6 +25,13 @@ import Profile from "./Profile";
 import { usePathname } from "next/navigation";
 import useGlobalState from "@src/handler/globalState";
 import CustomBox from "@src/components/CustomBox";
+import { useSettings } from "@src/lib/settingsContext";
+import {
+   eventPrefForCategory,
+   playNotificationSound,
+   resolveNotificationPrefs,
+   toastAnchorOrigin,
+} from "@src/lib/notificationPrefs";
 
 const Header = () => {
    const pathname = usePathname();
@@ -64,6 +71,18 @@ const Header = () => {
       more: number;
    } | null>(null);
 
+   // Cleanup Phase 3: per-category toast/sound preferences and
+   // the shared toast position/duration come from the store's
+   // notificationPrefs. The poll callback below is stable
+   // (useCallback []), so it reads the latest prefs through a
+   // ref. Preferences govern PRESENTATION only — every fetched
+   // id still joins the seen set (dedupe unchanged) and the
+   // badge/drawer still receive every notification.
+   const { settings } = useSettings();
+   const notifPrefs = resolveNotificationPrefs(settings?.customConfig);
+   const notifPrefsRef = React.useRef(notifPrefs);
+   notifPrefsRef.current = notifPrefs;
+
    const refreshUnreadCount = React.useCallback(() => {
       fetch("/api/notifications")
          .then((r) => (r.ok ? r.json() : null))
@@ -85,17 +104,30 @@ const Header = () => {
             );
             list.forEach((n: any) => n && seen.add(n.id));
             if (fresh.length > 0) {
-               const newest = fresh[0];
-               setToast({
-                  title: newest.title || "New notification",
-                  message: newest.message || "",
-                  severity: ["success", "warning", "error"].includes(
-                     newest.type,
-                  )
-                     ? newest.type
-                     : "info",
-                  more: fresh.length - 1,
-               });
+               // Cleanup Phase 3: only categories whose toast
+               // preference is on produce a toast (the badge and
+               // drawer above still count everything).
+               const prefs = notifPrefsRef.current;
+               const toastable = fresh.filter(
+                  (n: any) => eventPrefForCategory(prefs, n.category).toast,
+               );
+               if (toastable.length > 0) {
+                  const newest = toastable[0];
+                  setToast({
+                     title: newest.title || "New notification",
+                     message: newest.message || "",
+                     severity: ["success", "warning", "error"].includes(
+                        newest.type,
+                     )
+                        ? newest.type
+                        : "info",
+                     more: toastable.length - 1,
+                  });
+                  const newestPref = eventPrefForCategory(prefs, newest.category);
+                  if (newestPref.sound) {
+                     playNotificationSound(newestPref.soundId);
+                  }
+               }
             }
          })
          .catch(() => {});
@@ -296,6 +328,9 @@ const Header = () => {
                setToast(null);
                setOpenNotification(true);
             }}
+            anchorOrigin={toastAnchorOrigin(notifPrefs.toast.position)}
+            durationMs={notifPrefs.toast.durationMs}
+            clickawayDismiss={notifPrefs.toast.clickawayDismiss}
          />
 
          {/* Full-width overlay SearchBar */}

@@ -8,6 +8,7 @@ import { validateOrderCreateDefaultsInConfig } from "@src/lib/orderStatusDisplay
 import { validatePrefixSettingValue } from "@src/lib/idGenerator";
 import { validatePaymentMethodsInConfig } from "@src/lib/paymentMethods";
 import { validateCustomInvoiceTemplatesInConfig } from "@src/lib/customInvoiceTemplates";
+import { validateNotificationPrefsInConfig } from "@src/lib/notificationPrefs";
 import {
    logAudit,
    auditActorFromContext,
@@ -185,6 +186,13 @@ export async function GET(request: NextRequest) {
             // of a custom-template invoice would fall back to
             // the base layout (the RP-3 F1 failure mode).
             "customInvoiceTemplates",
+            // Cleanup Phase 3: notification + toast preferences —
+            // the header toast/sound logic and the global
+            // snackbar read them client-side for EVERY role;
+            // without the allowlist, staff clients would fall
+            // back to defaults while admins see the configured
+            // behaviour (the same F1 failure mode).
+            "notificationPrefs",
          ]) {
             if (key in cfg) scrubbed[key] = cfg[key];
          }
@@ -391,6 +399,17 @@ export async function PUT(request: NextRequest) {
          if (!customTemplatesVerdict.ok) {
             return NextResponse.json(
                { error: "Validation error", message: customTemplatesVerdict.message },
+               { status: 400 },
+            );
+         }
+         // Cleanup Phase 3: notification + toast preferences are
+         // validated the same way (known sounds/positions/styles,
+         // boolean switches, bounded duration).
+         const notificationPrefsVerdict =
+            validateNotificationPrefsInConfig(body.customConfig);
+         if (!notificationPrefsVerdict.ok) {
+            return NextResponse.json(
+               { error: "Validation error", message: notificationPrefsVerdict.message },
                { status: 400 },
             );
          }

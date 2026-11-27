@@ -19,6 +19,11 @@
 
 import React, { createContext, useCallback, useContext, useState } from "react";
 import { Alert, Snackbar } from "@mui/material";
+import { useSettings } from "@src/lib/settingsContext";
+import {
+   resolveNotificationPrefs,
+   toastAnchorOrigin,
+} from "@src/lib/notificationPrefs";
 
 export type SnackbarSeverity = "success" | "error" | "warning" | "info";
 
@@ -35,6 +40,17 @@ export const SnackbarProvider = ({
 }: {
    children: React.ReactNode;
 }) => {
+   // Cleanup Phase 3: position, duration, style and dismiss
+   // behaviour come from the store's toast configuration
+   // (customConfig.notificationPrefs). Defaults match the
+   // previous hard-coded values (4000 ms, standard style, close
+   // button, clickaway dismisses) except the anchor: this
+   // provider used bottom-center while the notification toast
+   // used bottom-right — both now share the configured
+   // position, whose default is bottom-right.
+   const { settings } = useSettings();
+   const toastCfg = resolveNotificationPrefs(settings?.customConfig).toast;
+
    const [state, setState] = useState<{
       open: boolean;
       message: string;
@@ -56,9 +72,13 @@ export const SnackbarProvider = ({
       [],
    );
 
-   const handleClose = useCallback(() => {
-      setState((prev) => ({ ...prev, open: false }));
-   }, []);
+   const handleClose = useCallback(
+      (_event?: unknown, reason?: string) => {
+         if (reason === "clickaway" && !toastCfg.clickawayDismiss) return;
+         setState((prev) => ({ ...prev, open: false }));
+      },
+      [toastCfg.clickawayDismiss],
+   );
 
    return (
       <SnackbarContext.Provider value={{ showSnackbar }}>
@@ -66,13 +86,14 @@ export const SnackbarProvider = ({
          <Snackbar
             key={state.nonce}
             open={state.open}
-            autoHideDuration={4000}
+            autoHideDuration={toastCfg.durationMs}
             onClose={handleClose}
-            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            anchorOrigin={toastAnchorOrigin(toastCfg.position)}
          >
             <Alert
                severity={state.severity}
-               onClose={handleClose}
+               variant={toastCfg.style}
+               onClose={toastCfg.showClose ? () => handleClose() : undefined}
                sx={{ width: "100%" }}
             >
                {state.message}

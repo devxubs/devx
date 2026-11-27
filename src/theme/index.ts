@@ -1,4 +1,9 @@
 import { alpha, createTheme } from "@mui/material/styles";
+import {
+   buildCustomPrimary,
+   isHexColor,
+   resolveFontStack,
+} from "@src/lib/appearance";
 import typography from "./typography";
 import { lightShadows, darkShadows } from "./shadow";
 import darkPalette from "./darkPalette";
@@ -26,15 +31,28 @@ const buildPalette = (
 
 export const buildAppTheme = (
    mode: "light" | "dark",
-   colorState: keyof typeof lightPalette,
-) =>
-   createTheme({
-      palette: buildPalette(
-         mode === "light" ? lightPalette : darkPalette,
-         mode,
-         colorState,
-      ),
-      typography,
+   colorState: keyof typeof lightPalette | string,
+   fontKey?: string,
+) => {
+   // Cleanup Phase 3: a custom accent colour arrives as a hex
+   // string instead of a preset key. It replaces ONLY the
+   // primary ramp (status colours are never recoloured); the
+   // preset keys keep their long-standing swap behaviour.
+   const customHex = isHexColor(colorState) ? colorState : null;
+   const palette = buildPalette(
+      mode === "light" ? lightPalette : darkPalette,
+      mode,
+      (customHex ? "primary" : colorState) as keyof typeof lightPalette,
+   );
+   if (customHex) {
+      (palette as any).primary = buildCustomPrimary(customHex);
+   }
+   return createTheme({
+      palette,
+      typography: {
+         ...typography,
+         fontFamily: resolveFontStack(fontKey),
+      },
       shape: { borderRadius: 12 },
       shadows: mode === "light" ? lightShadows : darkShadows,
       components: {
@@ -94,3 +112,4 @@ export const buildAppTheme = (
          // },
       },
    });
+};

@@ -14,11 +14,26 @@ import {
    Alert,
    CircularProgress,
    MenuItem,
+   IconButton,
+   Snackbar,
+   Tooltip,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import { useSnackbar } from "@src/lib/snackbarContext";
 import CustomSwitch from "@src/components/CustomSwitch";
+import CustomAutocomplete from "@src/components/Autocomplete";
 import AlertDialog from "@src/components/AlertDialog";
+import {
+   NOTIFICATION_EVENT_ROWS,
+   NOTIFICATION_PREFS_KEY,
+   NOTIFICATION_SOUNDS,
+   NotificationPrefs,
+   TOAST_DURATION_OPTIONS,
+   TOAST_POSITION_OPTIONS,
+   playNotificationSound,
+   resolveNotificationPrefs,
+   toastAnchorOrigin,
+} from "@src/lib/notificationPrefs";
 import CourierProvidersCard from "./CourierProvidersCard";
 import {
    COURIER_STATUSES,
@@ -41,7 +56,27 @@ export default function SystemTab({
    const [openResetDialog, setOpenResetDialog] = useState(false);
    const [isExporting, setIsExporting] = useState(false);
    const [isResetting, setIsResetting] = useState(false);
+   const [previewToastOpen, setPreviewToastOpen] = useState(false);
    const { showSnackbar } = useSnackbar();
+
+   // Cleanup Phase 3: notification presentation preferences
+   // (customConfig.notificationPrefs) — per-event toast/sound
+   // and the shared toast display configuration. Edited through
+   // the settings form like everything else on this tab, so
+   // Save/Discard/dirty tracking apply unchanged.
+   const notifPrefs = resolveNotificationPrefs(values.customConfig);
+   const writePrefs = (next: NotificationPrefs) =>
+      onConfigChange(NOTIFICATION_PREFS_KEY, next);
+   const setEventPref = (key: string, patch: Partial<NotificationPrefs["events"][string]>) =>
+      writePrefs({
+         ...notifPrefs,
+         events: {
+            ...notifPrefs.events,
+            [key]: { ...notifPrefs.events[key], ...patch },
+         },
+      });
+   const setToastCfg = (patch: Partial<NotificationPrefs["toast"]>) =>
+      writePrefs({ ...notifPrefs, toast: { ...notifPrefs.toast, ...patch } });
    // Audit L-1: factory reset and data export are administrator
    // actions server-side (requireAdmin). The settings GET reports
    // that capability separately (canAdminSettings) so editors who
@@ -144,6 +179,211 @@ export default function SystemTab({
                 no cancellation-notification producer exists, so the
                 switches saved a value nothing ever read. */}
          </Grid>
+
+         {/* Cleanup Phase 3: per-event presentation preferences.
+             Rows exist only for producers that actually create
+             notifications (stock engine, chat, and a fallback for
+             any other category) — see lib/notificationPrefs. */}
+         <Box sx={{ pt: 1 }}>
+            <Typography variant="h6" fontWeight={600}>
+               Notification Preferences
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+               Choose how each event is presented when it arrives. Turning a toast off never deletes the notification — it still appears in the notification drawer.
+            </Typography>
+         </Box>
+
+         <Stack spacing={1.5}>
+            {NOTIFICATION_EVENT_ROWS.map((row) => {
+               const pref = notifPrefs.events[row.key];
+               const soundOption =
+                  NOTIFICATION_SOUNDS.find((s) => s.id === pref.soundId) ||
+                  NOTIFICATION_SOUNDS[1];
+               return (
+                  <Card key={row.key} variant="outlined" sx={{ borderRadius: 1.5 }}>
+                     <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                        <Grid container spacing={2} alignItems="center">
+                           <Grid size={{ xs: 12, md: 4 }}>
+                              <Typography variant="subtitle2" fontWeight={600}>
+                                 {row.label}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                 {row.desc}
+                              </Typography>
+                           </Grid>
+                           <Grid size={{ xs: 6, md: 2 }}>
+                              <FormControlLabel
+                                 control={
+                                    <CustomSwitch
+                                       checked={pref.toast}
+                                       onChange={(e) => setEventPref(row.key, { toast: e.target.checked })}
+                                    />
+                                 }
+                                 label={<Typography variant="body2">Toast</Typography>}
+                              />
+                           </Grid>
+                           <Grid size={{ xs: 6, md: 2 }}>
+                              <FormControlLabel
+                                 control={
+                                    <CustomSwitch
+                                       checked={pref.sound}
+                                       onChange={(e) => setEventPref(row.key, { sound: e.target.checked })}
+                                    />
+                                 }
+                                 label={<Typography variant="body2">Sound</Typography>}
+                              />
+                           </Grid>
+                           <Grid size={{ xs: 10, md: 3 }}>
+                              <CustomAutocomplete
+                                 arrow
+                                 size="small"
+                                 label="Sound"
+                                 options={NOTIFICATION_SOUNDS}
+                                 getOptionLabel={(o: any) => o?.name || ""}
+                                 isOptionEqualToValue={(a: any, b: any) => a?.id === b?.id}
+                                 value={soundOption}
+                                 onChange={(next: any) => {
+                                    // CustomAutocomplete is value-first (Phase 1 lesson).
+                                    if (next) setEventPref(row.key, { soundId: next.id });
+                                 }}
+                              />
+                           </Grid>
+                           <Grid size={{ xs: 2, md: 1 }}>
+                              <Tooltip disableInteractive title="Preview sound">
+                                 <span>
+                                    <IconButton
+                                       size="small"
+                                       disabled={pref.soundId === "none"}
+                                       onClick={() => playNotificationSound(pref.soundId)}
+                                       sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1 }}
+                                    >
+                                       <Icon icon="solar:play-bold" size="small" />
+                                    </IconButton>
+                                 </span>
+                              </Tooltip>
+                           </Grid>
+                        </Grid>
+                     </CardContent>
+                  </Card>
+               );
+            })}
+         </Stack>
+
+         {/* Cleanup Phase 3: toast display configuration — read
+             by the global snackbar and the notification toast
+             from the SAVED settings; the preview below renders
+             the values currently in this form. */}
+         <Box sx={{ pt: 1 }}>
+            <Typography variant="h6" fontWeight={600}>
+               Toast Display
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+               Applies to pop-up messages across the app (action feedback and new-notification toasts) once saved.
+            </Typography>
+         </Box>
+
+         <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+               <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  label="Position"
+                  value={notifPrefs.toast.position}
+                  onChange={(e) => setToastCfg({ position: e.target.value as NotificationPrefs["toast"]["position"] })}
+               >
+                  {TOAST_POSITION_OPTIONS.map((o) => (
+                     <MenuItem key={o.key} value={o.key}>{o.name}</MenuItem>
+                  ))}
+               </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+               <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  label="Duration"
+                  value={notifPrefs.toast.durationMs === null ? "null" : String(notifPrefs.toast.durationMs)}
+                  onChange={(e) =>
+                     setToastCfg({ durationMs: e.target.value === "null" ? null : Number(e.target.value) })
+                  }
+               >
+                  {TOAST_DURATION_OPTIONS.map((o) => (
+                     <MenuItem key={o.name} value={o.value === null ? "null" : String(o.value)}>{o.name}</MenuItem>
+                  ))}
+               </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+               <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  label="Style"
+                  value={notifPrefs.toast.style}
+                  onChange={(e) => setToastCfg({ style: e.target.value as NotificationPrefs["toast"]["style"] })}
+               >
+                  <MenuItem value="standard">Standard</MenuItem>
+                  <MenuItem value="filled">Filled</MenuItem>
+                  <MenuItem value="outlined">Outlined</MenuItem>
+               </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+               <Stack spacing={0.5}>
+                  <FormControlLabel
+                     control={
+                        <CustomSwitch
+                           checked={notifPrefs.toast.showClose}
+                           onChange={(e) => setToastCfg({ showClose: e.target.checked })}
+                        />
+                     }
+                     label={<Typography variant="body2">Close button</Typography>}
+                  />
+                  <FormControlLabel
+                     control={
+                        <CustomSwitch
+                           checked={notifPrefs.toast.clickawayDismiss}
+                           onChange={(e) => setToastCfg({ clickawayDismiss: e.target.checked })}
+                        />
+                     }
+                     label={<Typography variant="body2">Click-away dismisses</Typography>}
+                  />
+               </Stack>
+            </Grid>
+            <Grid size={12}>
+               <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Icon icon="solar:eye-bold" size="small" />}
+                  onClick={() => setPreviewToastOpen(true)}
+               >
+                  Preview Toast
+               </Button>
+               <Typography variant="caption" color="text.secondary" sx={{ ml: 1.5 }}>
+                  Simultaneous toasts: pop-ups replace each other (a new one dismisses the previous) — queueing is not supported by the toast design.
+               </Typography>
+            </Grid>
+         </Grid>
+
+         {/* Live preview of the toast configuration AS EDITED in
+             the form (the app-wide systems read the saved values). */}
+         <Snackbar
+            open={previewToastOpen}
+            autoHideDuration={notifPrefs.toast.durationMs}
+            onClose={(_e, reason) => {
+               if (reason === "clickaway" && !notifPrefs.toast.clickawayDismiss) return;
+               setPreviewToastOpen(false);
+            }}
+            anchorOrigin={toastAnchorOrigin(notifPrefs.toast.position)}
+         >
+            <Alert
+               severity="success"
+               variant={notifPrefs.toast.style}
+               onClose={notifPrefs.toast.showClose ? () => setPreviewToastOpen(false) : undefined}
+               sx={{ width: "100%" }}
+            >
+               Preview — this is how toasts will look with the selected configuration.
+            </Alert>
+         </Snackbar>
 
          {/* Data Export (P2-5: this feature is a partial export, not
              a backup — the copy below states its exact scope, in

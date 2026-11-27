@@ -41,6 +41,15 @@ interface NotificationToastProps {
    toast: NotificationToastData | null;
    onClose: () => void;
    onOpen: () => void;
+   // Cleanup Phase 3: position/duration/dismiss come from the
+   // store's toast configuration; defaults preserve the
+   // historical bottom-right / 4000 ms behaviour.
+   anchorOrigin?: {
+      vertical: "top" | "bottom";
+      horizontal: "left" | "center" | "right";
+   };
+   durationMs?: number | null;
+   clickawayDismiss?: boolean;
 }
 
 // Decorative auto-dismiss indicator: shrinks from full width to
@@ -51,12 +60,13 @@ const shrink = keyframes`
    to { transform: scaleX(0); }
 `;
 
-// Slide-in from the right edge (the toast is anchored bottom
-// right). A wrapper because Snackbar's TransitionProps type does
-// not carry Slide's `direction` prop.
-const SlideFromRight = (props: SlideProps) => (
-   <Slide {...props} direction="left" />
-);
+// Slide-in from the anchored edge. A wrapper because
+// Snackbar's TransitionProps type does not carry Slide's
+// `direction` prop.
+const makeSlide = (direction: "left" | "right" | "up" | "down") =>
+   function SlideFromEdge(props: SlideProps) {
+      return <Slide {...props} direction={direction} />;
+   };
 
 const clampLines = (lines: number) => ({
    display: "-webkit-box",
@@ -70,20 +80,36 @@ const NotificationToast = ({
    toast,
    onClose,
    onOpen,
+   anchorOrigin = { vertical: "bottom", horizontal: "right" },
+   durationMs = AUTO_HIDE_MS,
+   clickawayDismiss = true,
 }: NotificationToastProps) => {
    const severity: ToastSeverity = toast?.severity ?? "info";
+   const slideDirection =
+      anchorOrigin.horizontal === "right"
+         ? "left"
+         : anchorOrigin.horizontal === "left"
+           ? "right"
+           : anchorOrigin.vertical === "top"
+             ? "down"
+             : "up";
 
    return (
       <Snackbar
          open={Boolean(toast)}
-         autoHideDuration={AUTO_HIDE_MS}
-         onClose={onClose}
-         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-         TransitionComponent={SlideFromRight}
+         autoHideDuration={durationMs}
+         onClose={(_event, reason) => {
+            if (reason === "clickaway" && !clickawayDismiss) return;
+            onClose();
+         }}
+         anchorOrigin={anchorOrigin}
+         TransitionComponent={makeSlide(slideDirection)}
          sx={{
-            left: { xs: 16, sm: "auto" },
-            right: { xs: 16, sm: 24 },
-            bottom: { xs: 16, sm: 24 },
+            left: { xs: 16, sm: anchorOrigin.horizontal === "right" ? "auto" : 24 },
+            right: { xs: 16, sm: anchorOrigin.horizontal === "left" ? "auto" : 24 },
+            ...(anchorOrigin.vertical === "bottom"
+               ? { bottom: { xs: 16, sm: 24 } }
+               : { top: { xs: 16, sm: 24 } }),
          }}
       >
          <Alert
@@ -203,8 +229,9 @@ const NotificationToast = ({
             </Stack>
 
             {/* Auto-dismiss progress bar (decorative; restarts per
-                toast via the key, unmounts when the toast closes). */}
-            {toast && (
+                toast via the key, unmounts when the toast closes).
+                Hidden when the toast stays until dismissed. */}
+            {toast && durationMs !== null && (
                <Box
                   key={`${toast.title}|${toast.message}|${toast.more}`}
                   className="notification-toast-progress"
@@ -217,7 +244,7 @@ const NotificationToast = ({
                      height: 3,
                      transformOrigin: "left center",
                      bgcolor: (theme) => theme.palette[severity].main,
-                     animation: `${shrink} ${AUTO_HIDE_MS}ms linear forwards`,
+                     animation: `${shrink} ${durationMs ?? AUTO_HIDE_MS}ms linear forwards`,
                   }}
                />
             )}

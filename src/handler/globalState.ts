@@ -6,6 +6,7 @@ import { GlobalStateProps } from "./globalTypes";
 const initialState: GlobalStateProps = {
   theme: "dark",
   color: "primary",
+  font: "inter",
   layoutFull: true,
 };
 
