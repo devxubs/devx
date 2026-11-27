@@ -14,6 +14,7 @@ import {
    MenuItem,
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
+import SectionResetButton from "./SectionResetButton";
 
 interface ProductsTabProps {
    values: any;
@@ -78,14 +79,31 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
    return (
       <Stack spacing={3}>
          {/* ── Phase 1: Product Settings ─────────────────────── */}
-         <Box>
-            <Typography variant="h6" fontWeight={600}>
-               Product Settings
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Default warehouse and order, stock and courier behaviour for products.
-            </Typography>
-         </Box>
+         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+            <Box>
+               <Typography variant="h6" fontWeight={600}>
+                  Product Settings
+               </Typography>
+               <Typography variant="body2" color="text.secondary">
+                  Default warehouse and order, stock and courier behaviour for products.
+               </Typography>
+            </Box>
+            {/* RP-7 (X2): clearing the keys restores the audited
+                Phase 1 defaults (resolvers supply them when a key
+                is unset): warehouse none, decrease on CONFIRMED,
+                stock-out ordering off, courier stock check off,
+                variation required on. */}
+            <SectionResetButton
+               section="Product Settings"
+               onReset={() => {
+                  onConfigChange("defaultWarehouseId", undefined);
+                  onConfigChange("decreaseStockOn", undefined);
+                  onConfigChange("stockOutProductCanOrder", undefined);
+                  onConfigChange("outOfStockCanSubmitCourier", undefined);
+                  onConfigChange("variationSelectOnOrder", undefined);
+               }}
+            />
+         </Stack>
 
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 6 }}>

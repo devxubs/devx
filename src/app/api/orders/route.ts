@@ -35,7 +35,7 @@ import {
    findOrderWithTxId,
    duplicateTxIdMessage,
    DuplicateTxIdError,
-   orderTxIdMethodError,
+   orderTxIdMethodErrorWithConfig,
 } from "@src/lib/payments";
 import {
    paymentMethodSelectionError,
@@ -823,7 +823,10 @@ export async function POST(request: NextRequest) {
       // payment method — reject the pairing with 400 instead of
       // storing an unreconcilable reference (neither POST nor PUT
       // checked this before; POST now enforces the stricter rule).
-      const txMethodError = orderTxIdMethodError(
+      // RP-7 (X1): "uses transaction IDs" is resolved from the
+      // payment-method config (explicit flag, legacy name fallback).
+      const txMethodError = orderTxIdMethodErrorWithConfig(
+         paymentSetting?.customConfig,
          effectivePaymentMethod,
          paymentTxId,
       );

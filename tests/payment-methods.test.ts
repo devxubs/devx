@@ -3,6 +3,7 @@ import {
    DEFAULT_PAYMENT_METHODS,
    activePaymentMethodNames,
    paymentMethodOptionsFor,
+   paymentMethodRequiresTxId,
    paymentMethodSelectionError,
    resolveDefaultPaymentMethod,
    resolvePaymentMethods,
@@ -144,6 +145,73 @@ describe("validatePaymentMethodsInConfig", () => {
       expect(validatePaymentMethodsInConfig(cfg("nope")).ok).toBe(false);
       expect(
          validatePaymentMethodsInConfig(cfg([{ name: "Cash", active: "yes" }])).ok,
+      ).toBe(false);
+   });
+});
+
+describe("paymentMethodRequiresTxId (RP-7 X1)", () => {
+   it("legacy fallback: the three wallet names require TxID when no flag is set", () => {
+      const legacy = cfg([
+         { name: "bKash", active: true },
+         { name: "Nagad", active: true },
+         { name: "Rocket", active: true },
+         { name: "Cash", active: true },
+      ]);
+      expect(paymentMethodRequiresTxId(legacy, "bKash")).toBe(true);
+      expect(paymentMethodRequiresTxId(legacy, "NAGAD")).toBe(true);
+      expect(paymentMethodRequiresTxId(legacy, "rocket")).toBe(true);
+      expect(paymentMethodRequiresTxId(legacy, "Cash")).toBe(false);
+   });
+
+   it("unconfigured (defaults) keeps wallet behaviour", () => {
+      expect(paymentMethodRequiresTxId(null, "bKash")).toBe(true);
+      expect(paymentMethodRequiresTxId({}, "Card")).toBe(false);
+      expect(paymentMethodRequiresTxId(null, "")).toBe(false);
+      expect(paymentMethodRequiresTxId(null, null)).toBe(false);
+   });
+
+   it("an explicit flag wins over the name rule, both ways", () => {
+      const configured = cfg([
+         { name: "bKash", active: true, requiresTransactionId: false },
+         { name: "SSLCommerz", active: true, requiresTransactionId: true },
+      ]);
+      expect(paymentMethodRequiresTxId(configured, "bKash")).toBe(false);
+      expect(paymentMethodRequiresTxId(configured, "SSLCommerz")).toBe(true);
+   });
+
+   it("a renamed wallet keeps TxID via its flag; unknown names use the name rule", () => {
+      const renamed = cfg([
+         { name: "bKash Personal", active: true, requiresTransactionId: true },
+      ]);
+      expect(paymentMethodRequiresTxId(renamed, "bKash Personal")).toBe(true);
+      // Not in the list at all: the legacy name rule still applies.
+      expect(paymentMethodRequiresTxId(renamed, "Nagad")).toBe(true);
+      expect(paymentMethodRequiresTxId(renamed, "Cash")).toBe(false);
+   });
+
+   it("the resolver carries the flag through and drops non-boolean values", () => {
+      const list = resolvePaymentMethods(
+         cfg([
+            { name: "A", active: true, requiresTransactionId: true },
+            { name: "B", active: true, requiresTransactionId: "yes" },
+            { name: "C", active: true },
+         ]),
+      );
+      expect(list[0].requiresTransactionId).toBe(true);
+      expect(list[1].requiresTransactionId).toBeUndefined();
+      expect(list[2].requiresTransactionId).toBeUndefined();
+   });
+
+   it("the settings validator accepts a boolean flag and rejects other types", () => {
+      expect(
+         validatePaymentMethodsInConfig(
+            cfg([{ name: "A", active: true, requiresTransactionId: true }]),
+         ).ok,
+      ).toBe(true);
+      expect(
+         validatePaymentMethodsInConfig(
+            cfg([{ name: "A", active: true, requiresTransactionId: "yes" }]),
+         ).ok,
       ).toBe(false);
    });
 });

@@ -16,10 +16,12 @@ import {
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
+import SectionResetButton from "./SectionResetButton";
 import {
    PAYMENT_METHODS_KEY,
    PaymentMethodConfig,
    activePaymentMethodNames,
+   paymentMethodRequiresTxId,
    resolveDefaultPaymentMethod,
    resolvePaymentMethods,
 } from "@src/lib/paymentMethods";
@@ -117,18 +119,35 @@ export default function PaymentMethodsSection({
       <Card variant="outlined">
          <CardContent>
             <Stack spacing={2.5}>
-               <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                     Payment Methods
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                     The methods offered for NEW payments, in display order.
-                     Deactivate a method to remove it from new transactions —
-                     past payments always keep the name they were recorded
-                     with, and renaming a method never rewrites history.
-                     There is no hard delete, by design.
-                  </Typography>
-               </Box>
+               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                  <Box>
+                     <Typography variant="subtitle1" fontWeight={600}>
+                        Payment Methods
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                        The methods offered for NEW payments, in display order.
+                        Deactivate a method to remove it from new transactions —
+                        past payments always keep the name they were recorded
+                        with, and renaming a method never rewrites history.
+                        There is no hard delete, by design.
+                     </Typography>
+                  </Box>
+                  {/* RP-7 (X2): clearing the list restores the
+                      built-in default methods (the resolver's
+                      fallback) and Cash as the default method. */}
+                  <SectionResetButton
+                     section="Payment Methods"
+                     onReset={() => {
+                        const defaults = resolvePaymentMethods(undefined);
+                        lastWritten.current = defaults;
+                        setMethods(defaults);
+                        setDraftNames({});
+                        setDraftDescriptions({});
+                        onConfigChange(PAYMENT_METHODS_KEY, undefined);
+                        onChange("defaultPaymentMethod", "Cash");
+                     }}
+                  />
+               </Stack>
 
                <Stack spacing={0.75}>
                   <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
@@ -159,6 +178,8 @@ export default function PaymentMethodsSection({
                         direction="row"
                         alignItems="center"
                         spacing={1.5}
+                        flexWrap="wrap"
+                        useFlexGap
                      >
                         <Typography
                            variant="body2"
@@ -225,6 +246,27 @@ export default function PaymentMethodsSection({
                               onChange={(e) => patchRow(index, { active: e.target.checked })}
                            />
                         </Stack>
+                        {/* RP-7 (X1): per-method TxID flag. The switch
+                            shows the EFFECTIVE value (explicit flag,
+                            or the legacy bKash/Nagad/Rocket fallback);
+                            toggling stores the explicit flag. */}
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                           <Typography variant="caption" color="text.secondary">
+                              TxID
+                           </Typography>
+                           <Switch
+                              size="small"
+                              checked={paymentMethodRequiresTxId(
+                                 { [PAYMENT_METHODS_KEY]: methods },
+                                 method.name,
+                              )}
+                              onChange={(e) =>
+                                 patchRow(index, {
+                                    requiresTransactionId: e.target.checked,
+                                 })
+                              }
+                           />
+                        </Stack>
                         <Stack direction="row">
                            <Tooltip title="Move up">
                               <span>
@@ -279,9 +321,13 @@ export default function PaymentMethodsSection({
                </Stack>
 
                <Typography variant="caption" color="text.secondary">
-                  Note: order Transaction ID fields are tied to the exact
-                  names bKash, Nagad and Rocket — renaming one of those
-                  three removes its TxID fields from order forms.
+                  Note: the TxID switch controls whether order forms ask
+                  for a transaction ID with that method, and the server
+                  enforces the same rule on order writes. Methods saved
+                  before this switch existed keep their previous
+                  behaviour (bKash, Nagad and Rocket use TxIDs) until
+                  you set the switch explicitly — so renaming a wallet
+                  no longer removes its TxID fields.
                </Typography>
             </Stack>
          </CardContent>

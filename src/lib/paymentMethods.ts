@@ -30,14 +30,21 @@ export interface PaymentMethodConfig {
    name: string;
    description?: string;
    active: boolean;
+   /**
+    * RP-7 (X1): whether this method uses transaction IDs (TxID +
+    * sender number on order payments). Optional for backward
+    * compatibility: when unset, the legacy name rule applies
+    * (bKash / Nagad / Rocket — see paymentMethodRequiresTxId).
+    */
+   requiresTransactionId?: boolean;
 }
 
 export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
    { name: "Cash", active: true },
    { name: "Cash on Delivery", active: true },
-   { name: "bKash", active: true },
-   { name: "Nagad", active: true },
-   { name: "Rocket", active: true },
+   { name: "bKash", active: true, requiresTransactionId: true },
+   { name: "Nagad", active: true, requiresTransactionId: true },
+   { name: "Rocket", active: true, requiresTransactionId: true },
    { name: "Card", active: true },
    { name: "Bank Transfer", active: true },
    { name: "Wallet", active: true },
@@ -77,6 +84,10 @@ export function resolvePaymentMethods(customConfig: unknown): PaymentMethodConfi
                ? e.description.trim()
                : undefined,
          active: e.active !== false,
+         requiresTransactionId:
+            typeof e.requiresTransactionId === "boolean"
+               ? e.requiresTransactionId
+               : undefined,
       });
    }
    return out.length > 0 ? out : DEFAULT_PAYMENT_METHODS.map((m) => ({ ...m }));
@@ -202,6 +213,46 @@ export function validatePaymentMethodsInConfig(
       if (e.active !== undefined && typeof e.active !== "boolean") {
          return { ok: false, message: `Active flag for "${name}" must be a boolean.` };
       }
+      if (
+         e.requiresTransactionId !== undefined &&
+         typeof e.requiresTransactionId !== "boolean"
+      ) {
+         return {
+            ok: false,
+            message: `Transaction ID flag for "${name}" must be a boolean.`,
+         };
+      }
    }
    return { ok: true };
+}
+
+/** The methods that used transaction IDs before the per-method flag existed. */
+export const LEGACY_TXID_METHODS = ["bKash", "Nagad", "Rocket"];
+
+/**
+ * RP-7 (X1) — does this payment method use transaction IDs?
+ *
+ * Resolution order (backward compatible by construction):
+ *   1. The method's own explicit `requiresTransactionId` flag in
+ *      the configured list wins — a renamed wallet keeps its TxID
+ *      behaviour, and a method named "bKash" can opt out.
+ *   2. Otherwise the legacy name rule: bKash / Nagad / Rocket
+ *      (case-insensitive). Configurations saved before the flag
+ *      existed therefore behave exactly as they always have, and
+ *      historical orders are unaffected — this only governs how
+ *      NEW writes and forms treat a method.
+ */
+export function paymentMethodRequiresTxId(
+   customConfig: unknown,
+   method: string | null | undefined,
+): boolean {
+   const name = typeof method === "string" ? method.trim() : "";
+   if (!name) return false;
+   const entry = resolvePaymentMethods(customConfig).find(
+      (m) => m.name.toLowerCase() === name.toLowerCase(),
+   );
+   if (entry && typeof entry.requiresTransactionId === "boolean") {
+      return entry.requiresTransactionId;
+   }
+   return LEGACY_TXID_METHODS.some((m) => m.toLowerCase() === name.toLowerCase());
 }

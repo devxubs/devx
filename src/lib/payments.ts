@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { paymentMethodRequiresTxId } from "./paymentMethods";
 
 /**
  * Payment reconciliation helpers (Phase 3B, roadmap 3.6 / schema
@@ -43,6 +44,29 @@ export function isMobilePaymentMethod(method?: string | null): boolean {
    if (!method) return false;
    const normalized = method.trim().toLowerCase();
    return MOBILE_PAYMENT_METHODS.some((m) => m.toLowerCase() === normalized);
+}
+
+/**
+ * RP-7 (X1): the config-aware form of orderTxIdMethodError, used
+ * by the order write paths. Whether a method uses transaction IDs
+ * now comes from the payment-method configuration
+ * (paymentMethodRequiresTxId: the method's explicit
+ * requiresTransactionId flag, falling back to the legacy
+ * bKash/Nagad/Rocket name rule for configurations saved before
+ * the flag existed). The server stays authoritative — the order
+ * forms use the same resolver only to decide which inputs to
+ * show. The supplier-payment paths keep the plain name rule
+ * above (their method list is deliberately separate, Phase 5).
+ */
+export function orderTxIdMethodErrorWithConfig(
+   customConfig: unknown,
+   method: string | null | undefined,
+   txId: string | null | undefined,
+): string | null {
+   const clean = String(txId || "").trim();
+   if (!clean) return null;
+   if (paymentMethodRequiresTxId(customConfig, method)) return null;
+   return `A transaction ID can only be recorded with a payment method that uses transaction IDs; payment method "${method || "Cash on Delivery"}" does not use transaction IDs.`;
 }
 
 /**

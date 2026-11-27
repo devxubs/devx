@@ -10,6 +10,7 @@ import {
    Box,
    Avatar,
 } from "@mui/material";
+import SectionResetButton from "./SectionResetButton";
 
 interface GeneralTabProps {
    values: any;
@@ -51,14 +52,27 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
 
    return (
       <Stack spacing={3}>
-         <Box>
-            <Typography variant="h6" fontWeight={600}>
-               General Store Profile
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Configure your business identity, primary contact information, currency, and locale.
-            </Typography>
-         </Box>
+         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+            <Box>
+               <Typography variant="h6" fontWeight={600}>
+                  General Store Profile
+               </Typography>
+               <Typography variant="body2" color="text.secondary">
+                  Configure your business identity, primary contact information, currency, and locale.
+               </Typography>
+            </Box>
+            <SectionResetButton
+               section="General Store Profile"
+               onReset={() => {
+                  onChange("storeName", "DevX POS");
+                  onChange("tagline", "Smart Retail & Point of Sale");
+                  onChange("logoUrl", "");
+                  onChange("email", "info@devxpos.com");
+                  onChange("phone", "+880 1700-000000");
+                  onChange("address", "Dhaka, Bangladesh");
+               }}
+            />
+         </Stack>
 
          {/* Store Identity */}
          <Grid container spacing={2}>
@@ -148,14 +162,25 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             </Grid>
          </Grid>
 
-         <Box sx={{ pt: 1 }}>
-            <Typography variant="h6" fontWeight={600}>
-               Currency & Localization
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Select your store currency, timezone, and calendar date preferences.
-            </Typography>
-         </Box>
+         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} sx={{ pt: 1 }}>
+            <Box>
+               <Typography variant="h6" fontWeight={600}>
+                  Currency & Localization
+               </Typography>
+               <Typography variant="body2" color="text.secondary">
+                  Select your store currency, timezone, and calendar date preferences.
+               </Typography>
+            </Box>
+            <SectionResetButton
+               section="Currency & Localization"
+               onReset={() => {
+                  onChange("currency", "BDT");
+                  onChange("currencySymbol", "৳");
+                  onChange("timezone", "Asia/Dhaka");
+                  onChange("language", "en");
+               }}
+            />
+         </Stack>
 
          <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>

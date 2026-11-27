@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import Icon from "@src/components/Icon";
-import { isMobilePaymentMethod } from "../../paymentMethods";
+import { methodUsesTxId } from "../../paymentMethods";
 import { useSettings } from "@src/lib/settingsContext";
 import { paymentMethodOptionsFor } from "@src/lib/paymentMethods";
 import { QuickEditPricingData } from "../types";
@@ -37,7 +37,8 @@ export const QuickEditPricingSection: React.FC<
       pricing.paymentMethod,
    );
    const isPaidInFull = Number(pricing.dueAmount) <= 0;
-   const showTxFields = isMobilePaymentMethod(pricing.paymentMethod);
+   // RP-7 (X1): TxID inputs follow the method's configured flag.
+   const showTxFields = methodUsesTxId(settings?.customConfig, pricing.paymentMethod);
 
    return (
       <Paper

@@ -14,6 +14,7 @@ import {
    Paper,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
+import SectionResetButton from "./SectionResetButton";
 
 interface PrefixesTabProps {
    values: any;
@@ -125,14 +126,34 @@ const prefixDefinitions: PrefixItem[] = [
 export default function PrefixesTab({ values, onChange }: PrefixesTabProps) {
    return (
       <Stack spacing={3}>
-         <Box>
-            <Typography variant="h6" fontWeight={600}>
-               Sequential Entity ID Formats & Prefixes
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-               Configure custom prefix codes for each entity type. IDs are generated automatically and sequentially starting from 1 (e.g. EP_1, CUS_1, ORD_1).
-            </Typography>
-         </Box>
+         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+            <Box>
+               <Typography variant="h6" fontWeight={600}>
+                  Sequential Entity ID Formats & Prefixes
+               </Typography>
+               <Typography variant="body2" color="text.secondary">
+                  Configure custom prefix codes for each entity type. IDs are generated automatically and sequentially starting from 1 (e.g. EP_1, CUS_1, ORD_1).
+               </Typography>
+            </Box>
+            <SectionResetButton
+               section="Entity ID Formats"
+               onReset={() => {
+                  onChange("prefixEmployee", "EP_");
+                  onChange("prefixCustomer", "CUS_");
+                  onChange("prefixSupplier", "SUP_");
+                  onChange("prefixOrder", "ORD_");
+                  onChange("prefixPurchase", "PUR_");
+                  onChange("prefixProduct", "PROD_");
+                  onChange("prefixCategory", "CAT_");
+                  onChange("prefixUnit", "UNIT_");
+                  onChange("prefixExpense", "EXP_");
+                  onChange("prefixAsset", "AST_");
+                  onChange("prefixRole", "ROLE_");
+                  onChange("prefixBilling", "BILL_");
+                  onChange("prefixWarehouse", "WH_");
+               }}
+            />
+         </Stack>
 
          <Paper
             variant="outlined"

@@ -15,7 +15,7 @@ import React from "react";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionCard from "./SectionCard";
 import { formatBDT } from "./orderCalculations";
-import { isMobilePaymentMethod } from "../paymentMethods";
+import { methodUsesTxId } from "../paymentMethods";
 import { useSettings } from "@src/lib/settingsContext";
 import { paymentMethodOptionsFor } from "@src/lib/paymentMethods";
 import type { OrderTotals } from "./types";
@@ -41,7 +41,9 @@ const PaymentSection = ({ paymentMethod, advancePayment, paymentTxId = "", payme
    // value is merged back so it always stays selectable.
    const { settings } = useSettings();
    const methodOptions = paymentMethodOptionsFor(settings?.customConfig, paymentMethod);
-   const showTxFields = isMobilePaymentMethod(paymentMethod);
+   // RP-7 (X1): TxID inputs follow the method's configured flag
+   // (legacy bKash/Nagad/Rocket name fallback built into the resolver).
+   const showTxFields = methodUsesTxId(settings?.customConfig, paymentMethod);
    const statusColor =
       totals.paymentStatus === "Paid" ? "success" : totals.paymentStatus === "Partial" ? "warning" : "error";
    const overpaid = advancePayment > totals.grandTotal;

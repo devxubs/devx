@@ -9,6 +9,7 @@ import {
    Typography,
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
+import SectionResetButton from "./SectionResetButton";
 import { orderSources } from "@src/Pages/admin/Order/data";
 import {
    ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY,
@@ -109,18 +110,28 @@ export default function OrderCreateDefaultsSection({
       <Card variant="outlined">
          <CardContent>
             <Stack spacing={2.5}>
-               <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                     Order Creation Defaults
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                     Starting values for a NEW order. They are applied once
-                     when the Order Create page opens — employees can change
-                     or remove them freely, editing an existing order never
-                     touches them, and an unavailable default product is
-                     skipped rather than forced.
-                  </Typography>
-               </Box>
+               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                  <Box>
+                     <Typography variant="subtitle1" fontWeight={600}>
+                        Order Creation Defaults
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                        Starting values for a NEW order. They are applied once
+                        when the Order Create page opens — employees can change
+                        or remove them freely, editing an existing order never
+                        touches them, and an unavailable default product is
+                        skipped rather than forced.
+                     </Typography>
+                  </Box>
+                  <SectionResetButton
+                     section="Order Creation Defaults"
+                     onReset={() => {
+                        onConfigChange(ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY, undefined);
+                        onConfigChange(ORDER_CREATE_DEFAULT_SOURCE_KEY, undefined);
+                        onConfigChange(ORDER_CREATE_DEFAULT_STATUS_KEY, undefined);
+                     }}
+                  />
+               </Stack>
 
                <Stack spacing={0.75}>
                   <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">

@@ -4,6 +4,7 @@ import React from "react";
 import OrderDisplaySection from "./OrderDisplaySection";
 import OrderCreateDefaultsSection from "./OrderCreateDefaultsSection";
 import PaymentMethodsSection from "./PaymentMethodsSection";
+import SectionResetButton from "./SectionResetButton";
 import {
    Grid,
    Stack,
@@ -14,7 +15,23 @@ import {
    Switch,
    Card,
    CardContent,
+   Chip,
 } from "@mui/material";
+
+// RP-7 (C5): in-tab section anchors. The chips scroll the
+// settings body to the matching section; scrollMarginTop on the
+// targets keeps headings clear of the top edge when they land.
+const POS_SECTIONS = [
+   { id: "pos-pricing", label: "Pricing & Fees" },
+   { id: "pos-policies", label: "Checkout Policies" },
+   { id: "pos-order-display", label: "Order Display" },
+   { id: "pos-order-defaults", label: "Order Create Defaults" },
+   { id: "pos-payment-methods", label: "Payment Methods" },
+];
+
+function scrollToSection(id: string) {
+   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 interface PosTabProps {
    values: any;
@@ -35,14 +52,49 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
             </Typography>
          </Box>
 
-         {/* Pricing & Fees */}
+         {/* RP-7 (C5): section quick-nav */}
+         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            {POS_SECTIONS.map((s) => (
+               <Chip
+                  key={s.id}
+                  label={s.label}
+                  size="small"
+                  variant="outlined"
+                  clickable
+                  onClick={() => scrollToSection(s.id)}
+               />
+            ))}
+         </Stack>
+
+         {/* Pricing & Fees — RP-7: the section gains its visible
+             heading (the C5 anchor names it) and its X2 reset. */}
+         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+            <Box>
+               <Typography variant="h6" fontWeight={600}>
+                  Pricing & Fees
+               </Typography>
+               <Typography variant="body2" color="text.secondary">
+                  Default amounts prefilled on new orders and invoices.
+               </Typography>
+            </Box>
+            <SectionResetButton
+               section="Pricing & Fees"
+               onReset={() => {
+                  onChange("defaultTaxRate", 0);
+                  onChange("defaultDeliveryCharge", 60);
+                  onChange("defaultDiscountRate", 0);
+                  onChange("invoicePrefix", "INV");
+               }}
+            />
+         </Stack>
+
          {/* P2-20: "Default Order Status" (customConfig.defaultOrderStatus)
              was removed — no order flow read it; new orders take the
              status chosen in the order form. The "Allow Partial & Due
              Payments", "Auto-trigger Receipt Print" and "Round Final
              Order Totals" toggles below were likewise write-only and
              have been removed. */}
-         <Grid container spacing={2}>
+         <Grid container spacing={2} id="pos-pricing" sx={{ scrollMarginTop: 12 }}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <TextField
                   fullWidth
@@ -107,7 +159,7 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
          </Grid>
 
-         <Box sx={{ pt: 1 }}>
+         <Box sx={{ pt: 1, scrollMarginTop: 12 }} id="pos-policies">
             <Typography variant="h6" fontWeight={600}>
                POS Checkout Policies & Controls
             </Typography>
@@ -149,13 +201,19 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
          {/* Phase 2: Order Display & Sorting (status order,
              visibility, list defaults, table columns). */}
-         <OrderDisplaySection values={values} onConfigChange={onConfigChange} />
+         <Box id="pos-order-display" sx={{ scrollMarginTop: 12 }}>
+            <OrderDisplaySection values={values} onConfigChange={onConfigChange} />
+         </Box>
 
          {/* Phase 3: Order Creation Defaults. */}
-         <OrderCreateDefaultsSection values={values} onConfigChange={onConfigChange} />
+         <Box id="pos-order-defaults" sx={{ scrollMarginTop: 12 }}>
+            <OrderCreateDefaultsSection values={values} onConfigChange={onConfigChange} />
+         </Box>
 
          {/* Phase 5: Payment Methods + default payment method. */}
-         <PaymentMethodsSection values={values} onChange={onChange} onConfigChange={onConfigChange} />
+         <Box id="pos-payment-methods" sx={{ scrollMarginTop: 12 }}>
+            <PaymentMethodsSection values={values} onChange={onChange} onConfigChange={onConfigChange} />
+         </Box>
       </Stack>
    );
 }

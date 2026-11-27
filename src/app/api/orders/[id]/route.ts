@@ -22,7 +22,7 @@ import {
    findOrderWithTxId,
    duplicateTxIdMessage,
    DuplicateTxIdError,
-   orderTxIdMethodError,
+   orderTxIdMethodErrorWithConfig,
 } from "@src/lib/payments";
 import { paymentMethodSelectionError } from "@src/lib/paymentMethods";
 import {
@@ -523,7 +523,14 @@ export async function PUT(
             carriedMethod !== undefined
                ? carriedMethod
                : existingOrder.paymentMethod;
-         const txMethodError = orderTxIdMethodError(
+         // RP-7 (X1): resolve "uses transaction IDs" from the
+         // payment-method config (explicit flag, legacy fallback).
+         const txSetting = await prisma.storeSetting.findUnique({
+            where: { id: "default" },
+            select: { customConfig: true },
+         });
+         const txMethodError = orderTxIdMethodErrorWithConfig(
+            txSetting?.customConfig,
             effectiveMethod,
             effectiveTxId,
          );

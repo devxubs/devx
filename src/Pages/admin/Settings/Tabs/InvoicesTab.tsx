@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { memo, useState } from "react";
 import {
    Grid,
    MenuItem,
@@ -49,6 +49,59 @@ const accentColorPresets = [
    { name: "Crimson Rose", hex: "#BE123C" },
    { name: "Monochrome Black", hex: "#000000" },
 ];
+
+// RP-7 (C4): card thumbnail — the ACTUAL template rendered with
+// the shared sample order at design width, scaled down and
+// centre-cropped. No image assets: it reuses InvoiceRenderer, so
+// a thumbnail can never drift from the real design. Memoized on
+// the (module-constant) template object with a fixed sample
+// customization, so it renders once and never re-renders while
+// the admin edits other fields. Decorative only — the eye button
+// remains the full preview path.
+const TemplateThumbnail = memo(function TemplateThumbnail({
+   template,
+}: {
+   template: (typeof INVOICE_TEMPLATES)[number];
+}) {
+   return (
+      <Box
+         aria-hidden
+         sx={{
+            position: "relative",
+            height: 148,
+            overflow: "hidden",
+            borderRadius: 1,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "#fff",
+            mb: 1.5,
+         }}
+      >
+         <Box
+            sx={{
+               position: "absolute",
+               top: 0,
+               left: "50%",
+               width: 680,
+               transform: "translateX(-50%) scale(0.38)",
+               transformOrigin: "top center",
+               pointerEvents: "none",
+               userSelect: "none",
+            }}
+         >
+            <InvoiceRenderer
+               order={SAMPLE_INVOICE_ORDER}
+               templateId={template.id}
+               customization={{
+                  templateId: template.id,
+                  accentColor: template.accent,
+                  paperSize: template.paperSize as any,
+               }}
+            />
+         </Box>
+      </Box>
+   );
+});
 
 export default function InvoicesTab({ values, onChange, onConfigChange }: InvoicesTabProps) {
    const customConfig = values.customConfig || {};
@@ -156,6 +209,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                            <Box sx={{ height: 6, bgcolor: template.accent }} />
 
                            <CardContent sx={{ p: 2, flexGrow: 1 }}>
+                              <TemplateThumbnail template={template} />
                               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1}>
                                  <Typography variant="subtitle1" fontWeight={700}>
                                     {template.name}
@@ -224,22 +278,17 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                These parameters apply universally to your selected invoice template when generating and printing invoices.
             </Typography>
 
-            <Grid container spacing={2.5}>
-               <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                     select
-                     fullWidth
-                     label="Invoice Language"
-                     size="small"
-                     value={values.language || "en"}
-                     onChange={(e) => onChange("language", e.target.value)}
-                     helperText="Bengali renders all invoice labels in বাংলা with a Bengali-capable font; amounts keep ৳ formatting"
-                  >
-                     <MenuItem value="en">English</MenuItem>
-                     <MenuItem value="bn">বাংলা (Bengali)</MenuItem>
-                  </TextField>
-               </Grid>
+            {/* RP-7 (C7): Store phone, address and language used to
+                be editable here as duplicates of the General Store
+                fields (same columns). They are now edited only in
+                General Store; invoices keep reading the same saved
+                values. */}
+            <Typography variant="caption" color="text.secondary" display="block" mb={2}>
+               Store phone, address and language are set once in the General Store tab and are used on invoices
+               automatically — edit them there.
+            </Typography>
 
+            <Grid container spacing={2.5}>
                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                      fullWidth
@@ -249,30 +298,6 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                      onChange={(e) => onChange("invoiceHeader", e.target.value)}
                      placeholder="Official Sales Invoice & Receipt"
                      helperText="Printed right beneath your store header"
-                  />
-               </Grid>
-
-               <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                     fullWidth
-                     label="Store Contact Phone"
-                     size="small"
-                     value={values.phone || ""}
-                     onChange={(e) => onChange("phone", e.target.value)}
-                     placeholder="+880 1700-123456"
-                     helperText="Shown on invoice header contact row"
-                  />
-               </Grid>
-
-               <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                     fullWidth
-                     label="Store Address"
-                     size="small"
-                     value={values.address || ""}
-                     onChange={(e) => onChange("address", e.target.value)}
-                     placeholder="Banani, Dhaka-1213, Bangladesh"
-                     helperText="Store location printed on the bill"
                   />
                </Grid>
 
