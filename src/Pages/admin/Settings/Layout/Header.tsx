@@ -21,6 +21,8 @@ interface HeaderProps {
    isSaving?: boolean;
    // RP-3 (U3): hide the Save action for read-only roles.
    canUpdate?: boolean;
+   // RP-4: Save is enabled (prominent) only with unsaved changes.
+   isDirty?: boolean;
    searchQuery?: string;
    onSearchChange?: (val: string) => void;
 }
@@ -30,6 +32,7 @@ const Header = ({
    onSave,
    isSaving = false,
    canUpdate = true,
+   isDirty = false,
    searchQuery = "",
    onSearchChange,
 }: HeaderProps) => {
@@ -87,7 +90,7 @@ const Header = ({
                }
                size={isSmDown ? "small" : "medium"}
                onClick={onSave}
-               disabled={isSaving}
+               disabled={isSaving || !isDirty}
             >
                {isSaving ? "Saving..." : "Save Changes"}
             </Button>

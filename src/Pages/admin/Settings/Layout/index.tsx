@@ -22,6 +22,8 @@ import Header from "./Header";
 import CustomBox from "@src/components/CustomBox";
 import { useSettings } from "@src/lib/settingsContext";
 import { useSnackbar } from "@src/lib/snackbarContext";
+import { isSettingsFormDirty } from "@src/lib/settingsDirty";
+import AlertDialog from "@src/components/AlertDialog";
 
 import GeneralTab from "../Tabs/GeneralTab";
 import PosTab from "../Tabs/PosTab";
@@ -125,11 +127,40 @@ const Layout = () => {
 
    const [showSidebar, setShowSidebar] = useState(false);
 
+   // RP-4: unsaved-changes tracking. `baseline` is a deep snapshot
+   // of the last loaded/saved settings, taken in the same effect
+   // that (re)populates the form — so initial load and hydration
+   // are never dirty, a successful save re-baselines via the
+   // context round-trip, and reverting every edit compares equal
+   // again. The form state is single and global across tabs, so
+   // edits survive tab switches and stay tracked.
+   const [baseline, setBaseline] = useState<any>(null);
+   const [discardOpen, setDiscardOpen] = useState(false);
+
    useEffect(() => {
       if (settings) {
          setFormValues({ ...settings });
+         setBaseline(JSON.parse(JSON.stringify(settings)));
       }
    }, [settings]);
+
+   const isDirty =
+      canUpdate && !loading && isSettingsFormDirty(formValues, baseline);
+
+   // RP-4: warn on refresh / tab close / hard navigation while
+   // dirty (the browser's native beforeunload prompt). The
+   // listener exists only while dirty, so a clean page never
+   // prompts. In-app tab switches keep the form state and need
+   // no warning — nothing is lost.
+   useEffect(() => {
+      if (!isDirty) return;
+      const handler = (e: BeforeUnloadEvent) => {
+         e.preventDefault();
+         e.returnValue = "";
+      };
+      window.addEventListener("beforeunload", handler);
+      return () => window.removeEventListener("beforeunload", handler);
+   }, [isDirty]);
 
    const handleChange = (field: string, value: any) => {
       setFormValues((prev: any) => ({
@@ -149,11 +180,17 @@ const Layout = () => {
    };
 
    const handleSave = async () => {
+      // RP-4: no duplicate submissions while a save is in flight.
+      if (isSaving) return;
       setIsSaving(true);
       try {
          const success = await updateSettings(formValues);
          if (success) {
             showSnackbar("Store settings saved and updated successfully!", "success");
+            // The context now holds the saved settings; the sync
+            // effect above re-populates the form and the baseline
+            // from it, which clears the dirty state. On failure
+            // nothing is touched — edits and the dirty state stay.
          } else {
             const serverError = getLastSaveError();
             showSnackbar(
@@ -168,6 +205,21 @@ const Layout = () => {
       } finally {
          setIsSaving(false);
       }
+   };
+
+   // RP-4: Discard asks first; confirming restores the baseline
+   // snapshot (the last saved values as loaded), cancelling keeps
+   // every edit. The server is never touched by Discard.
+   const handleDiscard = () => {
+      if (!isDirty || isSaving) return;
+      setDiscardOpen(true);
+   };
+
+   const confirmDiscard = () => {
+      if (baseline) {
+         setFormValues(JSON.parse(JSON.stringify(baseline)));
+      }
+      setDiscardOpen(false);
    };
 
    const handleResetDefaults = async (): Promise<boolean> => {
@@ -294,6 +346,7 @@ const Layout = () => {
                onSave={handleSave}
                isSaving={isSaving}
                canUpdate={canUpdate}
+               isDirty={isDirty}
                searchQuery={searchQuery}
                onSearchChange={setSearchQuery}
             />
@@ -370,7 +423,11 @@ const Layout = () => {
                 to the bottom of the settings column with its own
                 stacking layer and no flex compression, so it can
                 never ride over the tab content when the shell's
-                height maths differs from this page's 100vh calc. */}
+                height maths differs from this page's 100vh calc.
+                RP-4: hidden entirely on the tabs that hold no
+                editable settings fields (customers, appearance,
+                permissions) — there is nothing to save there. */}
+            {!["customers", "appearance", "permissions"].includes(selectedTab) && (
             <Paper
                elevation={3}
                sx={{
@@ -388,16 +445,28 @@ const Layout = () => {
                   flexShrink: 0,
                }}
             >
-               <Typography variant="caption" color="text.secondary">
-                  Default currency: <strong>{formValues.currency || "BDT"} ({formValues.currencySymbol || "৳"})</strong> • Changes apply across entire POS system
-               </Typography>
+               <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Typography variant="caption" color="text.secondary">
+                     Default currency: <strong>{formValues.currency || "BDT"} ({formValues.currencySymbol || "৳"})</strong> • Changes apply across entire POS system
+                  </Typography>
+                  {/* RP-4: the unsaved-changes indicator. */}
+                  {isDirty && (
+                     <Chip
+                        label="Unsaved changes"
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                     />
+                  )}
+               </Stack>
                {canUpdate ? (
                   <Stack direction="row" spacing={1.5}>
                      <Button
                         variant="outlined"
                         color="inherit"
                         size="small"
-                        onClick={() => setFormValues({ ...settings })}
+                        onClick={handleDiscard}
+                        disabled={!isDirty || isSaving}
                      >
                         Discard Changes
                      </Button>
@@ -413,7 +482,7 @@ const Layout = () => {
                            )
                         }
                         onClick={handleSave}
-                        disabled={isSaving}
+                        disabled={!isDirty || isSaving}
                      >
                         {isSaving ? "Saving..." : "Save Settings"}
                      </Button>
@@ -423,6 +492,18 @@ const Layout = () => {
                   <Chip label="Read-only" size="small" variant="outlined" />
                )}
             </Paper>
+            )}
+
+            {/* RP-4: Discard confirmation. */}
+            <AlertDialog
+               open={discardOpen}
+               onClose={() => setDiscardOpen(false)}
+               type="warning"
+               title="Discard unsaved changes? Your edits will be replaced with the last saved values."
+               onConfirm={confirmDiscard}
+               confirmText="Discard changes"
+               cancelText="Keep editing"
+            />
          </Stack>
       </Stack>
    );
