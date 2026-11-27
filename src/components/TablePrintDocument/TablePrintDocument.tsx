@@ -9,6 +9,7 @@ import type { ExportColumn, SummaryRowItem } from "@src/lib/exportColumns";
 import { getColField, getColHeader } from "@src/lib/exportColumns";
 import { StoreSettings } from "@src/lib/settingsContext";
 import InvoiceRenderer from "../InvoiceTemplates/InvoiceRenderer";
+import { applyInvoiceTemplateSelection } from "@src/lib/customInvoiceTemplates";
 import { InvoiceOrderData } from "../InvoiceTemplates/types";
 import Barcode from "../Barcode";
 
@@ -116,20 +117,23 @@ export default function TablePrintDocument({
                >
                   <InvoiceRenderer
                      order={orderData}
-                     customization={{
-                        ...settings,
-                        ...(settings?.customConfig || {}),
-                        // P2-20: the Settings invoice template choice
-                        // is persisted as customConfig.invoiceTemplateId
-                        // (legacy: a root invoiceTemplateId field); the
-                        // renderer selects on `templateId`, which
-                        // nothing used to pass — the chosen template
-                        // never reached a real print.
-                        templateId:
-                           settings?.customConfig?.invoiceTemplateId ||
-                           (settings as any)?.invoiceTemplateId ||
-                           undefined,
-                     }}
+                     customization={applyInvoiceTemplateSelection(
+                        {
+                           ...settings,
+                           ...(settings?.customConfig || {}),
+                           // P2-20: the Settings invoice template choice
+                           // is persisted as customConfig.invoiceTemplateId
+                           // (legacy: a root invoiceTemplateId field); the
+                           // renderer selects on `templateId`, which
+                           // nothing used to pass — the chosen template
+                           // never reached a real print.
+                           templateId:
+                              settings?.customConfig?.invoiceTemplateId ||
+                              (settings as any)?.invoiceTemplateId ||
+                              undefined,
+                        },
+                        settings?.customConfig,
+                     )}
                   />
                </div>
             ))}

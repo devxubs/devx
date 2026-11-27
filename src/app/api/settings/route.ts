@@ -7,6 +7,7 @@ import { validateDecreaseStockOnInConfig } from "@src/lib/productSettings";
 import { validateOrderCreateDefaultsInConfig } from "@src/lib/orderStatusDisplay";
 import { validatePrefixSettingValue } from "@src/lib/idGenerator";
 import { validatePaymentMethodsInConfig } from "@src/lib/paymentMethods";
+import { validateCustomInvoiceTemplatesInConfig } from "@src/lib/customInvoiceTemplates";
 import {
    logAudit,
    auditActorFromContext,
@@ -178,6 +179,12 @@ export async function GET(request: NextRequest) {
             "showTermsOnReceipt",
             "showLogoOnReceipt",
             "showBarcodeOnReceipt",
+            // Cleanup Phase 2: custom invoice templates — the
+            // print path resolves the selected template through
+            // this list for every role; without it a staff print
+            // of a custom-template invoice would fall back to
+            // the base layout (the RP-3 F1 failure mode).
+            "customInvoiceTemplates",
          ]) {
             if (key in cfg) scrubbed[key] = cfg[key];
          }
@@ -373,6 +380,17 @@ export async function PUT(request: NextRequest) {
          if (!paymentMethodsVerdict.ok) {
             return NextResponse.json(
                { error: "Validation error", message: paymentMethodsVerdict.message },
+               { status: 400 },
+            );
+         }
+         // Cleanup Phase 2: the custom invoice template list is
+         // validated the same way (well-formed entries, unique
+         // ids, real built-in base templates).
+         const customTemplatesVerdict =
+            validateCustomInvoiceTemplatesInConfig(body.customConfig);
+         if (!customTemplatesVerdict.ok) {
+            return NextResponse.json(
+               { error: "Validation error", message: customTemplatesVerdict.message },
                { status: 400 },
             );
          }
