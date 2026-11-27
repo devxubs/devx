@@ -16,6 +16,7 @@ import Logo from "@src/SvgIcon/logo";
 import LogoNameIcon from "@src/SvgIcon/logoName";
 import CustomBox from "@src/components/CustomBox";
 import ChatIcon from "@src/SvgIcon/ChatIcon";
+import SidebarAccount from "./SidebarAccount";
 
 // Phase 2 (2.2): permission-filtered navigation. Each item names the
 // permission family that governs it, using ONLY keys that exist in the
@@ -270,6 +271,9 @@ const Sidebar = () => {
       boolean
    > | null>(null);
    const [isAdmin, setIsAdmin] = useState(false);
+   // The sidebar account section (bottom) shows the same /me
+   // identity — one fetch serves both.
+   const [user, setUser] = useState<any>(null);
 
    useEffect(() => {
       let cancelled = false;
@@ -284,6 +288,7 @@ const Sidebar = () => {
             setIsAdmin(
                perms["all"] === true || data.user.role === "System Admin",
             );
+            setUser(data.user);
          })
          .catch(() => {});
       return () => {
@@ -420,6 +425,22 @@ const Sidebar = () => {
                />
             </Box>
          </Stack>
+
+         {/* Account section — pinned below the scrolling nav
+             (the nav Stack above is flex:1 with overflow auto,
+             so this stays at the bottom of the sidebar). */}
+         <SidebarAccount
+            user={user}
+            layout={layout}
+            canSeeSettings={visibleItems.some(
+               (i) => i.url === "/admin/settings",
+            )}
+            onNavigate={() => {
+               if (isSmDown) {
+                  globalState.set("layoutFull", false);
+               }
+            }}
+         />
       </Stack>
    );
 

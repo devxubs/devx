@@ -1,7 +1,6 @@
 "use client";
 import {
    alpha,
-   Avatar,
    Badge,
    IconButton,
    keyframes,
@@ -12,16 +11,12 @@ import {
    useTheme,
    Slide,
 } from "@mui/material";
-import AnimatedAvatar from "@src/components/AnimateAvatar";
 import Icon from "@src/components/Icon";
 import React, { useState } from "react";
 import SearchBar from "./SearchBar";
 import NotificationDrawer from "./NotificationDrawer";
 import NotificationToast from "./NotificationToast";
-import CustomPopover from "@src/components/CustomPopover";
-import Menu from "@src/components/Menu";
 import SettingsDrawer from "./Settings";
-import Profile from "./Profile";
 import { usePathname } from "next/navigation";
 import useGlobalState from "@src/handler/globalState";
 import CustomBox from "@src/components/CustomBox";
@@ -41,7 +36,6 @@ const Header = () => {
 
    const [openNotification, setOpenNotification] = useState(false);
    const [unreadCount, setUnreadCount] = useState(0);
-   const [openProfile, setOpenProfile] = useState(false);
    const [openSettings, setOpenSettings] = useState(false);
 
    // Phase 2 (2.11): the Settings → Appearance tab delegates to this
@@ -51,7 +45,6 @@ const Header = () => {
       window.addEventListener("devx:open-appearance", open);
       return () => window.removeEventListener("devx:open-appearance", open);
    }, []);
-   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
    const [openSearch, setOpenSearch] = useState(false);
 
    // Runtime-fix: toast on genuinely new notifications. The poll
@@ -152,10 +145,6 @@ const Header = () => {
       };
    }, [refreshUnreadCount]);
 
-   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-      setAnchorEl(event.currentTarget);
-   };
-
    const globalState = useGlobalState();
 
    const rotate = keyframes`
@@ -254,35 +243,11 @@ const Header = () => {
                   </Badge>
                </IconButton>
 
-               {/* User Menu */}
-               <CustomPopover
-                  anchorEl={anchorEl}
-                  onClose={() => setAnchorEl(null)}
-                  anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                  transformOrigin={{ vertical: "top", horizontal: "right" }}
-               >
-                  <Menu
-                     item={[
-                        {
-                           label: "Alice Johnson",
-                           icon: (
-                              <Avatar
-                                 src="/images/avatar/alice.jpg"
-                                 sx={{ width: 35, height: 35 }}
-                              />
-                           ),
-                        },
-                     ]}
-                     size="large"
-                  />
-               </CustomPopover>
-               {/* User Menu for Active user */}
-               <IconButton
-                  sx={{ color: "text.secondary" }}
-                  onClick={(e) => handleMenuOpen(e)}
-               >
-                  <Icon icon="solar:users-group-rounded-bold" />
-               </IconButton>
+               {/* The user account menu lives at the bottom of
+                   the sidebar (SidebarAccount) — it was removed
+                   from the header, including the old profile
+                   drawer and the placeholder "Alice Johnson"
+                   popover. */}
 
                {/* Settings */}
                <SettingsDrawer
@@ -300,21 +265,6 @@ const Header = () => {
                   <Icon icon="solar:settings-bold-duotone" />
                </IconButton>
 
-               {/* Profile */}
-               <Profile
-                  open={openProfile}
-                  onOpen={() => setOpenProfile(true)}
-                  onClose={() => setOpenProfile(false)}
-               />
-               <IconButton
-                  disableRipple
-                  disableFocusRipple
-                  disableTouchRipple
-                  sx={{ p: 0 }}
-                  onClick={() => setOpenProfile(!openProfile)}
-               >
-                  <AnimatedAvatar src="https://pub-c5e31b5cdafb419fb247a8ac2e78df7a.r2.dev/public/assets/images/mock/avatar/avatar-25.webp" />
-               </IconButton>
             </Stack>
          </Paper>
 
