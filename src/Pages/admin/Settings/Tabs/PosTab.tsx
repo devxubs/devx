@@ -14,23 +14,13 @@ import {
    Divider,
    FormControlLabel,
    Switch,
-   Chip,
 } from "@mui/material";
 
-// RP-7 (C5): in-tab section anchors. The chips scroll the
-// settings body to the matching section; scrollMarginTop on the
-// targets keeps headings clear of the top edge when they land.
-const POS_SECTIONS = [
-   { id: "pos-pricing", label: "Pricing & Fees" },
-   { id: "pos-policies", label: "Checkout Policies" },
-   { id: "pos-order-display", label: "Order Display" },
-   { id: "pos-order-defaults", label: "Order Create Defaults" },
-   { id: "pos-payment-methods", label: "Payment Methods" },
-];
-
-function scrollToSection(id: string) {
-   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
+// RP-7 (C5) history: this tab briefly carried a chip row that
+// scrolled to in-tab section anchors. The owner later asked for
+// the quick navigation to be removed again — the chips, the
+// POS_SECTIONS list, the scroll helper and the section anchor
+// ids were all deleted; the sections below are plain content.
 
 interface PosTabProps {
    values: any;
@@ -50,22 +40,8 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
              subtle divider between sections, no per-section
              cards. */}
 
-         {/* RP-7 (C5): section quick-nav */}
-         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            {POS_SECTIONS.map((s) => (
-               <Chip
-                  key={s.id}
-                  label={s.label}
-                  size="small"
-                  variant="outlined"
-                  clickable
-                  onClick={() => scrollToSection(s.id)}
-               />
-            ))}
-         </Stack>
-
          {/* Pricing & Fees — RP-7: the section gains its visible
-             heading (the C5 anchor names it) and its X2 reset. */}
+             heading and its X2 reset. */}
          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
             <Typography variant="h6" fontWeight={600}>
                Pricing & Fees
@@ -87,7 +63,7 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
              Payments", "Auto-trigger Receipt Print" and "Round Final
              Order Totals" toggles below were likewise write-only and
              have been removed. */}
-         <Grid container spacing={2} id="pos-pricing" sx={{ scrollMarginTop: 12 }}>
+         <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                <TextField
                   fullWidth
@@ -151,7 +127,7 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
          <Divider />
 
-         <Box sx={{ scrollMarginTop: 12 }} id="pos-policies">
+         <Box>
             <Typography variant="h6" fontWeight={600} sx={{ mb: 1.5 }}>
                POS Checkout Policies & Controls
             </Typography>
@@ -183,21 +159,21 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
 
          {/* Phase 2: Order Display & Sorting (status order,
              visibility, list defaults, table columns). */}
-         <Box id="pos-order-display" sx={{ scrollMarginTop: 12 }}>
+         <Box>
             <OrderDisplaySection values={values} onConfigChange={onConfigChange} />
          </Box>
 
          <Divider />
 
          {/* Phase 3: Order Creation Defaults. */}
-         <Box id="pos-order-defaults" sx={{ scrollMarginTop: 12 }}>
+         <Box>
             <OrderCreateDefaultsSection values={values} onConfigChange={onConfigChange} />
          </Box>
 
          <Divider />
 
          {/* Phase 5: Payment Methods + default payment method. */}
-         <Box id="pos-payment-methods" sx={{ scrollMarginTop: 12 }}>
+         <Box>
             <PaymentMethodsSection values={values} onChange={onChange} onConfigChange={onConfigChange} />
          </Box>
       </Stack>

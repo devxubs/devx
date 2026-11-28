@@ -104,6 +104,15 @@ function MoveButtons({
  * content in the tab's continuous form (no card wrapper), and
  * the modal (configuration controls only, no preview inside)
  * renders separately through its portal.
+ *
+ * Status Order split: the editor is TWO modals — Status Order
+ * & Visibility has its own dedicated modal (order + picker
+ * visibility only), and List Defaults & Columns (default
+ * statuses + table columns) keeps a separate one. Each modal
+ * snapshots ONLY its own config keys when it opens, so
+ * cancelling one can never discard the other's edits; "Done"
+ * on either keeps the edits in the form for the shared
+ * Settings Save, exactly as the single modal behaved.
  */
 export default function OrderDisplaySection({
    values,
@@ -117,28 +126,43 @@ export default function OrderDisplaySection({
    const defaultStatuses = resolveOrderListDefaultStatuses(config);
    const columnLayout = resolveOrderTableColumns(config, ALL_COLUMN_FIELDS);
 
-   const [editOpen, setEditOpen] = useState(false);
-   const snapshotRef = useRef<Record<string, any> | null>(null);
+   const [statusEditOpen, setStatusEditOpen] = useState(false);
+   const statusSnapshotRef = useRef<Record<string, any> | null>(null);
+   const [displayEditOpen, setDisplayEditOpen] = useState(false);
+   const displaySnapshotRef = useRef<Record<string, any> | null>(null);
 
-   const openEdit = () => {
-      snapshotRef.current = {
+   const restoreSnapshot = (snap: Record<string, any> | null) => {
+      if (!snap) return;
+      for (const key of Object.keys(snap)) {
+         onConfigChange(key, snap[key]);
+      }
+   };
+
+   const openStatusEdit = () => {
+      statusSnapshotRef.current = {
          [ORDER_STATUS_ORDER_KEY]: config?.[ORDER_STATUS_ORDER_KEY],
          [ORDER_STATUS_HIDDEN_KEY]: config?.[ORDER_STATUS_HIDDEN_KEY],
+      };
+      setStatusEditOpen(true);
+   };
+
+   const cancelStatusEdit = () => {
+      restoreSnapshot(statusSnapshotRef.current);
+      setStatusEditOpen(false);
+   };
+
+   const openDisplayEdit = () => {
+      displaySnapshotRef.current = {
          [ORDER_LIST_DEFAULT_STATUSES_KEY]:
             config?.[ORDER_LIST_DEFAULT_STATUSES_KEY],
          [ORDER_TABLE_COLUMNS_KEY]: config?.[ORDER_TABLE_COLUMNS_KEY],
       };
-      setEditOpen(true);
+      setDisplayEditOpen(true);
    };
 
-   const cancelEdit = () => {
-      const snap = snapshotRef.current;
-      if (snap) {
-         for (const key of Object.keys(snap)) {
-            onConfigChange(key, snap[key]);
-         }
-      }
-      setEditOpen(false);
+   const cancelDisplayEdit = () => {
+      restoreSnapshot(displaySnapshotRef.current);
+      setDisplayEditOpen(false);
    };
 
    const writeHidden = (
@@ -167,84 +191,109 @@ export default function OrderDisplaySection({
 
    return (
       <>
-         {/* ── Section preview (independent of the modal) ── */}
+         {/* ── Section preview (independent of the modals) ── */}
          <Stack spacing={1.5}>
+               <Box>
+                  <Typography variant="h6" fontWeight={600}>
+                     Order Display &amp; Sorting
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                     Status order, picker visibility, list defaults and
+                     table columns for orders.
+                  </Typography>
+               </Box>
+
+               {/* Status order preview — Edit opens the dedicated
+                   Status Order modal. */}
                <Stack
                   direction="row"
                   justifyContent="space-between"
                   alignItems="flex-start"
                   spacing={2}
                >
-                  <Box>
-                     <Typography variant="h6" fontWeight={600}>
-                        Order Display &amp; Sorting
-                     </Typography>
-                     <Typography variant="body2" color="text.secondary">
-                        Status order, picker visibility, list defaults and
-                        table columns for orders.
-                     </Typography>
-                  </Box>
+                  <Typography variant="body2" sx={{ pt: 0.75 }}>
+                     <strong>Status order:</strong>{" "}
+                     {statusOrder
+                        .map((s) => ORDER_STATUS_LABELS[s])
+                        .join(" · ")}
+                  </Typography>
                   <Button
                      variant="outlined"
                      size="small"
+                     aria-label="Edit status order"
                      startIcon={
                         <Icon icon="solar:pen-2-bold-duotone" size="small" />
                      }
-                     onClick={openEdit}
+                     onClick={openStatusEdit}
                      sx={{ whiteSpace: "nowrap" }}
                   >
                      Edit
                   </Button>
                </Stack>
 
-               {/* ── Compact preview ── */}
-               <Stack spacing={0.75}>
-                  <Typography variant="body2">
-                     <strong>Status order:</strong>{" "}
-                     {statusOrder
-                        .map((s) => ORDER_STATUS_LABELS[s])
-                        .join(" · ")}
-                  </Typography>
-                  <Stack
-                     direction="row"
-                     spacing={0.75}
-                     alignItems="center"
-                     useFlexGap
-                     flexWrap="wrap"
-                  >
-                     <Typography variant="body2">
-                        <strong>List opens with:</strong>
-                     </Typography>
-                     {defaultStatuses.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">
-                           All statuses
+               {/* List defaults + columns preview — Edit opens the
+                   List Defaults & Columns modal. */}
+               <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="flex-start"
+                  spacing={2}
+               >
+                  <Stack spacing={0.75}>
+                     <Stack
+                        direction="row"
+                        spacing={0.75}
+                        alignItems="center"
+                        useFlexGap
+                        flexWrap="wrap"
+                     >
+                        <Typography variant="body2">
+                           <strong>List opens with:</strong>
                         </Typography>
-                     ) : (
-                        defaultStatuses.map((s) => (
-                           <Chip
-                              key={s}
-                              label={ORDER_STATUS_LABELS[s]}
-                              size="small"
-                              variant="outlined"
-                           />
-                        ))
-                     )}
+                        {defaultStatuses.length === 0 ? (
+                           <Typography variant="body2" color="text.secondary">
+                              All statuses
+                           </Typography>
+                        ) : (
+                           defaultStatuses.map((s) => (
+                              <Chip
+                                 key={s}
+                                 label={ORDER_STATUS_LABELS[s]}
+                                 size="small"
+                                 variant="outlined"
+                              />
+                           ))
+                        )}
+                     </Stack>
+                     <Typography variant="body2">
+                        <strong>Visibility:</strong>{" "}
+                        {hiddenInCreate.size} hidden in Create,{" "}
+                        {hiddenInFilter.size} hidden in Filters ·{" "}
+                        <strong>Columns:</strong> {visibleColumns} of{" "}
+                        {columnLayout.order.length} visible
+                     </Typography>
                   </Stack>
-                  <Typography variant="body2">
-                     <strong>Visibility:</strong>{" "}
-                     {hiddenInCreate.size} hidden in Create,{" "}
-                     {hiddenInFilter.size} hidden in Filters ·{" "}
-                     <strong>Columns:</strong> {visibleColumns} of{" "}
-                     {columnLayout.order.length} visible
-                  </Typography>
+                  <Button
+                     variant="outlined"
+                     size="small"
+                     aria-label="Edit list defaults and columns"
+                     startIcon={
+                        <Icon icon="solar:pen-2-bold-duotone" size="small" />
+                     }
+                     onClick={openDisplayEdit}
+                     sx={{ whiteSpace: "nowrap" }}
+                  >
+                     Edit
+                  </Button>
                </Stack>
          </Stack>
 
-         {/* ── Editor modal (sibling of the preview) ── */}
+         {/* ── Status Order modal (dedicated: order + visibility
+             controls only; the preview stays on the page) ── */}
          <CustomModal
-            open={editOpen}
-            onClose={cancelEdit}
-            title="Order Display & Sorting"
+            open={statusEditOpen}
+            onClose={cancelStatusEdit}
+            title="Status Order & Visibility"
             size="lg"
             closeIcon
          >
@@ -254,11 +303,8 @@ export default function OrderDisplaySection({
                   <Stack
                      direction="row"
                      alignItems="center"
-                     justifyContent="space-between"
+                     justifyContent="flex-end"
                   >
-                     <Typography variant="subtitle2" fontWeight={600}>
-                        Status Order &amp; Visibility
-                     </Typography>
                      <Button
                         size="small"
                         onClick={() => {
@@ -345,6 +391,39 @@ export default function OrderDisplaySection({
                   ))}
                </Stack>
 
+               {/* ── Status modal footer ── */}
+               <Stack
+                  direction="row"
+                  justifyContent="flex-end"
+                  spacing={1.5}
+                  sx={{ pt: 1 }}
+               >
+                  <Button
+                     variant="outlined"
+                     color="inherit"
+                     onClick={cancelStatusEdit}
+                  >
+                     Cancel
+                  </Button>
+                  <Button
+                     variant="contained"
+                     onClick={() => setStatusEditOpen(false)}
+                  >
+                     Done
+                  </Button>
+               </Stack>
+            </Stack>
+         </CustomModal>
+
+         {/* ── List Defaults & Columns modal ── */}
+         <CustomModal
+            open={displayEditOpen}
+            onClose={cancelDisplayEdit}
+            title="List Defaults & Columns"
+            size="lg"
+            closeIcon
+         >
+            <Stack spacing={2.5} sx={{ mt: 1 }}>
                {/* ── Order List default statuses ── */}
                <Stack spacing={1}>
                   <Typography variant="subtitle2" fontWeight={600}>
@@ -468,25 +547,23 @@ export default function OrderDisplaySection({
                      size="small"
                      color="inherit"
                      onClick={() => {
-                        onConfigChange(ORDER_STATUS_ORDER_KEY, undefined);
-                        onConfigChange(ORDER_STATUS_HIDDEN_KEY, undefined);
                         onConfigChange(ORDER_LIST_DEFAULT_STATUSES_KEY, undefined);
                         onConfigChange(ORDER_TABLE_COLUMNS_KEY, undefined);
                      }}
                   >
-                     Reset all
+                     Reset list &amp; columns
                   </Button>
                   <Stack direction="row" spacing={1.5}>
                      <Button
                         variant="outlined"
                         color="inherit"
-                        onClick={cancelEdit}
+                        onClick={cancelDisplayEdit}
                      >
                         Cancel
                      </Button>
                      <Button
                         variant="contained"
-                        onClick={() => setEditOpen(false)}
+                        onClick={() => setDisplayEditOpen(false)}
                      >
                         Done
                      </Button>
