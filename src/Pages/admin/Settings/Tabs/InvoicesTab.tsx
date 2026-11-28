@@ -503,6 +503,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                <SettingsField
                   label="Warranty Terms & Conditions"
                   helper="Shown on invoices while 'Print Return & Warranty Terms' is switched on below."
+                  width="wide"
                >
                   <TextField
                      fullWidth
@@ -933,6 +934,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                         <SettingsField
                            label="Warranty Terms & Conditions"
                            helper="Terms text printed by this template when terms are shown."
+                           width="wide"
                         >
                            <TextField
                               fullWidth

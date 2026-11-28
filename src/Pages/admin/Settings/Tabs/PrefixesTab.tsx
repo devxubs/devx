@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import Icon from "@src/components/Icon";
 import SectionResetButton from "./SectionResetButton";
+import { SETTINGS_FIELD_MAX_WIDTH } from "./SettingsField";
 
 interface PrefixesTabProps {
    values: any;
@@ -102,7 +103,7 @@ export default function PrefixesTab({ values, onChange }: PrefixesTabProps) {
                const error = prefixError(String(currentPrefix ?? ""));
 
                return (
-                  <Stack spacing={0.75} key={item.key}>
+                  <Stack spacing={0.75} key={item.key} sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>
                      <Stack direction="row" alignItems="center" spacing={1}>
                         <Box
                            sx={{

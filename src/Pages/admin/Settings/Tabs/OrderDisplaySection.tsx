@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import CustomModal from "@src/components/Modal";
+import { SETTINGS_FIELD_MAX_WIDTH } from "./SettingsField";
 import Icon from "@src/components/Icon";
 import {
    ORDER_LIST_DEFAULT_STATUSES_KEY,
@@ -279,7 +280,10 @@ export default function OrderDisplaySection({
                    standard). */}
                <Grid container spacing={2}>
                   <Grid size={12}>
-                     <Stack spacing={0.75}>
+                     <Stack
+                        spacing={0.75}
+                        sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}
+                     >
                         <Typography
                            variant="body2"
                            fontSize={13}

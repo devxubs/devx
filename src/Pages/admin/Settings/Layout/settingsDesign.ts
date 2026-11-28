@@ -67,6 +67,17 @@ export const settingsDesignSx = (theme: Theme) => ({
          ),
       },
    },
+   // MUI Autocomplete pads its root 11px vertically (vs the
+   // 8px above), which made autocomplete fields 42px tall next
+   // to 36px text fields. Normalize them to the same 8px so
+   // every Settings control shares one height. Left/right
+   // padding is MUI's own (it reserves room for the popup
+   // button) and is left alone; chip rows in multiple
+   // autocompletes keep their own internal spacing.
+   "& .MuiAutocomplete-root .MuiOutlinedInput-root": {
+      paddingTop: "8px !important",
+      paddingBottom: "8px !important",
+   },
    // Floating labels: one size and weight everywhere, muted
    // until the field is focused.
    "& .MuiInputLabel-outlined": {

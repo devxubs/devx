@@ -231,6 +231,7 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             <SettingsField
                label="Business Address"
                helper="The full business address printed on invoices and documents."
+               width="wide"
             >
                <TextField
                   fullWidth

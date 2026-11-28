@@ -17,6 +17,7 @@ import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import CustomModal from "@src/components/Modal";
 import SectionResetButton from "./SectionResetButton";
+import { SETTINGS_FIELD_MAX_WIDTH } from "./SettingsField";
 import {
    PAYMENT_METHODS_KEY,
    PaymentMethodConfig,
@@ -206,7 +207,7 @@ export default function PaymentMethodsSection({
                   </Stack>
                </Stack>
 
-               <Stack spacing={0.75}>
+               <Stack spacing={0.75} sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>
                   <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Default Payment Method
                   </Typography>

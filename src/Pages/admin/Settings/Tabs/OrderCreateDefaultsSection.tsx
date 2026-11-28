@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionResetButton from "./SectionResetButton";
+import { SETTINGS_FIELD_MAX_WIDTH } from "./SettingsField";
 import { orderSources } from "@src/Pages/admin/Order/data";
 import {
    ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY,
@@ -136,7 +137,7 @@ export default function OrderCreateDefaultsSection({
                   />
                </Stack>
 
-               <Stack spacing={0.75}>
+               <Stack spacing={0.75} sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>
                   <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Default Product
                   </Typography>
@@ -169,7 +170,7 @@ export default function OrderCreateDefaultsSection({
                   </Typography>
                </Stack>
 
-               <Stack spacing={0.75}>
+               <Stack spacing={0.75} sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>
                   <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Default Source
                   </Typography>
@@ -191,7 +192,7 @@ export default function OrderCreateDefaultsSection({
                   </Typography>
                </Stack>
 
-               <Stack spacing={0.75}>
+               <Stack spacing={0.75} sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>
                   <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">
                      Default Status
                   </Typography>
