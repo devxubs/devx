@@ -2,7 +2,6 @@
 
 import React, { useRef, useState } from "react";
 import {
-   Grid,
    Stack,
    TextField,
    Typography,
@@ -19,6 +18,7 @@ import CustomAutocomplete from "@src/components/Autocomplete";
 import { uploadImageFile } from "@src/lib/uploadImage";
 import { useSnackbar } from "@src/lib/snackbarContext";
 import SectionResetButton from "./SectionResetButton";
+import SettingsField from "./SettingsField";
 
 interface GeneralTabProps {
    values: any;
@@ -175,55 +175,65 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             />
          </Stack>
 
-         {/* Store Identity */}
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
+         {/* Store Identity — global field standard: one field
+             per row, label above, placeholder inside, helper
+             text below (SettingsField). */}
+         <Stack spacing={2.5}>
+            <SettingsField
+               label="Store Name"
+               helper="The store name shown on invoices, receipts and exports."
+            >
                <TextField
                   fullWidth
-                  label="Store Name"
                   size="small"
                   value={values.storeName || ""}
                   onChange={(e) => onChange("storeName", e.target.value)}
                   placeholder="DevX POS"
                />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            </SettingsField>
+            <SettingsField
+               label="Store Tagline / Slogan"
+               helper="A short line shown with the store name where the design supports it."
+            >
                <TextField
                   fullWidth
-                  label="Store Tagline / Slogan"
                   size="small"
                   value={values.tagline || ""}
                   onChange={(e) => onChange("tagline", e.target.value)}
                   placeholder="Smart Retail & Point of Sale"
                />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
+            </SettingsField>
+            <SettingsField
+               label="Store Email"
+               helper="Contact email printed on invoices and used for store correspondence."
+            >
                <TextField
                   fullWidth
-                  label="Store Email"
                   size="small"
                   type="email"
                   value={values.email || ""}
                   onChange={(e) => onChange("email", e.target.value)}
                   placeholder="contact@devxpos.com"
                />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            </SettingsField>
+            <SettingsField
+               label="Store Phone / Hotline"
+               helper="Contact number printed on invoices and receipts."
+            >
                <TextField
                   fullWidth
-                  label="Store Phone / Hotline"
                   size="small"
                   value={values.phone || ""}
                   onChange={(e) => onChange("phone", e.target.value)}
                   placeholder="+880 1700-123456"
                />
-            </Grid>
-
-            <Grid size={12}>
+            </SettingsField>
+            <SettingsField
+               label="Business Address"
+               helper="The full business address printed on invoices and documents."
+            >
                <TextField
                   fullWidth
-                  label="Business Address"
                   size="small"
                   multiline
                   rows={2}
@@ -231,7 +241,7 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   onChange={(e) => onChange("address", e.target.value)}
                   placeholder="House 42, Road 11, Banani, Dhaka-1213, Bangladesh"
                />
-            </Grid>
+            </SettingsField>
 
             {/* Store Logo — compact upload box (drag & drop +
                 click to browse), following the product media
@@ -240,10 +250,10 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                 uploaded "/uploads/…" path, or a legacy URL/data-
                 URL from before — all keep rendering in invoices,
                 print and exports exactly as they did). */}
-            <Grid size={12}>
-               <Typography variant="subtitle2" fontWeight={600} mb={1}>
-                  Store Logo
-               </Typography>
+            <SettingsField
+               label="Store Logo"
+               helper="Used on invoices, printouts and exports. PNG, JPEG, WebP, GIF or AVIF, up to 5 MB."
+            >
                <Box
                   {...logoDragHandlers}
                   sx={{
@@ -437,8 +447,8 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                      onChange={(e) => handleLogoFile(e.target.files?.[0])}
                   />
                </Box>
-            </Grid>
-         </Grid>
+            </SettingsField>
+         </Stack>
 
          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ pt: 1 }}>
             <Typography variant="h6" fontWeight={600}>
@@ -455,12 +465,14 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             />
          </Stack>
 
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+         <Stack spacing={2.5}>
+            <SettingsField
+               label="Default Currency"
+               helper="The currency used for prices, totals and reports across the store."
+            >
                <CustomAutocomplete
                   arrow
                   size="small"
-                  label="Default Currency"
                   options={currencies}
                   getOptionLabel={(o: any) => o?.label || ""}
                   isOptionEqualToValue={(a: any, b: any) => a?.code === b?.code}
@@ -471,13 +483,16 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                      onChange("currency", next.code);
                      onChange("currencySymbol", next.symbol);
                   }}
+                  placeholder="Select currency"
                />
-            </Grid>
+            </SettingsField>
 
-            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <SettingsField
+               label="Currency Symbol"
+               helper="The symbol shown before amounts. Pick a known symbol or type a custom one."
+            >
                <CustomAutocomplete
                   size="small"
-                  label="Currency Symbol"
                   options={currencySymbols}
                   getOptionLabel={(o: any) =>
                      typeof o === "string" ? o : o?.label || ""
@@ -514,14 +529,17 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                         onChange("currencySymbol", inputValue);
                      }
                   }}
+                  placeholder="e.g. ৳"
                />
-            </Grid>
+            </SettingsField>
 
-            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
+            <SettingsField
+               label="System Timezone"
+               helper="The timezone used for dates and times across the store."
+            >
                <CustomAutocomplete
                   arrow
                   size="small"
-                  label="System Timezone"
                   options={timezones}
                   getOptionLabel={(o: any) => o?.label || ""}
                   isOptionEqualToValue={(a: any, b: any) => a?.value === b?.value}
@@ -529,14 +547,17 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   onChange={(next: any) => {
                      if (next) onChange("timezone", next.value);
                   }}
+                  placeholder="Select timezone"
                />
-            </Grid>
+            </SettingsField>
 
-            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
+            <SettingsField
+               label="Language"
+               helper="The language used for the interface and printed documents."
+            >
                <CustomAutocomplete
                   arrow
                   size="small"
-                  label="Language"
                   options={languages}
                   getOptionLabel={(o: any) => o?.label || ""}
                   isOptionEqualToValue={(a: any, b: any) => a?.value === b?.value}
@@ -544,9 +565,10 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   onChange={(next: any) => {
                      if (next) onChange("language", next.value);
                   }}
+                  placeholder="Select language"
                />
-            </Grid>
-         </Grid>
+            </SettingsField>
+         </Stack>
       </Stack>
    );
 }

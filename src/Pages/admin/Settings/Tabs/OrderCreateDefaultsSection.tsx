@@ -163,6 +163,10 @@ export default function OrderCreateDefaultsSection({
                      }}
                      placeholder="Search products…"
                   />
+                  <Typography variant="caption" color="text.secondary">
+                     Pre-added to a new order; staff can remove it
+                     before saving.
+                  </Typography>
                </Stack>
 
                <Stack spacing={0.75}>
@@ -182,6 +186,9 @@ export default function OrderCreateDefaultsSection({
                      }
                      placeholder="Select source"
                   />
+                  <Typography variant="caption" color="text.secondary">
+                     Pre-selected as the source of a new order.
+                  </Typography>
                </Stack>
 
                <Stack spacing={0.75}>

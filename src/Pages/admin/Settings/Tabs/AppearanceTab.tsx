@@ -128,11 +128,11 @@ export default function AppearanceTab(_props: AppearanceTabProps) {
                <ToggleButton value="dark">Dark</ToggleButton>
                <ToggleButton value="system">System</ToggleButton>
             </ToggleButtonGroup>
-            {themeMode === "system" && (
-               <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
-                  Follows your device&apos;s light/dark setting and updates live when it changes.
-               </Typography>
-            )}
+            <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
+               {themeMode === "system"
+                  ? "Follows your device's light/dark setting and updates live when it changes."
+                  : "Choose how the app looks on this device — this is a personal preference, not a store setting."}
+            </Typography>
          </Box>
 
          {/* Accent colour */}
@@ -167,7 +167,10 @@ export default function AppearanceTab(_props: AppearanceTabProps) {
                   sx={{ fontWeight: 600 }}
                />
             </Stack>
-            <Stack direction="row" spacing={1.5} alignItems="center" mt={1.5} flexWrap="wrap">
+            <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary" display="block" mt={1.5} mb={0.75}>
+               Custom Colour (Hex)
+            </Typography>
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
                <Box
                   component="input"
                   type="color"
@@ -178,9 +181,9 @@ export default function AppearanceTab(_props: AppearanceTabProps) {
                />
                <TextField
                   size="small"
-                  label="Hex"
                   value={customHex}
                   onChange={(e) => setCustomHex(e.target.value)}
+                  placeholder="#BE123C"
                   sx={{ width: 130 }}
                />
                <Button

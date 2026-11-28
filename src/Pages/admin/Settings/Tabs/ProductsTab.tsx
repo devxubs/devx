@@ -2,19 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import {
-   Grid,
    Stack,
    TextField,
    Typography,
    Box,
    FormControlLabel,
    Switch,
-   Card,
-   CardContent,
    MenuItem,
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import SectionResetButton from "./SectionResetButton";
+import SettingsField from "./SettingsField";
 
 interface ProductsTabProps {
    values: any;
@@ -105,11 +103,14 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
             />
          </Stack>
 
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.75 }}>
-                  Default Warehouse
-               </Typography>
+         {/* Global field standard: one field per row, label
+             above, helper below; switches are plain rows with
+             an external label and explanatory text. */}
+         <Stack spacing={2.5}>
+            <SettingsField
+               label="Default Warehouse"
+               helper="Warehouse used as the default for stock operations."
+            >
                <CustomAutocomplete
                   placeholder="Search warehouse..."
                   arrow
@@ -126,20 +127,18 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
                      option?.id === value?.id
                   }
                />
-               <Typography variant="caption" color="text.secondary">
-                  Warehouse used as the default for stock operations.
-               </Typography>
-            </Grid>
+            </SettingsField>
 
-            <Grid size={{ xs: 12, md: 6 }}>
+            <SettingsField
+               label="Decrease Stock On"
+               helper="Stock is deducted when an order reaches this status."
+            >
                <TextField
                   select
                   fullWidth
-                  label="Decrease Stock On"
                   size="small"
                   value={decreaseStockOn}
                   onChange={(e) => onConfigChange("decreaseStockOn", e.target.value)}
-                  helperText="Stock is deducted when an order reaches this status."
                >
                   {DECREASE_STOCK_ON_OPTIONS.map((o) => (
                      <MenuItem key={o.value} value={o.value}>
@@ -147,92 +146,74 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
                      </MenuItem>
                   ))}
                </TextField>
-            </Grid>
+            </SettingsField>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={stockOutProductCanOrder}
-                              onChange={(e) =>
-                                 onConfigChange("stockOutProductCanOrder", e.target.checked)
-                              }
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Allow ordering out-of-stock products
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Allow orders to be placed for products that are out of stock
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
+            <FormControlLabel
+               control={
+                  <Switch
+                     checked={stockOutProductCanOrder}
+                     onChange={(e) =>
+                        onConfigChange("stockOutProductCanOrder", e.target.checked)
+                     }
+                     color="primary"
+                  />
+               }
+               label={
+                  <Box>
+                     <Typography variant="subtitle2" fontWeight={600}>
+                        Allow ordering out-of-stock products
+                     </Typography>
+                     <Typography variant="caption" color="text.secondary">
+                        Allow orders to be placed for products that are out of stock
+                     </Typography>
+                  </Box>
+               }
+            />
 
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={outOfStockCanSubmitCourier}
-                              onChange={(e) =>
-                                 onConfigChange("outOfStockCanSubmitCourier", e.target.checked)
-                              }
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Out Of Stock can Submit Courier
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Allow orders with out-of-stock products to be submitted to the courier
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
+            <FormControlLabel
+               control={
+                  <Switch
+                     checked={outOfStockCanSubmitCourier}
+                     onChange={(e) =>
+                        onConfigChange("outOfStockCanSubmitCourier", e.target.checked)
+                     }
+                     color="primary"
+                  />
+               }
+               label={
+                  <Box>
+                     <Typography variant="subtitle2" fontWeight={600}>
+                        Out Of Stock can Submit Courier
+                     </Typography>
+                     <Typography variant="caption" color="text.secondary">
+                        Allow orders with out-of-stock products to be submitted to the courier
+                     </Typography>
+                  </Box>
+               }
+            />
 
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <Switch
-                              checked={variationSelectOnOrder}
-                              onChange={(e) =>
-                                 onConfigChange("variationSelectOnOrder", e.target.checked)
-                              }
-                              color="primary"
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Variation Select on Order
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Require a variation to be selected when ordering variable products
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
-         </Grid>
+            <FormControlLabel
+               control={
+                  <Switch
+                     checked={variationSelectOnOrder}
+                     onChange={(e) =>
+                        onConfigChange("variationSelectOnOrder", e.target.checked)
+                     }
+                     color="primary"
+                  />
+               }
+               label={
+                  <Box>
+                     <Typography variant="subtitle2" fontWeight={600}>
+                        Variation Select on Order
+                     </Typography>
+                     <Typography variant="caption" color="text.secondary">
+                        Require a variation to be selected when ordering variable products
+                     </Typography>
+                  </Box>
+               }
+            />
+         </Stack>
 
          <Box>
             <Typography variant="h6" fontWeight={600}>
@@ -243,22 +224,20 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
             </Typography>
          </Box>
 
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-               <TextField
-                  fullWidth
-                  label="Default Low Stock Threshold"
-                  type="number"
-                  size="small"
-                  value={values.defaultLowStockAlert ?? 10}
-                  onChange={(e) => onChange("defaultLowStockAlert", parseInt(e.target.value) || 0)}
-                  helperText="Items with inventory below this quantity trigger low-stock alerts"
-                  inputProps={{ min: 1, step: 1 }}
-               />
-            </Grid>
-
-
-         </Grid>
+         <SettingsField
+            label="Default Low Stock Threshold"
+            helper="Items with inventory below this quantity trigger low-stock alerts."
+         >
+            <TextField
+               fullWidth
+               type="number"
+               size="small"
+               value={values.defaultLowStockAlert ?? 10}
+               onChange={(e) => onChange("defaultLowStockAlert", parseInt(e.target.value) || 0)}
+               inputProps={{ min: 1, step: 1 }}
+               placeholder="10"
+            />
+         </SettingsField>
 
          {/* P2-20: "Default Unit of Measurement" and "Default Product
              Category" (customConfig.defaultUnit / defaultCategory)

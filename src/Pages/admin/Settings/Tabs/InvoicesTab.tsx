@@ -19,6 +19,7 @@ import {
    Tooltip,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
+import SettingsField from "./SettingsField";
 import CustomSwitch from "@src/components/CustomSwitch";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import CustomModal from "@src/components/Modal";
@@ -438,30 +439,37 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                Store phone, address and language are set once in the General Store tab and used on invoices automatically.
             </Typography>
 
-            <Grid container spacing={2}>
-               <Grid size={{ xs: 12, sm: 6 }}>
+            {/* Global field standard: one field per row, label
+                above, placeholder inside, helper below. */}
+            <Stack spacing={2.5}>
+               <SettingsField
+                  label="Invoice Header Subtitle"
+                  helper="Printed under the store name at the top of invoices."
+               >
                   <TextField
                      fullWidth
-                     label="Invoice Header Subtitle"
                      size="small"
                      value={values.invoiceHeader || ""}
                      onChange={(e) => onChange("invoiceHeader", e.target.value)}
                      placeholder="Official Sales Invoice & Receipt"
                   />
-               </Grid>
-               <Grid size={{ xs: 12, sm: 6 }}>
+               </SettingsField>
+               <SettingsField
+                  label="Closing Thank-You Note"
+                  helper="Printed at the bottom of every invoice."
+               >
                   <TextField
                      fullWidth
-                     label="Closing Thank-You Note"
                      size="small"
                      value={values.invoiceFooter || "Thank you for shopping with us! Please come again."}
                      onChange={(e) => onChange("invoiceFooter", e.target.value)}
+                     placeholder="Thank you for shopping with us! Please come again."
                   />
-               </Grid>
-               <Grid size={12}>
-                  <Typography variant="subtitle2" fontWeight={700} mb={1}>
-                     Invoice Accent Color
-                  </Typography>
+               </SettingsField>
+               <SettingsField
+                  label="Invoice Accent Color"
+                  helper="The accent colour the selected invoice template is rendered with."
+               >
                   <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
                      {accentColorPresets.map((c) => {
                         const isCurrentAccent = (customConfig.accentColor || "#0F766E") === c.hex;
@@ -491,19 +499,22 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                         );
                      })}
                   </Stack>
-               </Grid>
-               <Grid size={12}>
+               </SettingsField>
+               <SettingsField
+                  label="Warranty Terms & Conditions"
+                  helper="Shown on invoices while 'Print Return & Warranty Terms' is switched on below."
+               >
                   <TextField
                      fullWidth
-                     label="Warranty Terms & Conditions"
                      size="small"
                      multiline
                      rows={2}
                      value={customConfig.termsText || DEFAULT_TERMS}
                      onChange={(e) => onConfigChange("termsText", e.target.value)}
+                     placeholder="Enter the terms printed on invoices"
                   />
-               </Grid>
-            </Grid>
+               </SettingsField>
+            </Stack>
 
             {/* Visibility toggles — RP-2 (D6/D7): all eight persist
                 to customConfig; the two of the same name that used
@@ -511,39 +522,37 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
             <Typography variant="subtitle2" fontWeight={700} mt={2.5} mb={1}>
                Invoice Elements
             </Typography>
-            <Grid container spacing={1.5}>
+            {/* Switch rows follow the same standard: external
+                label with explanatory text, one per row, no
+                per-toggle cards. */}
+            <Stack spacing={2}>
                {VISIBILITY_FIELDS.map((item) => {
                   const isChecked = Boolean(customConfig[item.key] ?? true);
                   return (
-                     <Grid size={{ xs: 12, md: 6 }} key={item.key}>
-                        <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                           <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                              <FormControlLabel
-                                 control={
-                                    <CustomSwitch
-                                       checked={isChecked}
-                                       onChange={(e) =>
-                                          onConfigChange(item.key, e.target.checked)
-                                       }
-                                    />
-                                 }
-                                 label={
-                                    <Box>
-                                       <Typography variant="subtitle2" fontWeight={600}>
-                                          {item.label}
-                                       </Typography>
-                                       <Typography variant="caption" color="text.secondary">
-                                          {item.desc}
-                                       </Typography>
-                                    </Box>
-                                 }
-                              />
-                           </CardContent>
-                        </Card>
-                     </Grid>
+                     <FormControlLabel
+                        key={item.key}
+                        control={
+                           <CustomSwitch
+                              checked={isChecked}
+                              onChange={(e) =>
+                                 onConfigChange(item.key, e.target.checked)
+                              }
+                           />
+                        }
+                        label={
+                           <Box>
+                              <Typography variant="subtitle2" fontWeight={600}>
+                                 {item.label}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                 {item.desc}
+                              </Typography>
+                           </Box>
+                        }
+                     />
                   );
                })}
-            </Grid>
+            </Stack>
          </Box>
 
          <Divider />
@@ -834,19 +843,24 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
                   <Grid size={{ xs: 12, md: 6 }}>
                      <Stack spacing={2}>
-                        <TextField
-                           fullWidth
-                           size="small"
+                        <SettingsField
                            label="Template Name"
-                           value={builder.name}
-                           onChange={(e) => setBuilder({ ...builder, name: e.target.value })}
-                           error={!!builderError}
-                           helperText={builderError || undefined}
-                        />
-                        <Box>
-                           <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary" mb={0.75}>
-                              Base Layout
-                           </Typography>
+                           helper="The name shown in the Custom Templates list."
+                           error={builderError || null}
+                        >
+                           <TextField
+                              fullWidth
+                              size="small"
+                              value={builder.name}
+                              onChange={(e) => setBuilder({ ...builder, name: e.target.value })}
+                              error={!!builderError}
+                              placeholder="e.g. Corporate Copy"
+                           />
+                        </SettingsField>
+                        <SettingsField
+                           label="Base Layout"
+                           helper="The built-in design this template is based on."
+                        >
                            <CustomAutocomplete
                               arrow
                               size="small"
@@ -860,7 +874,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                               }
                               placeholder="Select base layout"
                            />
-                        </Box>
+                        </SettingsField>
                         <Box>
                            <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary" mb={0.75}>
                               Accent Color
@@ -888,33 +902,54 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                                  sx={{ width: 36, height: 28, p: 0, border: "1px solid", borderColor: "divider", borderRadius: 1, bgcolor: "transparent", cursor: "pointer" }}
                               />
                            </Stack>
+                           <Typography variant="caption" color="text.secondary" display="block" mt={0.75}>
+                              Overrides the base layout&apos;s accent colour for this template only.
+                           </Typography>
                         </Box>
-                        <TextField
-                           fullWidth
-                           size="small"
+                        <SettingsField
                            label="Invoice Header Subtitle"
-                           value={builder.invoiceHeader}
-                           onChange={(e) => setBuilder({ ...builder, invoiceHeader: e.target.value })}
-                        />
-                        <TextField
-                           fullWidth
-                           size="small"
+                           helper="Printed under the store name on this template. Leave empty to use the invoice-wide subtitle."
+                        >
+                           <TextField
+                              fullWidth
+                              size="small"
+                              value={builder.invoiceHeader}
+                              onChange={(e) => setBuilder({ ...builder, invoiceHeader: e.target.value })}
+                              placeholder="Official Sales Invoice & Receipt"
+                           />
+                        </SettingsField>
+                        <SettingsField
                            label="Closing Thank-You Note"
-                           value={builder.invoiceFooter}
-                           onChange={(e) => setBuilder({ ...builder, invoiceFooter: e.target.value })}
-                        />
-                        <TextField
-                           fullWidth
-                           size="small"
+                           helper="Printed at the bottom of this template's invoices."
+                        >
+                           <TextField
+                              fullWidth
+                              size="small"
+                              value={builder.invoiceFooter}
+                              onChange={(e) => setBuilder({ ...builder, invoiceFooter: e.target.value })}
+                              placeholder="Thank you for shopping with us! Please come again."
+                           />
+                        </SettingsField>
+                        <SettingsField
                            label="Warranty Terms & Conditions"
-                           multiline
-                           rows={2}
-                           value={builder.termsText}
-                           onChange={(e) => setBuilder({ ...builder, termsText: e.target.value })}
-                        />
+                           helper="Terms text printed by this template when terms are shown."
+                        >
+                           <TextField
+                              fullWidth
+                              size="small"
+                              multiline
+                              rows={2}
+                              value={builder.termsText}
+                              onChange={(e) => setBuilder({ ...builder, termsText: e.target.value })}
+                              placeholder="Enter the terms printed on invoices"
+                           />
+                        </SettingsField>
                         <Box>
                            <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary" mb={0.5}>
                               Elements
+                           </Typography>
+                           <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
+                              Choose which elements this template prints.
                            </Typography>
                            <Grid container spacing={0.5}>
                               {VISIBILITY_FIELDS.map((item) => (

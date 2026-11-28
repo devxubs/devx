@@ -220,6 +220,10 @@ export default function PaymentMethodsSection({
                      }
                      placeholder="Select default"
                   />
+                  <Typography variant="caption" color="text.secondary">
+                     Pre-selected when recording a payment; staff can
+                     choose any other active method instead.
+                  </Typography>
                </Stack>
 
                <Divider />
@@ -298,6 +302,7 @@ export default function PaymentMethodsSection({
                         </Typography>
                         <TextField
                            size="small"
+                           placeholder="Method name"
                            value={draftNames[index] ?? method.name}
                            onChange={(e) =>
                               setDraftNames((d) => ({ ...d, [index]: e.target.value }))

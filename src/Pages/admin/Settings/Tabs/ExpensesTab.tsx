@@ -2,13 +2,13 @@
 
 import React from "react";
 import {
-   Grid,
    MenuItem,
    Stack,
    TextField,
    Typography,
    Box,
 } from "@mui/material";
+import SettingsField from "./SettingsField";
 
 interface ExpensesTabProps {
    values: any;
@@ -40,35 +40,34 @@ export default function ExpensesTab({ values, onConfigChange }: ExpensesTabProps
             </Typography>
          </Box>
 
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-               <TextField
-                  select
-                  fullWidth
-                  label="Default Expense Category"
-                  size="small"
-                  value={customConfig.defaultExpenseCategory || "Store Operations"}
-                  onChange={(e) => onConfigChange("defaultExpenseCategory", e.target.value)}
-                  helperText="Default category assigned when recording store expenses"
-               >
-                  {expenseCategories.map((c) => (
-                     <MenuItem key={c} value={c}>
-                        {c}
-                     </MenuItem>
-                  ))}
-               </TextField>
-            </Grid>
+         <SettingsField
+            label="Default Expense Category"
+            helper="Default category assigned when recording store expenses."
+         >
+            <TextField
+               select
+               fullWidth
+               size="small"
+               value={customConfig.defaultExpenseCategory || "Store Operations"}
+               onChange={(e) => onConfigChange("defaultExpenseCategory", e.target.value)}
+            >
+               {expenseCategories.map((c) => (
+                  <MenuItem key={c} value={c}>
+                     {c}
+                  </MenuItem>
+               ))}
+            </TextField>
+         </SettingsField>
 
-            {/* P2-20: "Purchase Tax / Import Duty Rate" and "Default
-                Expense Payment Method" were removed — write-only
-                customConfig keys that no purchase or expense flow
-                ever read. The "Auto-sync Received Purchases" and
-                "Mandate Expense Attachment" toggles were removed for
-                the same reason (purchases always sync stock on save;
-                no expense-proof requirement exists). Only the Default
-                Expense Category above is live: the Expense page seeds
-                its category options from it. */}
-         </Grid>
+         {/* P2-20: "Purchase Tax / Import Duty Rate" and "Default
+             Expense Payment Method" were removed — write-only
+             customConfig keys that no purchase or expense flow
+             ever read. The "Auto-sync Received Purchases" and
+             "Mandate Expense Attachment" toggles were removed for
+             the same reason (purchases always sync stock on save;
+             no expense-proof requirement exists). Only the Default
+             Expense Category above is live: the Expense page seeds
+             its category options from it. */}
       </Stack>
    );
 }

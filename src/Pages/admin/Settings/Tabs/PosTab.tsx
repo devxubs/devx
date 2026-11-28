@@ -6,7 +6,6 @@ import OrderCreateDefaultsSection from "./OrderCreateDefaultsSection";
 import PaymentMethodsSection from "./PaymentMethodsSection";
 import SectionResetButton from "./SectionResetButton";
 import {
-   Grid,
    Stack,
    TextField,
    Typography,
@@ -15,6 +14,7 @@ import {
    FormControlLabel,
    Switch,
 } from "@mui/material";
+import SettingsField from "./SettingsField";
 
 // RP-7 (C5) history: this tab briefly carried a chip row that
 // scrolled to in-tab section anchors. The owner later asked for
@@ -63,58 +63,70 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
              Payments", "Auto-trigger Receipt Print" and "Round Final
              Order Totals" toggles below were likewise write-only and
              have been removed. */}
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+         {/* Global field standard: one field per row, label
+             above, placeholder inside, helper below. */}
+         <Stack spacing={2.5}>
+            <SettingsField
+               label="Default Tax / VAT Rate (%)"
+               helper="Applied to new orders by default; it can still be changed on each order."
+            >
                <TextField
                   fullWidth
-                  label="Default Tax / VAT Rate (%)"
                   type="number"
                   size="small"
                   value={values.defaultTaxRate ?? 0}
                   onChange={(e) => onChange("defaultTaxRate", parseFloat(e.target.value) || 0)}
                   inputProps={{ min: 0, max: 100, step: 0.5 }}
+                  placeholder="0"
                />
-            </Grid>
+            </SettingsField>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <SettingsField
+               label={`Default Delivery Fee (${values.currencySymbol || "৳"})`}
+               helper="Pre-filled as the delivery charge on new orders."
+            >
                <TextField
                   fullWidth
-                  label={`Default Delivery Fee (${values.currencySymbol || "৳"})`}
                   type="number"
                   size="small"
                   value={values.defaultDeliveryCharge ?? 60}
                   onChange={(e) => onChange("defaultDeliveryCharge", parseFloat(e.target.value) || 0)}
                   inputProps={{ min: 0, step: 5 }}
+                  placeholder="60"
                />
-            </Grid>
+            </SettingsField>
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <SettingsField
+               label="Default Discount Rate (%)"
+               helper="Default discount applied to new orders."
+            >
                <TextField
                   fullWidth
-                  label="Default Discount Rate (%)"
                   type="number"
                   size="small"
                   value={values.defaultDiscountRate ?? 0}
                   onChange={(e) => onChange("defaultDiscountRate", parseFloat(e.target.value) || 0)}
                   inputProps={{ min: 0, max: 100, step: 1 }}
+                  placeholder="0"
                />
-            </Grid>
+            </SettingsField>
 
             {/* Phase 5: the Default Payment Method selector moved
                 into the Payment Methods section below, where its
                 options come from the managed method list. */}
 
-            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <SettingsField
+               label="Invoice Number Prefix"
+               helper="e.g. INV_126 — shares the order number sequence."
+            >
                <TextField
                   fullWidth
-                  label="Invoice Number Prefix"
                   size="small"
                   value={values.invoicePrefix || "INV"}
                   onChange={(e) => onChange("invoicePrefix", e.target.value)}
                   placeholder="INV"
-                  helperText="e.g. INV_126 — shares the order number sequence."
                />
-            </Grid>
+            </SettingsField>
 
             {/* Final-verification fix: the legacy orderPrefix ("#")
                 field was removed — it edited a StoreSetting column
@@ -123,7 +135,7 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
                 The actual Order ID prefix is prefixOrder, edited in
                 the ID Prefixes tab. The column itself is untouched. */}
 
-         </Grid>
+         </Stack>
 
          <Divider />
 

@@ -35,6 +35,7 @@ import {
    toastAnchorOrigin,
 } from "@src/lib/notificationPrefs";
 import CourierProvidersCard from "./CourierProvidersCard";
+import SettingsField from "./SettingsField";
 import {
    COURIER_STATUSES,
    resolveDefaultCourierStatus,
@@ -147,38 +148,30 @@ export default function SystemTab({
             </Typography>
          </Box>
 
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-               <Card variant="outlined" sx={{ borderRadius: 1.5 }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                     <FormControlLabel
-                        control={
-                           <CustomSwitch
-                              checked={Boolean(values.enableLowStockAlert)}
-                              onChange={(e) => onChange("enableLowStockAlert", e.target.checked)}
-                           />
-                        }
-                        label={
-                           <Box>
-                              <Typography variant="subtitle2" fontWeight={600}>
-                                 Low-Stock Level Warnings
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                 Trigger notification badge when any product stock drops below threshold
-                              </Typography>
-                           </Box>
-                        }
-                     />
-                  </CardContent>
-               </Card>
-            </Grid>
+         <FormControlLabel
+            control={
+               <CustomSwitch
+                  checked={Boolean(values.enableLowStockAlert)}
+                  onChange={(e) => onChange("enableLowStockAlert", e.target.checked)}
+               />
+            }
+            label={
+               <Box>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                     Low-Stock Level Warnings
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                     Trigger notification badge when any product stock drops below threshold
+                  </Typography>
+               </Box>
+            }
+         />
 
-            {/* P2-20: the "Daily Sales & Revenue Digest" and "Order
-                Void & Cancellation Alerts" toggles were removed —
-                they were write-only customConfig keys: no mailer and
-                no cancellation-notification producer exists, so the
-                switches saved a value nothing ever read. */}
-         </Grid>
+         {/* P2-20: the "Daily Sales & Revenue Digest" and "Order
+             Void & Cancellation Alerts" toggles were removed —
+             they were write-only customConfig keys: no mailer and
+             no cancellation-notification producer exists, so the
+             switches saved a value nothing ever read. */}
 
          {/* Cleanup Phase 3: per-event presentation preferences.
              Rows exist only for producers that actually create
@@ -237,7 +230,7 @@ export default function SystemTab({
                               <CustomAutocomplete
                                  arrow
                                  size="small"
-                                 label="Sound"
+                                 placeholder="Choose a sound"
                                  options={NOTIFICATION_SOUNDS}
                                  getOptionLabel={(o: any) => o?.name || ""}
                                  isOptionEqualToValue={(a: any, b: any) => a?.id === b?.id}
@@ -282,13 +275,17 @@ export default function SystemTab({
             </Typography>
          </Box>
 
-         <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+         {/* Global field standard: one field per row, label
+             above, helper below. */}
+         <Stack spacing={2.5}>
+            <SettingsField
+               label="Position"
+               helper="Where pop-up messages appear on the screen."
+            >
                <TextField
                   select
                   fullWidth
                   size="small"
-                  label="Position"
                   value={notifPrefs.toast.position}
                   onChange={(e) => setToastCfg({ position: e.target.value as NotificationPrefs["toast"]["position"] })}
                >
@@ -296,13 +293,15 @@ export default function SystemTab({
                      <MenuItem key={o.key} value={o.key}>{o.name}</MenuItem>
                   ))}
                </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            </SettingsField>
+            <SettingsField
+               label="Duration"
+               helper="How long a pop-up stays visible before it dismisses itself."
+            >
                <TextField
                   select
                   fullWidth
                   size="small"
-                  label="Duration"
                   value={notifPrefs.toast.durationMs === null ? "null" : String(notifPrefs.toast.durationMs)}
                   onChange={(e) =>
                      setToastCfg({ durationMs: e.target.value === "null" ? null : Number(e.target.value) })
@@ -312,13 +311,15 @@ export default function SystemTab({
                      <MenuItem key={o.name} value={o.value === null ? "null" : String(o.value)}>{o.name}</MenuItem>
                   ))}
                </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            </SettingsField>
+            <SettingsField
+               label="Style"
+               helper="The visual style pop-up messages are rendered in."
+            >
                <TextField
                   select
                   fullWidth
                   size="small"
-                  label="Style"
                   value={notifPrefs.toast.style}
                   onChange={(e) => setToastCfg({ style: e.target.value as NotificationPrefs["toast"]["style"] })}
                >
@@ -326,30 +327,44 @@ export default function SystemTab({
                   <MenuItem value="filled">Filled</MenuItem>
                   <MenuItem value="outlined">Outlined</MenuItem>
                </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-               <Stack spacing={0.5}>
-                  <FormControlLabel
-                     control={
-                        <CustomSwitch
-                           checked={notifPrefs.toast.showClose}
-                           onChange={(e) => setToastCfg({ showClose: e.target.checked })}
-                        />
-                     }
-                     label={<Typography variant="body2">Close button</Typography>}
+            </SettingsField>
+            <FormControlLabel
+               control={
+                  <CustomSwitch
+                     checked={notifPrefs.toast.showClose}
+                     onChange={(e) => setToastCfg({ showClose: e.target.checked })}
                   />
-                  <FormControlLabel
-                     control={
-                        <CustomSwitch
-                           checked={notifPrefs.toast.clickawayDismiss}
-                           onChange={(e) => setToastCfg({ clickawayDismiss: e.target.checked })}
-                        />
-                     }
-                     label={<Typography variant="body2">Click-away dismisses</Typography>}
+               }
+               label={
+                  <Box>
+                     <Typography variant="subtitle2" fontWeight={600}>
+                        Close button
+                     </Typography>
+                     <Typography variant="caption" color="text.secondary">
+                        Show a close (×) button on pop-up messages
+                     </Typography>
+                  </Box>
+               }
+            />
+            <FormControlLabel
+               control={
+                  <CustomSwitch
+                     checked={notifPrefs.toast.clickawayDismiss}
+                     onChange={(e) => setToastCfg({ clickawayDismiss: e.target.checked })}
                   />
-               </Stack>
-            </Grid>
-            <Grid size={12}>
+               }
+               label={
+                  <Box>
+                     <Typography variant="subtitle2" fontWeight={600}>
+                        Click-away dismisses
+                     </Typography>
+                     <Typography variant="caption" color="text.secondary">
+                        Clicking anywhere else dismisses the pop-up immediately
+                     </Typography>
+                  </Box>
+               }
+            />
+            <Box>
                <Button
                   variant="outlined"
                   size="small"
@@ -361,8 +376,8 @@ export default function SystemTab({
                <Typography variant="caption" color="text.secondary" sx={{ ml: 1.5 }}>
                   Simultaneous toasts: pop-ups replace each other (a new one dismisses the previous) — queueing is not supported by the toast design.
                </Typography>
-            </Grid>
-         </Grid>
+            </Box>
+         </Stack>
 
          {/* Live preview of the toast configuration AS EDITED in
              the form (the app-wide systems read the saved values). */}
@@ -442,28 +457,27 @@ export default function SystemTab({
                Choose the courier status new bulk courier submissions start
                with. Leave it unset to keep the current behaviour.
             </Typography>
-            <Grid container spacing={2}>
-               <Grid size={{ xs: 12, md: 6 }}>
-                  <TextField
-                     select
-                     fullWidth
-                     label="Default Courier Status"
-                     size="small"
-                     value={resolveDefaultCourierStatus(values.customConfig) || ""}
-                     onChange={(e) =>
-                        onConfigChange("defaultCourierStatus", e.target.value)
-                     }
-                     helperText="Pre-selected in the bulk courier dialog and applied automatically on submission"
-                  >
-                     <MenuItem value="">— No default —</MenuItem>
-                     {COURIER_STATUSES.map((s) => (
-                        <MenuItem key={s} value={s}>
-                           {s}
-                        </MenuItem>
-                     ))}
-                  </TextField>
-               </Grid>
-            </Grid>
+            <SettingsField
+               label="Default Courier Status"
+               helper="Pre-selected in the bulk courier dialog and applied automatically on submission."
+            >
+               <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={resolveDefaultCourierStatus(values.customConfig) || ""}
+                  onChange={(e) =>
+                     onConfigChange("defaultCourierStatus", e.target.value)
+                  }
+               >
+                  <MenuItem value="">— No default —</MenuItem>
+                  {COURIER_STATUSES.map((s) => (
+                     <MenuItem key={s} value={s}>
+                        {s}
+                     </MenuItem>
+                  ))}
+               </TextField>
+            </SettingsField>
          </Box>
 
          {/* Courier Providers (Phase 4, D4) — env-credential status */}
