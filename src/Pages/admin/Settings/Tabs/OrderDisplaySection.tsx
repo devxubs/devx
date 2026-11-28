@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react";
 import {
    Box,
    Button,
-   Chip,
+   Grid,
    IconButton,
    Stack,
    Switch,
@@ -83,6 +83,48 @@ function MoveButtons({
    );
 }
 
+// Shared modal presentation (RP-7 C6 refinement): the surface
+// is capped to the viewport and laid out as a flex column, so
+// the CustomModal title row and the modal footer stay fixed
+// while only the row list scrolls. Width comes from the "md"
+// size token (640px) — a sensible measure for these row lists.
+const MODAL_SURFACE_SX = {
+   maxHeight: "calc(100vh - 48px)",
+   display: "flex",
+   flexDirection: "column",
+   overflow: "hidden",
+} as const;
+
+// The scrollable row region inside each modal: it takes the
+// leftover height, scrolls vertically with a thin scrollbar,
+// and never causes horizontal overflow.
+const MODAL_SCROLL_SX = {
+   flex: 1,
+   minHeight: 0,
+   overflowY: "auto",
+   overflowX: "hidden",
+   pr: 0.5,
+   scrollbarWidth: "thin",
+   scrollbarColor: "rgba(128, 128, 128, 0.45) transparent",
+   "&::-webkit-scrollbar": { width: 6 },
+   "&::-webkit-scrollbar-thumb": {
+      backgroundColor: "rgba(128, 128, 128, 0.35)",
+      borderRadius: 3,
+   },
+} as const;
+
+// One configuration row (status or column): compact, aligned,
+// subtle border, gentle hover — shared by both modals.
+const MODAL_ROW_SX = {
+   px: 1.5,
+   py: 0.75,
+   border: 1,
+   borderColor: "divider",
+   borderRadius: "8px",
+   transition: "background-color 0.15s ease",
+   "&:hover": { bgcolor: "action.hover" },
+} as const;
+
 /**
  * Phase 2 — Order Display & Sorting settings (rendered inside
  * the Sales & POS tab). Everything writes through the tab's
@@ -92,27 +134,21 @@ function MoveButtons({
  * and the ordering model (a single saved array) is identical
  * either way.
  *
- * Cleanup Phase 1: the section now shows a compact preview with
- * an Edit button; the full editor lives in a CustomModal.
- * Cancelling the modal restores the four config keys to the
- * values they had when it opened, so a cancelled edit never
- * reaches the form (and therefore never the server). "Done"
- * keeps the edits in the form for the normal Settings Save.
- *
- * Sales & POS cleanup: the preview and the editor modal are
- * independent sibling elements — the preview is plain section
- * content in the tab's continuous form (no card wrapper), and
- * the modal (configuration controls only, no preview inside)
- * renders separately through its portal.
- *
- * Status Order split: the editor is TWO modals — Status Order
- * & Visibility has its own dedicated modal (order + picker
- * visibility only), and List Defaults & Columns (default
- * statuses + table columns) keeps a separate one. Each modal
- * snapshots ONLY its own config keys when it opens, so
- * cancelling one can never discard the other's edits; "Done"
- * on either keeps the edits in the form for the shared
- * Settings Save, exactly as the single modal behaved.
+ * Structure (after the Cleanup Phase 1 preview/modal split, the
+ * Status Order modal split, and the RP-7 C6 refinement):
+ * - The section shows plain preview lines on the page — status
+ *   order + picker visibility, and the visible column count —
+ *   each with its own Edit action.
+ * - "Order List — Default Statuses" is edited DIRECTLY on the
+ *   page (label above the field, helper text below), no modal.
+ * - Status Order & Visibility has a dedicated modal (order +
+ *   Create/Filters visibility only).
+ * - Order List — Columns has its own modal (column order +
+ *   visibility only).
+ * Each modal snapshots ONLY its own config keys when it opens,
+ * so cancelling one can never discard the other's edits;
+ * "Done" keeps the edits in the form for the shared Settings
+ * Save, exactly as the original single modal behaved.
  */
 export default function OrderDisplaySection({
    values,
@@ -128,8 +164,8 @@ export default function OrderDisplaySection({
 
    const [statusEditOpen, setStatusEditOpen] = useState(false);
    const statusSnapshotRef = useRef<Record<string, any> | null>(null);
-   const [displayEditOpen, setDisplayEditOpen] = useState(false);
-   const displaySnapshotRef = useRef<Record<string, any> | null>(null);
+   const [columnsEditOpen, setColumnsEditOpen] = useState(false);
+   const columnsSnapshotRef = useRef<Record<string, any> | null>(null);
 
    const restoreSnapshot = (snap: Record<string, any> | null) => {
       if (!snap) return;
@@ -151,18 +187,16 @@ export default function OrderDisplaySection({
       setStatusEditOpen(false);
    };
 
-   const openDisplayEdit = () => {
-      displaySnapshotRef.current = {
-         [ORDER_LIST_DEFAULT_STATUSES_KEY]:
-            config?.[ORDER_LIST_DEFAULT_STATUSES_KEY],
+   const openColumnsEdit = () => {
+      columnsSnapshotRef.current = {
          [ORDER_TABLE_COLUMNS_KEY]: config?.[ORDER_TABLE_COLUMNS_KEY],
       };
-      setDisplayEditOpen(true);
+      setColumnsEditOpen(true);
    };
 
-   const cancelDisplayEdit = () => {
-      restoreSnapshot(displaySnapshotRef.current);
-      setDisplayEditOpen(false);
+   const cancelColumnsEdit = () => {
+      restoreSnapshot(columnsSnapshotRef.current);
+      setColumnsEditOpen(false);
    };
 
    const writeHidden = (
@@ -191,8 +225,8 @@ export default function OrderDisplaySection({
 
    return (
       <>
-         {/* ── Section preview (independent of the modals) ── */}
-         <Stack spacing={1.5}>
+         {/* ── Section content on the page ── */}
+         <Stack spacing={2}>
                <Box>
                   <Typography variant="h6" fontWeight={600}>
                      Order Display &amp; Sorting
@@ -203,20 +237,27 @@ export default function OrderDisplaySection({
                   </Typography>
                </Box>
 
-               {/* Status order preview — Edit opens the dedicated
-                   Status Order modal. */}
+               {/* Status order + visibility preview — Edit opens
+                   the dedicated Status Order modal. */}
                <Stack
                   direction="row"
                   justifyContent="space-between"
                   alignItems="flex-start"
                   spacing={2}
                >
-                  <Typography variant="body2" sx={{ pt: 0.75 }}>
-                     <strong>Status order:</strong>{" "}
-                     {statusOrder
-                        .map((s) => ORDER_STATUS_LABELS[s])
-                        .join(" · ")}
-                  </Typography>
+                  <Stack spacing={0.75} sx={{ pt: 0.5 }}>
+                     <Typography variant="body2">
+                        <strong>Status order:</strong>{" "}
+                        {statusOrder
+                           .map((s) => ORDER_STATUS_LABELS[s])
+                           .join(" · ")}
+                     </Typography>
+                     <Typography variant="body2">
+                        <strong>Visibility:</strong>{" "}
+                        {hiddenInCreate.size} hidden in Create,{" "}
+                        {hiddenInFilter.size} hidden in Filters
+                     </Typography>
+                  </Stack>
                   <Button
                      variant="outlined"
                      size="small"
@@ -231,56 +272,73 @@ export default function OrderDisplaySection({
                   </Button>
                </Stack>
 
-               {/* List defaults + columns preview — Edit opens the
-                   List Defaults & Columns modal. */}
+               {/* Order List — Default Statuses, edited directly
+                   on the page: external label above the field,
+                   helper text below, in a compact grid cell. */}
+               <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                     <Stack spacing={0.75}>
+                        <Typography
+                           variant="body2"
+                           fontSize={13}
+                           fontWeight={600}
+                           color="textSecondary"
+                        >
+                           Order List — Default Statuses
+                        </Typography>
+                        <CustomAutocomplete
+                           multiple
+                           arrow
+                           size="small"
+                           options={statusOptions}
+                           getOptionLabel={(o: any) => o.label}
+                           isOptionEqualToValue={(a: any, b: any) => a.value === b.value}
+                           value={statusOptions.filter((o) =>
+                              defaultStatuses.includes(o.value),
+                           )}
+                           onChange={(next: any) =>
+                              // CustomAutocomplete calls onChange
+                              // value-first (see the note in
+                              // OrderCreateDefaultsSection). Only
+                              // known status values are written.
+                              onConfigChange(
+                                 ORDER_LIST_DEFAULT_STATUSES_KEY,
+                                 (next || [])
+                                    .map((o: any) => o.value)
+                                    .filter((v: any) =>
+                                       ALL_STATUS_VALUES.includes(v),
+                                    ),
+                              )
+                           }
+                           placeholder="All statuses"
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                           The order list opens filtered to these
+                           statuses. Leave empty to show all statuses.
+                        </Typography>
+                     </Stack>
+                  </Grid>
+               </Grid>
+
+               {/* Columns preview — Edit opens the Columns modal. */}
                <Stack
                   direction="row"
                   justifyContent="space-between"
                   alignItems="flex-start"
                   spacing={2}
                >
-                  <Stack spacing={0.75}>
-                     <Stack
-                        direction="row"
-                        spacing={0.75}
-                        alignItems="center"
-                        useFlexGap
-                        flexWrap="wrap"
-                     >
-                        <Typography variant="body2">
-                           <strong>List opens with:</strong>
-                        </Typography>
-                        {defaultStatuses.length === 0 ? (
-                           <Typography variant="body2" color="text.secondary">
-                              All statuses
-                           </Typography>
-                        ) : (
-                           defaultStatuses.map((s) => (
-                              <Chip
-                                 key={s}
-                                 label={ORDER_STATUS_LABELS[s]}
-                                 size="small"
-                                 variant="outlined"
-                              />
-                           ))
-                        )}
-                     </Stack>
-                     <Typography variant="body2">
-                        <strong>Visibility:</strong>{" "}
-                        {hiddenInCreate.size} hidden in Create,{" "}
-                        {hiddenInFilter.size} hidden in Filters ·{" "}
-                        <strong>Columns:</strong> {visibleColumns} of{" "}
-                        {columnLayout.order.length} visible
-                     </Typography>
-                  </Stack>
+                  <Typography variant="body2" sx={{ pt: 0.5 }}>
+                     <strong>Columns:</strong> {visibleColumns} of{" "}
+                     {columnLayout.order.length} visible
+                  </Typography>
                   <Button
                      variant="outlined"
                      size="small"
-                     aria-label="Edit list defaults and columns"
+                     aria-label="Edit columns"
                      startIcon={
                         <Icon icon="solar:pen-2-bold-duotone" size="small" />
                      }
-                     onClick={openDisplayEdit}
+                     onClick={openColumnsEdit}
                      sx={{ whiteSpace: "nowrap" }}
                   >
                      Edit
@@ -288,115 +346,122 @@ export default function OrderDisplaySection({
                </Stack>
          </Stack>
 
-         {/* ── Status Order modal (dedicated: order + visibility
-             controls only; the preview stays on the page) ── */}
+         {/* ── Status Order & Visibility modal ── */}
          <CustomModal
             open={statusEditOpen}
             onClose={cancelStatusEdit}
             title="Status Order & Visibility"
-            size="lg"
+            size="md"
             closeIcon
+            sx={MODAL_SURFACE_SX}
          >
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-               {/* ── Global status order + per-location visibility ── */}
-               <Stack spacing={1}>
-                  <Stack
-                     direction="row"
-                     alignItems="center"
-                     justifyContent="flex-end"
+            <Stack spacing={2} sx={{ flex: 1, minHeight: 0, mt: 0.5 }}>
+               <Typography variant="body2" color="text.secondary">
+                  One global order for statuses, applied to every status
+                  selector. Hiding affects only the named picker —
+                  status-change menus always offer every status.
+               </Typography>
+
+               <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="flex-end"
+               >
+                  <Button
+                     size="small"
+                     onClick={() => {
+                        onConfigChange(ORDER_STATUS_ORDER_KEY, undefined);
+                        onConfigChange(ORDER_STATUS_HIDDEN_KEY, undefined);
+                     }}
                   >
-                     <Button
-                        size="small"
-                        onClick={() => {
-                           onConfigChange(ORDER_STATUS_ORDER_KEY, undefined);
-                           onConfigChange(ORDER_STATUS_HIDDEN_KEY, undefined);
-                        }}
-                     >
-                        Reset order
-                     </Button>
-                  </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                     One global order for statuses, applied to every status
-                     selector. Hiding affects only the named picker —
-                     status-change menus always offer every status.
-                  </Typography>
-                  <Stack
-                     direction="row"
-                     spacing={1}
-                     sx={{ px: 1, color: "text.secondary" }}
-                  >
-                     <Box sx={{ flex: 1 }}>
-                        <Typography variant="caption">Status</Typography>
-                     </Box>
-                     <Typography variant="caption" sx={{ width: 64, textAlign: "center" }}>
-                        Create
-                     </Typography>
-                     <Typography variant="caption" sx={{ width: 64, textAlign: "center" }}>
-                        Filters
-                     </Typography>
-                     <Box sx={{ width: 76 }} />
-                  </Stack>
-                  {statusOrder.map((status, i) => (
-                     <Stack
-                        key={status}
-                        direction="row"
-                        alignItems="center"
-                        spacing={1}
-                        sx={{
-                           px: 1,
-                           py: 0.5,
-                           border: 1,
-                           borderColor: "divider",
-                           borderRadius: 1,
-                        }}
-                     >
-                        <Typography variant="body2" sx={{ flex: 1 }}>
-                           {i + 1}. {ORDER_STATUS_LABELS[status]}
-                        </Typography>
-                        <Box sx={{ width: 64, textAlign: "center" }}>
-                           <Switch
-                              size="small"
-                              checked={!hiddenInCreate.has(status)}
-                              onChange={(e) =>
-                                 writeHidden("create", status, !e.target.checked)
-                              }
-                              inputProps={{
-                                 "aria-label": `Show ${ORDER_STATUS_LABELS[status]} in create pickers`,
-                              }}
-                           />
-                        </Box>
-                        <Box sx={{ width: 64, textAlign: "center" }}>
-                           <Switch
-                              size="small"
-                              checked={!hiddenInFilter.has(status)}
-                              onChange={(e) =>
-                                 writeHidden("filter", status, !e.target.checked)
-                              }
-                              inputProps={{
-                                 "aria-label": `Show ${ORDER_STATUS_LABELS[status]} in filters`,
-                              }}
-                           />
-                        </Box>
-                        <MoveButtons
-                           index={i}
-                           count={statusOrder.length}
-                           onMove={(delta) =>
-                              onConfigChange(
-                                 ORDER_STATUS_ORDER_KEY,
-                                 move(statusOrder, i, delta),
-                              )
-                           }
-                        />
-                     </Stack>
-                  ))}
+                     Reset order
+                  </Button>
                </Stack>
 
-               {/* ── Status modal footer ── */}
+               {/* Column captions, aligned with the rows below. */}
+               <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{ px: 1.5, color: "text.secondary" }}
+               >
+                  <Box sx={{ flex: 1 }}>
+                     <Typography variant="caption">Status</Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{ width: 72, textAlign: "center" }}>
+                     Create
+                  </Typography>
+                  <Typography variant="caption" sx={{ width: 72, textAlign: "center" }}>
+                     Filters
+                  </Typography>
+                  <Box sx={{ width: 76 }} />
+               </Stack>
+
+               {/* Scrollable status list. */}
+               <Box sx={MODAL_SCROLL_SX}>
+                  <Stack spacing={1}>
+                     {statusOrder.map((status, i) => (
+                        <Stack
+                           key={status}
+                           direction="row"
+                           alignItems="center"
+                           spacing={1}
+                           sx={MODAL_ROW_SX}
+                        >
+                           <Typography variant="body2" sx={{ flex: 1 }}>
+                              <Typography
+                                 component="span"
+                                 variant="body2"
+                                 color="text.secondary"
+                              >
+                                 {i + 1}.{" "}
+                              </Typography>
+                              {ORDER_STATUS_LABELS[status]}
+                           </Typography>
+                           <Box sx={{ width: 72, textAlign: "center" }}>
+                              <Switch
+                                 size="small"
+                                 checked={!hiddenInCreate.has(status)}
+                                 onChange={(e) =>
+                                    writeHidden("create", status, !e.target.checked)
+                                 }
+                                 inputProps={{
+                                    "aria-label": `Show ${ORDER_STATUS_LABELS[status]} in create pickers`,
+                                 }}
+                              />
+                           </Box>
+                           <Box sx={{ width: 72, textAlign: "center" }}>
+                              <Switch
+                                 size="small"
+                                 checked={!hiddenInFilter.has(status)}
+                                 onChange={(e) =>
+                                    writeHidden("filter", status, !e.target.checked)
+                                 }
+                                 inputProps={{
+                                    "aria-label": `Show ${ORDER_STATUS_LABELS[status]} in filters`,
+                                 }}
+                              />
+                           </Box>
+                           <MoveButtons
+                              index={i}
+                              count={statusOrder.length}
+                              onMove={(delta) =>
+                                 onConfigChange(
+                                    ORDER_STATUS_ORDER_KEY,
+                                    move(statusOrder, i, delta),
+                                 )
+                              }
+                           />
+                        </Stack>
+                     ))}
+                  </Stack>
+               </Box>
+
+               {/* Footer — stays visible while the list scrolls. */}
                <Stack
                   direction="row"
                   justifyContent="flex-end"
                   spacing={1.5}
-                  sx={{ pt: 1 }}
+                  sx={{ pt: 2, borderTop: 1, borderColor: "divider" }}
                >
                   <Button
                      variant="outlined"
@@ -415,159 +480,105 @@ export default function OrderDisplaySection({
             </Stack>
          </CustomModal>
 
-         {/* ── List Defaults & Columns modal ── */}
+         {/* ── Order List — Columns modal ── */}
          <CustomModal
-            open={displayEditOpen}
-            onClose={cancelDisplayEdit}
-            title="List Defaults & Columns"
-            size="lg"
+            open={columnsEditOpen}
+            onClose={cancelColumnsEdit}
+            title="Order List — Columns"
+            size="md"
             closeIcon
+            sx={MODAL_SURFACE_SX}
          >
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-               {/* ── Order List default statuses ── */}
-               <Stack spacing={1}>
-                  <Typography variant="subtitle2" fontWeight={600}>
-                     Order List — Default Statuses
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                     The Order List opens filtered to these statuses. Empty
-                     means All.
-                  </Typography>
-                  <CustomAutocomplete
-                     multiple
-                     arrow
-                     size="small"
-                     options={statusOptions}
-                     getOptionLabel={(o: any) => o.label}
-                     isOptionEqualToValue={(a: any, b: any) => a.value === b.value}
-                     value={statusOptions.filter((o) =>
-                        defaultStatuses.includes(o.value),
-                     )}
-                     onChange={(next: any) =>
-                        // Cleanup Phase 1: CustomAutocomplete calls
-                        // onChange value-first (see the note in
-                        // OrderCreateDefaultsSection). Only known
-                        // status values are written to the form.
-                        onConfigChange(
-                           ORDER_LIST_DEFAULT_STATUSES_KEY,
-                           (next || [])
-                              .map((o: any) => o.value)
-                              .filter((v: any) =>
-                                 ALL_STATUS_VALUES.includes(v),
-                              ),
-                        )
-                     }
-                     placeholder="All statuses"
-                  />
-               </Stack>
+            <Stack spacing={2} sx={{ flex: 1, minHeight: 0, mt: 0.5 }}>
+               <Typography variant="body2" color="text.secondary">
+                  Reorder or hide table columns. The actions column is
+                  required and always stays at the end.
+               </Typography>
 
-               {/* ── Order List columns ── */}
-               <Stack spacing={1}>
-                  <Stack
-                     direction="row"
-                     alignItems="center"
-                     justifyContent="space-between"
-                  >
-                     <Typography variant="subtitle2" fontWeight={600}>
-                        Order List — Columns
-                     </Typography>
-                     <Button
-                        size="small"
-                        onClick={() =>
-                           onConfigChange(ORDER_TABLE_COLUMNS_KEY, undefined)
-                        }
-                     >
-                        Reset columns
-                     </Button>
-                  </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                     Reorder or hide table columns. The actions column is
-                     required and always stays at the end.
-                  </Typography>
-                  {columnLayout.order.map((field, i) => {
-                     const meta = ORDER_TABLE_CONFIGURABLE_FIELDS.find(
-                        (f) => f.field === field,
-                     );
-                     if (!meta) return null;
-                     const visible = !columnLayout.hidden.includes(field);
-                     return (
-                        <Stack
-                           key={field}
-                           direction="row"
-                           alignItems="center"
-                           spacing={1}
-                           sx={{
-                              px: 1,
-                              py: 0.5,
-                              border: 1,
-                              borderColor: "divider",
-                              borderRadius: 1,
-                           }}
-                        >
-                           <Typography variant="body2" sx={{ flex: 1 }}>
-                              {meta.label}
-                           </Typography>
-                           <Switch
-                              size="small"
-                              checked={visible}
-                              onChange={(e) =>
-                                 onConfigChange(ORDER_TABLE_COLUMNS_KEY, {
-                                    order: columnLayout.order,
-                                    hidden: e.target.checked
-                                       ? columnLayout.hidden.filter((f) => f !== field)
-                                       : [...columnLayout.hidden, field],
-                                 })
-                              }
-                              inputProps={{ "aria-label": `Show ${meta.label} column` }}
-                           />
-                           <MoveButtons
-                              index={i}
-                              count={columnLayout.order.length}
-                              onMove={(delta) =>
-                                 onConfigChange(ORDER_TABLE_COLUMNS_KEY, {
-                                    order: move(columnLayout.order, i, delta),
-                                    hidden: columnLayout.hidden,
-                                 })
-                              }
-                           />
-                        </Stack>
-                     );
-                  })}
-               </Stack>
-
-               {/* ── Footer ── */}
                <Stack
                   direction="row"
-                  justifyContent="space-between"
                   alignItems="center"
-                  spacing={2}
-                  sx={{ pt: 1 }}
+                  justifyContent="flex-end"
                >
                   <Button
                      size="small"
-                     color="inherit"
-                     onClick={() => {
-                        onConfigChange(ORDER_LIST_DEFAULT_STATUSES_KEY, undefined);
-                        onConfigChange(ORDER_TABLE_COLUMNS_KEY, undefined);
-                     }}
+                     onClick={() =>
+                        onConfigChange(ORDER_TABLE_COLUMNS_KEY, undefined)
+                     }
                   >
-                     Reset list &amp; columns
+                     Reset columns
                   </Button>
-                  <Stack direction="row" spacing={1.5}>
-                     <Button
-                        variant="outlined"
-                        color="inherit"
-                        onClick={cancelDisplayEdit}
-                     >
-                        Cancel
-                     </Button>
-                     <Button
-                        variant="contained"
-                        onClick={() => setDisplayEditOpen(false)}
-                     >
-                        Done
-                     </Button>
+               </Stack>
+
+               {/* Scrollable column list. */}
+               <Box sx={MODAL_SCROLL_SX}>
+                  <Stack spacing={1}>
+                     {columnLayout.order.map((field, i) => {
+                        const meta = ORDER_TABLE_CONFIGURABLE_FIELDS.find(
+                           (f) => f.field === field,
+                        );
+                        if (!meta) return null;
+                        const visible = !columnLayout.hidden.includes(field);
+                        return (
+                           <Stack
+                              key={field}
+                              direction="row"
+                              alignItems="center"
+                              spacing={1}
+                              sx={MODAL_ROW_SX}
+                           >
+                              <Typography variant="body2" sx={{ flex: 1 }}>
+                                 {meta.label}
+                              </Typography>
+                              <Switch
+                                 size="small"
+                                 checked={visible}
+                                 onChange={(e) =>
+                                    onConfigChange(ORDER_TABLE_COLUMNS_KEY, {
+                                       order: columnLayout.order,
+                                       hidden: e.target.checked
+                                          ? columnLayout.hidden.filter((f) => f !== field)
+                                          : [...columnLayout.hidden, field],
+                                    })
+                                 }
+                                 inputProps={{ "aria-label": `Show ${meta.label} column` }}
+                              />
+                              <MoveButtons
+                                 index={i}
+                                 count={columnLayout.order.length}
+                                 onMove={(delta) =>
+                                    onConfigChange(ORDER_TABLE_COLUMNS_KEY, {
+                                       order: move(columnLayout.order, i, delta),
+                                       hidden: columnLayout.hidden,
+                                    })
+                                 }
+                              />
+                           </Stack>
+                        );
+                     })}
                   </Stack>
+               </Box>
+
+               {/* Footer — stays visible while the list scrolls. */}
+               <Stack
+                  direction="row"
+                  justifyContent="flex-end"
+                  spacing={1.5}
+                  sx={{ pt: 2, borderTop: 1, borderColor: "divider" }}
+               >
+                  <Button
+                     variant="outlined"
+                     color="inherit"
+                     onClick={cancelColumnsEdit}
+                  >
+                     Cancel
+                  </Button>
+                  <Button
+                     variant="contained"
+                     onClick={() => setColumnsEditOpen(false)}
+                  >
+                     Done
+                  </Button>
                </Stack>
             </Stack>
          </CustomModal>
