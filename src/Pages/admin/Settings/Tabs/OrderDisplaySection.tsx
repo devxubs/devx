@@ -254,28 +254,26 @@ export default function OrderDisplaySection({
                    precise reorder tool. Writes go through
                    onConfigChange like every other field here. */}
                <Stack spacing={0.75}>
-                  <Typography
-                     variant="body2"
-                     fontSize={13}
-                     fontWeight={600}
-                     color="textSecondary"
-                  >
-                     Status Order
-                  </Typography>
-                  <Stack
-                     direction="row"
-                     alignItems="flex-start"
-                     spacing={1.5}
-                     useFlexGap
-                     flexWrap="wrap"
-                  >
-                     <Box
-                        sx={{
-                           flex: 1,
-                           minWidth: 220,
-                           maxWidth: SETTINGS_FIELD_MAX_WIDTH,
-                        }}
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                     <Typography
+                        variant="body2"
+                        fontSize={13}
+                        fontWeight={600}
+                        color="textSecondary"
                      >
+                        Status Order
+                     </Typography>
+                     <Tooltip title="Edit status order">
+                        <IconButton
+                           size="small"
+                           aria-label="Edit status order"
+                           onClick={openStatusEdit}
+                        >
+                           <Icon icon="solar:pen-2-bold-duotone" size="16px" />
+                        </IconButton>
+                     </Tooltip>
+                  </Stack>
+                  <Box sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>
                         <CustomAutocomplete
                            multiple
                            arrow
@@ -300,20 +298,7 @@ export default function OrderDisplaySection({
                            }
                            placeholder="Select statuses"
                         />
-                     </Box>
-                     <Button
-                        variant="outlined"
-                        size="small"
-                        aria-label="Edit status order"
-                        startIcon={
-                           <Icon icon="solar:pen-2-bold-duotone" size="small" />
-                        }
-                        onClick={openStatusEdit}
-                        sx={{ whiteSpace: "nowrap" }}
-                     >
-                        Edit
-                     </Button>
-                  </Stack>
+                  </Box>
                   <Typography variant="caption" color="text.secondary">
                      Pickers and lists follow this order. Removing a
                      chip moves that status to the end — use Edit
@@ -377,29 +362,33 @@ export default function OrderDisplaySection({
                   </Grid>
                </Grid>
 
-               {/* Columns preview — Edit opens the Columns modal. */}
-               <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="flex-start"
-                  spacing={2}
-               >
-                  <Typography variant="body2" sx={{ pt: 0.5 }}>
-                     <strong>Columns:</strong> {visibleColumns} of{" "}
-                     {columnLayout.order.length} visible
+               {/* Columns — the label carries the Edit
+                   IconButton; the visible count is the helper
+                   caption. Edit opens the Columns modal. */}
+               <Stack spacing={0.75}>
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                     <Typography
+                        variant="body2"
+                        fontSize={13}
+                        fontWeight={600}
+                        color="textSecondary"
+                     >
+                        Order List — Columns
+                     </Typography>
+                     <Tooltip title="Edit columns">
+                        <IconButton
+                           size="small"
+                           aria-label="Edit columns"
+                           onClick={openColumnsEdit}
+                        >
+                           <Icon icon="solar:pen-2-bold-duotone" size="16px" />
+                        </IconButton>
+                     </Tooltip>
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                     {visibleColumns} of {columnLayout.order.length}{" "}
+                     columns visible in the order list.
                   </Typography>
-                  <Button
-                     variant="outlined"
-                     size="small"
-                     aria-label="Edit columns"
-                     startIcon={
-                        <Icon icon="solar:pen-2-bold-duotone" size="small" />
-                     }
-                     onClick={openColumnsEdit}
-                     sx={{ whiteSpace: "nowrap" }}
-                  >
-                     Edit
-                  </Button>
                </Stack>
          </Stack>
 

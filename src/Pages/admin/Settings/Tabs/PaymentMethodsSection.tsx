@@ -165,33 +165,28 @@ export default function PaymentMethodsSection({
              tab's continuous form — no card wrapper; the editor
              modal below is a sibling element. */}
          <Stack spacing={2}>
-               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-                  <Box>
+               <Box>
+                  {/* The RP-7 X2 per-section reset button was
+                      removed in the global reset-actions removal
+                      — Settings now has no section resets. */}
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
                      <Typography variant="h6" fontWeight={600}>
                         Payment Methods
                      </Typography>
-                     <Typography variant="body2" color="text.secondary">
-                        Methods offered for new payments, in display order.
-                     </Typography>
-                  </Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                     {/* The RP-7 X2 per-section reset button
-                         was removed in the global reset-actions
-                         removal — Settings now has no section
-                         resets. */}
-                     <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={
-                           <Icon icon="solar:pen-2-bold-duotone" size="small" />
-                        }
-                        onClick={openEdit}
-                        sx={{ whiteSpace: "nowrap" }}
-                     >
-                        Edit
-                     </Button>
+                     <Tooltip title="Edit payment methods">
+                        <IconButton
+                           size="small"
+                           aria-label="Edit payment methods"
+                           onClick={openEdit}
+                        >
+                           <Icon icon="solar:pen-2-bold-duotone" size="16px" />
+                        </IconButton>
+                     </Tooltip>
                   </Stack>
-               </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                     Methods offered for new payments, in display order.
+                  </Typography>
+               </Box>
 
                <Stack spacing={0.75} sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>
                   <Typography variant="body2" fontSize={13} fontWeight={600} color="textSecondary">

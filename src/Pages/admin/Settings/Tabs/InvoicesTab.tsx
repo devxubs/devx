@@ -724,7 +724,7 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                                        <Icon icon="solar:eye-bold" size="small" />
                                     </IconButton>
                                  </Tooltip>
-                                 <Tooltip disableInteractive title="Edit">
+                                 <Tooltip disableInteractive title="Edit template">
                                     <IconButton
                                        size="small"
                                        onClick={() => openEditCustom(ct)}
