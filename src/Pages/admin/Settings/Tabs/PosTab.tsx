@@ -4,7 +4,6 @@ import React from "react";
 import OrderDisplaySection from "./OrderDisplaySection";
 import OrderCreateDefaultsSection from "./OrderCreateDefaultsSection";
 import PaymentMethodsSection from "./PaymentMethodsSection";
-import SectionResetButton from "./SectionResetButton";
 import {
    Stack,
    TextField,
@@ -40,21 +39,13 @@ export default function PosTab({ values, onChange, onConfigChange }: PosTabProps
              subtle divider between sections, no per-section
              cards. */}
 
-         {/* Pricing & Fees — RP-7: the section gains its visible
-             heading and its X2 reset. */}
+         {/* Pricing & Fees. (The RP-7 X2 per-section reset
+             button was removed in the global reset-actions
+             removal — Settings now has no section resets.) */}
          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
             <Typography variant="h6" fontWeight={600}>
                Pricing & Fees
             </Typography>
-            <SectionResetButton
-               section="Pricing & Fees"
-               onReset={() => {
-                  onChange("defaultTaxRate", 0);
-                  onChange("defaultDeliveryCharge", 60);
-                  onChange("defaultDiscountRate", 0);
-                  onChange("invoicePrefix", "INV");
-               }}
-            />
          </Stack>
 
          {/* P2-20: "Default Order Status" (customConfig.defaultOrderStatus)

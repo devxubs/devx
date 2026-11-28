@@ -4,8 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
    Box,
    Button,
-   Chip,
-   Divider,
    IconButton,
    Stack,
    Switch,
@@ -16,7 +14,6 @@ import {
 import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import CustomModal from "@src/components/Modal";
-import SectionResetButton from "./SectionResetButton";
 import { SETTINGS_FIELD_MAX_WIDTH } from "./SettingsField";
 import {
    PAYMENT_METHODS_KEY,
@@ -178,21 +175,10 @@ export default function PaymentMethodsSection({
                      </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} alignItems="center">
-                     {/* RP-7 (X2): clearing the list restores the
-                         built-in default methods (the resolver's
-                         fallback) and Cash as the default method. */}
-                     <SectionResetButton
-                        section="Payment Methods"
-                        onReset={() => {
-                           const defaults = resolvePaymentMethods(undefined);
-                           lastWritten.current = defaults;
-                           setMethods(defaults);
-                           setDraftNames({});
-                           setDraftDescriptions({});
-                           onConfigChange(PAYMENT_METHODS_KEY, undefined);
-                           onChange("defaultPaymentMethod", "Cash");
-                        }}
-                     />
+                     {/* The RP-7 X2 per-section reset button
+                         was removed in the global reset-actions
+                         removal — Settings now has no section
+                         resets. */}
                      <Button
                         variant="outlined"
                         size="small"
@@ -227,46 +213,6 @@ export default function PaymentMethodsSection({
                   </Typography>
                </Stack>
 
-               <Divider />
-
-               {/* ── Compact preview list ── */}
-               <Stack spacing={0.75}>
-                  {methods.map((method, index) => (
-                     <Stack
-                        key={`${method.name}-${index}`}
-                        direction="row"
-                        alignItems="center"
-                        spacing={1}
-                        useFlexGap
-                        flexWrap="wrap"
-                     >
-                        <Typography variant="body2" sx={{ minWidth: 22, color: "text.secondary" }}>
-                           {index + 1}.
-                        </Typography>
-                        <Typography
-                           variant="body2"
-                           fontWeight={600}
-                           color={method.active ? "text.primary" : "text.secondary"}
-                        >
-                           {method.name}
-                        </Typography>
-                        {method.description && (
-                           <Typography variant="body2" color="text.secondary">
-                              {method.description}
-                           </Typography>
-                        )}
-                        {!method.active && (
-                           <Chip label="Inactive" size="small" variant="outlined" />
-                        )}
-                        {paymentMethodRequiresTxId(
-                           { [PAYMENT_METHODS_KEY]: methods },
-                           method.name,
-                        ) && (
-                           <Chip label="TxID" size="small" variant="outlined" />
-                        )}
-                     </Stack>
-                  ))}
-               </Stack>
          </Stack>
 
          {/* ── Editor modal (sibling of the preview) ── */}

@@ -11,7 +11,6 @@ import {
    MenuItem,
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
-import SectionResetButton from "./SectionResetButton";
 import SettingsField from "./SettingsField";
 
 interface ProductsTabProps {
@@ -86,21 +85,12 @@ export default function ProductsTab({ values, onChange, onConfigChange }: Produc
                   Default warehouse and order, stock and courier behaviour for products.
                </Typography>
             </Box>
-            {/* RP-7 (X2): clearing the keys restores the audited
-                Phase 1 defaults (resolvers supply them when a key
-                is unset): warehouse none, decrease on CONFIRMED,
-                stock-out ordering off, courier stock check off,
-                variation required on. */}
-            <SectionResetButton
-               section="Product Settings"
-               onReset={() => {
-                  onConfigChange("defaultWarehouseId", undefined);
-                  onConfigChange("decreaseStockOn", undefined);
-                  onConfigChange("stockOutProductCanOrder", undefined);
-                  onConfigChange("outOfStockCanSubmitCourier", undefined);
-                  onConfigChange("variationSelectOnOrder", undefined);
-               }}
-            />
+            {/* Phase 1 defaults are supplied by the resolvers
+                when a key is unset: warehouse none, decrease on
+                CONFIRMED, stock-out ordering off, courier stock
+                check off, variation required on. (The RP-7 X2
+                per-section reset button was removed in the
+                global reset-actions removal.) */}
          </Stack>
 
          {/* Global field standard: one field per row, label

@@ -17,7 +17,6 @@ import Icon from "@src/components/Icon";
 import CustomAutocomplete from "@src/components/Autocomplete";
 import { uploadImageFile } from "@src/lib/uploadImage";
 import { useSnackbar } from "@src/lib/snackbarContext";
-import SectionResetButton from "./SectionResetButton";
 import SettingsField from "./SettingsField";
 
 interface GeneralTabProps {
@@ -162,17 +161,6 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             <Typography variant="h6" fontWeight={600}>
                General Store Profile
             </Typography>
-            <SectionResetButton
-               section="General Store Profile"
-               onReset={() => {
-                  onChange("storeName", "DevX POS");
-                  onChange("tagline", "Smart Retail & Point of Sale");
-                  onChange("logoUrl", "");
-                  onChange("email", "info@devxpos.com");
-                  onChange("phone", "+880 1700-000000");
-                  onChange("address", "Dhaka, Bangladesh");
-               }}
-            />
          </Stack>
 
          {/* Store Identity — global field standard: one field
@@ -231,13 +219,12 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             <SettingsField
                label="Business Address"
                helper="The full business address printed on invoices and documents."
-               width="wide"
             >
                <TextField
                   fullWidth
                   size="small"
                   multiline
-                  rows={2}
+                  rows={1}
                   value={values.address || ""}
                   onChange={(e) => onChange("address", e.target.value)}
                   placeholder="House 42, Road 11, Banani, Dhaka-1213, Bangladesh"
@@ -259,20 +246,21 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
                   {...logoDragHandlers}
                   sx={{
                      position: "relative",
-                     // Preview state: the box hugs the logo, so
-                     // its size follows the image's natural
-                     // dimensions. The preview is capped at a
-                     // 250px-wide image: the cap lives on the BOX
-                     // (250 + 16px padding + 2px border = 268),
-                     // not on the img — a max-width on the img
-                     // alone does not shrink an inline-block
-                     // box's shrink-to-fit width, so the box
-                     // would keep the natural width with empty
-                     // space beside the capped image. Empty
-                     // state: a compact fixed box (max-width
-                     // 520, content height 136).
+                     // Preview state: the box fits the rendered
+                     // image EXACTLY — no padding at all, so the
+                     // box is the image plus its own border. The
+                     // 250px image cap lives on the BOX
+                     // (250 + the 2px of rendered border = 252),
+                     // not on
+                     // the img — a max-width on the img alone
+                     // does not shrink an inline-block box's
+                     // shrink-to-fit width, so the box would
+                     // keep the natural width with empty space
+                     // beside the capped image. Empty state: a
+                     // compact fixed box (max-width 520,
+                     // content height 136).
                      ...(values.logoUrl
-                        ? { display: "inline-block", maxWidth: "min(268px, 100%)", p: 1 }
+                        ? { display: "inline-block", maxWidth: "min(252px, 100%)" }
                         : { maxWidth: 520 }),
                      border: "1.5px dashed",
                      borderColor: logoError
@@ -455,15 +443,6 @@ export default function GeneralTab({ values, onChange }: GeneralTabProps) {
             <Typography variant="h6" fontWeight={600}>
                Currency & Localization
             </Typography>
-            <SectionResetButton
-               section="Currency & Localization"
-               onReset={() => {
-                  onChange("currency", "BDT");
-                  onChange("currencySymbol", "৳");
-                  onChange("timezone", "Asia/Dhaka");
-                  onChange("language", "en");
-               }}
-            />
          </Stack>
 
          <Stack spacing={2.5}>

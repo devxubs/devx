@@ -136,16 +136,21 @@ const MODAL_ROW_SX = {
  * either way.
  *
  * Structure (after the Cleanup Phase 1 preview/modal split, the
- * Status Order modal split, and the RP-7 C6 refinement):
- * - The section shows plain preview lines on the page — status
- *   order + picker visibility, and the visible column count —
- *   each with its own Edit action.
+ * Status Order modal split, the RP-7 C6 refinement, and the
+ * RP-7 status-autocomplete redesign):
+ * - The status order is shown on the page as a multiple-select
+ *   autocomplete (chips in order) with an adjacent Edit button;
+ *   the dedicated Status Order & Visibility modal remains the
+ *   precise reorder tool (move buttons + Create/Filters
+ *   visibility).
  * - "Order List — Default Statuses" is edited DIRECTLY on the
  *   page (label above the field, helper text below), no modal.
- * - Status Order & Visibility has a dedicated modal (order +
- *   Create/Filters visibility only).
  * - Order List — Columns has its own modal (column order +
- *   visibility only).
+ *   visibility only), opened from its preview line's Edit.
+ * - Statuses themselves are the Prisma OrderStatus enum — they
+ *   cannot be created, renamed or deleted at runtime (see
+ *   orderStatusDisplay.ts), so the autocomplete offers exactly
+ *   the enum values and is NOT freeSolo.
  * Each modal snapshots ONLY its own config keys when it opens,
  * so cancelling one can never discard the other's edits;
  * "Done" keeps the edits in the form for the shared Settings
@@ -238,39 +243,85 @@ export default function OrderDisplaySection({
                   </Typography>
                </Box>
 
-               {/* Status order + visibility preview — Edit opens
-                   the dedicated Status Order modal. */}
-               <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="flex-start"
-                  spacing={2}
-               >
-                  <Stack spacing={0.75} sx={{ pt: 0.5 }}>
-                     <Typography variant="body2">
-                        <strong>Status order:</strong>{" "}
-                        {statusOrder
-                           .map((s) => ORDER_STATUS_LABELS[s])
-                           .join(" · ")}
-                     </Typography>
-                     <Typography variant="body2">
-                        <strong>Visibility:</strong>{" "}
-                        {hiddenInCreate.size} hidden in Create,{" "}
-                        {hiddenInFilter.size} hidden in Filters
-                     </Typography>
-                  </Stack>
-                  <Button
-                     variant="outlined"
-                     size="small"
-                     aria-label="Edit status order"
-                     startIcon={
-                        <Icon icon="solar:pen-2-bold-duotone" size="small" />
-                     }
-                     onClick={openStatusEdit}
-                     sx={{ whiteSpace: "nowrap" }}
+               {/* Status order — a multiple-select autocomplete
+                   whose chips ARE the current order, with the
+                   Edit button beside it opening the dedicated
+                   reorder modal. The order always covers every
+                   status (the resolver appends any status the
+                   saved order does not mention), so removing a
+                   chip moves that status to the end of the
+                   order; the modal's move buttons are the
+                   precise reorder tool. Writes go through
+                   onConfigChange like every other field here. */}
+               <Stack spacing={0.75}>
+                  <Typography
+                     variant="body2"
+                     fontSize={13}
+                     fontWeight={600}
+                     color="textSecondary"
                   >
-                     Edit
-                  </Button>
+                     Status Order
+                  </Typography>
+                  <Stack
+                     direction="row"
+                     alignItems="flex-start"
+                     spacing={1.5}
+                     useFlexGap
+                     flexWrap="wrap"
+                  >
+                     <Box
+                        sx={{
+                           flex: 1,
+                           minWidth: 220,
+                           maxWidth: SETTINGS_FIELD_MAX_WIDTH,
+                        }}
+                     >
+                        <CustomAutocomplete
+                           multiple
+                           arrow
+                           size="small"
+                           options={statusOptions}
+                           getOptionLabel={(o: any) => o.label}
+                           isOptionEqualToValue={(a: any, b: any) => a.value === b.value}
+                           value={statusOptions}
+                           onChange={(next: any) =>
+                              // Value-first (see the note in
+                              // OrderCreateDefaultsSection). The
+                              // selection's array order becomes
+                              // the saved status order.
+                              onConfigChange(
+                                 ORDER_STATUS_ORDER_KEY,
+                                 (next || [])
+                                    .map((o: any) => o.value)
+                                    .filter((v: any) =>
+                                       ALL_STATUS_VALUES.includes(v),
+                                    ),
+                              )
+                           }
+                           placeholder="Select statuses"
+                        />
+                     </Box>
+                     <Button
+                        variant="outlined"
+                        size="small"
+                        aria-label="Edit status order"
+                        startIcon={
+                           <Icon icon="solar:pen-2-bold-duotone" size="small" />
+                        }
+                        onClick={openStatusEdit}
+                        sx={{ whiteSpace: "nowrap" }}
+                     >
+                        Edit
+                     </Button>
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                     Pickers and lists follow this order. Removing a
+                     chip moves that status to the end — use Edit
+                     to reorder precisely and to set Create/Filters
+                     visibility ({hiddenInCreate.size} hidden in
+                     Create, {hiddenInFilter.size} hidden in
+                     Filters).
+                  </Typography>
                </Stack>
 
                {/* Order List — Default Statuses, edited directly
@@ -367,22 +418,6 @@ export default function OrderDisplaySection({
                   selector. Hiding affects only the named picker —
                   status-change menus always offer every status.
                </Typography>
-
-               <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="flex-end"
-               >
-                  <Button
-                     size="small"
-                     onClick={() => {
-                        onConfigChange(ORDER_STATUS_ORDER_KEY, undefined);
-                        onConfigChange(ORDER_STATUS_HIDDEN_KEY, undefined);
-                     }}
-                  >
-                     Reset order
-                  </Button>
-               </Stack>
 
                {/* Column captions, aligned with the rows below. */}
                <Stack
@@ -500,21 +535,6 @@ export default function OrderDisplaySection({
                   Reorder or hide table columns. The actions column is
                   required and always stays at the end.
                </Typography>
-
-               <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="flex-end"
-               >
-                  <Button
-                     size="small"
-                     onClick={() =>
-                        onConfigChange(ORDER_TABLE_COLUMNS_KEY, undefined)
-                     }
-                  >
-                     Reset columns
-                  </Button>
-               </Stack>
 
                {/* Scrollable column list. */}
                <Box sx={MODAL_SCROLL_SX}>

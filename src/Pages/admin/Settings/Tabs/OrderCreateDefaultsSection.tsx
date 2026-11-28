@@ -7,7 +7,6 @@ import {
    Typography,
 } from "@mui/material";
 import CustomAutocomplete from "@src/components/Autocomplete";
-import SectionResetButton from "./SectionResetButton";
 import { SETTINGS_FIELD_MAX_WIDTH } from "./SettingsField";
 import { orderSources } from "@src/Pages/admin/Order/data";
 import {
@@ -127,14 +126,6 @@ export default function OrderCreateDefaultsSection({
                         Order Create opens.
                      </Typography>
                   </Box>
-                  <SectionResetButton
-                     section="Order Creation Defaults"
-                     onReset={() => {
-                        onConfigChange(ORDER_CREATE_DEFAULT_PRODUCT_ID_KEY, undefined);
-                        onConfigChange(ORDER_CREATE_DEFAULT_SOURCE_KEY, undefined);
-                        onConfigChange(ORDER_CREATE_DEFAULT_STATUS_KEY, undefined);
-                     }}
-                  />
                </Stack>
 
                <Stack spacing={0.75} sx={{ width: "100%", maxWidth: SETTINGS_FIELD_MAX_WIDTH }}>

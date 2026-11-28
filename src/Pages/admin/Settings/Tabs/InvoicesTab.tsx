@@ -207,7 +207,6 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
    const [categoryFilter, setCategoryFilter] = useState<string>("All");
    const [previewModalOpen, setPreviewModalOpen] = useState(false);
    const [previewTemplateId, setPreviewTemplateId] = useState<string>(activeTemplateId);
-   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
    const [builder, setBuilder] = useState<BuilderDraft | null>(null);
    const [builderError, setBuilderError] = useState<string>("");
    const [deleteTarget, setDeleteTarget] = useState<CustomInvoiceTemplate | null>(null);
@@ -343,34 +342,6 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
       setDeleteTarget(null);
    };
 
-   const handleConfirmReset = () => {
-      // Audit L-2: aligned with the FACTORY defaults — the same
-      // state the global Reset Defaults produces. The reset route
-      // restores the invoiceHeader/invoiceFooter COLUMNS to the
-      // literals below and replaces customConfig with an empty
-      // object, so every config key is CLEARED here (undefined):
-      // the template falls back to classic-pro, the accent to the
-      // template's own default, the terms text to the renderer's
-      // default, and every visibility toggle to its default (on).
-      // Cleanup Phase 2: the custom template list is cleared for
-      // the same reason — factory state has none.
-      onConfigChange("invoiceTemplateId", undefined);
-      onConfigChange(CUSTOM_INVOICE_TEMPLATES_KEY, undefined);
-      onConfigChange("accentColor", undefined);
-      onChange("invoiceHeader", "DevX POS - Retail Invoice");
-      onChange("invoiceFooter", "Thank you for shopping with us! Please come again.");
-      onConfigChange("termsText", undefined);
-      onConfigChange("showLogoOnReceipt", undefined);
-      onConfigChange("showBarcodeOnReceipt", undefined);
-      onConfigChange("showCustomerOnReceipt", undefined);
-      onConfigChange("showCashierOnReceipt", undefined);
-      onConfigChange("showCourierOnReceipt", undefined);
-      onConfigChange("showSkuColumn", undefined);
-      onConfigChange("showSignatureBox", undefined);
-      onConfigChange("showTermsOnReceipt", undefined);
-      setResetConfirmOpen(false);
-   };
-
    // Preview resolution shared by built-in and custom ids.
    const previewCustom = findCustomInvoiceTemplate(customConfig, previewTemplateId);
    const previewBase = INVOICE_TEMPLATES.find(
@@ -420,16 +391,6 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
                <Typography variant="h6" fontWeight={700}>
                   Invoice Settings
                </Typography>
-               <Button
-                  variant="outlined"
-                  color="inherit"
-                  size="small"
-                  startIcon={<Icon icon="solar:restart-bold" size="small" />}
-                  onClick={() => setResetConfirmOpen(true)}
-                  sx={{ mt: { xs: 1, sm: 0 }, alignSelf: { xs: "flex-start", sm: "center" }, whiteSpace: "nowrap", flexShrink: 0 }}
-               >
-                  Reset Defaults
-               </Button>
             </Stack>
 
             {/* RP-7 (C7): store phone, address and language are
@@ -1051,16 +1012,6 @@ export default function InvoicesTab({ values, onChange, onConfigChange }: Invoic
             onConfirm={confirmDeleteCustom}
          />
 
-         {/* Reset Defaults Confirmation Dialog */}
-         <AlertDialog
-            open={resetConfirmOpen}
-            onClose={() => setResetConfirmOpen(false)}
-            type="warning"
-            title="Reset invoice template and printing layout to standard Classic Professional defaults?"
-            confirmText="Reset Defaults"
-            cancelText="Cancel"
-            onConfirm={handleConfirmReset}
-         />
       </Stack>
    );
 }

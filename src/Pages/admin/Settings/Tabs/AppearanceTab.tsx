@@ -52,7 +52,6 @@ export default function AppearanceTab(_props: AppearanceTabProps) {
    const [customHex, setCustomHex] = useState<string>(
       isHexColor(colorValue) ? colorValue : "#BE123C",
    );
-   const [resetOpen, setResetOpen] = useState(false);
 
    // The drawer's write pattern: update the live bucket AND the
    // persisted localStorage object (merged, so keys this tab
@@ -97,16 +96,6 @@ export default function AppearanceTab(_props: AppearanceTabProps) {
             <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
                <Button variant="outlined" color="inherit" size="small" onClick={openAppearanceDrawer} sx={{ whiteSpace: "nowrap" }}>
                   Open Drawer
-               </Button>
-               <Button
-                  variant="outlined"
-                  color="inherit"
-                  size="small"
-                  startIcon={<Icon icon="solar:restart-bold" size="small" />}
-                  onClick={() => setResetOpen(true)}
-                  sx={{ whiteSpace: "nowrap" }}
-               >
-                  Reset to Defaults
                </Button>
             </Stack>
          </Stack>
@@ -272,22 +261,6 @@ export default function AppearanceTab(_props: AppearanceTabProps) {
             </Card>
          </Box>
 
-         <AlertDialog
-            open={resetOpen}
-            onClose={() => setResetOpen(false)}
-            type="warning"
-            title="Reset appearance to the factory defaults (Dark mode, Green accent, Inter font)?"
-            confirmText="Reset Appearance"
-            cancelText="Cancel"
-            onConfirm={() => {
-               writeAppearance({
-                  theme: APPEARANCE_DEFAULTS.theme,
-                  color: APPEARANCE_DEFAULTS.color,
-                  font: APPEARANCE_DEFAULTS.font,
-               });
-               setResetOpen(false);
-            }}
-         />
       </Stack>
    );
 }

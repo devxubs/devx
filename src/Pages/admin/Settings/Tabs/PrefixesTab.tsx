@@ -9,7 +9,6 @@ import {
    Chip,
 } from "@mui/material";
 import Icon from "@src/components/Icon";
-import SectionResetButton from "./SectionResetButton";
 import { SETTINGS_FIELD_MAX_WIDTH } from "./SettingsField";
 
 interface PrefixesTabProps {
@@ -72,24 +71,6 @@ export default function PrefixesTab({ values, onChange }: PrefixesTabProps) {
             <Typography variant="h6" fontWeight={600}>
                Entity ID Prefixes
             </Typography>
-            <SectionResetButton
-               section="Entity ID Formats"
-               onReset={() => {
-                  onChange("prefixEmployee", "EP_");
-                  onChange("prefixCustomer", "CUS_");
-                  onChange("prefixSupplier", "SUP_");
-                  onChange("prefixOrder", "ORD_");
-                  onChange("prefixPurchase", "PUR_");
-                  onChange("prefixProduct", "PROD_");
-                  onChange("prefixCategory", "CAT_");
-                  onChange("prefixUnit", "UNIT_");
-                  onChange("prefixExpense", "EXP_");
-                  onChange("prefixAsset", "AST_");
-                  onChange("prefixRole", "ROLE_");
-                  onChange("prefixBilling", "BILL_");
-                  onChange("prefixWarehouse", "WH_");
-               }}
-            />
          </Stack>
 
          {/* Global field standard: one prefix per row — the
