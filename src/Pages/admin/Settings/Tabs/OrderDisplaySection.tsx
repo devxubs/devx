@@ -274,9 +274,11 @@ export default function OrderDisplaySection({
 
                {/* Order List — Default Statuses, edited directly
                    on the page: external label above the field,
-                   helper text below, in a compact grid cell. */}
+                   helper text below, one field per row like
+                   every other Settings field (global field
+                   standard). */}
                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, md: 6 }}>
+                  <Grid size={12}>
                      <Stack spacing={0.75}>
                         <Typography
                            variant="body2"
